@@ -140,6 +140,21 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 - **Napomena:** legacy per-user toggles (add/edit/delete students, reset results,
   status) mapiraju se na permisije/role u kasnijim fazama (student management).
 
+## ADR-0010 — Admin shell: left sidebar + tanak top bar
+
+- **Status:** Prihvaćeno (2026-08-13); vlasnik proizvoda
+- **Kontekst:** Navigacija ima duboku grupisanu hijerarhiju (Students, Coordinators,
+  Venues, Countries, Quizzes[9 pod-stavki], Portal content, Accounting, Settings).
+  `PROJECT_CONTEXT.md` §8.6 je pretpostavljao `admin.top` + `admin.right_sidebar`.
+- **Odluka:** Admin/coordinator shell = **tanak top bar** (logo, aktivna sezona,
+  user + logout) + **left sidebar** (primarna grupisana nav) + content. Opcioni
+  right sidebar za kontekstualne module ostaje mogućnost (§8.6). Top bar **nema
+  globalni search** — svaka celina ima svoj per-lista search; globalni „quick find"
+  (competitor_number/ime/venue) dolazi kad postoje registracije.
+- **Ponašanje:** sidebar je **data-driven i permission-aware** (stavka/grupa se
+  prikazuje samo uz permisiju). Na breakpoint-u (< `lg`) sidebar prelazi u
+  **icon-rail** (samo ikone, label kroz tooltip); grupe su collapsible.
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)

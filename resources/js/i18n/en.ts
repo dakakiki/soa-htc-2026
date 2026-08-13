@@ -13,6 +13,7 @@ export default {
         venues: 'Venues',
         users: 'Users',
         roles: 'Roles',
+        settings: 'Settings',
         login: 'Login',
         logout: 'Logout',
     },
