@@ -28,10 +28,28 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true },
     },
     {
-        path: '/schools',
-        name: 'schools',
-        component: () => import('@/pages/SchoolsPage.vue'),
+        path: '/venues',
+        name: 'venues',
+        component: () => import('@/pages/venues/VenuesListPage.vue'),
         meta: { requiresAuth: true, permission: 'schools.view' },
+    },
+    {
+        path: '/venues/new',
+        name: 'venues.new',
+        component: () => import('@/pages/venues/VenueFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'schools.manage' },
+    },
+    {
+        path: '/venues/:id',
+        name: 'venues.view',
+        component: () => import('@/pages/venues/VenueViewPage.vue'),
+        meta: { requiresAuth: true, permission: 'schools.view' },
+    },
+    {
+        path: '/venues/:id/edit',
+        name: 'venues.edit',
+        component: () => import('@/pages/venues/VenueFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'schools.manage' },
     },
     {
         path: '/users',

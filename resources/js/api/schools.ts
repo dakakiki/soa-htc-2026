@@ -13,10 +13,15 @@ export interface SchoolListParams {
     country_id?: number;
     region_id?: number;
     per_page?: number;
+    search?: string;
 }
 
 export function listSchools(params: SchoolListParams = {}) {
     return http.get<Paginated<School>>('/api/schools', { params });
+}
+
+export function getSchool(id: number) {
+    return http.get<{ data: School }>(`/api/schools/${id}`);
 }
 
 export function createSchool(payload: SchoolPayload) {

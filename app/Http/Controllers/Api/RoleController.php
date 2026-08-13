@@ -27,6 +27,13 @@ class RoleController extends Controller
         );
     }
 
+    public function show(Role $role): RoleResource
+    {
+        $this->authorize('viewAny', Role::class);
+
+        return RoleResource::make($role->load('permissions'));
+    }
+
     public function store(StoreRoleRequest $request): JsonResponse
     {
         $data = $request->validated();

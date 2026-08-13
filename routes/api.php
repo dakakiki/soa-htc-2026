@@ -43,11 +43,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('countries', [CountryController::class, 'index']);
     Route::get('regions', [RegionController::class, 'index']);
     Route::get('permissions', [PermissionController::class, 'index']);
-    Route::apiResource('roles', RoleController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('schools', SchoolController::class);
 
     // Staff users and their season role/scope assignments.
-    Route::apiResource('users', UserController::class)->only(['index', 'store', 'update']);
+    Route::apiResource('users', UserController::class)->only(['index', 'show', 'store', 'update']);
     Route::post('users/{user}/assignments', [AssignmentController::class, 'store']);
     Route::put('assignments/{assignment}', [AssignmentController::class, 'update']);
     Route::delete('assignments/{assignment}', [AssignmentController::class, 'destroy']);

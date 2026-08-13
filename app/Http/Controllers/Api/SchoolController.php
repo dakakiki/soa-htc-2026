@@ -29,6 +29,9 @@ class SchoolController extends Controller
         if ($request->filled('region_id')) {
             $query->where('region_id', $request->integer('region_id'));
         }
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%'.$request->string('search').'%');
+        }
 
         // Server-side scope: non-admins see only their allowed schools.
         $allowed = $request->user()->allowedSchoolIds();

@@ -27,7 +27,7 @@ async function logout(): Promise<void> {
                     </RouterLink>
                     <RouterLink
                         v-if="session.can('schools.view')"
-                        to="/schools"
+                        to="/venues"
                         class="text-sm text-gray-600 hover:text-gray-900"
                     >
                         {{ $t('nav.venues') }}

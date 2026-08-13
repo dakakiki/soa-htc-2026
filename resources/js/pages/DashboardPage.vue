@@ -64,7 +64,7 @@ onMounted(async () => {
                 >{{ $t('dashboard.newUser') }}</RouterLink>
                 <RouterLink
                     v-if="session.can('schools.manage')"
-                    to="/schools"
+                    to="/venues/new"
                     class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
                 >{{ $t('dashboard.newVenue') }}</RouterLink>
                 <RouterLink

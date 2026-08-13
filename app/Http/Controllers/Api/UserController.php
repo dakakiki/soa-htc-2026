@@ -9,6 +9,7 @@ use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\AdminUserResource;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class UserController extends Controller
@@ -21,16 +22,27 @@ class UserController extends Controller
         'seasonAssignments.schools',
     ];
 
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', User::class);
 
         $users = User::query()
             ->with(self::ASSIGNMENT_RELATIONS)
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $term = '%'.$request->string('search').'%';
+                $query->where(fn ($w) => $w->where('name', 'like', $term)->orWhere('email', 'like', $term));
+            })
             ->orderBy('name')
             ->paginate(20);
 
         return AdminUserResource::collection($users);
+    }
+
+    public function show(User $user): AdminUserResource
+    {
+        $this->authorize('view', $user);
+
+        return AdminUserResource::make($user->load(self::ASSIGNMENT_RELATIONS));
     }
 
     public function store(StoreUserRequest $request): AdminUserResource
