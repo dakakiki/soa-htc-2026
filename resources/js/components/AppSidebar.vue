@@ -67,7 +67,7 @@ const toggle = (g: NavGroup): void => {
 };
 
 const itemClass = (active: boolean): string =>
-    active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50';
+    active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
 </script>
 
 <template>
@@ -90,7 +90,7 @@ const itemClass = (active: boolean): string =>
                     type="button"
                     :title="g.label"
                     class="flex w-full items-center justify-center gap-3 rounded-md px-3 py-2 text-sm lg:justify-start"
-                    :class="groupActive(g) ? 'text-blue-700' : 'text-gray-600 hover:bg-gray-50'"
+                    :class="groupActive(g) ? 'text-blue-700 hover:bg-gray-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
                     @click="toggle(g)"
                 >
                     <component :is="g.icon" :size="20" class="shrink-0" />
