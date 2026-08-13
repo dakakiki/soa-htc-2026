@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CountryController;
+use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 
@@ -34,5 +37,12 @@ Route::prefix('auth')->group(function () {
  */
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('countries', [CountryController::class, 'index']);
+    Route::get('roles', [RoleController::class, 'index']);
     Route::apiResource('schools', SchoolController::class);
+
+    // Staff users and their season role/scope assignments.
+    Route::apiResource('users', UserController::class)->only(['index', 'store', 'update']);
+    Route::post('users/{user}/assignments', [AssignmentController::class, 'store']);
+    Route::put('assignments/{assignment}', [AssignmentController::class, 'update']);
+    Route::delete('assignments/{assignment}', [AssignmentController::class, 'destroy']);
 });

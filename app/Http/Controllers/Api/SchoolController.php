@@ -12,6 +12,7 @@ use App\Http\Resources\SchoolResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 class SchoolController extends Controller
 {
@@ -55,12 +56,12 @@ class SchoolController extends Controller
         return SchoolResource::make($school->load(['country', 'region']));
     }
 
-    public function destroy(School $school): JsonResponse
+    public function destroy(School $school): Response
     {
         $this->authorize('delete', $school);
 
         $school->delete();
 
-        return response()->json(status: 204);
+        return response()->noContent();
     }
 }
