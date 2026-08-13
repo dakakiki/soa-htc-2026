@@ -91,7 +91,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <section class="mx-auto max-w-xl space-y-5">
+    <section class="space-y-5">
         <div class="flex items-center gap-2 text-sm text-gray-500">
             <RouterLink :to="{ name: 'venues' }" class="hover:text-gray-900">{{ $t('venue.title') }}</RouterLink>
             <span>/</span>
