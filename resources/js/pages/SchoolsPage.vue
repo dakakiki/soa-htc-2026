@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { createSchool, deleteSchool, listSchools, updateSchool, type SchoolPayload } from '@/api/schools';
 import { listCountries } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import type { Country, School } from '@/types/models';
 
+const { t } = useI18n();
 const session = useSessionStore();
 const canManage = computed(() => session.can('schools.manage'));
 
@@ -36,7 +38,7 @@ async function load(target = page.value): Promise<void> {
         lastPage.value = data.meta.last_page;
         total.value = data.meta.total;
     } catch (e) {
-        error.value = apiErrorMessage(e);
+        error.value = apiErrorMessage(e, t('venue.error'));
     } finally {
         loading.value = false;
     }
@@ -60,7 +62,7 @@ function startEdit(school: School): void {
 
 async function submit(): Promise<void> {
     if (form.country_id === null) {
-        formError.value = 'Izaberi zemlju.';
+        formError.value = t('venue.countryPlaceholder');
         return;
     }
     saving.value = true;
@@ -75,14 +77,14 @@ async function submit(): Promise<void> {
         resetForm();
         await load();
     } catch (e) {
-        formError.value = apiErrorMessage(e, 'Čuvanje nije uspelo.');
+        formError.value = apiErrorMessage(e, t('venue.saveFailed'));
     } finally {
         saving.value = false;
     }
 }
 
 async function remove(school: School): Promise<void> {
-    if (!window.confirm(`Obrisati školu "${school.name}"?`)) {
+    if (!window.confirm(t('venue.confirmDelete', { name: school.name }))) {
         return;
     }
     try {
@@ -109,29 +111,27 @@ onMounted(async () => {
 
 <template>
     <section class="space-y-6">
-        <div class="flex items-end justify-between">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight">Škole</h1>
-                <p class="mt-1 text-sm text-gray-500">{{ total }} ukupno</p>
-            </div>
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">{{ $t('venue.title') }}</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ $t('common.total', { count: total }) }}</p>
         </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
         <div v-if="canManage" class="rounded-lg border border-gray-200 bg-white p-5">
             <h2 class="text-sm font-medium text-gray-700">
-                {{ editingId === null ? 'Nova škola' : 'Izmena škole' }}
+                {{ editingId === null ? $t('venue.new') : $t('venue.edit') }}
             </h2>
             <form class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4" @submit.prevent="submit">
                 <input
                     v-model="form.name"
                     type="text"
-                    placeholder="Naziv škole"
+                    :placeholder="$t('venue.namePlaceholder')"
                     required
                     class="rounded-md border border-gray-300 px-3 py-2 text-sm sm:col-span-2"
                 />
                 <select v-model="form.country_id" class="rounded-md border border-gray-300 px-3 py-2 text-sm">
-                    <option :value="null" disabled>Zemlja…</option>
+                    <option :value="null" disabled>{{ $t('venue.countryPlaceholder') }}</option>
                     <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
                 <select v-model="form.status" class="rounded-md border border-gray-300 px-3 py-2 text-sm">
@@ -144,7 +144,7 @@ onMounted(async () => {
                         :disabled="saving"
                         class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                     >
-                        {{ editingId === null ? 'Dodaj' : 'Sačuvaj' }}
+                        {{ editingId === null ? $t('common.add') : $t('common.save') }}
                     </button>
                     <button
                         v-if="editingId !== null"
@@ -152,7 +152,7 @@ onMounted(async () => {
                         class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
                         @click="resetForm"
                     >
-                        Otkaži
+                        {{ $t('common.cancel') }}
                     </button>
                     <span v-if="formError" class="self-center text-sm text-red-600">{{ formError }}</span>
                 </div>
@@ -163,18 +163,18 @@ onMounted(async () => {
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                     <tr>
-                        <th class="px-4 py-3">Naziv</th>
-                        <th class="px-4 py-3">Zemlja</th>
-                        <th class="px-4 py-3">Region</th>
-                        <th class="px-4 py-3">Status</th>
-                        <th v-if="canManage" class="px-4 py-3 text-right">Akcije</th>
+                        <th class="px-4 py-3">{{ $t('venue.name') }}</th>
+                        <th class="px-4 py-3">{{ $t('venue.country') }}</th>
+                        <th class="px-4 py-3">{{ $t('venue.region') }}</th>
+                        <th class="px-4 py-3">{{ $t('venue.status') }}</th>
+                        <th v-if="canManage" class="px-4 py-3 text-right">{{ $t('common.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <tr v-for="school in schools" :key="school.id">
                         <td class="px-4 py-3 font-medium text-gray-900">{{ school.name }}</td>
-                        <td class="px-4 py-3 text-gray-600">{{ school.country.name ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-600">{{ school.region?.name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-600">{{ school.country.name ?? $t('common.dash') }}</td>
+                        <td class="px-4 py-3 text-gray-600">{{ school.region?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3">
                             <span
                                 class="rounded-full px-2 py-0.5 text-xs"
@@ -182,12 +182,12 @@ onMounted(async () => {
                             >{{ school.status }}</span>
                         </td>
                         <td v-if="canManage" class="px-4 py-3 text-right">
-                            <button class="text-blue-600 hover:underline" @click="startEdit(school)">Izmeni</button>
-                            <button class="ml-3 text-red-600 hover:underline" @click="remove(school)">Obriši</button>
+                            <button class="text-blue-600 hover:underline" @click="startEdit(school)">{{ $t('common.edit') }}</button>
+                            <button class="ml-3 text-red-600 hover:underline" @click="remove(school)">{{ $t('common.remove') }}</button>
                         </td>
                     </tr>
                     <tr v-if="!loading && schools.length === 0">
-                        <td :colspan="canManage ? 5 : 4" class="px-4 py-6 text-center text-gray-400">Nema škola.</td>
+                        <td :colspan="canManage ? 5 : 4" class="px-4 py-6 text-center text-gray-400">{{ $t('venue.empty') }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -199,15 +199,15 @@ onMounted(async () => {
                 class="rounded-md border border-gray-300 px-3 py-1 disabled:opacity-40"
                 @click="load(page - 1)"
             >
-                Prethodna
+                {{ $t('common.previous') }}
             </button>
-            <span class="text-gray-500">Strana {{ page }} / {{ lastPage }}</span>
+            <span class="text-gray-500">{{ $t('common.pageOf', { current: page, last: lastPage }) }}</span>
             <button
                 :disabled="page >= lastPage"
                 class="rounded-md border border-gray-300 px-3 py-1 disabled:opacity-40"
                 @click="load(page + 1)"
             >
-                Sledeća
+                {{ $t('common.next') }}
             </button>
         </div>
     </section>
