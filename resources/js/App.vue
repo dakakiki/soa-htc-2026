@@ -25,6 +25,13 @@ async function logout(): Promise<void> {
                     >
                         Škole
                     </RouterLink>
+                    <RouterLink
+                        v-if="session.can('users.manage')"
+                        to="/users"
+                        class="text-sm text-gray-600 hover:text-gray-900"
+                    >
+                        Korisnici
+                    </RouterLink>
                 </div>
 
                 <div class="flex items-center gap-4 text-sm">

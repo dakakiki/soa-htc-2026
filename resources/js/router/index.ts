@@ -28,6 +28,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'schools.view' },
     },
     {
+        path: '/users',
+        name: 'users',
+        component: () => import('@/pages/UsersPage.vue'),
+        meta: { requiresAuth: true, permission: 'users.manage' },
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),

@@ -21,6 +21,31 @@ export interface School {
     region?: { id: number; name?: string | null };
 }
 
+export interface Role {
+    id: number;
+    key: string;
+    name: string;
+    is_system?: boolean;
+    permissions?: string[];
+}
+
+export interface Assignment {
+    id: number;
+    status: string;
+    season: { id: number; name?: string };
+    role: { id: number; key?: string; name?: string };
+    schools: { id: number; name: string }[];
+    countries: { id: number; name: string }[];
+}
+
+export interface AdminUser {
+    id: number;
+    name: string;
+    email: string;
+    roles: string[];
+    assignments: Assignment[];
+}
+
 export interface Paginated<T> {
     data: T[];
     meta: {
