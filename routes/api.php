@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\SchoolController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -32,5 +33,6 @@ Route::prefix('auth')->group(function () {
  * via policies; listing is scoped server-side.
  */
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('countries', [CountryController::class, 'index']);
     Route::apiResource('schools', SchoolController::class);
 });

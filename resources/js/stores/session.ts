@@ -1,32 +1,48 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import { http } from '@/api/http';
-
-export interface AuthUser {
-    id: number;
-    name: string;
-    email: string;
-}
+import { computed, ref } from 'vue';
+import * as authApi from '@/api/auth';
+import type { AuthUser } from '@/types/models';
 
 /**
- * Holds the authenticated admin/coordinator user for the SPA.
- * Student access uses a separate short-lived session and is modelled later.
+ * Authenticated admin/coordinator identity for the SPA. Student access uses a
+ * separate short-lived session modelled later.
  */
 export const useSessionStore = defineStore('session', () => {
     const user = ref<AuthUser | null>(null);
-    const loading = ref(false);
+    const ready = ref(false);
 
-    async function fetchUser(): Promise<void> {
-        loading.value = true;
+    const isAuthenticated = computed(() => user.value !== null);
+
+    function can(permission: string): boolean {
+        return user.value?.permissions.includes(permission) ?? false;
+    }
+
+    /**
+     * Resolve the current user once (used by the router guard on first load).
+     */
+    async function ensureLoaded(): Promise<void> {
+        if (ready.value) {
+            return;
+        }
+
         try {
-            const { data } = await http.get<AuthUser>('/api/user');
-            user.value = data;
+            user.value = await authApi.fetchUser();
         } catch {
             user.value = null;
         } finally {
-            loading.value = false;
+            ready.value = true;
         }
     }
 
-    return { user, loading, fetchUser };
+    async function login(email: string, password: string): Promise<void> {
+        user.value = await authApi.login(email, password);
+        ready.value = true;
+    }
+
+    async function logout(): Promise<void> {
+        await authApi.logout();
+        user.value = null;
+    }
+
+    return { user, ready, isAuthenticated, can, ensureLoaded, login, logout };
 });
