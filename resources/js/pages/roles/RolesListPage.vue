@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { deleteRole } from '@/api/roles';
 import { listRoles } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
+import RowActions from '@/components/RowActions.vue';
 import type { Role } from '@/types/models';
 
 const { t } = useI18n();
@@ -59,8 +60,10 @@ onMounted(load);
             >{{ $t('role.add') }}</RouterLink>
         </div>
 
-        <input v-model="search" type="search" :placeholder="$t('role.searchPlaceholder')"
-            class="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm" />
+        <div class="flex justify-end">
+            <input v-model="search" type="search" :placeholder="$t('role.searchPlaceholder')"
+                class="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm" />
+        </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
@@ -73,8 +76,12 @@ onMounted(load);
                         <th class="px-4 py-3 text-right">{{ $t('common.actions') }}</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                    <tr v-for="role in filtered" :key="role.id">
+                <tbody>
+                    <tr
+                        v-for="role in filtered"
+                        :key="role.id"
+                        class="odd:bg-white even:bg-gray-50 hover:bg-blue-50"
+                    >
                         <td class="px-4 py-3">
                             <span class="font-medium text-gray-900">{{ role.name }}</span>
                             <span
@@ -84,16 +91,13 @@ onMounted(load);
                             <div class="text-xs text-gray-400">{{ role.key }}</div>
                         </td>
                         <td class="px-4 py-3 text-gray-500">{{ role.permissions?.length ?? 0 }}</td>
-                        <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <RouterLink :to="{ name: 'roles.view', params: { id: role.id } }" class="text-blue-600 hover:underline">
-                                {{ $t('common.view') }}
-                            </RouterLink>
-                            <template v-if="!role.is_system">
-                                <RouterLink :to="{ name: 'roles.edit', params: { id: role.id } }" class="ml-3 text-blue-600 hover:underline">
-                                    {{ $t('common.edit') }}
-                                </RouterLink>
-                                <button class="ml-3 text-red-600 hover:underline" @click="remove(role)">{{ $t('common.remove') }}</button>
-                            </template>
+                        <td class="px-4 py-3">
+                            <RowActions
+                                :view-to="{ name: 'roles.view', params: { id: role.id } }"
+                                :edit-to="role.is_system ? null : { name: 'roles.edit', params: { id: role.id } }"
+                                :deletable="!role.is_system"
+                                @delete="remove(role)"
+                            />
                         </td>
                     </tr>
                     <tr v-if="filtered.length === 0">

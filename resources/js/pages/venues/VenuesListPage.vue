@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { deleteSchool, listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
+import RowActions from '@/components/RowActions.vue';
 import type { School } from '@/types/models';
 
 const { t } = useI18n();
@@ -64,7 +65,7 @@ onMounted(() => load(1));
             >{{ $t('venue.add') }}</RouterLink>
         </div>
 
-        <form class="flex gap-2" @submit.prevent="load(1)">
+        <form class="flex justify-end gap-2" @submit.prevent="load(1)">
             <input
                 v-model="search"
                 type="search"
@@ -89,8 +90,12 @@ onMounted(() => load(1));
                         <th class="px-4 py-3 text-right">{{ $t('common.actions') }}</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                    <tr v-for="school in schools" :key="school.id">
+                <tbody>
+                    <tr
+                        v-for="school in schools"
+                        :key="school.id"
+                        class="odd:bg-white even:bg-gray-50 hover:bg-blue-50"
+                    >
                         <td class="px-4 py-3 font-medium text-gray-900">{{ school.name }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ school.country.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ school.region?.name ?? $t('common.dash') }}</td>
@@ -100,18 +105,13 @@ onMounted(() => load(1));
                                 :class="school.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
                             >{{ school.status }}</span>
                         </td>
-                        <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <RouterLink :to="{ name: 'venues.view', params: { id: school.id } }" class="text-blue-600 hover:underline">
-                                {{ $t('common.view') }}
-                            </RouterLink>
-                            <RouterLink
-                                v-if="canManage"
-                                :to="{ name: 'venues.edit', params: { id: school.id } }"
-                                class="ml-3 text-blue-600 hover:underline"
-                            >{{ $t('common.edit') }}</RouterLink>
-                            <button v-if="canManage" class="ml-3 text-red-600 hover:underline" @click="remove(school)">
-                                {{ $t('common.remove') }}
-                            </button>
+                        <td class="px-4 py-3">
+                            <RowActions
+                                :view-to="{ name: 'venues.view', params: { id: school.id } }"
+                                :edit-to="canManage ? { name: 'venues.edit', params: { id: school.id } } : null"
+                                :deletable="canManage"
+                                @delete="remove(school)"
+                            />
                         </td>
                     </tr>
                     <tr v-if="!loading && schools.length === 0">

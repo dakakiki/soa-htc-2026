@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { IconWorld, IconLogout } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 
 const session = useSessionStore();
 const router = useRouter();
+const { t } = useI18n();
 
 async function logout(): Promise<void> {
     await session.logout();
@@ -17,7 +20,9 @@ async function logout(): Promise<void> {
             <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
                 <div class="flex items-center gap-6">
                     <RouterLink to="/" class="text-lg font-semibold tracking-tight">{{ $t('app.name') }}</RouterLink>
-                    <RouterLink to="/" class="text-sm text-gray-600 hover:text-gray-900">{{ $t('nav.home') }}</RouterLink>
+                    <RouterLink to="/" :title="t('nav.home')" :aria-label="t('nav.home')" class="text-gray-600 hover:text-gray-900">
+                        <IconWorld :size="20" />
+                    </RouterLink>
                     <RouterLink
                         v-if="session.isAuthenticated"
                         to="/dashboard"
@@ -51,7 +56,14 @@ async function logout(): Promise<void> {
                 <div class="flex items-center gap-4 text-sm">
                     <template v-if="session.isAuthenticated">
                         <span class="text-gray-500">{{ session.user?.email }}</span>
-                        <button class="text-gray-600 hover:text-gray-900" @click="logout">{{ $t('nav.logout') }}</button>
+                        <button
+                            :title="t('nav.logout')"
+                            :aria-label="t('nav.logout')"
+                            class="text-red-600 hover:text-red-700"
+                            @click="logout"
+                        >
+                            <IconLogout :size="20" />
+                        </button>
                     </template>
                     <RouterLink v-else to="/login" class="text-gray-600 hover:text-gray-900">{{ $t('nav.login') }}</RouterLink>
                 </div>

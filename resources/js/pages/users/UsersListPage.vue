@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { listUsers } from '@/api/users';
 import { apiErrorMessage } from '@/api/http';
+import RowActions from '@/components/RowActions.vue';
 import type { AdminUser } from '@/types/models';
 
 const users = ref<AdminUser[]>([]);
@@ -45,7 +46,7 @@ onMounted(() => load(1));
             >{{ $t('user.add') }}</RouterLink>
         </div>
 
-        <form class="flex gap-2" @submit.prevent="load(1)">
+        <form class="flex justify-end gap-2" @submit.prevent="load(1)">
             <input v-model="search" type="search" :placeholder="$t('user.searchPlaceholder')"
                 class="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm" />
             <button type="submit" class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
@@ -65,21 +66,23 @@ onMounted(() => load(1));
                         <th class="px-4 py-3 text-right">{{ $t('common.actions') }}</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                    <tr v-for="user in users" :key="user.id">
+                <tbody>
+                    <tr
+                        v-for="user in users"
+                        :key="user.id"
+                        class="odd:bg-white even:bg-gray-50 hover:bg-blue-50"
+                    >
                         <td class="px-4 py-3">
                             <div class="font-medium text-gray-900">{{ user.name }}</div>
                             <div class="text-xs text-gray-400">{{ user.email }}</div>
                         </td>
                         <td class="px-4 py-3 text-gray-600">{{ user.country.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ user.roles.join(', ') || $t('common.dash') }}</td>
-                        <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <RouterLink :to="{ name: 'users.view', params: { id: user.id } }" class="text-blue-600 hover:underline">
-                                {{ $t('common.view') }}
-                            </RouterLink>
-                            <RouterLink :to="{ name: 'users.edit', params: { id: user.id } }" class="ml-3 text-blue-600 hover:underline">
-                                {{ $t('common.edit') }}
-                            </RouterLink>
+                        <td class="px-4 py-3">
+                            <RowActions
+                                :view-to="{ name: 'users.view', params: { id: user.id } }"
+                                :edit-to="{ name: 'users.edit', params: { id: user.id } }"
+                            />
                         </td>
                     </tr>
                     <tr v-if="!loading && users.length === 0">
