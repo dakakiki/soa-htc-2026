@@ -9,8 +9,12 @@ export interface UserPayload {
     region_id?: number | null;
 }
 
-export function listUsers(page = 1) {
-    return http.get<Paginated<AdminUser>>('/api/users', { params: { page } });
+export function listUsers(page = 1, search?: string) {
+    return http.get<Paginated<AdminUser>>('/api/users', { params: { page, search: search || undefined } });
+}
+
+export function getUser(id: number) {
+    return http.get<{ data: AdminUser }>(`/api/users/${id}`);
 }
 
 export function createUser(payload: UserPayload) {

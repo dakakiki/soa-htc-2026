@@ -59,7 +59,7 @@ onMounted(async () => {
             <div class="flex flex-wrap gap-2">
                 <RouterLink
                     v-if="session.can('users.manage')"
-                    to="/users"
+                    to="/users/new"
                     class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
                 >{{ $t('dashboard.newUser') }}</RouterLink>
                 <RouterLink
