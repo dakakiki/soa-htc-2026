@@ -5,19 +5,20 @@ declare(strict_types=1);
 namespace App\Domain\Identity\Enums;
 
 /**
- * Named application roles. Legacy numeric levels (10/5/1) exist only as a
- * migration map — new code must use these named values and policies, never
- * scattered numeric checks.
+ * Built-in system roles seeded on every environment. Custom roles created by an
+ * admin live only in the `roles` table; these keys let code reference the
+ * system ones and carry the legacy `user_level` (10/5/1) migration map.
+ *
+ * Authorization decisions check permissions, not these keys — the enum is for
+ * seeding and migration mapping.
  */
-enum Role: string
+enum SystemRole: string
 {
     case Admin = 'admin';
     case CountryCoordinator = 'country_coordinator';
     case SchoolCoordinator = 'school_coordinator';
+    case Student = 'student';
 
-    /**
-     * Map a legacy `user_level` value to a role.
-     */
     public static function fromLegacyLevel(int $level): self
     {
         return match ($level) {
@@ -28,12 +29,13 @@ enum Role: string
         };
     }
 
-    public function legacyLevel(): int
+    public function legacyLevel(): ?int
     {
         return match ($this) {
             self::Admin => 10,
             self::CountryCoordinator => 5,
             self::SchoolCoordinator => 1,
+            self::Student => null,
         };
     }
 
@@ -43,6 +45,7 @@ enum Role: string
             self::Admin => 'Administrator',
             self::CountryCoordinator => 'Country coordinator',
             self::SchoolCoordinator => 'School coordinator',
+            self::Student => 'Student',
         };
     }
 }

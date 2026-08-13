@@ -12,13 +12,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('season_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('role', 40);
+            $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
             $table->string('status', 20)->default('active');
             $table->timestamps();
 
             // A user holds a given role at most once per season.
-            $table->unique(['season_id', 'user_id', 'role']);
-            $table->index(['season_id', 'role', 'status']);
+            $table->unique(['season_id', 'user_id', 'role_id']);
+            $table->index(['season_id', 'role_id', 'status']);
         });
     }
 

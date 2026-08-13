@@ -4,7 +4,8 @@ namespace Database\Seeders;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Assessment\Models\DifficultyLevel;
-use App\Domain\Identity\Enums\Role;
+use App\Domain\Identity\Enums\SystemRole;
+use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Enums\SeasonStatus;
 use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
@@ -19,7 +20,7 @@ use Illuminate\Database\Seeder;
  *
  * IMPORTANT: contains NO data derived from the legacy dump (which is real PII).
  * Country codes/names are public ISO reference data; schools/people are invented.
- * Only runs in local/testing environments.
+ * Only runs in local/testing environments. Assumes RolePermissionSeeder ran first.
  */
 class MasterDataSeeder extends Seeder
 {
@@ -66,8 +67,10 @@ class MasterDataSeeder extends Seeder
             );
         }
 
+        $adminRole = Role::query()->where('key', SystemRole::Admin->value)->firstOrFail();
+
         SeasonUserAssignment::query()->firstOrCreate(
-            ['season_id' => $season->id, 'user_id' => $admin->id, 'role' => Role::Admin->value],
+            ['season_id' => $season->id, 'user_id' => $admin->id, 'role_id' => $adminRole->id],
             ['status' => 'active'],
         );
     }

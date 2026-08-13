@@ -1,7 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\SchoolController;
 use Illuminate\Foundation\Application;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -17,6 +18,19 @@ Route::get('/ping', function () {
     ];
 });
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+/*
+ * Admin / coordinator authentication (Sanctum cookie session for the SPA).
+ */
+Route::prefix('auth')->group(function () {
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    Route::get('user', [AuthController::class, 'user'])->middleware('auth:sanctum');
+});
+
+/*
+ * Authenticated staff API. Object-level authorization is enforced per endpoint
+ * via policies; listing is scoped server-side.
+ */
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('schools', SchoolController::class);
+});

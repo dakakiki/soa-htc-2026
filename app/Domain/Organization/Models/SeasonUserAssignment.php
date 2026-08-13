@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Organization\Models;
 
-use App\Domain\Identity\Enums\Role;
+use App\Domain\Identity\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,14 +12,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class SeasonUserAssignment extends Model
 {
-    protected $fillable = ['season_id', 'user_id', 'role', 'status'];
+    protected $fillable = ['season_id', 'user_id', 'role_id', 'status'];
 
     protected function casts(): array
     {
         return [
             'season_id' => 'integer',
             'user_id' => 'integer',
-            'role' => Role::class,
+            'role_id' => 'integer',
         ];
     }
 
@@ -33,6 +33,12 @@ class SeasonUserAssignment extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** @return BelongsTo<Role, $this> */
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
     }
 
     /** @return BelongsToMany<School, $this> */

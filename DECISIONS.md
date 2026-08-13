@@ -91,7 +91,8 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ## ADR-0007 — Uloge kao enum + sezonske dodele (bez spatie/permission)
 
-- **Status:** Prihvaćeno (2026-08-13)
+- **Status:** Delimično zamenjeno ADR-0008 (2026-08-13) — sezonske dodele i „bez
+  spatie" ostaju; fiksni enum uloga zamenjen RBAC modelom sa permisijama.
 - **Kontekst:** `02` §5.1 opisuje `season_user_assignments` sa ulogom i scope-om;
   legacy priprema sezone briše naloge, što nova app ne sme (PROJECT_CONTEXT §5.5).
 - **Odluka:** `Role` je PHP enum (`admin`/`country_coordinator`/`school_coordinator`)
@@ -103,6 +104,23 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   ostaju potpuni. `audit_logs` je append-only (samo `created_at`).
 - **Localization:** `config/localization.php` drži eksplicitnu listu locale-a
   (`['en']`) + fallback; sav tekst kroz `lang/` fajlove.
+
+## ADR-0008 — RBAC: role sa permisijama (admin-upravljive)
+
+- **Status:** Prihvaćeno (2026-08-13); amandman na ADR-0007
+- **Kontekst:** Fiksne 3 role (+student) kao enum ne dozvoljavaju kombinovanje
+  pristupa niti nove role bez izmene koda. `02` §5.1 predviđa `roles/permissions`.
+- **Odluka:** RBAC — tabele `roles`, `permissions`, `permission_role`.
+  `season_user_assignments.role_id` → FK na `roles`. Autorizacija proverava
+  **permisiju** (`schools.view`, `schools.manage`, …) kroz Policies, ne ime role.
+  `SystemRole` enum (admin/country_coordinator/school_coordinator/student) služi
+  samo za seed sistemskih uloga i legacy `10/5/1` mapu. Admin kasnije pravi
+  custom (ne-system) role i dodeljuje permisije kroz UI.
+- **Scope ≠ permisije:** koje škole/zemlje ostaje strukturno u dodelama
+  (`allowedSchoolIds`); permisija `schools.view.all` zaobilazi scope.
+- **Posledica:** `User::hasPermission()` je jedina tačka provere; nove role/
+  kombinacije bez izmene koda. `RolePermissionSeeder` (svuda) seed-uje katalog
+  permisija i sistemske role idempotentno.
 
 ---
 

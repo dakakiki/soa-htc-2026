@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Domain\Organization\Models\School;
+use App\Policies\SchoolPolicy;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Domain models live outside app/Models, so policies are registered explicitly.
+        Gate::policy(School::class, SchoolPolicy::class);
     }
 }
