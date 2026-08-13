@@ -29,6 +29,11 @@ export interface Role {
     permissions?: string[];
 }
 
+export interface Permission {
+    key: string;
+    description: string | null;
+}
+
 export interface Assignment {
     id: number;
     status: string;

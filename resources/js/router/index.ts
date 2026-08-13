@@ -34,6 +34,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'users.manage' },
     },
     {
+        path: '/roles',
+        name: 'roles',
+        component: () => import('@/pages/RolesPage.vue'),
+        meta: { requiresAuth: true, permission: 'roles.manage' },
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),
