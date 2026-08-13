@@ -1,0 +1,67 @@
+Dve stvari koje bih dodao usmeno, a ne u prompt: prva odluka koju treba doneti u toj sesiji je MySQL ili PostgreSQL, jer od nje zavisi kako se implementira „jedan aktivni attempt" (partial unique index u PG naspram generated column u MySQL) — bolje je odlučiti pre prve migracije nego posle. I drugo, ako u nekom trenutku Claude Code počne da predlaže rešenja koja zvuče kao legacy ponašanje, to je znak da čita PROJECT_CONTEXT umesto dokumenta 00 — podseti ga na prioritet.
+
+
+
+
+Radimo novu verziju SOA HTC aplikacije: svež Laravel + Vue 3 + TypeScript
+projekat sa novom bazom. Ovo je rewrite, ne upgrade legacy sistema.
+
+KONTEKST
+U kontekstu su: PROJECT_CONTEXT.md, 01_DEVELOPMENT_ROADMAP.md,
+02_TARGET_ARCHITECTURE_AND_DATA_MODEL.md, 03_COMPETITION_CORE_SPEC.md,
+04_LEGACY_MIGRATION_PLAN.md, 05_PERFORMANCE_AND_LOAD_STRATEGY.md i
+00_LEGACY_BEHAVIOR_FINDINGS.md, plus anonimizovani legacy dump.
+
+PRIORITET DOKUMENATA
+00_LEGACY_BEHAVIOR_FINDINGS.md ima prednost nad ostalim dokumentima svuda
+gde se razlikuju. Ostali dokumenti opisuju nameru; 00 opisuje izmereno
+stanje koda i podataka. Sekcija 6 u dokumentu 00 nabraja tačna mesta gde
+su ostali dokumenti netačni — proveri je pre nego što se osloniš na bilo
+koje pravilo iz PROJECT_CONTEXT.md.
+
+NEPREGOVARAČKE ISPRAVKE (ne prihvataj suprotno iz drugih dokumenata)
+- competitor_number: round + ŠESTOcifrena sekvenca (npr. '14000001'),
+  širina promenljiva po sezoni. Pravilo LPAD(...,5,'0') je NETAČNO.
+  Čuva se kao varchar. Ne parsira se po fiksnim pozicijama.
+- Unutrašnji ključ za povezivanje rezultata u legacy bazi je
+  el_student.entry_id, NE competitor_number.
+- Server-side tajmer je NOVA funkcionalnost. Legacy ga nema — test_started
+  ima samo created_at, finishTest ne proverava proteklo vreme.
+- Legacy dozvoljava neograničeno ponavljanje testa ocenjenog sa 0 poena
+  (briše test_results i quiz_results). Pravilo "jedan pokušaj" u legacy
+  sistemu ne važi. Da li se zadržava je OTVORENA odluka — ne pretpostavljaj.
+- Mapiranje nivoa u legacy sistemu postoji na SVA ČETIRI nivoa hijerarhije
+  (quiz, exam, test, question) kao CSV u varchar(11). Nova šema mora
+  svesno odlučiti šta zadržava.
+- Broj "10.000 istovremenih sesija" nije potvrđen podacima. Izmeren pik je
+  ~1.820 startova u 45 minuta. Ne dimenzioniši infrastrukturu prema 10.000
+  bez eksplicitne potvrde.
+- Legacy dump sadrži prave lične podatke (archive_test_results.student_name,
+  schools.email/phone, invigilators.name). Ne commituj ga, ne koristi kao
+  seed, ne kopiraj u dev okruženje.
+
+REDOSLED RADA
+Prati faze iz 01_DEVELOPMENT_ROADMAP.md. Ne prelazi na sledeću fazu dok
+prethodna nema testabilan izlaz. Faza 4 (attempt engine) se NE započinje
+dok se ne potvrde: ponašanje pri gubitku browsera bez autosave-a,
+sudbina retake-a na 0, i fill-the-gap normalizacija.
+
+PRAVILA IMPLEMENTACIJE
+- Svi FK-evi eksplicitni. Indeksi se pišu prema stvarnim upitima, ne po
+  navici — legacy nema nijedan sekundarni indeks na poslovnim tabelama i
+  to je glavni uzrok njegovih problema sa performansama.
+- season_id je eksplicitna kolona svuda gde je relevantna. U legacy sistemu
+  sezona ne postoji kao podatak, nego kao zasebna baza.
+- Autorizacija je server-side na svakom endpointu, object-level. Nikad ne
+  čitaj student_id/quiz_id/test_id iz request-a bez policy provere — to je
+  tačna ranjivost legacy sistema.
+- Bodovi i novac kao decimal. Datumi u UTC. Nikad float.
+- Sav korisnički tekst kroz language fajlove, locale 'en'.
+- Kontroleri tanki: validacija u Form Request, autorizacija u Policy,
+  logika u Action/Service, izlaz kroz API Resource.
+
+PRE PISANJA KODA
+Otvorene odluke vodi u DECISIONS.md kao ADR zapise. Ako naiđeš na pravilo
+koje nije potvrđeno ni u jednom dokumentu — pitaj, ne pretpostavljaj i ne
+izmišljaj default. Lista otvorenih pitanja je u PROJECT_CONTEXT.md sekcija
+14 i u sekcijama "Odluka" dokumenta 00.
