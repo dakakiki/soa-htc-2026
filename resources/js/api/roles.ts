@@ -7,6 +7,10 @@ export interface RolePayload {
     permissions: string[];
 }
 
+export function getRole(id: number) {
+    return http.get<{ data: Role }>(`/api/roles/${id}`);
+}
+
 export function createRole(payload: RolePayload) {
     return http.post<{ data: Role }>('/api/roles', payload);
 }

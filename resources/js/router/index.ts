@@ -78,7 +78,25 @@ const routes: RouteRecordRaw[] = [
     {
         path: '/roles',
         name: 'roles',
-        component: () => import('@/pages/RolesPage.vue'),
+        component: () => import('@/pages/roles/RolesListPage.vue'),
+        meta: { requiresAuth: true, permission: 'roles.manage' },
+    },
+    {
+        path: '/roles/new',
+        name: 'roles.new',
+        component: () => import('@/pages/roles/RoleFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'roles.manage' },
+    },
+    {
+        path: '/roles/:id',
+        name: 'roles.view',
+        component: () => import('@/pages/roles/RoleViewPage.vue'),
+        meta: { requiresAuth: true, permission: 'roles.manage' },
+    },
+    {
+        path: '/roles/:id/edit',
+        name: 'roles.edit',
+        component: () => import('@/pages/roles/RoleFormPage.vue'),
         meta: { requiresAuth: true, permission: 'roles.manage' },
     },
     {
