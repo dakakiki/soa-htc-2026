@@ -18,13 +18,17 @@ async function submit(): Promise<void> {
     error.value = null;
     try {
         await session.login(email.value, password.value);
-        const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/schools';
-        await router.push(redirect);
     } catch (e) {
         error.value = apiErrorMessage(e, 'Prijava nije uspela.');
+        return;
     } finally {
         loading.value = false;
     }
+
+    // Login succeeded — a navigation redirect (e.g. missing permission) must not
+    // be reported as a failed login.
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/schools';
+    void router.push(redirect);
 }
 </script>
 
