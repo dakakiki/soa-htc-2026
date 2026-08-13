@@ -78,6 +78,32 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
      startova u 45 min. Infrastruktura se ne dimenzioniše na 10.000 bez
      eksplicitne potvrde porekla tog broja.
 
+## ADR-0006 — Raspored koda: modularni monolit `app/Domain/*`
+
+- **Status:** Prihvaćeno (2026-08-13)
+- **Kontekst:** `02` §4 i `PROJECT_CONTEXT.md` §8.3 traže domenske module sa tankim
+  kontrolerima i logikom van Eloquent modela.
+- **Odluka:** Novi kod ide u `app/Domain/<Context>/{Models,Enums,Actions,...}`
+  (Organization, Assessment, Identity, Audit, …), autoload preko default `App\` PSR-4.
+  `App\Models\User` ostaje na standardnoj lokaciji zbog auth/factory konvencija.
+- **Posledica:** Kontroleri tanki; validacija u Form Request, autorizacija u Policy,
+  logika u Action/Service, izlaz u API Resource.
+
+## ADR-0007 — Uloge kao enum + sezonske dodele (bez spatie/permission)
+
+- **Status:** Prihvaćeno (2026-08-13)
+- **Kontekst:** `02` §5.1 opisuje `season_user_assignments` sa ulogom i scope-om;
+  legacy priprema sezone briše naloge, što nova app ne sme (PROJECT_CONTEXT §5.5).
+- **Odluka:** `Role` je PHP enum (`admin`/`country_coordinator`/`school_coordinator`)
+  sa mapom na legacy `10/5/1`. Sezonska aktivnost/scope se čuva u
+  `season_user_assignments` (+ `assignment_schools`, `assignment_countries`), a ne
+  brisanjem naloga. Bez `spatie/laravel-permission` — globalne role tog paketa ne
+  odgovaraju sezonski ograničenom scope-u. Autorizacija ide kroz Policies.
+- **Posledica:** Nova sezona deaktivira/ne prenosi stare dodele; audit i istorija
+  ostaju potpuni. `audit_logs` je append-only (samo `created_at`).
+- **Localization:** `config/localization.php` drži eksplicitnu listu locale-a
+  (`['en']`) + fallback; sav tekst kroz `lang/` fajlove.
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
