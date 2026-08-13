@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
+use App\Policies\RolePolicy;
 use App\Policies\SchoolPolicy;
 use App\Policies\SeasonUserAssignmentPolicy;
 use App\Policies\UserPolicy;
@@ -30,5 +32,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(School::class, SchoolPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(SeasonUserAssignment::class, SeasonUserAssignmentPolicy::class);
+        Gate::policy(Role::class, RolePolicy::class);
     }
 }

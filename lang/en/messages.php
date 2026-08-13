@@ -17,6 +17,7 @@ return [
         'admin' => 'Administrator',
         'country_coordinator' => 'Country coordinator',
         'school_coordinator' => 'School coordinator',
+        'in_use' => 'This role is assigned to users and cannot be deleted.',
     ],
     'assignment' => [
         'duplicate' => 'This user already holds that role in the selected season.',
