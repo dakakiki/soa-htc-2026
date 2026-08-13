@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
+import { useConfirmStore } from '@/stores/confirm';
 import { deleteSchool, listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
@@ -10,6 +11,7 @@ import type { School } from '@/types/models';
 
 const { t } = useI18n();
 const session = useSessionStore();
+const confirm = useConfirmStore();
 const canManage = computed(() => session.can('schools.manage'));
 
 const schools = ref<School[]>([]);
@@ -37,7 +39,7 @@ async function load(target = page.value): Promise<void> {
 }
 
 async function remove(school: School): Promise<void> {
-    if (!window.confirm(t('venue.confirmDelete', { name: school.name }))) {
+    if (!(await confirm.ask({ message: t('venue.confirmDelete', { name: school.name }) }))) {
         return;
     }
     try {

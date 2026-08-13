@@ -5,10 +5,12 @@ import { useI18n } from 'vue-i18n';
 import { deleteRole } from '@/api/roles';
 import { listRoles } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
+import { useConfirmStore } from '@/stores/confirm';
 import RowActions from '@/components/RowActions.vue';
 import type { Role } from '@/types/models';
 
 const { t } = useI18n();
+const confirm = useConfirmStore();
 
 const roles = ref<Role[]>([]);
 const error = ref<string | null>(null);
@@ -33,7 +35,7 @@ async function load(): Promise<void> {
 }
 
 async function remove(role: Role): Promise<void> {
-    if (!window.confirm(t('role.confirmDelete', { name: role.name }))) {
+    if (!(await confirm.ask({ message: t('role.confirmDelete', { name: role.name }) }))) {
         return;
     }
     try {

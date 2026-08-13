@@ -4,18 +4,23 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { deleteRole, getRole } from '@/api/roles';
 import { apiErrorMessage } from '@/api/http';
+import { useConfirmStore } from '@/stores/confirm';
 import type { Role } from '@/types/models';
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
+const confirm = useConfirmStore();
 const id = Number(route.params.id);
 
 const role = ref<Role | null>(null);
 const error = ref<string | null>(null);
 
 async function remove(): Promise<void> {
-    if (role.value === null || !window.confirm(t('role.confirmDelete', { name: role.value.name }))) {
+    if (role.value === null) {
+        return;
+    }
+    if (!(await confirm.ask({ message: t('role.confirmDelete', { name: role.value.name }) }))) {
         return;
     }
     try {

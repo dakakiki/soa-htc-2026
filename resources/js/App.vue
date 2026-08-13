@@ -3,6 +3,7 @@ import { RouterLink, RouterView, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconWorld, IconLogout } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 const session = useSessionStore();
 const router = useRouter();
@@ -73,5 +74,7 @@ async function logout(): Promise<void> {
         <main class="mx-auto max-w-5xl px-6 py-10">
             <RouterView />
         </main>
+
+        <ConfirmDialog />
     </div>
 </template>

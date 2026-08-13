@@ -157,6 +157,10 @@ export default {
         editFailed: 'Update failed.',
         confirmDelete: 'Delete role "{name}"?',
     },
+    confirm: {
+        title: 'Delete',
+        confirm: 'Delete',
+    },
     error: {
         generic: 'Something went wrong.',
     },

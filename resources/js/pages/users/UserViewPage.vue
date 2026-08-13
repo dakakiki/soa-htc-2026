@@ -7,10 +7,12 @@ import { createAssignment, deleteAssignment, type AssignmentPayload } from '@/ap
 import { listRoles } from '@/api/reference';
 import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
+import { useConfirmStore } from '@/stores/confirm';
 import type { AdminUser, Role, School } from '@/types/models';
 
 const route = useRoute();
 const { t } = useI18n();
+const confirm = useConfirmStore();
 const id = Number(route.params.id);
 
 const user = ref<AdminUser | null>(null);
@@ -60,7 +62,7 @@ async function submitAssignment(): Promise<void> {
 }
 
 async function removeAssignment(assignmentId: number): Promise<void> {
-    if (!window.confirm(t('user.confirmRemove'))) {
+    if (!(await confirm.ask({ message: t('user.confirmRemove') }))) {
         return;
     }
     try {
