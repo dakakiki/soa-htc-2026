@@ -21,5 +21,12 @@ return [
     ],
     'assignment' => [
         'duplicate' => 'This user already holds that role in the selected season.',
+        'school_single' => 'A school coordinator must be assigned exactly one school.',
+        'school_required' => 'Select at least one school.',
+        'school_country' => "Selected schools must belong to the user's country.",
+        'needs_country' => 'Assign a country to the user before adding coordinator scope.',
+    ],
+    'region' => [
+        'mismatch' => 'The selected region does not belong to the selected country.',
     ],
 ];

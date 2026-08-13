@@ -8,8 +8,15 @@ export interface SchoolPayload {
     status?: string;
 }
 
-export function listSchools(page = 1) {
-    return http.get<Paginated<School>>('/api/schools', { params: { page } });
+export interface SchoolListParams {
+    page?: number;
+    country_id?: number;
+    region_id?: number;
+    per_page?: number;
+}
+
+export function listSchools(params: SchoolListParams = {}) {
+    return http.get<Paginated<School>>('/api/schools', { params });
 }
 
 export function createSchool(payload: SchoolPayload) {

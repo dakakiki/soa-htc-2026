@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
 use App\Http\Controllers\Api\UserController;
@@ -38,6 +39,7 @@ Route::prefix('auth')->group(function () {
  */
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('countries', [CountryController::class, 'index']);
+    Route::get('regions', [RegionController::class, 'index']);
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('schools', SchoolController::class);

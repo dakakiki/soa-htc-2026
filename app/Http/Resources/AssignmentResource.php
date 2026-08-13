@@ -32,10 +32,6 @@ class AssignmentResource extends JsonResource
                 'id' => $s->id,
                 'name' => $s->name,
             ])->values()),
-            'countries' => $this->whenLoaded('countries', fn () => $this->countries->map(fn ($c) => [
-                'id' => $c->id,
-                'name' => $c->name,
-            ])->values()),
         ];
     }
 }

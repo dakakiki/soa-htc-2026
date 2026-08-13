@@ -19,7 +19,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AssignmentController extends Controller
 {
-    private const RELATIONS = ['role', 'season', 'schools', 'countries'];
+    private const RELATIONS = ['role', 'season', 'schools'];
 
     public function store(StoreAssignmentRequest $request, User $user): JsonResponse
     {
@@ -53,7 +53,6 @@ class AssignmentController extends Controller
             ]);
 
             $assignment->schools()->sync($data['school_ids'] ?? []);
-            $assignment->countries()->sync($data['country_ids'] ?? []);
 
             return $assignment;
         });
@@ -73,9 +72,6 @@ class AssignmentController extends Controller
             }
             if (array_key_exists('school_ids', $data)) {
                 $assignment->schools()->sync($data['school_ids']);
-            }
-            if (array_key_exists('country_ids', $data)) {
-                $assignment->countries()->sync($data['country_ids']);
             }
         });
 

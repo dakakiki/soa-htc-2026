@@ -8,16 +8,19 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Domain\Identity\Enums\SystemRole;
+use App\Domain\Organization\Models\Country;
+use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Support\SeasonContext;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'country_id', 'region_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -28,6 +31,18 @@ class User extends Authenticatable
     public function seasonAssignments(): HasMany
     {
         return $this->hasMany(SeasonUserAssignment::class);
+    }
+
+    /** @return BelongsTo<Country, $this> */
+    public function country(): BelongsTo
+    {
+        return $this->belongsTo(Country::class);
+    }
+
+    /** @return BelongsTo<Region, $this> */
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class);
     }
 
     /** @var Collection<int, SeasonUserAssignment>|null */
@@ -54,7 +69,7 @@ class User extends Authenticatable
         return $this->activeAssignmentsCache = $this->seasonAssignments()
             ->where('season_id', $season->id)
             ->where('status', 'active')
-            ->with(['role.permissions', 'schools:id', 'countries:id'])
+            ->with(['role.permissions', 'schools:id'])
             ->get();
     }
 
@@ -86,9 +101,8 @@ class User extends Authenticatable
      * Schools the user may access in the active season.
      *
      * Returns null when the user may access every school (holds the global
-     * `schools.view.all` permission); otherwise the explicit set of allowed
-     * school ids (direct school assignments plus every school in the assigned
-     * countries).
+     * `schools.view.all` permission); otherwise the explicit set of bound
+     * school ids from the user's season assignments.
      *
      * @return Collection<int, int>|null
      */
@@ -98,19 +112,10 @@ class User extends Authenticatable
             return null;
         }
 
-        $assignments = $this->activeSeasonAssignments();
-
-        $schoolIds = $assignments->flatMap(fn (SeasonUserAssignment $a) => $a->schools->pluck('id'));
-
-        $countryIds = $assignments->flatMap(fn (SeasonUserAssignment $a) => $a->countries->pluck('id'))->unique();
-
-        if ($countryIds->isNotEmpty()) {
-            $schoolIds = $schoolIds->merge(
-                School::query()->whereIn('country_id', $countryIds)->pluck('id')
-            );
-        }
-
-        return $schoolIds->unique()->values();
+        return $this->activeSeasonAssignments()
+            ->flatMap(fn (SeasonUserAssignment $a) => $a->schools->pluck('id'))
+            ->unique()
+            ->values();
     }
 
     /**
@@ -123,6 +128,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'country_id' => 'integer',
+            'region_id' => 'integer',
         ];
     }
 }

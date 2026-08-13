@@ -30,16 +30,6 @@ class MasterDataSeeder extends Seeder
             return;
         }
 
-        $admin = User::query()->firstOrCreate(
-            ['email' => 'admin@soahtc.test'],
-            ['name' => 'Dev Admin', 'password' => 'password'],
-        );
-
-        $season = Season::query()->firstOrCreate(
-            ['round_number' => 14],
-            ['name' => 'Season 2026', 'year' => 2026, 'status' => SeasonStatus::Active],
-        );
-
         $countries = collect([
             ['code' => 'RS', 'name' => 'Serbia'],
             ['code' => 'MK', 'name' => 'North Macedonia'],
@@ -48,8 +38,23 @@ class MasterDataSeeder extends Seeder
             $c['code'] => Country::query()->firstOrCreate(['code' => $c['code']], ['name' => $c['name']]),
         ]);
 
-        $vojvodina = Region::query()->firstOrCreate(
-            ['country_id' => $countries['RS']->id, 'name' => 'Vojvodina'],
+        // One country has many regions.
+        $vojvodina = Region::query()->firstOrCreate(['country_id' => $countries['RS']->id, 'name' => 'Vojvodina']);
+        Region::query()->firstOrCreate(['country_id' => $countries['RS']->id, 'name' => 'Belgrade']);
+
+        $admin = User::query()->firstOrCreate(
+            ['email' => 'admin@soahtc.test'],
+            [
+                'name' => 'Dev Admin',
+                'password' => 'password',
+                'country_id' => $countries['RS']->id,
+                'region_id' => $vojvodina->id,
+            ],
+        );
+
+        $season = Season::query()->firstOrCreate(
+            ['round_number' => 14],
+            ['name' => 'Season 2026', 'year' => 2026, 'status' => SeasonStatus::Active],
         );
 
         foreach (['Demo Primary School A', 'Demo Primary School B', 'Demo Gymnasium C'] as $name) {

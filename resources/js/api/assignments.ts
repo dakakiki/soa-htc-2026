@@ -6,7 +6,6 @@ export interface AssignmentPayload {
     season_id?: number | null;
     status?: string;
     school_ids?: number[];
-    country_ids?: number[];
 }
 
 export function createAssignment(userId: number, payload: AssignmentPayload) {

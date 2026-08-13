@@ -5,6 +5,8 @@ export interface UserPayload {
     name: string;
     email: string;
     password?: string;
+    country_id?: number;
+    region_id?: number | null;
 }
 
 export function listUsers(page = 1) {

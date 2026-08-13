@@ -30,7 +30,7 @@ async function load(target = page.value): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
-        const { data } = await listSchools(target);
+        const { data } = await listSchools({ page: target });
         schools.value = data.data;
         page.value = data.meta.current_page;
         lastPage.value = data.meta.last_page;

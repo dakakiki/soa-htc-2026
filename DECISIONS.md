@@ -122,6 +122,24 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   kombinacije bez izmene koda. `RolePermissionSeeder` (svuda) seed-uje katalog
   permisija i sistemske role idempotentno.
 
+## ADR-0009 — User zemlja/region + scope koordinatora po školama
+
+- **Status:** Prihvaćeno (2026-08-13); potvrđeno legacy formom (User LVL 10=admin,
+  5/1=koordinatori) i vlasnikom proizvoda
+- **Odluka:**
+  - Svaki user ima **obaveznu zemlju** (`users.country_id`) i **opcioni region**
+    (`users.region_id`). Region pripada zemlji.
+  - Scope koordinatora je **po školama** (ne po celoj zemlji):
+    `school_coordinator` = **tačno 1 škola**, `country_coordinator` = **1..X škola**.
+  - Škole koje se mogu vezati su **samo iz korisnikove zemlje**; UI kaskadira
+    Country → Region → Schools.
+  - `assignment_countries` **uklonjena** — scope je isključivo `assignment_schools`.
+- **Posledica:** `User::allowedSchoolIds()` koristi samo vezane škole;
+  `schools.view.all` (admin) zaobilazi scope. Kardinalnost i „škola iz iste
+  zemlje" se validiraju u `StoreAssignmentRequest`/`UpdateAssignmentRequest`.
+- **Napomena:** legacy per-user toggles (add/edit/delete students, reset results,
+  status) mapiraju se na permisije/role u kasnijim fazama (student management).
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)

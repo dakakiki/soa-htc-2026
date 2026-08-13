@@ -47,11 +47,4 @@ class SeasonUserAssignment extends Model
         return $this->belongsToMany(School::class, 'assignment_schools', 'season_user_assignment_id', 'school_id')
             ->withTimestamps();
     }
-
-    /** @return BelongsToMany<Country, $this> */
-    public function countries(): BelongsToMany
-    {
-        return $this->belongsToMany(Country::class, 'assignment_countries', 'season_user_assignment_id', 'country_id')
-            ->withTimestamps();
-    }
 }

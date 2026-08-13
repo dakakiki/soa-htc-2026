@@ -27,6 +27,14 @@ class AdminUserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+            'country' => [
+                'id' => $this->country_id,
+                'name' => $this->whenLoaded('country', fn () => $this->country?->name),
+            ],
+            'region' => $this->when($this->region_id !== null, fn () => [
+                'id' => $this->region_id,
+                'name' => $this->whenLoaded('region', fn () => $this->region?->name),
+            ]),
             'assignments' => AssignmentResource::collection(
                 $this->whenLoaded('seasonAssignments')
             ),

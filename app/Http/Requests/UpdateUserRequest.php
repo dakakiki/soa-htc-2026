@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domain\Organization\Models\Region;
 use App\Models\User;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -29,6 +31,21 @@ class UpdateUserRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
             'password' => ['nullable', 'string', 'min:8'],
+            'country_id' => ['sometimes', 'integer', 'exists:countries,id'],
+            'region_id' => ['nullable', 'integer', 'exists:regions,id'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $user = $this->route('user');
+            $regionId = $this->input('region_id');
+            $countryId = $this->input('country_id') ?? ($user instanceof User ? $user->country_id : null);
+
+            if ($regionId && $countryId && ! Region::where('id', $regionId)->where('country_id', $countryId)->exists()) {
+                $validator->errors()->add('region_id', trans('messages.region.mismatch'));
+            }
+        });
     }
 }

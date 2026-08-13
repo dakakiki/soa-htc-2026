@@ -14,10 +14,11 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class UserController extends Controller
 {
     private const ASSIGNMENT_RELATIONS = [
+        'country',
+        'region',
         'seasonAssignments.role',
         'seasonAssignments.season',
         'seasonAssignments.schools',
-        'seasonAssignments.countries',
     ];
 
     public function index(): AnonymousResourceCollection

@@ -21,6 +21,12 @@ export interface School {
     region?: { id: number; name?: string | null };
 }
 
+export interface Region {
+    id: number;
+    name: string;
+    country_id: number;
+}
+
 export interface Role {
     id: number;
     key: string;
@@ -40,13 +46,14 @@ export interface Assignment {
     season: { id: number; name?: string };
     role: { id: number; key?: string; name?: string };
     schools: { id: number; name: string }[];
-    countries: { id: number; name: string }[];
 }
 
 export interface AdminUser {
     id: number;
     name: string;
     email: string;
+    country: { id: number | null; name?: string };
+    region?: { id: number | null; name?: string | null };
     roles: string[];
     assignments: Assignment[];
 }

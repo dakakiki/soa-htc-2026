@@ -22,13 +22,23 @@ class SchoolController extends Controller
 
         $query = School::query()->with(['country', 'region'])->orderBy('name');
 
+        // Optional cascade filters (used by the assignment school picker).
+        if ($request->filled('country_id')) {
+            $query->where('country_id', $request->integer('country_id'));
+        }
+        if ($request->filled('region_id')) {
+            $query->where('region_id', $request->integer('region_id'));
+        }
+
         // Server-side scope: non-admins see only their allowed schools.
         $allowed = $request->user()->allowedSchoolIds();
         if ($allowed !== null) {
             $query->whereIn('id', $allowed);
         }
 
-        return SchoolResource::collection($query->paginate(20));
+        $perPage = min(max($request->integer('per_page', 20), 1), 200);
+
+        return SchoolResource::collection($query->paginate($perPage));
     }
 
     public function store(StoreSchoolRequest $request): JsonResponse
