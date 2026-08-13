@@ -58,6 +58,13 @@ export interface AdminUser {
     assignments: Assignment[];
 }
 
+export interface DashboardData {
+    season: { name: string; round_number: number; status: string; ends_at: string | null } | null;
+    venues: { count: number; scoped: boolean };
+    users: { count: number } | null;
+    coordinators: { count: number } | null;
+}
+
 export interface Paginated<T> {
     data: T[];
     meta: {

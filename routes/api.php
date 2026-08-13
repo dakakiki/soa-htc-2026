@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CountryController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\RoleController;
@@ -38,6 +39,7 @@ Route::prefix('auth')->group(function () {
  * via policies; listing is scoped server-side.
  */
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('dashboard', [DashboardController::class, 'show']);
     Route::get('countries', [CountryController::class, 'index']);
     Route::get('regions', [RegionController::class, 'index']);
     Route::get('permissions', [PermissionController::class, 'index']);

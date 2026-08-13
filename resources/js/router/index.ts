@@ -22,6 +22,12 @@ const routes: RouteRecordRaw[] = [
         meta: { guestOnly: true },
     },
     {
+        path: '/dashboard',
+        name: 'dashboard',
+        component: () => import('@/pages/DashboardPage.vue'),
+        meta: { requiresAuth: true },
+    },
+    {
         path: '/schools',
         name: 'schools',
         component: () => import('@/pages/SchoolsPage.vue'),
@@ -56,7 +62,7 @@ router.beforeEach(async (to) => {
     await session.ensureLoaded();
 
     if (to.meta.guestOnly && session.isAuthenticated) {
-        return { name: 'schools' };
+        return { name: 'dashboard' };
     }
 
     if (to.meta.requiresAuth && !session.isAuthenticated) {

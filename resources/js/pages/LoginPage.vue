@@ -29,7 +29,7 @@ async function submit(): Promise<void> {
 
     // Login succeeded — a navigation redirect (e.g. missing permission) must not
     // be reported as a failed login.
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/schools';
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard';
     void router.push(redirect);
 }
 </script>

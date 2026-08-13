@@ -19,6 +19,13 @@ async function logout(): Promise<void> {
                     <RouterLink to="/" class="text-lg font-semibold tracking-tight">{{ $t('app.name') }}</RouterLink>
                     <RouterLink to="/" class="text-sm text-gray-600 hover:text-gray-900">{{ $t('nav.home') }}</RouterLink>
                     <RouterLink
+                        v-if="session.isAuthenticated"
+                        to="/dashboard"
+                        class="text-sm text-gray-600 hover:text-gray-900"
+                    >
+                        {{ $t('nav.dashboard') }}
+                    </RouterLink>
+                    <RouterLink
                         v-if="session.can('schools.view')"
                         to="/schools"
                         class="text-sm text-gray-600 hover:text-gray-900"
