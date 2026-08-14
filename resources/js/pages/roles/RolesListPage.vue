@@ -64,7 +64,7 @@ onMounted(load);
 
         <div class="flex justify-end">
             <input v-model="search" type="search" :placeholder="$t('role.searchPlaceholder')"
-                class="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                class="w-full max-w-xs rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
         </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
@@ -82,7 +82,7 @@ onMounted(load);
                     <tr
                         v-for="role in filtered"
                         :key="role.id"
-                        class="odd:bg-white even:bg-gray-50 hover:bg-blue-50"
+                        class="odd:bg-white even:bg-gray-100 hover:bg-blue-50"
                     >
                         <td class="px-4 py-3">
                             <span class="font-medium text-gray-900">{{ role.name }}</span>

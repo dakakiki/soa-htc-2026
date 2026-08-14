@@ -86,7 +86,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <section class="space-y-5">
+    <section class="flex flex-col gap-6">
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('venue.title') }}</h1>
@@ -99,24 +99,24 @@ onMounted(async () => {
             >{{ $t('venue.add') }}</RouterLink>
         </div>
 
-        <form class="flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
+        <form class="mt-2 flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
             <input v-model="filters.search" type="search" :placeholder="$t('venue.searchNameCity')"
-                class="w-56 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <select v-model="filters.country_id" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="onCountryFilterChange">
+                class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+            <select v-model="filters.country_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="onCountryFilterChange">
                 <option :value="null">{{ $t('venue.countryPlaceholder') }}</option>
                 <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
             <select v-model="filters.region_id" :disabled="regions.length === 0"
-                class="rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50">
+                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-50">
                 <option :value="null">{{ $t('venue.region') }}</option>
                 <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
             </select>
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
                 <option value="">{{ $t('venue.filterStatus') }}</option>
                 <option value="active">{{ $t('venue.statusActive') }}</option>
                 <option value="inactive">{{ $t('venue.statusInactive') }}</option>
             </select>
-            <button type="submit" class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
+            <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
                 {{ $t('common.search') }}
             </button>
         </form>
@@ -140,7 +140,7 @@ onMounted(async () => {
                     <tr
                         v-for="school in schools"
                         :key="school.id"
-                        class="odd:bg-white even:bg-gray-50 hover:bg-blue-50"
+                        class="odd:bg-white even:bg-gray-100 hover:bg-blue-50"
                     >
                         <td class="px-4 py-3 text-gray-500">{{ school.id }}</td>
                         <td class="px-4 py-3">
@@ -159,7 +159,6 @@ onMounted(async () => {
                         </td>
                         <td class="px-4 py-3">
                             <RowActions
-                                :view-to="{ name: 'venues.view', params: { id: school.id } }"
                                 :edit-to="canManage ? { name: 'venues.edit', params: { id: school.id } } : null"
                                 :deletable="canManage"
                                 @delete="remove(school)"

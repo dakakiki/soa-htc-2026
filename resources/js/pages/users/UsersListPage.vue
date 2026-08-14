@@ -48,8 +48,8 @@ onMounted(() => load(1));
 
         <form class="flex justify-end gap-2" @submit.prevent="load(1)">
             <input v-model="search" type="search" :placeholder="$t('user.searchPlaceholder')"
-                class="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <button type="submit" class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
+                class="w-full max-w-xs rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+            <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
                 {{ $t('common.search') }}
             </button>
         </form>
@@ -70,7 +70,7 @@ onMounted(() => load(1));
                     <tr
                         v-for="user in users"
                         :key="user.id"
-                        class="odd:bg-white even:bg-gray-50 hover:bg-blue-50"
+                        class="odd:bg-white even:bg-gray-100 hover:bg-blue-50"
                     >
                         <td class="px-4 py-3">
                             <div class="font-medium text-gray-900">{{ user.name }}</div>

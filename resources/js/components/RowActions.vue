@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { IconEye, IconPencil, IconTrash } from '@tabler/icons-vue';
 
 defineProps<{
-    viewTo: RouteLocationRaw;
+    viewTo?: RouteLocationRaw | null;
     editTo?: RouteLocationRaw | null;
     deletable?: boolean;
 }>();
@@ -19,6 +19,7 @@ const chip = 'inline-flex h-9 w-9 items-center justify-center rounded-md border 
 <template>
     <div class="flex items-center justify-end gap-2">
         <RouterLink
+            v-if="viewTo"
             :to="viewTo"
             :title="t('common.view')"
             :aria-label="t('common.view')"
