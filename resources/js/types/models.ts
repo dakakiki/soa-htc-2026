@@ -85,6 +85,37 @@ export interface DifficultyCategory {
     status: string;
 }
 
+export interface LevelOption {
+    id: number;
+    level_short: string;
+    name: string;
+    category_name: string;
+    category_type: string;
+}
+
+export interface QuestionAnswer {
+    id?: number;
+    text: string;
+    is_correct: boolean;
+    position: number;
+}
+
+export interface Question {
+    id: number;
+    title: string;
+    description: string | null;
+    question_type: string;
+    question_type_label: string;
+    points: number;
+    status: string;
+    tag?: { id: number; name?: string };
+    image_url: string | null;
+    audio_url: string | null;
+    levels?: { id: number; level_short: string }[];
+    answers?: QuestionAnswer[];
+    answers_count?: number;
+}
+
 export interface Permission {
     key: string;
     description: string | null;

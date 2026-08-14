@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\QuestionTag;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -39,9 +40,13 @@ class QuestionTagController extends Controller
         return response()->json(['data' => $questionTag->only(['id', 'name'])]);
     }
 
-    public function destroy(QuestionTag $questionTag): Response
+    public function destroy(QuestionTag $questionTag): Response|JsonResponse
     {
         $this->authorize('content.manage');
+
+        if (Question::query()->where('question_tag_id', $questionTag->id)->exists()) {
+            return response()->json(['message' => __('messages.content.tag_in_use')], 422);
+        }
         $questionTag->delete();
 
         return response()->noContent();

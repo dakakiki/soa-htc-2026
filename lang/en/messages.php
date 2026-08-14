@@ -43,4 +43,7 @@ return [
         'countries_required' => 'Select at least one country, or enable "all countries".',
         'category_in_use' => 'This category has levels and cannot be deleted. Delete its levels first.',
     ],
+    'content' => [
+        'tag_in_use' => 'This tag is used by questions and cannot be deleted.',
+    ],
 ];

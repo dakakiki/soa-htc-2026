@@ -73,6 +73,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('test-types', \App\Http\Controllers\Api\TestTypeController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('exam-rounds', \App\Http\Controllers\Api\ExamRoundController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('question-tags', \App\Http\Controllers\Api\QuestionTagController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::apiResource('questions', \App\Http\Controllers\Api\QuestionController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+
+    // Difficulty levels as pickable options for content forms (id + short + category).
+    Route::get('difficulty-level-options', fn () => ['data' => \App\Domain\Assessment\Models\DifficultyLevel::query()
+        ->join('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
+        ->orderBy('difficulty_categories.type')->orderBy('difficulty_levels.position')
+        ->get(['difficulty_levels.id', 'difficulty_levels.level_short', 'difficulty_levels.name', 'difficulty_categories.name as category_name', 'difficulty_categories.type as category_type'])]);
 
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);

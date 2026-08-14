@@ -100,6 +100,24 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'difficulty.manage' },
     },
     {
+        path: '/content/questions',
+        name: 'questions',
+        component: () => import('@/pages/content/QuestionsListPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
+        path: '/content/questions/new',
+        name: 'questions.new',
+        component: () => import('@/pages/content/QuestionFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
+        path: '/content/questions/:id/edit',
+        name: 'questions.edit',
+        component: () => import('@/pages/content/QuestionFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
         path: '/content/test-types',
         name: 'content.test-types',
         component: () => import('@/pages/content/LookupListPage.vue'),
