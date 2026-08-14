@@ -11,6 +11,7 @@ import {
     IconSettings,
     IconLock,
     IconWorld,
+    IconPalette,
     IconChevronDown,
     IconChevronUp,
     IconChevronsLeft,
@@ -57,6 +58,7 @@ const groups: NavGroup[] = [
         icon: IconSettings,
         children: [
             { label: t('nav.locations'), icon: IconWorld, to: 'locations', prefix: 'locations', perm: 'locations.manage' },
+            { label: t('nav.theme'), icon: IconPalette, to: 'settings.theme', prefix: 'settings.theme', perm: 'settings.manage' },
             { label: t('nav.roles'), icon: IconLock, to: 'roles', prefix: 'roles', perm: 'roles.manage' },
         ],
     },
@@ -88,7 +90,7 @@ function toggle(g: NavGroup): void {
 }
 
 const itemClass = (active: boolean): string =>
-    active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
+    active ? 'bg-brand-primary-soft text-brand-primary' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
 
 // Right-side hover tooltip shown next to icon-rail items when the sidebar is collapsed.
 const railTip =
@@ -118,7 +120,7 @@ const railTip =
                     type="button"
                     class="group/tt relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm"
                     :class="[
-                        groupActive(g) ? 'text-blue-700 hover:bg-gray-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                        groupActive(g) ? 'text-brand-primary hover:bg-gray-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
                         { 'justify-center': collapsed },
                     ]"
                     @click="toggle(g)"

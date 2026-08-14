@@ -7,12 +7,14 @@ use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\SeasonUserAssignment;
+use App\Domain\Organization\Models\Setting;
 use App\Models\User;
 use App\Policies\CountryPolicy;
 use App\Policies\RegionPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\SchoolPolicy;
 use App\Policies\SeasonUserAssignmentPolicy;
+use App\Policies\SettingPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -39,5 +41,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Role::class, RolePolicy::class);
         Gate::policy(Country::class, CountryPolicy::class);
         Gate::policy(Region::class, RegionPolicy::class);
+        Gate::policy(Setting::class, SettingPolicy::class);
     }
 }

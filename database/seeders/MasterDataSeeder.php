@@ -12,6 +12,7 @@ use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
+use App\Domain\Organization\Models\Setting;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -29,6 +30,9 @@ class MasterDataSeeder extends Seeder
         if (! app()->environment('local', 'testing')) {
             return;
         }
+
+        // Branding/theme singleton (self-heals via Setting::current(), seeded here for dev).
+        Setting::current();
 
         $countries = collect([
             ['code' => 'RS', 'name' => 'Serbia'],

@@ -15,6 +15,22 @@ export interface Country {
     schools_count?: number;
 }
 
+export type ThemeColorKey =
+    | 'primary'
+    | 'primary_hover'
+    | 'primary_soft'
+    | 'on_primary'
+    | 'accent'
+    | 'accent_hover'
+    | 'link'
+    | 'border';
+
+export interface Theme {
+    logo_url: string | null;
+    logo_icon_url: string | null;
+    colors: Record<ThemeColorKey, string>;
+}
+
 export interface School {
     id: number;
     name: string;

@@ -89,7 +89,7 @@ onMounted(async () => {
 
             <div class="flex gap-2">
                 <button v-if="!locked" type="submit" :disabled="saving"
-                    class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                     {{ saving ? $t('common.saving') : isEdit ? $t('common.save') : $t('common.create') }}
                 </button>
                 <RouterLink :to="{ name: 'roles' }" class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">

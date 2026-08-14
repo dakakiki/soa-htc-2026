@@ -58,7 +58,7 @@ onMounted(load);
             </div>
             <RouterLink
                 :to="{ name: 'roles.new' }"
-                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
             >{{ $t('role.add') }}</RouterLink>
         </div>
 
@@ -82,13 +82,13 @@ onMounted(load);
                     <tr
                         v-for="role in filtered"
                         :key="role.id"
-                        class="odd:bg-white even:bg-gray-100 hover:bg-blue-50"
+                        class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft"
                     >
                         <td class="px-4 py-3">
                             <span class="font-medium text-gray-900">{{ role.name }}</span>
                             <span
                                 class="ml-2 rounded-full px-2 py-0.5 text-xs"
-                                :class="role.is_system ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-700'"
+                                :class="role.is_system ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-brand-primary'"
                             >{{ role.is_system ? $t('role.system') : $t('role.custom') }}</span>
                             <div class="text-xs text-gray-400">{{ role.key }}</div>
                         </td>

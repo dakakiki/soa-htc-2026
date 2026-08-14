@@ -3,9 +3,11 @@ import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
+import { useThemeStore } from '@/stores/theme';
 import { apiErrorMessage } from '@/api/http';
 
 const session = useSessionStore();
+const themeStore = useThemeStore();
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
@@ -37,6 +39,8 @@ async function submit(): Promise<void> {
 <template>
     <div class="mx-auto max-w-sm">
         <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <img v-if="themeStore.theme?.logo_url" :src="themeStore.theme.logo_url" :alt="$t('app.name')"
+                class="mb-4 h-12 max-w-[16rem] object-contain" />
             <h1 class="text-lg font-semibold">{{ $t('login.title') }}</h1>
             <p class="mt-1 text-sm text-gray-500">{{ $t('login.subtitle') }}</p>
 
@@ -69,7 +73,7 @@ async function submit(): Promise<void> {
                 <button
                     type="submit"
                     :disabled="loading"
-                    class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    class="w-full rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
                 >
                     {{ loading ? $t('login.submitting') : $t('login.submit') }}
                 </button>

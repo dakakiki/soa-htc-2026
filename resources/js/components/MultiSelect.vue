@@ -120,12 +120,12 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
                     <span
                         v-for="opt in selectedOptions"
                         :key="opt.id"
-                        class="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+                        class="inline-flex items-center gap-1 rounded bg-brand-primary-soft px-2 py-0.5 text-xs text-brand-primary"
                     >
                         {{ opt.label }}
                         <span
                             v-if="!disabled"
-                            class="cursor-pointer text-blue-400 hover:text-blue-700"
+                            class="cursor-pointer text-blue-400 hover:text-brand-primary"
                             role="button"
                             :aria-label="`remove ${opt.label}`"
                             @click.stop="remove(opt.id)"
@@ -159,7 +159,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
                 <li
                     v-for="opt in filtered"
                     :key="opt.id"
-                    class="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-blue-50"
+                    class="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-brand-primary-soft"
                     @click="toggle(opt.id)"
                 >
                     <input type="checkbox" :checked="isSelected(opt.id)" class="pointer-events-none h-4 w-4" tabindex="-1" />

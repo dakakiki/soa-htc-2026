@@ -222,7 +222,7 @@ onMounted(load);
             <button
                 v-if="canManage"
                 type="button"
-                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                 @click="openAddCountry"
             >{{ $t('location.addCountry') }}</button>
         </div>
@@ -254,7 +254,7 @@ onMounted(load);
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="c in filtered" :key="c.id" class="odd:bg-white even:bg-gray-100 hover:bg-blue-50">
+                    <tr v-for="c in filtered" :key="c.id" class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft">
                         <td class="px-4 py-3 text-gray-500">{{ c.id }}</td>
                         <td class="px-4 py-3 font-mono font-medium text-gray-900">{{ c.code }}</td>
                         <td class="px-4 py-3 text-gray-800">{{ c.name }}</td>
@@ -264,7 +264,7 @@ onMounted(load);
                             <div class="flex items-center justify-end gap-1.5">
                                 <Tooltip :text="$t('location.manageRegions')">
                                     <button type="button" :aria-label="$t('location.manageRegions')"
-                                        :class="[chip, 'text-blue-600']" @click="openRegions(c)">
+                                        :class="[chip, 'text-brand-link']" @click="openRegions(c)">
                                         <IconMap :size="16" />
                                     </button>
                                 </Tooltip>
@@ -318,7 +318,7 @@ onMounted(load);
                         <button type="button" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
                             @click="closeCountryModal">{{ $t('common.cancel') }}</button>
                         <button type="submit" :disabled="countryModal.saving"
-                            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                            class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                             {{ countryModal.saving ? $t('common.saving') : $t('common.save') }}
                         </button>
                     </div>
@@ -381,7 +381,7 @@ onMounted(load);
                             class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
                             :placeholder="regionsModal.editingId ? $t('location.editRegion') : $t('location.addRegionPlaceholder')" />
                         <button type="submit" :disabled="regionsModal.saving"
-                            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                            class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                             {{ regionsModal.editingId ? $t('common.save') : $t('location.addRegion') }}
                         </button>
                         <button v-if="regionsModal.editingId" type="button"

@@ -73,7 +73,7 @@ onMounted(async () => {
                 <dd class="text-gray-900">{{ venue.invigilators_count ?? $t('common.dash') }}</dd>
                 <dt class="text-gray-500">{{ $t('venue.file') }}</dt>
                 <dd class="text-gray-900">
-                    <a v-if="venue.image_url" :href="venue.image_url" target="_blank" class="text-blue-600 hover:underline">
+                    <a v-if="venue.image_url" :href="venue.image_url" target="_blank" class="text-brand-link hover:underline">
                         {{ $t('venue.currentFile') }}
                     </a>
                     <span v-else>{{ $t('common.dash') }}</span>
@@ -84,7 +84,7 @@ onMounted(async () => {
                 <RouterLink
                     v-if="canManage"
                     :to="{ name: 'venues.edit', params: { id: venue.id } }"
-                    class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                 >{{ $t('common.edit') }}</RouterLink>
                 <RouterLink :to="{ name: 'venues' }" class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
                     {{ $t('common.back') }}

@@ -56,7 +56,7 @@ onMounted(async () => {
                 <h1 class="text-2xl font-semibold tracking-tight">{{ role.name }}</h1>
                 <span
                     class="rounded-full px-2 py-0.5 text-xs"
-                    :class="role.is_system ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-700'"
+                    :class="role.is_system ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-brand-primary'"
                 >{{ role.is_system ? $t('role.system') : $t('role.custom') }}</span>
             </div>
             <p class="mt-1 font-mono text-xs text-gray-400">{{ role.key }}</p>
@@ -75,7 +75,7 @@ onMounted(async () => {
                 <RouterLink
                     v-if="!role.is_system"
                     :to="{ name: 'roles.edit', params: { id: role.id } }"
-                    class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                 >{{ $t('common.edit') }}</RouterLink>
                 <button v-if="!role.is_system" class="rounded-md border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50" @click="remove">
                     {{ $t('common.remove') }}

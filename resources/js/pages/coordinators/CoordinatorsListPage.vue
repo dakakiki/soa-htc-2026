@@ -165,7 +165,7 @@ onMounted(async () => {
             <RouterLink
                 v-if="canManage"
                 :to="{ name: 'coordinators.new' }"
-                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
             >{{ $t('coordinator.add') }}</RouterLink>
         </div>
 
@@ -241,9 +241,9 @@ onMounted(async () => {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="c in coordinators" :key="c.id" class="odd:bg-white even:bg-gray-100 hover:bg-blue-50">
+                    <tr v-for="c in coordinators" :key="c.id" class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft">
                         <td class="px-4 py-3">
-                            <RouterLink :to="{ name: 'coordinators.edit', params: { id: c.id } }" class="font-medium text-gray-900 hover:text-blue-700">
+                            <RouterLink :to="{ name: 'coordinators.edit', params: { id: c.id } }" class="font-medium text-gray-900 hover:text-brand-primary">
                                 {{ c.name }}
                             </RouterLink>
                             <div class="text-xs text-gray-400">{{ c.email }}</div>
@@ -253,7 +253,7 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-600">{{ c.role?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ c.venues_count }}</td>
                         <td class="px-4 py-3 text-center">
-                            <button v-if="c.schools.length" type="button" class="text-gray-500 hover:text-blue-600"
+                            <button v-if="c.schools.length" type="button" class="text-gray-500 hover:text-brand-link"
                                 :title="$t('coordinator.schools')" @click="modalCoordinator = c">
                                 <IconBuilding :size="20" />
                             </button>

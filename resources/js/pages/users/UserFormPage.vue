@@ -178,7 +178,7 @@ onMounted(async () => {
 
 const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 const fileBtn =
-    'mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-400 hover:bg-blue-50';
+    'mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-400 hover:bg-brand-primary-soft';
 </script>
 
 <template>
@@ -271,7 +271,7 @@ const fileBtn =
                                 <input type="file" accept="image/*" class="hidden" @change="onImageChange" />
                             </label>
                             <a v-if="currentImageUrl && !imageFile" :href="currentImageUrl" target="_blank"
-                                class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('user.currentImage') }}</a>
+                                class="mt-1 inline-block text-xs text-brand-link hover:underline">{{ $t('user.currentImage') }}</a>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">{{ $t('user.file') }}</label>
@@ -283,7 +283,7 @@ const fileBtn =
                                 <input type="file" accept="image/*,application/pdf" class="hidden" @change="onFileChange" />
                             </label>
                             <a v-if="currentFileUrl && !uploadFile" :href="currentFileUrl" target="_blank"
-                                class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('user.currentFile') }}</a>
+                                class="mt-1 inline-block text-xs text-brand-link hover:underline">{{ $t('user.currentFile') }}</a>
                         </div>
                     </div>
                 </div>
@@ -322,7 +322,7 @@ const fileBtn =
                     {{ $t('common.cancel') }}
                 </button>
                 <button type="submit" :disabled="saving"
-                    class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                     {{ saving ? $t('common.saving') : isEdit ? $t('common.save') : $t('common.create') }}
                 </button>
             </div>

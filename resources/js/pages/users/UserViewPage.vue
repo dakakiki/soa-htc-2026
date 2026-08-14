@@ -103,7 +103,7 @@ onMounted(async () => {
             <div class="rounded-lg border border-gray-200 bg-white p-6">
                 <div class="flex items-start justify-between">
                     <h1 class="text-2xl font-semibold tracking-tight">{{ user.name }}</h1>
-                    <RouterLink :to="{ name: 'users.edit', params: { id: user.id } }" class="text-sm text-blue-600 hover:underline">
+                    <RouterLink :to="{ name: 'users.edit', params: { id: user.id } }" class="text-sm text-brand-link hover:underline">
                         {{ $t('common.edit') }}
                     </RouterLink>
                 </div>
@@ -136,8 +136,8 @@ onMounted(async () => {
                     <template v-if="user.image_url || user.file_url">
                         <dt class="text-gray-500">{{ $t('user.file') }}</dt>
                         <dd class="col-span-2 text-gray-900">
-                            <a v-if="user.image_url" :href="user.image_url" target="_blank" class="text-blue-600 hover:underline">{{ $t('user.image') }}</a>
-                            <a v-if="user.file_url" :href="user.file_url" target="_blank" class="ml-3 text-blue-600 hover:underline">{{ $t('user.file') }}</a>
+                            <a v-if="user.image_url" :href="user.image_url" target="_blank" class="text-brand-link hover:underline">{{ $t('user.image') }}</a>
+                            <a v-if="user.file_url" :href="user.file_url" target="_blank" class="ml-3 text-brand-link hover:underline">{{ $t('user.file') }}</a>
                         </dd>
                     </template>
                 </dl>
@@ -192,7 +192,7 @@ onMounted(async () => {
 
                     <div class="flex items-center gap-3">
                         <button type="submit" :disabled="assignSaving"
-                            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                            class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                             {{ $t('user.assign') }}
                         </button>
                         <span v-if="assignError" class="text-sm text-red-600">{{ assignError }}</span>

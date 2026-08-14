@@ -22,7 +22,7 @@ defineEmits<{ (e: 'update:modelValue', value: T): void }>();
             class="px-4 py-2 text-sm"
             :class="[
                 opt.value === modelValue
-                    ? (opt.activeClass ?? 'bg-blue-600 text-white')
+                    ? (opt.activeClass ?? 'bg-brand-primary text-white')
                     : 'bg-white text-gray-600 hover:bg-gray-50',
                 i > 0 ? 'border-l border-gray-300' : '',
             ]"

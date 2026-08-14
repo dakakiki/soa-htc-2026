@@ -119,8 +119,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
                 <li
                     v-for="opt in filtered"
                     :key="opt.id"
-                    class="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-blue-50"
-                    :class="opt.id === modelValue ? 'bg-blue-50 font-medium text-blue-700' : 'text-gray-800'"
+                    class="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-brand-primary-soft"
+                    :class="opt.id === modelValue ? 'bg-brand-primary-soft font-medium text-brand-primary' : 'text-gray-800'"
                     @click="choose(opt.id)"
                 >
                     <span class="flex-1">{{ opt.label }}</span>

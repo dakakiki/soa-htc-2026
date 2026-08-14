@@ -146,7 +146,7 @@ onMounted(async () => {
             <RouterLink
                 v-if="canManage"
                 :to="{ name: 'venues.new' }"
-                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
             >{{ $t('venue.add') }}</RouterLink>
         </div>
 
@@ -206,11 +206,11 @@ onMounted(async () => {
                     <tr
                         v-for="school in schools"
                         :key="school.id"
-                        class="odd:bg-white even:bg-gray-100 hover:bg-blue-50"
+                        class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft"
                     >
                         <td class="px-4 py-3 text-gray-500">{{ school.id }}</td>
                         <td class="px-4 py-3">
-                            <RouterLink :to="{ name: 'venues.view', params: { id: school.id } }" class="font-medium text-gray-900 hover:text-blue-700">
+                            <RouterLink :to="{ name: 'venues.view', params: { id: school.id } }" class="font-medium text-gray-900 hover:text-brand-primary">
                                 {{ school.name }}
                             </RouterLink>
                         </td>

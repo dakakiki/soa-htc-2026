@@ -6,6 +6,20 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /*
+     * Brand colour tokens. Defaults preserve the original blue look; the SPA
+     * overrides these CSS variables at runtime from the admin theme settings
+     * (resources/js/theme.ts), so `bg-brand-primary` etc. re-skin live.
+     */
+    --color-brand-primary: #2563eb;
+    --color-brand-primary-hover: #1d4ed8;
+    --color-brand-primary-soft: #eff6ff;
+    --color-brand-on-primary: #ffffff;
+    --color-brand-accent: #0d9488;
+    --color-brand-accent-hover: #0f766e;
+    --color-brand-link: #2563eb;
+    --color-brand-border: #e5e7eb;
 }
 
 @layer base {

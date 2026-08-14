@@ -235,7 +235,7 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
                     <label class="block text-sm font-medium text-gray-700">{{ $t('venue.file') }}</label>
                     <input type="file" accept="image/*,application/pdf" class="mt-2 text-sm" @change="onFileChange" />
                     <a v-if="currentImageUrl" :href="currentImageUrl" target="_blank"
-                        class="ml-3 text-sm text-blue-600 hover:underline">{{ $t('venue.currentFile') }}</a>
+                        class="ml-3 text-sm text-brand-link hover:underline">{{ $t('venue.currentFile') }}</a>
                 </div>
 
                 <div class="sm:col-span-4">
@@ -253,7 +253,7 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
                     {{ $t('common.cancel') }}
                 </button>
                 <button type="submit" :disabled="saving"
-                    class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                     {{ saving ? $t('common.saving') : isEdit ? $t('common.save') : $t('common.create') }}
                 </button>
             </div>

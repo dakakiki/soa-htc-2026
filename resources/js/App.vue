@@ -3,11 +3,13 @@ import { RouterLink, RouterView, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconLogout } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
+import { useThemeStore } from '@/stores/theme';
 import AppSidebar from '@/components/AppSidebar.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Tooltip from '@/components/Tooltip.vue';
 
 const session = useSessionStore();
+const themeStore = useThemeStore();
 const router = useRouter();
 const { t } = useI18n();
 
@@ -21,7 +23,10 @@ async function logout(): Promise<void> {
     <div class="flex h-screen flex-col overflow-hidden bg-gray-50 text-gray-900">
         <template v-if="session.isAuthenticated">
             <header class="flex shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 py-3">
-                <RouterLink to="/dashboard" class="text-lg font-semibold tracking-tight">{{ $t('app.name') }}</RouterLink>
+                <RouterLink to="/dashboard" class="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                    <img v-if="themeStore.theme?.logo_url" :src="themeStore.theme.logo_url" :alt="$t('app.name')" class="h-8 max-w-[12rem] object-contain" />
+                    <span v-else>{{ $t('app.name') }}</span>
+                </RouterLink>
                 <div class="ml-auto flex items-center gap-4 text-sm">
                     <span class="text-gray-500">{{ session.user?.email }}</span>
                     <Tooltip :text="t('nav.logout')" position="bottom">
