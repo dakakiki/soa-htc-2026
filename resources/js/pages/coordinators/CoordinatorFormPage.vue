@@ -8,6 +8,7 @@ import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
+import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import type { Country, Region, Role, School } from '@/types/models';
 
 const SCHOOL_COORDINATOR_KEY = 'school_coordinator';
@@ -55,14 +56,9 @@ const coordinatorRoles = computed(() => roles.value.filter((r) => COORDINATOR_RO
 const selectedRoleKey = computed(() => roles.value.find((r) => r.id === form.role_id)?.key);
 const isSingleSchool = computed(() => selectedRoleKey.value === SCHOOL_COORDINATOR_KEY);
 
-// A school coordinator holds exactly one school; bind the single <select> to the
-// first (and only) entry of school_ids.
-const singleSchoolId = computed<number | null>({
-    get: () => form.school_ids[0] ?? null,
-    set: (v) => {
-        form.school_ids = v === null ? [] : [v];
-    },
-});
+const schoolOptions = computed<MultiSelectOption[]>(() =>
+    schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })),
+);
 
 const statusOptions = computed(() => [
     { value: 'active', label: t('coordinator.statusActive'), activeClass: 'bg-green-500 text-white' },
@@ -231,16 +227,16 @@ const fileBtn =
                     </select>
                 </div>
                 <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.schools') }}</label>
-                    <select v-if="isSingleSchool" v-model="singleSchoolId" :disabled="schools.length === 0"
-                        :class="[field, 'disabled:bg-gray-50']">
-                        <option :value="null">{{ form.country_id ? $t('coordinator.schoolSingleHint') : $t('coordinator.schoolsPlaceholder') }}</option>
-                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
-                    <select v-else v-model="form.school_ids" multiple :disabled="schools.length === 0"
-                        class="mt-1 h-24 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50">
-                        <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.venuesLabel') }}</label>
+                    <MultiSelect
+                        v-model="form.school_ids"
+                        :options="schoolOptions"
+                        :single="isSingleSchool"
+                        :disabled="schools.length === 0"
+                        :placeholder="$t('coordinator.schoolsPlaceholder')"
+                        :search-placeholder="$t('coordinator.venuesLabel')"
+                        :summary="(n: number) => $t('coordinator.venuesSelected', { count: n })"
+                    />
                     <p class="mt-1 text-xs text-gray-400">{{ isSingleSchool ? $t('coordinator.schoolSingleHint') : $t('coordinator.schoolMultiHint') }}</p>
                 </div>
 
