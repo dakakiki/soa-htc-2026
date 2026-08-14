@@ -45,6 +45,8 @@ export interface School {
     invigilators_count?: number | null;
     school_type?: string | null;
     image_url?: string | null;
+    level_counts?: Record<string, number>;
+    total_competitors?: number;
 }
 
 export interface Region {
@@ -122,6 +124,8 @@ export interface CoordinatorSchool {
     city: string | null;
     country: string | null;
     status: string;
+    level_counts?: Record<string, number>;
+    total_competitors?: number;
 }
 
 export interface Coordinator {

@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
 import { deleteSchool, listSchools, setSchoolStatus } from '@/api/schools';
-import { listCountries, listRegions } from '@/api/reference';
+import { listCountries, listRegions, listLevelColumns } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
@@ -34,6 +34,7 @@ const error = ref<string | null>(null);
 
 const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
+const levelColumns = ref<string[]>([]);
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
 const filters = reactive<{ search: string; country_id: number | null; region_id: number | null; status: string }>({
@@ -119,10 +120,11 @@ async function remove(school: School): Promise<void> {
 
 onMounted(async () => {
     try {
-        const { data } = await listCountries();
-        countries.value = data.data;
+        const [{ data: countryData }, { data: columnData }] = await Promise.all([listCountries(), listLevelColumns()]);
+        countries.value = countryData.data;
+        levelColumns.value = columnData.data;
     } catch {
-        // filters are optional
+        // filters and level columns are optional
     }
     if (filters.country_id) {
         try {
@@ -198,6 +200,8 @@ onMounted(async () => {
                         <th class="px-4 py-3">{{ $t('venue.city') }}</th>
                         <th class="px-4 py-3">{{ $t('venue.region') }}</th>
                         <th class="px-4 py-3">{{ $t('venue.country') }}</th>
+                        <th v-for="col in levelColumns" :key="col" class="px-2 py-3 text-center">{{ col }}</th>
+                        <th class="px-2 py-3 text-center font-semibold">{{ $t('venue.total') }}</th>
                         <th class="px-4 py-3">{{ $t('venue.status') }}</th>
                         <th class="px-4 py-3 text-right">{{ $t('common.actions') }}</th>
                     </tr>
@@ -217,6 +221,10 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-600">{{ school.city || $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ school.region?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ school.country.name ?? $t('common.dash') }}</td>
+                        <td v-for="col in levelColumns" :key="col" class="px-2 py-3 text-center text-gray-500">
+                            {{ school.level_counts?.[col] ?? 0 }}
+                        </td>
+                        <td class="px-2 py-3 text-center font-semibold text-gray-800">{{ school.total_competitors ?? 0 }}</td>
                         <td class="px-4 py-3">
                             <Tooltip :text="$t('venue.toggleStatus')">
                                 <ToggleSwitch
@@ -236,7 +244,7 @@ onMounted(async () => {
                         </td>
                     </tr>
                     <tr v-if="!loading && schools.length === 0">
-                        <td colspan="7" class="px-4 py-6 text-center text-gray-400">{{ $t('venue.empty') }}</td>
+                        <td :colspan="7 + levelColumns.length" class="px-4 py-6 text-center text-gray-400">{{ $t('venue.empty') }}</td>
                     </tr>
                 </tbody>
             </table>

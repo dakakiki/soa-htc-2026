@@ -37,6 +37,10 @@ class SchoolResource extends JsonResource
             'invigilators_count' => $this->invigilators_count,
             'school_type' => $this->school_type?->value,
             'image_url' => $this->image_path ? Storage::disk('public')->url($this->image_path) : null,
+            // Competitor counts per difficulty level; empty/zero until results are
+            // imported, then keyed by level short (e.g. {"H1": 19}).
+            'level_counts' => (object) [],
+            'total_competitors' => 0,
         ];
     }
 }

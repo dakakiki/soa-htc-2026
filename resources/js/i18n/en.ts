@@ -115,6 +115,7 @@ export default {
         currentFile: 'Current file',
         searchPlaceholder: 'Search venues…',
         id: 'ID',
+        total: 'Total',
         searchNameCity: 'Name, City',
         filterStatus: 'Status…',
         empty: 'No venues.',

@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
 import { deleteCoordinator, listCoordinators, setCoordinatorStatus } from '@/api/coordinators';
-import { listCountries, listRegions, listRoles } from '@/api/reference';
+import { listCountries, listRegions, listRoles, listLevelColumns } from '@/api/reference';
 import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
@@ -40,6 +40,7 @@ const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
 const schools = ref<School[]>([]);
 const roles = ref<Role[]>([]);
+const levelColumns = ref<string[]>([]);
 const coordinatorRoles = computed(() => roles.value.filter((r) => COORDINATOR_ROLE_KEYS.includes(r.key)));
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
@@ -142,9 +143,10 @@ async function remove(c: Coordinator): Promise<void> {
 
 onMounted(async () => {
     try {
-        const [{ data: countryData }, { data: roleData }] = await Promise.all([listCountries(), listRoles()]);
+        const [{ data: countryData }, { data: roleData }, { data: columnData }] = await Promise.all([listCountries(), listRoles(), listLevelColumns()]);
         countries.value = countryData.data;
         roles.value = roleData.data;
+        levelColumns.value = columnData.data;
     } catch {
         // filters are optional
     }
@@ -310,6 +312,8 @@ onMounted(async () => {
                                 <th class="px-3 py-2">{{ $t('coordinator.venue') }}</th>
                                 <th class="px-3 py-2">{{ $t('coordinator.city') }}</th>
                                 <th class="px-3 py-2">{{ $t('coordinator.country') }}</th>
+                                <th v-for="col in levelColumns" :key="col" class="px-2 py-2 text-center">{{ col }}</th>
+                                <th class="px-2 py-2 text-center font-semibold">{{ $t('venue.total') }}</th>
                                 <th class="px-3 py-2">{{ $t('coordinator.status') }}</th>
                             </tr>
                         </thead>
@@ -319,6 +323,8 @@ onMounted(async () => {
                                 <td class="px-3 py-2 font-medium text-gray-900">{{ s.name }}</td>
                                 <td class="px-3 py-2 text-gray-600">{{ s.city || $t('common.dash') }}</td>
                                 <td class="px-3 py-2 text-gray-600">{{ s.country || $t('common.dash') }}</td>
+                                <td v-for="col in levelColumns" :key="col" class="px-2 py-2 text-center text-gray-500">{{ s.level_counts?.[col] ?? 0 }}</td>
+                                <td class="px-2 py-2 text-center font-semibold text-gray-800">{{ s.total_competitors ?? 0 }}</td>
                                 <td class="px-3 py-2">
                                     <ToggleSwitch :model-value="s.status === 'active'" disabled :aria-label="$t('coordinator.toggleStatus')" />
                                 </td>

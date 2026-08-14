@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\Storage;
 /**
  * A staff user seen through the coordinator lens: exposes their profile plus the
  * single coordinator assignment (role + scoped schools) for the active season.
- * Result columns (BH/LH/H1…Total) are intentionally omitted until levels and
- * results exist in the new system.
+ * Per-school competitor counts by difficulty level are exposed but stay zero
+ * until results are imported.
  *
  * @mixin User
  */
@@ -65,6 +65,9 @@ class CoordinatorResource extends JsonResource
                 'city' => $s->city,
                 'country' => $s->relationLoaded('country') ? $s->country?->name : null,
                 'status' => $s->status,
+                // Zero until results exist; then keyed by level short (e.g. {"H1": 19}).
+                'level_counts' => (object) [],
+                'total_competitors' => 0,
             ])->values(),
         ];
     }

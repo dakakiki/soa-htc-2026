@@ -18,3 +18,8 @@ export function listRoles() {
 export function listPermissions() {
     return http.get<{ data: Permission[] }>('/api/permissions');
 }
+
+/** Ordered difficulty level short codes used as competitor-count columns. */
+export function listLevelColumns() {
+    return http.get<{ data: string[] }>('/api/difficulty-level-columns');
+}
