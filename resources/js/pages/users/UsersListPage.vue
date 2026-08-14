@@ -9,6 +9,7 @@ import { listCountries, listRegions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
+import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import type { AdminUser, Country, Region } from '@/types/models';
 
 const { t } = useI18n();
@@ -159,7 +160,10 @@ onMounted(async () => {
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
-        <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <p class="text-sm text-gray-500">{{ $t('common.results', { count: total }) }}</p>
+
+        <div class="relative min-h-[8rem] overflow-x-auto rounded-lg border border-gray-200 bg-white">
+            <LoadingOverlay v-if="loading" />
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                     <tr>

@@ -35,6 +35,7 @@ export default {
     },
     common: {
         loading: 'Loading…',
+        results: '{count} results found',
         cancel: 'Cancel',
         add: 'Add',
         save: 'Save',

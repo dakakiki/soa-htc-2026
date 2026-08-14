@@ -6,6 +6,7 @@ import { createSchool, getSchool, updateSchool, type SchoolPayload } from '@/api
 import { listCountries, listRegions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import ButtonGroup from '@/components/ButtonGroup.vue';
+import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import type { Country, Region } from '@/types/models';
 
 const route = useRoute();
@@ -147,7 +148,8 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 
         <h1 class="text-2xl font-semibold tracking-tight">{{ isEdit ? $t('venue.edit') : $t('venue.add') }}</h1>
 
-        <form class="rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
+        <form class="relative rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
+            <LoadingOverlay v-if="saving" :message="$t('common.saving')" />
             <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-4">
                 <div class="sm:col-span-4">
                     <label class="block text-sm font-medium text-gray-700">{{ $t('venue.name') }} *</label>

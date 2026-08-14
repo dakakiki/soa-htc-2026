@@ -7,6 +7,7 @@ import { listCountries, listRegions, listRoles } from '@/api/reference';
 import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import ButtonGroup from '@/components/ButtonGroup.vue';
+import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
@@ -203,7 +204,8 @@ const fileBtn =
 
         <h1 class="text-2xl font-semibold tracking-tight">{{ isEdit ? $t('coordinator.edit') : $t('coordinator.add') }}</h1>
 
-        <form class="rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
+        <form class="relative rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
+            <LoadingOverlay v-if="saving" :message="$t('common.saving')" />
             <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
                 <!-- Right column: assignment + permissions -->
                 <div class="space-y-5 lg:order-2 lg:col-span-4 lg:border-l lg:border-gray-200 lg:pl-8">

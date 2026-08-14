@@ -6,6 +6,7 @@ import { createUser, getUser, updateUser, type UserPayload } from '@/api/users';
 import { listCountries, listRegions, listRoles } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import ButtonGroup from '@/components/ButtonGroup.vue';
+import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import type { Country, Region, Role } from '@/types/models';
@@ -184,7 +185,8 @@ const fileBtn =
 
         <h1 class="text-2xl font-semibold tracking-tight">{{ isEdit ? $t('user.edit') : $t('user.add') }}</h1>
 
-        <form class="rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
+        <form class="relative rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
+            <LoadingOverlay v-if="saving" :message="$t('common.saving')" />
             <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
                 <!-- Left column: basic data -->
                 <div class="space-y-5 lg:order-1 lg:col-span-8">
