@@ -11,6 +11,8 @@ export interface Country {
     id: number;
     code: string;
     name: string;
+    regions_count?: number;
+    schools_count?: number;
 }
 
 export interface School {
@@ -33,6 +35,7 @@ export interface Region {
     id: number;
     name: string;
     country_id: number;
+    schools_count?: number;
 }
 
 export interface Role {

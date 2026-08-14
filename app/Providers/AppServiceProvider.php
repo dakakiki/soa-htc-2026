@@ -3,9 +3,13 @@
 namespace App\Providers;
 
 use App\Domain\Identity\Models\Role;
+use App\Domain\Organization\Models\Country;
+use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
+use App\Policies\CountryPolicy;
+use App\Policies\RegionPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\SchoolPolicy;
 use App\Policies\SeasonUserAssignmentPolicy;
@@ -33,5 +37,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(SeasonUserAssignment::class, SeasonUserAssignmentPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
+        Gate::policy(Country::class, CountryPolicy::class);
+        Gate::policy(Region::class, RegionPolicy::class);
     }
 }

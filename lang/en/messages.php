@@ -26,8 +26,12 @@ return [
         'school_country' => "Selected schools must belong to the user's country.",
         'needs_country' => 'Assign a country to the user before adding coordinator scope.',
     ],
+    'country' => [
+        'in_use' => 'This country has regions, venues or users and cannot be deleted.',
+    ],
     'region' => [
         'mismatch' => 'The selected region does not belong to the selected country.',
+        'in_use' => 'This region has venues or users and cannot be deleted.',
     ],
     'user' => [
         'self_delete' => 'You cannot delete your own account.',

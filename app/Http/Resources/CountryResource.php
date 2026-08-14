@@ -20,6 +20,8 @@ class CountryResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
+            'regions_count' => $this->whenCounted('regions'),
+            'schools_count' => $this->whenCounted('schools'),
         ];
     }
 }

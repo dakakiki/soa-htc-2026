@@ -42,7 +42,13 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'show']);
     Route::get('countries', [CountryController::class, 'index']);
+    Route::post('countries', [CountryController::class, 'store']);
+    Route::put('countries/{country}', [CountryController::class, 'update']);
+    Route::delete('countries/{country}', [CountryController::class, 'destroy']);
     Route::get('regions', [RegionController::class, 'index']);
+    Route::post('regions', [RegionController::class, 'store']);
+    Route::put('regions/{region}', [RegionController::class, 'update']);
+    Route::delete('regions/{region}', [RegionController::class, 'destroy']);
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('schools', SchoolController::class);

@@ -25,6 +25,7 @@ class RolePermissionSeeder extends Seeder
         'seasons.manage' => 'Create and manage seasons',
         'users.manage' => 'Manage staff users and season assignments',
         'roles.manage' => 'Create and manage roles and their permissions',
+        'locations.manage' => 'Create and update countries and regions',
     ];
 
     /**

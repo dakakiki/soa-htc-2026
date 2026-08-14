@@ -117,6 +117,6 @@ class RoleAdminTest extends TestCase
         $this->actingAs($this->admin())
             ->getJson('/api/permissions')
             ->assertOk()
-            ->assertJsonCount(7, 'data');
+            ->assertJsonCount(8, 'data');
     }
 }

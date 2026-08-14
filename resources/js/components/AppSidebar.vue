@@ -10,6 +10,7 @@ import {
     IconUserStar,
     IconSettings,
     IconLock,
+    IconWorld,
     IconChevronDown,
     IconChevronUp,
     IconChevronsLeft,
@@ -54,7 +55,10 @@ const groups: NavGroup[] = [
         key: 'settings',
         label: t('nav.settings'),
         icon: IconSettings,
-        children: [{ label: t('nav.roles'), icon: IconLock, to: 'roles', prefix: 'roles', perm: 'roles.manage' }],
+        children: [
+            { label: t('nav.locations'), icon: IconWorld, to: 'locations', prefix: 'locations', perm: 'locations.manage' },
+            { label: t('nav.roles'), icon: IconLock, to: 'roles', prefix: 'roles', perm: 'roles.manage' },
+        ],
     },
 ];
 
