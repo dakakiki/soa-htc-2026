@@ -2,6 +2,7 @@
 interface Option {
     value: T;
     label: string;
+    activeClass?: string;
 }
 
 defineProps<{
@@ -20,7 +21,9 @@ defineEmits<{ (e: 'update:modelValue', value: T): void }>();
             type="button"
             class="px-4 py-2 text-sm"
             :class="[
-                opt.value === modelValue ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+                opt.value === modelValue
+                    ? (opt.activeClass ?? 'bg-blue-600 text-white')
+                    : 'bg-white text-gray-600 hover:bg-gray-50',
                 i > 0 ? 'border-l border-gray-300' : '',
             ]"
             @click="$emit('update:modelValue', opt.value)"

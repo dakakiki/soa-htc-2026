@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
@@ -12,9 +12,14 @@ import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import type { Country, Region, School } from '@/types/models';
 
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const session = useSessionStore();
 const confirm = useConfirmStore();
 const canManage = computed(() => session.can('schools.manage'));
+
+const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
+const asNumber = (v: unknown): number | null => (v ? Number(v) : null);
 
 const schools = ref<School[]>([]);
 const page = ref(1);
@@ -26,11 +31,21 @@ const error = ref<string | null>(null);
 const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
 const filters = reactive<{ search: string; country_id: number | null; region_id: number | null; status: string }>({
-    search: '',
-    country_id: null,
-    region_id: null,
-    status: '',
+    search: asString(route.query.search),
+    country_id: asNumber(route.query.country_id),
+    region_id: asNumber(route.query.region_id),
+    status: asString(route.query.status),
 });
+
+function syncUrl(p: number): void {
+    const query: Record<string, string> = {};
+    if (filters.search) query.search = filters.search;
+    if (filters.country_id) query.country_id = String(filters.country_id);
+    if (filters.region_id) query.region_id = String(filters.region_id);
+    if (filters.status) query.status = filters.status;
+    if (p > 1) query.page = String(p);
+    router.replace({ query });
+}
 
 async function load(target = page.value): Promise<void> {
     loading.value = true;
@@ -47,6 +62,7 @@ async function load(target = page.value): Promise<void> {
         page.value = data.meta.current_page;
         lastPage.value = data.meta.last_page;
         total.value = data.meta.total;
+        syncUrl(page.value);
     } catch (e) {
         error.value = apiErrorMessage(e, t('venue.error'));
     } finally {
@@ -87,13 +103,21 @@ async function remove(school: School): Promise<void> {
 }
 
 onMounted(async () => {
-    await load(1);
     try {
         const { data } = await listCountries();
         countries.value = data.data;
     } catch {
         // filters are optional
     }
+    if (filters.country_id) {
+        try {
+            const { data } = await listRegions(filters.country_id);
+            regions.value = data.data;
+        } catch {
+            // region filter is optional
+        }
+    }
+    await load(asNumber(route.query.page) ?? 1);
 });
 </script>
 

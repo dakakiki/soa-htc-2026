@@ -42,8 +42,8 @@ const schoolTypes = computed(() => [
     { value: 'only_special', label: t('venue.typeSpecial') },
 ]);
 const statusOptions = computed(() => [
-    { value: 'active', label: t('venue.statusActive') },
-    { value: 'inactive', label: t('venue.statusInactive') },
+    { value: 'active', label: t('venue.statusActive'), activeClass: 'bg-green-500 text-white' },
+    { value: 'inactive', label: t('venue.statusInactive'), activeClass: 'bg-gray-400 text-white' },
 ]);
 
 async function loadRegions(): Promise<void> {
@@ -59,6 +59,16 @@ async function onCountryChange(): Promise<void> {
 }
 function onFileChange(event: Event): void {
     imageFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+}
+
+// Return to where the user came from (the list with its search/page), falling
+// back to the venues list on a direct load.
+function goBack(): void {
+    if (window.history.state?.back) {
+        router.back();
+    } else {
+        router.push({ name: 'venues' });
+    }
 }
 
 async function submit(): Promise<void> {
@@ -84,10 +94,12 @@ async function submit(): Promise<void> {
     };
 
     try {
-        const { data } = isEdit.value && id.value !== null
-            ? await updateSchool(id.value, payload, imageFile.value)
-            : await createSchool(payload, imageFile.value);
-        await router.push({ name: 'venues.view', params: { id: data.data.id } });
+        if (isEdit.value && id.value !== null) {
+            await updateSchool(id.value, payload, imageFile.value);
+        } else {
+            await createSchool(payload, imageFile.value);
+        }
+        goBack();
     } catch (e) {
         error.value = apiErrorMessage(e, t('venue.saveFailed'));
     } finally {
@@ -212,14 +224,14 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 
             <p v-if="error" class="mt-4 text-sm text-red-600">{{ error }}</p>
 
-            <div class="mt-6 flex gap-2">
+            <div class="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
+                <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50" @click="goBack">
+                    {{ $t('common.cancel') }}
+                </button>
                 <button type="submit" :disabled="saving"
                     class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                     {{ saving ? $t('common.saving') : isEdit ? $t('common.save') : $t('common.create') }}
                 </button>
-                <RouterLink :to="{ name: 'venues' }" class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
-                    {{ $t('common.cancel') }}
-                </RouterLink>
             </div>
         </form>
     </section>
