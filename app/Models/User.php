@@ -20,7 +20,11 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'country_id', 'region_id'])]
+#[Fillable([
+    'name', 'email', 'password', 'country_id', 'region_id',
+    'status', 'city', 'address', 'phone', 'image_path', 'file_path',
+    'can_student_insert', 'can_student_edit', 'can_student_delete', 'can_reset_test_results',
+])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -130,6 +134,10 @@ class User extends Authenticatable
             'password' => 'hashed',
             'country_id' => 'integer',
             'region_id' => 'integer',
+            'can_student_insert' => 'boolean',
+            'can_student_edit' => 'boolean',
+            'can_student_delete' => 'boolean',
+            'can_reset_test_results' => 'boolean',
         ];
     }
 }

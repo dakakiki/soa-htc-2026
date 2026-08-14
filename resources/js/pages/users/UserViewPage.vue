@@ -109,12 +109,36 @@ onMounted(async () => {
                 <dl class="mt-4 grid grid-cols-3 gap-2 text-sm">
                     <dt class="text-gray-500">{{ $t('user.email') }}</dt>
                     <dd class="col-span-2 text-gray-900">{{ user.email }}</dd>
+                    <dt class="text-gray-500">{{ $t('user.status') }}</dt>
+                    <dd class="col-span-2 text-gray-900">{{ user.status === 'active' ? $t('user.statusActive') : $t('user.statusInactive') }}</dd>
                     <dt class="text-gray-500">{{ $t('user.country') }}</dt>
                     <dd class="col-span-2 text-gray-900">{{ user.country.name ?? $t('common.dash') }}</dd>
-                    <dt class="text-gray-500">{{ $t('venue.region') }}</dt>
+                    <dt class="text-gray-500">{{ $t('user.region') }}</dt>
                     <dd class="col-span-2 text-gray-900">{{ user.region?.name ?? $t('common.dash') }}</dd>
+                    <dt class="text-gray-500">{{ $t('user.city') }}</dt>
+                    <dd class="col-span-2 text-gray-900">{{ user.city || $t('common.dash') }}</dd>
+                    <dt class="text-gray-500">{{ $t('user.address') }}</dt>
+                    <dd class="col-span-2 text-gray-900">{{ user.address || $t('common.dash') }}</dd>
+                    <dt class="text-gray-500">{{ $t('user.phone') }}</dt>
+                    <dd class="col-span-2 text-gray-900">{{ user.phone || $t('common.dash') }}</dd>
                     <dt class="text-gray-500">{{ $t('user.roles') }}</dt>
                     <dd class="col-span-2 text-gray-900">{{ user.roles.join(', ') || $t('common.dash') }}</dd>
+                    <dt class="text-gray-500">{{ $t('user.permissions') }}</dt>
+                    <dd class="col-span-2 text-gray-900">
+                        <ul class="space-y-0.5">
+                            <li>{{ user.can_student_insert ? '✓' : '—' }} {{ $t('user.canAddStudents') }}</li>
+                            <li>{{ user.can_student_edit ? '✓' : '—' }} {{ $t('user.canEditStudents') }}</li>
+                            <li>{{ user.can_student_delete ? '✓' : '—' }} {{ $t('user.canDeleteStudents') }}</li>
+                            <li>{{ user.can_reset_test_results ? '✓' : '—' }} {{ $t('user.canResetResults') }}</li>
+                        </ul>
+                    </dd>
+                    <template v-if="user.image_url || user.file_url">
+                        <dt class="text-gray-500">{{ $t('user.file') }}</dt>
+                        <dd class="col-span-2 text-gray-900">
+                            <a v-if="user.image_url" :href="user.image_url" target="_blank" class="text-blue-600 hover:underline">{{ $t('user.image') }}</a>
+                            <a v-if="user.file_url" :href="user.file_url" target="_blank" class="ml-3 text-blue-600 hover:underline">{{ $t('user.file') }}</a>
+                        </dd>
+                    </template>
                 </dl>
                 <RouterLink :to="{ name: 'users' }" class="mt-6 inline-block rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
                     {{ $t('common.back') }}

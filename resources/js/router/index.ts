@@ -64,12 +64,6 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'users.manage' },
     },
     {
-        path: '/users/:id',
-        name: 'users.view',
-        component: () => import('@/pages/users/UserViewPage.vue'),
-        meta: { requiresAuth: true, permission: 'users.manage' },
-    },
-    {
         path: '/users/:id/edit',
         name: 'users.edit',
         component: () => import('@/pages/users/UserFormPage.vue'),

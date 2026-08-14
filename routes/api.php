@@ -47,7 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('schools', SchoolController::class);
 
     // Staff users and their season role/scope assignments.
-    Route::apiResource('users', UserController::class)->only(['index', 'show', 'store', 'update']);
+    Route::apiResource('users', UserController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::post('users/{user}/assignments', [AssignmentController::class, 'store']);
     Route::put('assignments/{assignment}', [AssignmentController::class, 'update']);
     Route::delete('assignments/{assignment}', [AssignmentController::class, 'destroy']);

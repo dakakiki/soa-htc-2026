@@ -60,6 +60,16 @@ export interface AdminUser {
     id: number;
     name: string;
     email: string;
+    status: string;
+    city: string | null;
+    address: string | null;
+    phone: string | null;
+    image_url: string | null;
+    file_url: string | null;
+    can_student_insert: boolean;
+    can_student_edit: boolean;
+    can_student_delete: boolean;
+    can_reset_test_results: boolean;
     country: { id: number | null; name?: string };
     region?: { id: number | null; name?: string | null };
     roles: string[];

@@ -8,6 +8,7 @@ use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * User representation for the admin management screens: includes all season
@@ -27,6 +28,16 @@ class AdminUserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+            'status' => $this->status,
+            'city' => $this->city,
+            'address' => $this->address,
+            'phone' => $this->phone,
+            'image_url' => $this->image_path ? Storage::disk('public')->url($this->image_path) : null,
+            'file_url' => $this->file_path ? Storage::disk('public')->url($this->file_path) : null,
+            'can_student_insert' => (bool) $this->can_student_insert,
+            'can_student_edit' => (bool) $this->can_student_edit,
+            'can_student_delete' => (bool) $this->can_student_delete,
+            'can_reset_test_results' => (bool) $this->can_reset_test_results,
             'country' => [
                 'id' => $this->country_id,
                 'name' => $this->whenLoaded('country', fn () => $this->country?->name),

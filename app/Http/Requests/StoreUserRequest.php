@@ -27,6 +27,17 @@ class StoreUserRequest extends FormRequest
             'password' => ['required', 'string', 'min:8'],
             'country_id' => ['required', 'integer', 'exists:countries,id'],
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,id'],
+            'status' => ['sometimes', 'in:active,inactive'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'phone' => ['nullable', 'string', 'max:100'],
+            'image' => ['nullable', 'file', 'image', 'max:5120'],
+            'file_upload' => ['nullable', 'file', 'max:10240'],
+            'can_student_insert' => ['sometimes', 'boolean'],
+            'can_student_edit' => ['sometimes', 'boolean'],
+            'can_student_delete' => ['sometimes', 'boolean'],
+            'can_reset_test_results' => ['sometimes', 'boolean'],
         ];
     }
 

@@ -27,4 +27,9 @@ class UserPolicy
     {
         return $user->hasPermission('users.manage');
     }
+
+    public function delete(User $user, User $model): bool
+    {
+        return $user->hasPermission('users.manage');
+    }
 }

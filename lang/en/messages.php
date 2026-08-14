@@ -29,4 +29,7 @@ return [
     'region' => [
         'mismatch' => 'The selected region does not belong to the selected country.',
     ],
+    'user' => [
+        'self_delete' => 'You cannot delete your own account.',
+    ],
 ];
