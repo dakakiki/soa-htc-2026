@@ -110,7 +110,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
         <button
             type="button"
             :disabled="disabled || loading"
-            class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 px-3 py-2 text-left text-sm disabled:bg-gray-50"
+            class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm disabled:bg-gray-50"
             :class="open ? 'border-blue-400 ring-1 ring-blue-200' : ''"
             @click="toggleOpen"
         >
