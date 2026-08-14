@@ -10,6 +10,7 @@ import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import type { Country, Region, School } from '@/types/models';
 
 const { t } = useI18n();
@@ -27,10 +28,13 @@ const page = ref(1);
 const lastPage = ref(1);
 const total = ref(0);
 const loading = ref(false);
+const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
 
 const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
+const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
+const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
 const filters = reactive<{ search: string; country_id: number | null; region_id: number | null; status: string }>({
     search: asString(route.query.search),
     country_id: asNumber(route.query.country_id),
@@ -75,9 +79,18 @@ async function onCountryFilterChange(): Promise<void> {
     filters.region_id = null;
     regions.value = [];
     if (filters.country_id) {
-        const { data } = await listRegions(filters.country_id);
-        regions.value = data.data;
+        cascadeLoading.value = true;
+        try {
+            const { data } = await listRegions(filters.country_id);
+            regions.value = data.data;
+        } finally {
+            cascadeLoading.value = false;
+        }
     }
+}
+async function onCountryFilterSelected(value: number | null): Promise<void> {
+    filters.country_id = value;
+    await onCountryFilterChange();
 }
 
 async function onToggleStatus(school: School, value: boolean): Promise<void> {
@@ -139,15 +152,27 @@ onMounted(async () => {
         <form class="mt-2 flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
             <input v-model="filters.search" type="search" :placeholder="$t('venue.searchNameCity')"
                 class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <select v-model="filters.country_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="onCountryFilterChange">
-                <option :value="null">{{ $t('venue.countryPlaceholder') }}</option>
-                <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-            <select v-model="filters.region_id" :disabled="regions.length === 0"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-50">
-                <option :value="null">{{ $t('venue.region') }}</option>
-                <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-            </select>
+            <div class="w-44">
+                <SearchSelect
+                    :model-value="filters.country_id"
+                    :options="countryOptions"
+                    dense
+                    :placeholder="$t('venue.countryPlaceholder')"
+                    :search-placeholder="$t('venue.country')"
+                    @update:model-value="onCountryFilterSelected"
+                />
+            </div>
+            <div class="w-44">
+                <SearchSelect
+                    v-model="filters.region_id"
+                    :options="regionOptions"
+                    dense
+                    :disabled="!filters.country_id"
+                    :loading="cascadeLoading"
+                    :placeholder="$t('venue.region')"
+                    :search-placeholder="$t('venue.region')"
+                />
+            </div>
             <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
                 <option value="">{{ $t('venue.filterStatus') }}</option>
                 <option value="active">{{ $t('venue.statusActive') }}</option>
