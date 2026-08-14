@@ -9,6 +9,7 @@ import { apiErrorMessage } from '@/api/http';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import type { Country, Region, Role, School } from '@/types/models';
 
 const SCHOOL_COORDINATOR_KEY = 'school_coordinator';
@@ -59,6 +60,8 @@ const isSingleSchool = computed(() => selectedRoleKey.value === SCHOOL_COORDINAT
 const schoolOptions = computed<MultiSelectOption[]>(() =>
     schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })),
 );
+const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
+const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
 
 const statusOptions = computed(() => [
     { value: 'active', label: t('coordinator.statusActive'), activeClass: 'bg-green-500 text-white' },
@@ -87,6 +90,10 @@ async function onCountryChange(): Promise<void> {
     form.region_id = null;
     form.school_ids = [];
     await loadCountryScoped();
+}
+async function onCountrySelected(value: number | null): Promise<void> {
+    form.country_id = value;
+    await onCountryChange();
 }
 function onImageChange(event: Event): void {
     imageFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
@@ -197,122 +204,142 @@ const fileBtn =
         <h1 class="text-2xl font-semibold tracking-tight">{{ isEdit ? $t('coordinator.edit') : $t('coordinator.add') }}</h1>
 
         <form class="rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
-            <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-6">
-                <!-- Name, Role -->
-                <div class="sm:col-span-4">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.name') }} *</label>
-                    <input v-model="form.name" type="text" required :class="field" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.role') }} *</label>
-                    <select v-model="form.role_id" required :class="field">
-                        <option :value="null" disabled>{{ $t('coordinator.rolePlaceholder') }}</option>
-                        <option v-for="r in coordinatorRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
-                    </select>
-                </div>
-
-                <!-- Country, Region, Schools -->
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.country') }} *</label>
-                    <select v-model="form.country_id" required :class="field" @change="onCountryChange">
-                        <option :value="null" disabled>{{ $t('coordinator.countryPlaceholder') }}</option>
-                        <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
-                    </select>
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.region') }}</label>
-                    <select v-model="form.region_id" :disabled="regions.length === 0" :class="[field, 'disabled:bg-gray-50']">
-                        <option :value="null">{{ form.country_id ? $t('coordinator.regionOptional') : $t('coordinator.regionFirst') }}</option>
-                        <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                    </select>
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.venuesLabel') }}</label>
-                    <MultiSelect
-                        v-model="form.school_ids"
-                        :options="schoolOptions"
-                        :single="isSingleSchool"
-                        :disabled="schools.length === 0"
-                        :placeholder="$t('coordinator.schoolsPlaceholder')"
-                        :search-placeholder="$t('coordinator.venuesLabel')"
-                        :summary="(n: number) => $t('coordinator.venuesSelected', { count: n })"
-                    />
-                    <p class="mt-1 text-xs text-gray-400">{{ isSingleSchool ? $t('coordinator.schoolSingleHint') : $t('coordinator.schoolMultiHint') }}</p>
-                </div>
-
-                <!-- Email, Password, Confirm -->
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.email') }} *</label>
-                    <input v-model="form.email" type="email" required :class="field" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">
-                        {{ isEdit ? $t('coordinator.passwordEditHint') : $t('coordinator.passwordHint') }}
-                    </label>
-                    <input v-model="form.password" type="password" :required="!isEdit" autocomplete="new-password" :class="field" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.passwordRepeat') }}</label>
-                    <input v-model="form.password_confirm" type="password" :required="!isEdit && !!form.password"
-                        autocomplete="new-password" :class="field" />
-                </div>
-
-                <!-- Address, City, Phone -->
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.address') }}</label>
-                    <input v-model="form.address" type="text" :class="field" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.city') }}</label>
-                    <input v-model="form.city" type="text" :class="field" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.phone') }}</label>
-                    <input v-model="form.phone" type="text" :class="field" />
-                </div>
-
-                <!-- Image, File -->
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.image') }}</label>
-                    <label :class="fileBtn">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
-                        </svg>
-                        <span class="truncate">{{ imageFile?.name || $t('coordinator.chooseImage') }}</span>
-                        <input type="file" accept="image/*" class="hidden" @change="onImageChange" />
-                    </label>
-                    <a v-if="currentImageUrl && !imageFile" :href="currentImageUrl" target="_blank"
-                        class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('coordinator.currentImage') }}</a>
-                </div>
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.file') }}</label>
-                    <label :class="fileBtn">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
-                        </svg>
-                        <span class="truncate">{{ uploadFile?.name || $t('coordinator.chooseFile') }}</span>
-                        <input type="file" accept="image/*,application/pdf" class="hidden" @change="onFileChange" />
-                    </label>
-                    <a v-if="currentFileUrl && !uploadFile" :href="currentFileUrl" target="_blank"
-                        class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('coordinator.currentFile') }}</a>
-                </div>
-
-                <!-- Permissions -->
-                <div class="sm:col-span-6">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.permissions') }}</label>
-                    <div class="mt-2 flex flex-col gap-3">
-                        <label v-for="tog in permissionToggles" :key="tog.key" class="flex items-center gap-2 text-sm text-gray-700">
-                            <ToggleSwitch v-model="form[tog.key]" :aria-label="tog.label" />
-                            <span>{{ tog.label }}</span>
-                        </label>
+            <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                <!-- Right column: assignment + permissions -->
+                <div class="space-y-5 lg:order-2 lg:col-span-4 lg:border-l lg:border-gray-200 lg:pl-8">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.role') }} *</label>
+                        <select v-model="form.role_id" required :class="field">
+                            <option :value="null" disabled>{{ $t('coordinator.rolePlaceholder') }}</option>
+                            <option v-for="r in coordinatorRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.venuesLabel') }}</label>
+                        <MultiSelect
+                            v-model="form.school_ids"
+                            :options="schoolOptions"
+                            :single="isSingleSchool"
+                            :disabled="schools.length === 0"
+                            :placeholder="form.country_id ? $t('coordinator.venuesPlaceholder') : $t('coordinator.schoolsPlaceholder')"
+                            :search-placeholder="$t('coordinator.venuesLabel')"
+                            :summary="(n: number) => $t('coordinator.venuesSelected', { count: n })"
+                        />
+                        <p class="mt-1 text-xs text-gray-400">{{ isSingleSchool ? $t('coordinator.schoolSingleHint') : $t('coordinator.schoolMultiHint') }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.permissions') }}</label>
+                        <div class="mt-2 flex flex-col gap-3">
+                            <label v-for="tog in permissionToggles" :key="tog.key" class="flex items-center gap-2 text-sm text-gray-700">
+                                <ToggleSwitch v-model="form[tog.key]" :aria-label="tog.label" />
+                                <span>{{ tog.label }}</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.status') }}</label>
+                        <div class="mt-2">
+                            <ButtonGroup v-model="form.status" :options="statusOptions" />
+                        </div>
                     </div>
                 </div>
 
-                <!-- Status -->
-                <div class="sm:col-span-6">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.status') }}</label>
-                    <div class="mt-2">
-                        <ButtonGroup v-model="form.status" :options="statusOptions" />
+                <!-- Left column: profile / contact / credentials -->
+                <div class="space-y-5 lg:order-1 lg:col-span-8">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.name') }} *</label>
+                        <input v-model="form.name" type="text" required :class="field" />
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.country') }} *</label>
+                            <SearchSelect
+                                :model-value="form.country_id"
+                                :options="countryOptions"
+                                :clearable="false"
+                                :placeholder="$t('coordinator.countryPlaceholder')"
+                                :search-placeholder="$t('coordinator.country')"
+                                @update:model-value="onCountrySelected"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.region') }}</label>
+                            <SearchSelect
+                                v-model="form.region_id"
+                                :options="regionOptions"
+                                :disabled="regions.length === 0"
+                                :placeholder="form.country_id ? $t('coordinator.regionOptional') : $t('coordinator.regionFirst')"
+                                :search-placeholder="$t('coordinator.region')"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.address') }}</label>
+                            <input v-model="form.address" type="text" :class="field" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.city') }}</label>
+                            <input v-model="form.city" type="text" :class="field" />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.phone') }}</label>
+                            <input v-model="form.phone" type="text" :class="field" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.email') }} *</label>
+                            <input v-model="form.email" type="email" required :class="field" />
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-200" />
+
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">
+                                {{ isEdit ? $t('coordinator.passwordEditHint') : $t('coordinator.passwordHint') }}
+                            </label>
+                            <input v-model="form.password" type="password" :required="!isEdit" autocomplete="new-password" :class="field" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.passwordRepeat') }}</label>
+                            <input v-model="form.password_confirm" type="password" :required="!isEdit && !!form.password"
+                                autocomplete="new-password" :class="field" />
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-200" />
+
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.image') }}</label>
+                            <label :class="fileBtn">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
+                                </svg>
+                                <span class="truncate">{{ imageFile?.name || $t('coordinator.chooseImage') }}</span>
+                                <input type="file" accept="image/*" class="hidden" @change="onImageChange" />
+                            </label>
+                            <a v-if="currentImageUrl && !imageFile" :href="currentImageUrl" target="_blank"
+                                class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('coordinator.currentImage') }}</a>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.file') }}</label>
+                            <label :class="fileBtn">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
+                                </svg>
+                                <span class="truncate">{{ uploadFile?.name || $t('coordinator.chooseFile') }}</span>
+                                <input type="file" accept="image/*,application/pdf" class="hidden" @change="onFileChange" />
+                            </label>
+                            <a v-if="currentFileUrl && !uploadFile" :href="currentFileUrl" target="_blank"
+                                class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('coordinator.currentFile') }}</a>
+                        </div>
                     </div>
                 </div>
             </div>

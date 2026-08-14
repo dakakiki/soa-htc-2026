@@ -201,6 +201,7 @@ export default {
         schools: 'Schools',
         venuesLabel: 'Venues',
         schoolsPlaceholder: 'Select country first…',
+        venuesPlaceholder: 'Select venues…',
         schoolSingleHint: 'Select exactly one school.',
         schoolMultiHint: 'Select one or more schools.',
         venuesSelected: '{count} venues selected',
