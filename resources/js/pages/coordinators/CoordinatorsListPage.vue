@@ -278,9 +278,7 @@ onMounted(async () => {
                                 <td class="px-3 py-2 text-gray-600">{{ s.city || $t('common.dash') }}</td>
                                 <td class="px-3 py-2 text-gray-600">{{ s.country || $t('common.dash') }}</td>
                                 <td class="px-3 py-2">
-                                    <span :class="s.status === 'active' ? 'text-green-600' : 'text-gray-400'">
-                                        {{ s.status === 'active' ? $t('coordinator.statusActive') : $t('coordinator.statusInactive') }}
-                                    </span>
+                                    <ToggleSwitch :model-value="s.status === 'active'" disabled :aria-label="$t('coordinator.toggleStatus')" />
                                 </td>
                             </tr>
                         </tbody>

@@ -8,6 +8,7 @@ import { listRoles } from '@/api/reference';
 import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import { useConfirmStore } from '@/stores/confirm';
+import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import type { AdminUser, Role, School } from '@/types/models';
 
 const route = useRoute();
@@ -110,7 +111,7 @@ onMounted(async () => {
                     <dt class="text-gray-500">{{ $t('user.email') }}</dt>
                     <dd class="col-span-2 text-gray-900">{{ user.email }}</dd>
                     <dt class="text-gray-500">{{ $t('user.status') }}</dt>
-                    <dd class="col-span-2 text-gray-900">{{ user.status === 'active' ? $t('user.statusActive') : $t('user.statusInactive') }}</dd>
+                    <dd class="col-span-2"><ToggleSwitch :model-value="user.status === 'active'" disabled :aria-label="$t('user.toggleStatus')" /></dd>
                     <dt class="text-gray-500">{{ $t('user.country') }}</dt>
                     <dd class="col-span-2 text-gray-900">{{ user.country.name ?? $t('common.dash') }}</dd>
                     <dt class="text-gray-500">{{ $t('user.region') }}</dt>

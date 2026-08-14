@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { getSchool } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
+import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import type { School } from '@/types/models';
 
 const route = useRoute();
@@ -48,10 +49,7 @@ onMounted(async () => {
         <div v-if="venue" class="rounded-lg border border-gray-200 bg-white p-6">
             <div class="flex items-start justify-between">
                 <h1 class="text-2xl font-semibold tracking-tight">{{ venue.name }}</h1>
-                <span
-                    class="rounded-full px-2 py-0.5 text-xs"
-                    :class="venue.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                >{{ venue.status }}</span>
+                <ToggleSwitch :model-value="venue.status === 'active'" disabled :aria-label="$t('venue.toggleStatus')" />
             </div>
 
             <dl class="mt-4 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
