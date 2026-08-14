@@ -13,11 +13,11 @@ defineEmits<{ (e: 'delete'): void }>();
 
 const { t } = useI18n();
 
-const chip = 'inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200';
+const chip = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200';
 </script>
 
 <template>
-    <div class="flex items-center justify-end gap-2">
+    <div class="flex items-center justify-end gap-1.5">
         <RouterLink
             v-if="viewTo"
             :to="viewTo"
@@ -25,7 +25,7 @@ const chip = 'inline-flex h-9 w-9 items-center justify-center rounded-md border 
             :aria-label="t('common.view')"
             :class="[chip, 'text-orange-500']"
         >
-            <IconEye :size="18" />
+            <IconEye :size="16" />
         </RouterLink>
         <RouterLink
             v-if="editTo"
@@ -34,7 +34,7 @@ const chip = 'inline-flex h-9 w-9 items-center justify-center rounded-md border 
             :aria-label="t('common.edit')"
             :class="[chip, 'text-green-600']"
         >
-            <IconPencil :size="18" />
+            <IconPencil :size="16" />
         </RouterLink>
         <button
             v-if="deletable"
@@ -44,7 +44,7 @@ const chip = 'inline-flex h-9 w-9 items-center justify-center rounded-md border 
             :class="[chip, 'text-red-600']"
             @click="$emit('delete')"
         >
-            <IconTrash :size="18" />
+            <IconTrash :size="16" />
         </button>
     </div>
 </template>
