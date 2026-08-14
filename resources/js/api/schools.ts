@@ -56,6 +56,10 @@ export function updateSchool(id: number, payload: SchoolPayload, image?: File | 
     return http.post<{ data: School }>(`/api/schools/${id}`, fd);
 }
 
+export function setSchoolStatus(id: number, status: string) {
+    return http.put<{ data: School }>(`/api/schools/${id}`, { status });
+}
+
 export function deleteSchool(id: number) {
     return http.delete(`/api/schools/${id}`);
 }

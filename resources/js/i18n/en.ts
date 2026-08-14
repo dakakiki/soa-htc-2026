@@ -92,6 +92,7 @@ export default {
         status: 'Status',
         statusActive: 'On',
         statusInactive: 'Off',
+        toggleStatus: 'Toggle status',
         city: 'City',
         address: 'Address',
         phone: 'Phone',

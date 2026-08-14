@@ -4,10 +4,11 @@ import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
-import { deleteSchool, listSchools } from '@/api/schools';
+import { deleteSchool, listSchools, setSchoolStatus } from '@/api/schools';
 import { listCountries, listRegions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
+import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import type { Country, Region, School } from '@/types/models';
 
 const { t } = useI18n();
@@ -59,6 +60,17 @@ async function onCountryFilterChange(): Promise<void> {
     if (filters.country_id) {
         const { data } = await listRegions(filters.country_id);
         regions.value = data.data;
+    }
+}
+
+async function onToggleStatus(school: School, value: boolean): Promise<void> {
+    const previous = school.status;
+    school.status = value ? 'active' : 'inactive';
+    try {
+        await setSchoolStatus(school.id, school.status);
+    } catch (e) {
+        school.status = previous;
+        error.value = apiErrorMessage(e);
     }
 }
 
@@ -152,10 +164,12 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-600">{{ school.region?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ school.country.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3">
-                            <span
-                                class="rounded-full px-2 py-0.5 text-xs"
-                                :class="school.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                            >{{ school.status === 'active' ? $t('venue.statusActive') : $t('venue.statusInactive') }}</span>
+                            <ToggleSwitch
+                                :model-value="school.status === 'active'"
+                                :disabled="!canManage"
+                                :aria-label="$t('venue.toggleStatus')"
+                                @update:model-value="(v: boolean) => onToggleStatus(school, v)"
+                            />
                         </td>
                         <td class="px-4 py-3">
                             <RowActions
