@@ -13,6 +13,10 @@ import {
     IconWorld,
     IconPalette,
     IconStairs,
+    IconListCheck,
+    IconTag,
+    IconClockHour4,
+    IconCategory,
     IconChevronDown,
     IconChevronUp,
     IconChevronsLeft,
@@ -53,6 +57,16 @@ const items: NavItem[] = [
 ];
 
 const groups: NavGroup[] = [
+    {
+        key: 'quizzes',
+        label: t('nav.quizzes'),
+        icon: IconListCheck,
+        children: [
+            { label: t('nav.tags'), icon: IconTag, to: 'content.tags', prefix: 'content.tags', perm: 'content.manage' },
+            { label: t('nav.examRounds'), icon: IconClockHour4, to: 'content.exam-rounds', prefix: 'content.exam-rounds', perm: 'content.manage' },
+            { label: t('nav.testType'), icon: IconCategory, to: 'content.test-types', prefix: 'content.test-types', perm: 'content.manage' },
+        ],
+    },
     {
         key: 'settings',
         label: t('nav.settings'),

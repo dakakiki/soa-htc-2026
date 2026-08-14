@@ -100,6 +100,27 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'difficulty.manage' },
     },
     {
+        path: '/content/test-types',
+        name: 'content.test-types',
+        component: () => import('@/pages/content/LookupListPage.vue'),
+        props: { kind: 'testType' },
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
+        path: '/content/exam-rounds',
+        name: 'content.exam-rounds',
+        component: () => import('@/pages/content/LookupListPage.vue'),
+        props: { kind: 'examRound' },
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
+        path: '/content/tags',
+        name: 'content.tags',
+        component: () => import('@/pages/content/LookupListPage.vue'),
+        props: { kind: 'tag' },
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
         path: '/settings/theme',
         name: 'settings.theme',
         component: () => import('@/pages/settings/ThemeSettingsPage.vue'),

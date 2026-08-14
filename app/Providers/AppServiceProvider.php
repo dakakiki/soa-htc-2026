@@ -48,5 +48,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Setting::class, SettingPolicy::class);
         Gate::policy(DifficultyCategory::class, DifficultyCategoryPolicy::class);
         Gate::policy(DifficultyLevel::class, DifficultyLevelPolicy::class);
+
+        // Content hierarchy (lookups + questions) is admin-only and shares one
+        // ability rather than a policy per lookup model.
+        Gate::define('content.manage', fn (User $user): bool => $user->hasPermission('content.manage'));
     }
 }

@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // Reference data first (runs everywhere), then dev-only synthetic data.
             RolePermissionSeeder::class,
+            ContentLookupSeeder::class,
             MasterDataSeeder::class,
         ]);
     }

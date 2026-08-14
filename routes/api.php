@@ -69,6 +69,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Competitor-count column headers for the venue/school listings (level shorts).
     Route::get('difficulty-level-columns', fn () => ['data' => \App\Domain\Assessment\Models\DifficultyLevel::orderedShorts()]);
 
+    // Content configuration lookups (admin-only; gated in the controllers).
+    Route::apiResource('test-types', \App\Http\Controllers\Api\TestTypeController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::apiResource('exam-rounds', \App\Http\Controllers\Api\ExamRoundController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::apiResource('question-tags', \App\Http\Controllers\Api\QuestionTagController::class)->only(['index', 'store', 'update', 'destroy']);
+
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('schools', SchoolController::class);
