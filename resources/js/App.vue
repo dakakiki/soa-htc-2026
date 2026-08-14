@@ -26,10 +26,10 @@ async function logout(): Promise<void> {
                     <button
                         :title="t('nav.logout')"
                         :aria-label="t('nav.logout')"
-                        class="text-red-600 hover:text-red-700"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-red-600 hover:bg-gray-200"
                         @click="logout"
                     >
-                        <IconLogout :size="20" />
+                        <IconLogout :size="18" />
                     </button>
                 </div>
             </header>
