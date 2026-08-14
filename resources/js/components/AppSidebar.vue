@@ -85,6 +85,10 @@ function toggle(g: NavGroup): void {
 
 const itemClass = (active: boolean): string =>
     active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
+
+// Right-side hover tooltip shown next to icon-rail items when the sidebar is collapsed.
+const railTip =
+    'pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-100 group-hover/tt:opacity-100';
 </script>
 
 <template>
@@ -92,24 +96,23 @@ const itemClass = (active: boolean): string =>
         class="flex flex-col shrink-0 border-r border-gray-200 bg-white transition-[width] duration-150"
         :class="collapsed ? 'w-16' : 'w-60'"
     >
-        <nav class="flex-1 space-y-1 overflow-y-auto p-2">
+        <nav class="flex-1 space-y-1 p-2" :class="collapsed ? 'overflow-visible' : 'overflow-y-auto'">
             <RouterLink
                 v-for="item in visibleItems"
                 :key="item.to"
                 :to="{ name: item.to }"
-                :title="item.label"
-                class="flex items-center gap-3 rounded-md px-3 py-2 text-sm"
+                class="group/tt relative flex items-center gap-3 rounded-md px-3 py-2 text-sm"
                 :class="[itemClass(isActive(item.prefix)), { 'justify-center': collapsed }]"
             >
                 <component :is="item.icon" :size="20" class="shrink-0" />
                 <span v-show="!collapsed">{{ item.label }}</span>
+                <span v-if="collapsed" :class="railTip">{{ item.label }}</span>
             </RouterLink>
 
             <div v-for="g in visibleGroups" :key="g.key">
                 <button
                     type="button"
-                    :title="g.label"
-                    class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm"
+                    class="group/tt relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm"
                     :class="[
                         groupActive(g) ? 'text-blue-700 hover:bg-gray-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
                         { 'justify-center': collapsed },
@@ -124,18 +127,19 @@ const itemClass = (active: boolean): string =>
                         :size="16"
                         class="ml-auto"
                     />
+                    <span v-if="collapsed" :class="railTip">{{ g.label }}</span>
                 </button>
                 <div v-show="isOpen(g)" class="space-y-1">
                     <RouterLink
                         v-for="c in g.children"
                         :key="c.to"
                         :to="{ name: c.to }"
-                        :title="c.label"
-                        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm"
+                        class="group/tt relative flex items-center gap-3 rounded-md px-3 py-2 text-sm"
                         :class="[itemClass(isActive(c.prefix)), collapsed ? 'justify-center' : 'pl-9']"
                     >
                         <component :is="c.icon" :size="18" class="shrink-0" />
                         <span v-show="!collapsed">{{ c.label }}</span>
+                        <span v-if="collapsed" :class="railTip">{{ c.label }}</span>
                     </RouterLink>
                 </div>
             </div>

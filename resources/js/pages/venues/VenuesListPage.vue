@@ -11,6 +11,7 @@ import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import type { Country, Region, School } from '@/types/models';
 
 const { t } = useI18n();
@@ -217,12 +218,14 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-600">{{ school.region?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ school.country.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3">
-                            <ToggleSwitch
-                                :model-value="school.status === 'active'"
-                                :disabled="!canManage"
-                                :aria-label="$t('venue.toggleStatus')"
-                                @update:model-value="(v: boolean) => onToggleStatus(school, v)"
-                            />
+                            <Tooltip :text="$t('venue.toggleStatus')">
+                                <ToggleSwitch
+                                    :model-value="school.status === 'active'"
+                                    :disabled="!canManage"
+                                    :aria-label="$t('venue.toggleStatus')"
+                                    @update:model-value="(v: boolean) => onToggleStatus(school, v)"
+                                />
+                            </Tooltip>
                         </td>
                         <td class="px-4 py-3">
                             <RowActions

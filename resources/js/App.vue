@@ -5,6 +5,7 @@ import { IconLogout } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import AppSidebar from '@/components/AppSidebar.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import Tooltip from '@/components/Tooltip.vue';
 
 const session = useSessionStore();
 const router = useRouter();
@@ -23,14 +24,15 @@ async function logout(): Promise<void> {
                 <RouterLink to="/dashboard" class="text-lg font-semibold tracking-tight">{{ $t('app.name') }}</RouterLink>
                 <div class="ml-auto flex items-center gap-4 text-sm">
                     <span class="text-gray-500">{{ session.user?.email }}</span>
-                    <button
-                        :title="t('nav.logout')"
-                        :aria-label="t('nav.logout')"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-red-600 hover:bg-gray-200"
-                        @click="logout"
-                    >
-                        <IconLogout :size="18" />
-                    </button>
+                    <Tooltip :text="t('nav.logout')" position="bottom">
+                        <button
+                            :aria-label="t('nav.logout')"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-red-600 hover:bg-gray-200"
+                            @click="logout"
+                        >
+                            <IconLogout :size="18" />
+                        </button>
+                    </Tooltip>
                 </div>
             </header>
             <div class="flex flex-1 overflow-hidden">

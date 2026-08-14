@@ -11,6 +11,7 @@ import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import type { AdminUser, Country, Region } from '@/types/models';
 
 const { t } = useI18n();
@@ -218,12 +219,14 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-600">{{ user.region?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ user.roles.join(', ') || $t('common.dash') }}</td>
                         <td class="px-4 py-3">
-                            <ToggleSwitch
-                                :model-value="user.status === 'active'"
-                                :disabled="!canManage"
-                                :aria-label="$t('user.toggleStatus')"
-                                @update:model-value="(v: boolean) => onToggleStatus(user, v)"
-                            />
+                            <Tooltip :text="$t('user.toggleStatus')">
+                                <ToggleSwitch
+                                    :model-value="user.status === 'active'"
+                                    :disabled="!canManage"
+                                    :aria-label="$t('user.toggleStatus')"
+                                    @update:model-value="(v: boolean) => onToggleStatus(user, v)"
+                                />
+                            </Tooltip>
                         </td>
                         <td class="px-4 py-3">
                             <RowActions

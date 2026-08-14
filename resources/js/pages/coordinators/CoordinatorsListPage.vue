@@ -12,6 +12,7 @@ import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import { IconBuilding } from '@tabler/icons-vue';
 import type { Coordinator, Country, Region, Role, School } from '@/types/models';
 
@@ -259,12 +260,14 @@ onMounted(async () => {
                             <span v-else class="text-gray-300">{{ $t('common.dash') }}</span>
                         </td>
                         <td class="px-4 py-3">
-                            <ToggleSwitch
-                                :model-value="c.status === 'active'"
-                                :disabled="!canManage"
-                                :aria-label="$t('coordinator.toggleStatus')"
-                                @update:model-value="(v: boolean) => onToggleStatus(c, v)"
-                            />
+                            <Tooltip :text="$t('coordinator.toggleStatus')">
+                                <ToggleSwitch
+                                    :model-value="c.status === 'active'"
+                                    :disabled="!canManage"
+                                    :aria-label="$t('coordinator.toggleStatus')"
+                                    @update:model-value="(v: boolean) => onToggleStatus(c, v)"
+                                />
+                            </Tooltip>
                         </td>
                         <td class="px-4 py-3">
                             <RowActions
