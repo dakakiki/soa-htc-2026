@@ -227,10 +227,14 @@ onMounted(load);
             >{{ $t('location.addCountry') }}</button>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3">
+        <form class="flex flex-wrap items-center gap-3" @submit.prevent>
             <input v-model="search" type="search" :placeholder="$t('location.search')"
                 class="w-56 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-        </div>
+            <button type="submit"
+                class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
+                {{ $t('common.search') }}
+            </button>
+        </form>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
