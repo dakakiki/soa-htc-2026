@@ -43,6 +43,7 @@ const levels = ref<LevelOption[]>([]);
 const tagOptions = computed<SearchSelectOption[]>(() => tags.value.map((tg) => ({ id: tg.id, label: tg.name })));
 const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: `${l.name} · ${l.category_name}` })));
 const showAnswers = computed(() => form.question_type !== 'essay');
+const isGap = computed(() => form.question_type === 'gap_filling');
 
 const loading = ref(true);
 const saving = ref(false);
@@ -75,7 +76,10 @@ async function save(): Promise<void> {
         question_tag_id: form.question_tag_id,
         status: form.status,
         level_ids: form.level_ids,
-        answers: showAnswers.value ? answers.value.filter((a) => a.text.trim()).map((a, i) => ({ ...a, position: i + 1 })) : [],
+        // Gap answers are all "accepted" sets (pipe-separated), so they are always correct.
+        answers: showAnswers.value
+            ? answers.value.filter((a) => a.text.trim()).map((a, i) => ({ text: a.text.trim(), is_correct: isGap.value ? true : a.is_correct, position: i + 1 }))
+            : [],
     };
     try {
         if (isEdit.value) {
@@ -138,18 +142,20 @@ onMounted(async () => {
                         <RichTextEditor v-model="form.description" :placeholder="$t('question.descriptionHint')" />
                     </div>
 
-                    <!-- Answers -->
+                    <!-- Answers / gaps -->
                     <div v-if="showAnswers">
-                        <div class="mb-2 flex items-center justify-between">
-                            <label class="block text-sm font-medium text-gray-700">{{ $t('question.answers') }}</label>
+                        <div class="mb-1 flex items-center justify-between">
+                            <label class="block text-sm font-medium text-gray-700">{{ isGap ? $t('question.gaps') : $t('question.answers') }}</label>
                             <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200" @click="addAnswer">
-                                <IconPlus :size="14" /> {{ $t('question.addAnswer') }}
+                                <IconPlus :size="14" /> {{ isGap ? $t('question.addGap') : $t('question.addAnswer') }}
                             </button>
                         </div>
+                        <p v-if="isGap" class="mb-2 text-xs text-gray-500">{{ $t('question.gapHint') }}</p>
                         <div class="space-y-2">
                             <div v-for="(a, i) in answers" :key="i" class="flex items-center gap-2">
-                                <input v-model="a.text" type="text" :placeholder="$t('question.answerText')" class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-                                <label class="flex shrink-0 items-center gap-1.5 text-xs text-gray-600">
+                                <span v-if="isGap" class="w-14 shrink-0 text-xs font-medium text-gray-500">{{ $t('question.gapN', { n: i + 1 }) }}</span>
+                                <input v-model="a.text" type="text" :placeholder="isGap ? $t('question.gapPlaceholder') : $t('question.answerText')" class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                                <label v-if="!isGap" class="flex shrink-0 items-center gap-1.5 text-xs text-gray-600">
                                     <ToggleSwitch v-model="a.is_correct" :aria-label="$t('question.correct')" />
                                     {{ $t('question.correct') }}
                                 </label>

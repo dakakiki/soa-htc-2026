@@ -89,12 +89,31 @@ class ImportLegacyQuestions extends Command
             }
             $question->levels()->sync(array_values(array_unique($ourIds)));
 
+            // Answer shape depends on the question type:
+            //  - gap-filling (2): one row per gap; `answers` holds the pipe-separated
+            //    acceptable answers (the `title` is just the "[answer]" placeholder).
+            //  - essay (5): no stored answers (manually graded).
+            //  - multiple choice (1): each row is an option with a correct flag.
+            $type = (int) $lq->type;
             $question->answers()->delete();
             foreach (($answersByQuestion[$lq->id] ?? collect()) as $i => $a) {
+                $position = (int) ($a->replie_order ?? $i + 1);
+                if ($type === 5) {
+                    continue;
+                }
+                if ($type === 2) {
+                    $accepted = trim((string) $a->answers, " |");
+                    if ($accepted === '') {
+                        continue;
+                    }
+                    $question->answers()->create(['text' => $accepted, 'is_correct' => true, 'position' => $position]);
+
+                    continue;
+                }
                 $question->answers()->create([
                     'text' => (string) $a->title,
                     'is_correct' => (bool) $a->correct_answer,
-                    'position' => (int) ($a->replie_order ?? $i + 1),
+                    'position' => $position,
                 ]);
             }
 
