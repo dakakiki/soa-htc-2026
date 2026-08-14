@@ -83,7 +83,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
             @click="toggleOpen"
         >
             <span v-if="selected" class="truncate text-gray-800">{{ selected.label }}</span>
-            <span v-else class="truncate text-gray-400">{{ loading ? t('common.loading') : placeholder }}</span>
+            <span v-else class="truncate text-gray-500">{{ loading ? t('common.loading') : placeholder }}</span>
             <span class="flex shrink-0 items-center gap-1">
                 <svg v-if="loading" class="h-4 w-4 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -97,7 +97,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
                         aria-label="clear"
                         @click.stop="clear"
                     >✕</span>
-                    <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                 </template>
