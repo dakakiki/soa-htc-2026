@@ -32,4 +32,7 @@ return [
     'user' => [
         'self_delete' => 'You cannot delete your own account.',
     ],
+    'coordinator' => [
+        'role_invalid' => 'Select a coordinator role (country or school coordinator).',
+    ],
 ];

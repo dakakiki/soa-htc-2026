@@ -76,6 +76,36 @@ export interface AdminUser {
     assignments: Assignment[];
 }
 
+export interface CoordinatorSchool {
+    id: number;
+    name: string;
+    city: string | null;
+    country: string | null;
+    status: string;
+}
+
+export interface Coordinator {
+    id: number;
+    name: string;
+    email: string;
+    status: string;
+    city: string | null;
+    address: string | null;
+    phone: string | null;
+    image_url: string | null;
+    file_url: string | null;
+    can_student_insert: boolean;
+    can_student_edit: boolean;
+    can_student_delete: boolean;
+    can_reset_test_results: boolean;
+    country: { id: number | null; name?: string };
+    region?: { id: number | null; name?: string | null };
+    assignment_id: number | null;
+    role: { id: number; key: string; name: string } | null;
+    venues_count: number;
+    schools: CoordinatorSchool[];
+}
+
 export interface DashboardData {
     season: { name: string; round_number: number; status: string; ends_at: string | null } | null;
     venues: { count: number; scoped: boolean };

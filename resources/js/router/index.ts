@@ -70,6 +70,24 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'users.manage' },
     },
     {
+        path: '/coordinators',
+        name: 'coordinators',
+        component: () => import('@/pages/coordinators/CoordinatorsListPage.vue'),
+        meta: { requiresAuth: true, permission: 'users.manage' },
+    },
+    {
+        path: '/coordinators/new',
+        name: 'coordinators.new',
+        component: () => import('@/pages/coordinators/CoordinatorFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'users.manage' },
+    },
+    {
+        path: '/coordinators/:id/edit',
+        name: 'coordinators.edit',
+        component: () => import('@/pages/coordinators/CoordinatorFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'users.manage' },
+    },
+    {
         path: '/roles',
         name: 'roles',
         component: () => import('@/pages/roles/RolesListPage.vue'),

@@ -7,6 +7,7 @@ import {
     IconLayoutDashboard,
     IconBuilding,
     IconUsers,
+    IconUserStar,
     IconSettings,
     IconLock,
     IconChevronDown,
@@ -45,6 +46,7 @@ const items: NavItem[] = [
     { label: t('nav.dashboard'), icon: IconLayoutDashboard, to: 'dashboard', prefix: 'dashboard' },
     { label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.view' },
     { label: t('nav.users'), icon: IconUsers, to: 'users', prefix: 'users', perm: 'users.manage' },
+    { label: t('nav.coordinators'), icon: IconUserStar, to: 'coordinators', prefix: 'coordinators', perm: 'users.manage' },
 ];
 
 const groups: NavGroup[] = [

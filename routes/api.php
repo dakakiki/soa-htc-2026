@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CoordinatorController;
 use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PermissionController;
@@ -48,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Staff users and their season role/scope assignments.
     Route::apiResource('users', UserController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    Route::apiResource('coordinators', CoordinatorController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::post('users/{user}/assignments', [AssignmentController::class, 'store']);
     Route::put('assignments/{assignment}', [AssignmentController::class, 'update']);
     Route::delete('assignments/{assignment}', [AssignmentController::class, 'destroy']);
