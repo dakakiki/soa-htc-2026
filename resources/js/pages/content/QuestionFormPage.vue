@@ -11,6 +11,7 @@ import ButtonGroup from '@/components/ButtonGroup.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
+import RichTextEditor from '@/components/RichTextEditor.vue';
 import { IconTrash, IconPlus } from '@tabler/icons-vue';
 import type { Lookup } from '@/api/content';
 import type { LevelOption, QuestionAnswer } from '@/types/models';
@@ -133,8 +134,8 @@ onMounted(async () => {
                         <input v-model="form.title" type="text" required :class="field" :placeholder="$t('question.titlePlaceholder')" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('question.description') }}</label>
-                        <textarea v-model="form.description" rows="4" :class="field" :placeholder="$t('question.descriptionHint')" />
+                        <label class="mb-1 block text-sm font-medium text-gray-700">{{ $t('question.description') }}</label>
+                        <RichTextEditor v-model="form.description" :placeholder="$t('question.descriptionHint')" />
                     </div>
 
                     <!-- Answers -->

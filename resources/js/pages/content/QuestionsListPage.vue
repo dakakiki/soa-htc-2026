@@ -43,6 +43,7 @@ async function load(target = page.value): Promise<void> {
     try {
         const { data } = await listQuestions({
             page: target,
+            per_page: 10,
             search: filters.search || undefined,
             question_type: filters.question_type || undefined,
             tag_id: filters.tag_id ?? undefined,
