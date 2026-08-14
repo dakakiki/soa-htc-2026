@@ -52,6 +52,7 @@ const regions = ref<Region[]>([]);
 const schools = ref<School[]>([]);
 const roles = ref<Role[]>([]);
 const saving = ref(false);
+const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
 
 const coordinatorRoles = computed(() => roles.value.filter((r) => COORDINATOR_ROLE_KEYS.includes(r.key)));
@@ -79,12 +80,17 @@ async function loadCountryScoped(): Promise<void> {
     regions.value = [];
     schools.value = [];
     if (form.country_id) {
-        const [regionRes, schoolRes] = await Promise.all([
-            listRegions(form.country_id),
-            listSchools({ country_id: form.country_id, per_page: 200 }),
-        ]);
-        regions.value = regionRes.data.data;
-        schools.value = schoolRes.data.data;
+        cascadeLoading.value = true;
+        try {
+            const [regionRes, schoolRes] = await Promise.all([
+                listRegions(form.country_id),
+                listSchools({ country_id: form.country_id, per_page: 200 }),
+            ]);
+            regions.value = regionRes.data.data;
+            schools.value = schoolRes.data.data;
+        } finally {
+            cascadeLoading.value = false;
+        }
     }
 }
 async function onCountryChange(): Promise<void> {
@@ -223,6 +229,7 @@ const fileBtn =
                             :options="schoolOptions"
                             :single="isSingleSchool"
                             :disabled="schools.length === 0"
+                            :loading="cascadeLoading"
                             :placeholder="form.country_id ? $t('coordinator.venuesPlaceholder') : $t('coordinator.schoolsPlaceholder')"
                             :search-placeholder="$t('coordinator.venuesLabel')"
                             :summary="(n: number) => $t('coordinator.venuesSelected', { count: n })"
@@ -271,6 +278,7 @@ const fileBtn =
                                 v-model="form.region_id"
                                 :options="regionOptions"
                                 :disabled="regions.length === 0"
+                                :loading="cascadeLoading"
                                 :placeholder="form.country_id ? $t('coordinator.regionOptional') : $t('coordinator.regionFirst')"
                                 :search-placeholder="$t('coordinator.region')"
                             />

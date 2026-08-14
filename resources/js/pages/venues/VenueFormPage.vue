@@ -35,6 +35,7 @@ const currentImageUrl = ref<string | null>(null);
 const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
 const saving = ref(false);
+const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
 
 const schoolTypes = computed(() => [
@@ -50,8 +51,13 @@ const statusOptions = computed(() => [
 async function loadRegions(): Promise<void> {
     regions.value = [];
     if (form.country_id) {
-        const { data } = await listRegions(form.country_id);
-        regions.value = data.data;
+        cascadeLoading.value = true;
+        try {
+            const { data } = await listRegions(form.country_id);
+            regions.value = data.data;
+        } finally {
+            cascadeLoading.value = false;
+        }
     }
 }
 async function onCountryChange(): Promise<void> {
@@ -165,8 +171,8 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">{{ $t('venue.region') }}</label>
-                    <select v-model="form.region_id" :disabled="regions.length === 0" :class="[field, 'disabled:bg-gray-50']">
-                        <option :value="null">{{ form.country_id ? $t('venue.regionOptional') : $t('venue.regionFirst') }}</option>
+                    <select v-model="form.region_id" :disabled="regions.length === 0 || cascadeLoading" :class="[field, 'disabled:bg-gray-50']">
+                        <option :value="null">{{ cascadeLoading ? $t('common.loading') : (form.country_id ? $t('venue.regionOptional') : $t('venue.regionFirst')) }}</option>
                         <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
                     </select>
                 </div>

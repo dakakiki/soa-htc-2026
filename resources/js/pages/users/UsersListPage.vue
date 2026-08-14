@@ -27,6 +27,7 @@ const page = ref(1);
 const lastPage = ref(1);
 const total = ref(0);
 const loading = ref(true);
+const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
 
 const countries = ref<Country[]>([]);
@@ -75,8 +76,13 @@ async function onCountryFilterChange(): Promise<void> {
     filters.region_id = null;
     regions.value = [];
     if (filters.country_id) {
-        const { data } = await listRegions(filters.country_id);
-        regions.value = data.data;
+        cascadeLoading.value = true;
+        try {
+            const { data } = await listRegions(filters.country_id);
+            regions.value = data.data;
+        } finally {
+            cascadeLoading.value = false;
+        }
     }
 }
 
@@ -143,9 +149,9 @@ onMounted(async () => {
                 <option :value="null">{{ $t('user.countryPlaceholder') }}</option>
                 <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
-            <select v-model="filters.region_id" :disabled="regions.length === 0"
+            <select v-model="filters.region_id" :disabled="regions.length === 0 || cascadeLoading"
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-50">
-                <option :value="null">{{ $t('user.region') }}</option>
+                <option :value="null">{{ cascadeLoading ? $t('common.loading') : $t('user.region') }}</option>
                 <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
             </select>
             <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">

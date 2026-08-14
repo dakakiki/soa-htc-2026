@@ -32,6 +32,7 @@ const page = ref(1);
 const lastPage = ref(1);
 const total = ref(0);
 const loading = ref(true);
+const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
 
 const countries = ref<Country[]>([]);
@@ -97,12 +98,17 @@ async function onCountryFilterChange(): Promise<void> {
     regions.value = [];
     schools.value = [];
     if (filters.country_id) {
-        const [regionRes, schoolRes] = await Promise.all([
-            listRegions(filters.country_id),
-            listSchools({ country_id: filters.country_id, per_page: 200 }),
-        ]);
-        regions.value = regionRes.data.data;
-        schools.value = schoolRes.data.data;
+        cascadeLoading.value = true;
+        try {
+            const [regionRes, schoolRes] = await Promise.all([
+                listRegions(filters.country_id),
+                listSchools({ country_id: filters.country_id, per_page: 200 }),
+            ]);
+            regions.value = regionRes.data.data;
+            schools.value = schoolRes.data.data;
+        } finally {
+            cascadeLoading.value = false;
+        }
     }
 }
 async function onCountryFilterSelected(value: number | null): Promise<void> {
@@ -180,6 +186,7 @@ onMounted(async () => {
                     :options="regionOptions"
                     dense
                     :disabled="regions.length === 0"
+                    :loading="cascadeLoading"
                     :placeholder="$t('coordinator.filterRegion')"
                     :search-placeholder="$t('coordinator.region')"
                 />
@@ -191,6 +198,7 @@ onMounted(async () => {
                     :options="venueOptions"
                     dense
                     :disabled="schools.length === 0"
+                    :loading="cascadeLoading"
                     :placeholder="$t('coordinator.filterVenue')"
                     :search-placeholder="$t('coordinator.venuesLabel')"
                 />

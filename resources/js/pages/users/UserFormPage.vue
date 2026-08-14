@@ -47,6 +47,7 @@ const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
 const roles = ref<Role[]>([]);
 const saving = ref(false);
+const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
 
 const selectableRoles = computed(() => roles.value.filter((r) => !HIDDEN_ROLE_KEYS.includes(r.key)));
@@ -66,8 +67,13 @@ const studentToggles = computed(() => [
 async function loadRegions(): Promise<void> {
     regions.value = [];
     if (form.country_id) {
-        const { data } = await listRegions(form.country_id);
-        regions.value = data.data;
+        cascadeLoading.value = true;
+        try {
+            const { data } = await listRegions(form.country_id);
+            regions.value = data.data;
+        } finally {
+            cascadeLoading.value = false;
+        }
     }
 }
 async function onCountryChange(): Promise<void> {
@@ -213,6 +219,7 @@ const fileBtn =
                                 v-model="form.region_id"
                                 :options="regionOptions"
                                 :disabled="regions.length === 0"
+                                :loading="cascadeLoading"
                                 :placeholder="form.country_id ? $t('user.regionOptional') : $t('user.regionFirst')"
                                 :search-placeholder="$t('user.region')"
                             />
