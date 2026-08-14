@@ -205,6 +205,8 @@ export default {
         schoolSingleHint: 'Select exactly one school.',
         schoolMultiHint: 'Select one or more schools.',
         venuesSelected: '{count} venues selected',
+        filterCountry: 'Countries…',
+        filterRegion: 'Regions…',
         level: 'Coordinator level',
         venues: 'No. of Venues',
         active: 'Active',

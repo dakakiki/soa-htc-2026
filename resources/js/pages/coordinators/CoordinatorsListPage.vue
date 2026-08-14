@@ -10,6 +10,7 @@ import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import { IconBuilding } from '@tabler/icons-vue';
 import type { Coordinator, Country, Region, Role, School } from '@/types/models';
 
@@ -37,6 +38,9 @@ const regions = ref<Region[]>([]);
 const schools = ref<School[]>([]);
 const roles = ref<Role[]>([]);
 const coordinatorRoles = computed(() => roles.value.filter((r) => COORDINATOR_ROLE_KEYS.includes(r.key)));
+const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
+const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
+const venueOptions = computed<SearchSelectOption[]>(() => schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })));
 
 const filters = reactive<{ search: string; country_id: number | null; region_id: number | null; role_id: number | null; school_id: number | null; status: string }>({
     search: asString(route.query.search),
@@ -100,6 +104,10 @@ async function onCountryFilterChange(): Promise<void> {
         schools.value = schoolRes.data.data;
     }
 }
+async function onCountryFilterSelected(value: number | null): Promise<void> {
+    filters.country_id = value;
+    await onCountryFilterChange();
+}
 
 async function onToggleStatus(c: Coordinator, value: boolean): Promise<void> {
     const previous = c.status;
@@ -153,32 +161,51 @@ onMounted(async () => {
             >{{ $t('coordinator.add') }}</RouterLink>
         </div>
 
-        <form class="flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
+        <form class="flex flex-wrap items-start gap-3" @submit.prevent="load(1)">
             <input v-model="filters.search" type="search" :placeholder="$t('coordinator.search')"
-                class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <select v-model="filters.country_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="onCountryFilterChange">
-                <option :value="null">{{ $t('coordinator.countryPlaceholder') }}</option>
-                <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-            <select v-model="filters.region_id" :disabled="regions.length === 0"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-50">
-                <option :value="null">{{ $t('coordinator.region') }}</option>
-                <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-            </select>
-            <select v-model="filters.school_id" :disabled="schools.length === 0"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-50">
-                <option :value="null">{{ $t('coordinator.filterVenue') }}</option>
-                <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-            <select v-model="filters.role_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
-                <option :value="null">{{ $t('coordinator.filterLevel') }}</option>
-                <option v-for="r in coordinatorRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
-            </select>
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
-                <option value="">{{ $t('coordinator.filterStatus') }}</option>
-                <option value="active">{{ $t('coordinator.statusActive') }}</option>
-                <option value="inactive">{{ $t('coordinator.statusInactive') }}</option>
-            </select>
+                class="w-48 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+            <!-- Country over Regions -->
+            <div class="flex w-44 flex-col gap-2">
+                <SearchSelect
+                    :model-value="filters.country_id"
+                    :options="countryOptions"
+                    dense
+                    :placeholder="$t('coordinator.filterCountry')"
+                    :search-placeholder="$t('coordinator.country')"
+                    @update:model-value="onCountryFilterSelected"
+                />
+                <SearchSelect
+                    v-model="filters.region_id"
+                    :options="regionOptions"
+                    dense
+                    :disabled="regions.length === 0"
+                    :placeholder="$t('coordinator.filterRegion')"
+                    :search-placeholder="$t('coordinator.region')"
+                />
+            </div>
+            <!-- Venue -->
+            <div class="w-44">
+                <SearchSelect
+                    v-model="filters.school_id"
+                    :options="venueOptions"
+                    dense
+                    :disabled="schools.length === 0"
+                    :placeholder="$t('coordinator.filterVenue')"
+                    :search-placeholder="$t('coordinator.venuesLabel')"
+                />
+            </div>
+            <!-- Coordinator level over Status -->
+            <div class="flex flex-col gap-2">
+                <select v-model="filters.role_id" class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                    <option :value="null">{{ $t('coordinator.filterLevel') }}</option>
+                    <option v-for="r in coordinatorRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
+                </select>
+                <select v-model="filters.status" class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                    <option value="">{{ $t('coordinator.filterStatus') }}</option>
+                    <option value="active">{{ $t('coordinator.statusActive') }}</option>
+                    <option value="inactive">{{ $t('coordinator.statusInactive') }}</option>
+                </select>
+            </div>
             <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
                 {{ $t('common.search') }}
             </button>

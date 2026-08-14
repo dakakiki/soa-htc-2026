@@ -16,10 +16,12 @@ const props = withDefaults(
         searchPlaceholder?: string;
         disabled?: boolean;
         clearable?: boolean;
+        /** Compact control (filter rows) instead of the taller form control. */
+        dense?: boolean;
         /** Maximum matches rendered at once; the rest require refining search. */
         limit?: number;
     }>(),
-    { placeholder: '', searchPlaceholder: '', disabled: false, clearable: true, limit: 200 },
+    { placeholder: '', searchPlaceholder: '', disabled: false, clearable: true, dense: false, limit: 200 },
 );
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: number | null): void }>();
@@ -74,8 +76,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
         <button
             type="button"
             :disabled="disabled"
-            class="mt-1 flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 px-3 py-2 text-left text-sm disabled:bg-gray-50"
-            :class="open ? 'border-blue-400 ring-1 ring-blue-200' : ''"
+            class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-left text-sm disabled:bg-gray-50"
+            :class="[dense ? 'py-1.5' : 'mt-1 py-2', open ? 'border-blue-400 ring-1 ring-blue-200' : '']"
             @click="toggleOpen"
         >
             <span v-if="selected" class="truncate text-gray-800">{{ selected.label }}</span>
