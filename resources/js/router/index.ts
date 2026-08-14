@@ -118,6 +118,24 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'content.manage' },
     },
     {
+        path: '/content/tests',
+        name: 'tests',
+        component: () => import('@/pages/content/TestsListPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
+        path: '/content/tests/new',
+        name: 'tests.new',
+        component: () => import('@/pages/content/TestFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
+        path: '/content/tests/:id/edit',
+        name: 'tests.edit',
+        component: () => import('@/pages/content/TestFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
         path: '/content/test-types',
         name: 'content.test-types',
         component: () => import('@/pages/content/LookupListPage.vue'),

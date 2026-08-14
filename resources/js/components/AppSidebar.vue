@@ -10,11 +10,13 @@ import {
     IconUserStar,
     IconSettings,
     IconLock,
+    IconShieldLock,
     IconWorld,
     IconPalette,
     IconStairs,
     IconListCheck,
     IconHelpCircle,
+    IconFileText,
     IconTag,
     IconClockHour4,
     IconCategory,
@@ -53,7 +55,6 @@ function toggleCollapsed(): void {
 const items: NavItem[] = [
     { label: t('nav.dashboard'), icon: IconLayoutDashboard, to: 'dashboard', prefix: 'dashboard' },
     { label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.view' },
-    { label: t('nav.users'), icon: IconUsers, to: 'users', prefix: 'users', perm: 'users.manage' },
     { label: t('nav.coordinators'), icon: IconUserStar, to: 'coordinators', prefix: 'coordinators', perm: 'users.manage' },
 ];
 
@@ -63,10 +64,20 @@ const groups: NavGroup[] = [
         label: t('nav.quizzes'),
         icon: IconListCheck,
         children: [
+            { label: t('nav.tests'), icon: IconFileText, to: 'tests', prefix: 'tests', perm: 'content.manage' },
             { label: t('nav.questions'), icon: IconHelpCircle, to: 'questions', prefix: 'questions', perm: 'content.manage' },
             { label: t('nav.tags'), icon: IconTag, to: 'content.tags', prefix: 'content.tags', perm: 'content.manage' },
             { label: t('nav.examRounds'), icon: IconClockHour4, to: 'content.exam-rounds', prefix: 'content.exam-rounds', perm: 'content.manage' },
             { label: t('nav.testType'), icon: IconCategory, to: 'content.test-types', prefix: 'content.test-types', perm: 'content.manage' },
+        ],
+    },
+    {
+        key: 'access',
+        label: t('nav.access'),
+        icon: IconShieldLock,
+        children: [
+            { label: t('nav.users'), icon: IconUsers, to: 'users', prefix: 'users', perm: 'users.manage' },
+            { label: t('nav.roles'), icon: IconLock, to: 'roles', prefix: 'roles', perm: 'roles.manage' },
         ],
     },
     {
@@ -77,7 +88,6 @@ const groups: NavGroup[] = [
             { label: t('nav.locations'), icon: IconWorld, to: 'locations', prefix: 'locations', perm: 'locations.manage' },
             { label: t('nav.difficulty'), icon: IconStairs, to: 'difficulty', prefix: 'difficulty', perm: 'difficulty.manage' },
             { label: t('nav.theme'), icon: IconPalette, to: 'settings.theme', prefix: 'settings.theme', perm: 'settings.manage' },
-            { label: t('nav.roles'), icon: IconLock, to: 'roles', prefix: 'roles', perm: 'roles.manage' },
         ],
     },
 ];

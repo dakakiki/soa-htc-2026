@@ -116,6 +116,51 @@ export interface Question {
     answers_count?: number;
 }
 
+export interface TestQuestionRef {
+    id: number;
+    title: string;
+    points: number;
+    position: number;
+}
+
+export interface Test {
+    id: number;
+    title: string;
+    description: string | null;
+    duration: number | null;
+    status: string;
+    type?: { id: number; name?: string };
+    levels?: { id: number; level_short: string }[];
+    questions?: TestQuestionRef[];
+    questions_count?: number;
+}
+
+export interface TestPreviewAnswer {
+    text: string;
+    is_correct: boolean;
+    position: number;
+}
+
+export interface TestPreviewQuestion {
+    id: number;
+    title: string;
+    description: string | null;
+    question_type: string;
+    question_type_label: string;
+    points: number;
+    position: number;
+    answers: TestPreviewAnswer[];
+}
+
+export interface TestPreview {
+    id: number;
+    title: string;
+    description: string | null;
+    duration: number | null;
+    type?: { id: number; name?: string };
+    questions: TestPreviewQuestion[];
+}
+
 export interface Permission {
     key: string;
     description: string | null;

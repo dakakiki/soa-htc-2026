@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CoordinatorController;
@@ -7,11 +8,16 @@ use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DifficultyCategoryController;
 use App\Http\Controllers\Api\DifficultyLevelController;
+use App\Http\Controllers\Api\ExamRoundController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\QuestionController;
+use App\Http\Controllers\Api\QuestionTagController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\TestController;
+use App\Http\Controllers\Api\TestTypeController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -67,18 +73,20 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters(['difficulty-levels' => 'difficulty_level']);
 
     // Competitor-count column headers for the venue/school listings (level shorts).
-    Route::get('difficulty-level-columns', fn () => ['data' => \App\Domain\Assessment\Models\DifficultyLevel::orderedShorts()]);
+    Route::get('difficulty-level-columns', fn () => ['data' => DifficultyLevel::orderedShorts()]);
 
     // Content configuration lookups (admin-only; gated in the controllers).
-    Route::apiResource('test-types', \App\Http\Controllers\Api\TestTypeController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::apiResource('exam-rounds', \App\Http\Controllers\Api\ExamRoundController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::apiResource('question-tags', \App\Http\Controllers\Api\QuestionTagController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::apiResource('questions', \App\Http\Controllers\Api\QuestionController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    Route::apiResource('test-types', TestTypeController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::apiResource('exam-rounds', ExamRoundController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::apiResource('question-tags', QuestionTagController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::apiResource('questions', QuestionController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    Route::get('tests/{test}/preview', [TestController::class, 'preview']);
+    Route::apiResource('tests', TestController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
 
     // Difficulty levels as pickable options for content forms (id + short + category).
-    Route::get('difficulty-level-options', fn () => ['data' => \App\Domain\Assessment\Models\DifficultyLevel::query()
+    Route::get('difficulty-level-options', fn () => ['data' => DifficultyLevel::query()
         ->join('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
-        ->orderBy('difficulty_categories.type')->orderBy('difficulty_levels.position')
+        ->orderBy('difficulty_categories.type')->orderBy('difficulty_categories.id')->orderBy('difficulty_levels.position')
         ->get(['difficulty_levels.id', 'difficulty_levels.level_short', 'difficulty_levels.name', 'difficulty_categories.name as category_name', 'difficulty_categories.type as category_type'])]);
 
     Route::get('permissions', [PermissionController::class, 'index']);

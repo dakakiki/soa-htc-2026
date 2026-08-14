@@ -157,6 +157,42 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0011 — Round pripada Exams sloju, ne Tests
+
+- **Status:** Prihvaćeno (2026-08-14); vlasnik proizvoda
+- **Kontekst:** Faza 2 Slice 2 (Tests). Legacy `tests` ima kolonu `round` (int),
+  ali je u svih 59 legacy testova **NULL**; round/tip se realno drže na legacy
+  `exams` (`exam_round`, `exam_type`). Naš lookup `exam_rounds` već postoji.
+- **Odluka:** `tests` tabela **nema** round kolonu. Test se za round vezuje preko
+  Exams sloja (budući `exam_tests` pivot). Iz legacy `tests` se **ne prenose**
+  `round`, `test_index`, `test_password` (poslednja dva su uvek NULL — legacy
+  online-exam feature). Test nosi: `title`, `description`, `test_type_id` (FK →
+  `test_types` preko `legacy_id`), `duration`, `status`, `legacy_id`, + OD-3 level
+  pivot (`difficulty_level_test`) i uređeni `question_test` pivot (`position`).
+- **Posledica:** Migracija `legacy:import-tests` mapira `test_type` 2/3/6 →
+  Reading/Writing/Use of English, difficulty CSV → pivot (isti `legToOur` kao
+  Questions), i reconcile-uje `question_id` preko `Question.legacy_id`.
+
+---
+
+## ADR-0012 — Sve 4 legacy difficulty kategorije (bez re-mapiranja sadržaja)
+
+- **Status:** Prihvaćeno (2026-08-14); vlasnik proizvoda
+- **Kontekst:** Legacy ima 4 difficulty kategorije: Regular Default + **Regular 7** i
+  Special default + **Special 7**. „…7" su country-scoped varijante (12/15 zemalja) sa
+  **istim oznakama nivoa** (H2 je H2) ali **različitim grade→level pragovima**. Raniji
+  slice (OD-3) je kolapsirao sve varijante na 2 Default kategorije.
+- **Odluka:** Uvezene su i „…7" varijante (`legacy:import-difficulty-categories`,
+  idempotentno po `legacy_id`) kao zasebne šeme sa svojim nivoima/pragovima — **ali
+  bez re-mapiranja** questions/tests (i dalje ciljaju Default nivoe). Sada 4 kategorije
+  / 24 nivoa; Tests filter/forma prikazuju 4 optgroup-a.
+- **Posledica / otvoreno:** country-scope „…7" kategorija je **prazan** — dev `countries`
+  nemaju `legacy_id`, pa se legacy country_id ne može mapirati dok se zemlje ne migriraju
+  (Faza 7–8). „…7" nivoi zasad nemaju vezanih testova (očekivano). OD-3 kolaps ostaje na
+  snazi za sadržaj; ovo je samo dopuna reference kategorija.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
