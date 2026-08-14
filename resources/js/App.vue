@@ -17,9 +17,9 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-    <div class="flex min-h-screen flex-col bg-gray-50 text-gray-900">
+    <div class="flex h-screen flex-col overflow-hidden bg-gray-50 text-gray-900">
         <template v-if="session.isAuthenticated">
-            <header class="flex items-center gap-4 border-b border-gray-200 bg-white px-4 py-3">
+            <header class="flex shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 py-3">
                 <RouterLink to="/dashboard" class="text-lg font-semibold tracking-tight">{{ $t('app.name') }}</RouterLink>
                 <div class="ml-auto flex items-center gap-4 text-sm">
                     <span class="text-gray-500">{{ session.user?.email }}</span>
@@ -33,16 +33,16 @@ async function logout(): Promise<void> {
                     </button>
                 </div>
             </header>
-            <div class="flex flex-1">
+            <div class="flex flex-1 overflow-hidden">
                 <AppSidebar />
-                <main class="min-w-0 flex-1 px-6 py-8">
+                <main class="min-w-0 flex-1 overflow-y-auto px-6 py-8">
                     <RouterView />
                 </main>
             </div>
         </template>
 
         <template v-else>
-            <main class="mx-auto w-full max-w-5xl px-6 py-10">
+            <main class="mx-auto w-full max-w-5xl overflow-y-auto px-6 py-10">
                 <RouterView />
             </main>
         </template>

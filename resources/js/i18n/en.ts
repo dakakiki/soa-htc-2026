@@ -16,6 +16,7 @@ export default {
         settings: 'Settings',
         login: 'Login',
         logout: 'Logout',
+        toggleMenu: 'Toggle navigation',
     },
     dashboard: {
         title: 'Dashboard',

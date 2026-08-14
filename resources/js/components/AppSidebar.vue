@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, type Component } from 'vue';
+import { computed, reactive, ref, type Component } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
@@ -11,6 +11,8 @@ import {
     IconLock,
     IconChevronDown,
     IconChevronUp,
+    IconChevronsLeft,
+    IconChevronsRight,
 } from '@tabler/icons-vue';
 
 interface NavItem {
@@ -30,6 +32,14 @@ interface NavGroup {
 const { t } = useI18n();
 const route = useRoute();
 const session = useSessionStore();
+
+const STORAGE_KEY = 'sidebar-collapsed';
+const stored = localStorage.getItem(STORAGE_KEY);
+const collapsed = ref(stored !== null ? stored === '1' : window.innerWidth < 1024);
+function toggleCollapsed(): void {
+    collapsed.value = !collapsed.value;
+    localStorage.setItem(STORAGE_KEY, collapsed.value ? '1' : '0');
+}
 
 const items: NavItem[] = [
     { label: t('nav.dashboard'), icon: IconLayoutDashboard, to: 'dashboard', prefix: 'dashboard' },
@@ -62,40 +72,56 @@ const groupActive = (g: NavGroup): boolean => g.children.some((c) => isActive(c.
 
 const openState = reactive<Record<string, boolean>>({});
 const isOpen = (g: NavGroup): boolean => openState[g.key] ?? groupActive(g);
-const toggle = (g: NavGroup): void => {
+function toggle(g: NavGroup): void {
+    // Expanding a group while collapsed also opens the rail so labels are visible.
+    if (collapsed.value) {
+        collapsed.value = false;
+        localStorage.setItem(STORAGE_KEY, '0');
+    }
     openState[g.key] = !isOpen(g);
-};
+}
 
 const itemClass = (active: boolean): string =>
     active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
 </script>
 
 <template>
-    <aside class="w-16 shrink-0 border-r border-gray-200 bg-white lg:w-60">
-        <nav class="space-y-1 p-2">
+    <aside
+        class="flex flex-col shrink-0 border-r border-gray-200 bg-white transition-[width] duration-150"
+        :class="collapsed ? 'w-16' : 'w-60'"
+    >
+        <nav class="flex-1 space-y-1 overflow-y-auto p-2">
             <RouterLink
                 v-for="item in visibleItems"
                 :key="item.to"
                 :to="{ name: item.to }"
                 :title="item.label"
-                class="flex items-center justify-center gap-3 rounded-md px-3 py-2 text-sm lg:justify-start"
-                :class="itemClass(isActive(item.prefix))"
+                class="flex items-center gap-3 rounded-md px-3 py-2 text-sm"
+                :class="[itemClass(isActive(item.prefix)), { 'justify-center': collapsed }]"
             >
                 <component :is="item.icon" :size="20" class="shrink-0" />
-                <span class="hidden lg:inline">{{ item.label }}</span>
+                <span v-show="!collapsed">{{ item.label }}</span>
             </RouterLink>
 
             <div v-for="g in visibleGroups" :key="g.key">
                 <button
                     type="button"
                     :title="g.label"
-                    class="flex w-full items-center justify-center gap-3 rounded-md px-3 py-2 text-sm lg:justify-start"
-                    :class="groupActive(g) ? 'text-blue-700 hover:bg-gray-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+                    class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm"
+                    :class="[
+                        groupActive(g) ? 'text-blue-700 hover:bg-gray-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                        { 'justify-center': collapsed },
+                    ]"
                     @click="toggle(g)"
                 >
                     <component :is="g.icon" :size="20" class="shrink-0" />
-                    <span class="hidden lg:inline">{{ g.label }}</span>
-                    <component :is="isOpen(g) ? IconChevronUp : IconChevronDown" :size="16" class="ml-auto hidden lg:block" />
+                    <span v-show="!collapsed">{{ g.label }}</span>
+                    <component
+                        v-show="!collapsed"
+                        :is="isOpen(g) ? IconChevronUp : IconChevronDown"
+                        :size="16"
+                        class="ml-auto"
+                    />
                 </button>
                 <div v-show="isOpen(g)" class="space-y-1">
                     <RouterLink
@@ -103,14 +129,26 @@ const itemClass = (active: boolean): string =>
                         :key="c.to"
                         :to="{ name: c.to }"
                         :title="c.label"
-                        class="flex items-center justify-center gap-3 rounded-md px-3 py-2 text-sm lg:justify-start lg:pl-9"
-                        :class="itemClass(isActive(c.prefix))"
+                        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm"
+                        :class="[itemClass(isActive(c.prefix)), collapsed ? 'justify-center' : 'pl-9']"
                     >
                         <component :is="c.icon" :size="18" class="shrink-0" />
-                        <span class="hidden lg:inline">{{ c.label }}</span>
+                        <span v-show="!collapsed">{{ c.label }}</span>
                     </RouterLink>
                 </div>
             </div>
         </nav>
+
+        <div class="flex border-t border-gray-200 p-2" :class="collapsed ? 'justify-center' : 'justify-end'">
+            <button
+                type="button"
+                :title="t('nav.toggleMenu')"
+                :aria-label="t('nav.toggleMenu')"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-gray-600 hover:bg-gray-200"
+                @click="toggleCollapsed"
+            >
+                <component :is="collapsed ? IconChevronsRight : IconChevronsLeft" :size="18" />
+            </button>
+        </div>
     </aside>
 </template>
