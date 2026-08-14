@@ -9,12 +9,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DifficultyLevel extends Model
 {
-    protected $fillable = ['difficulty_category_id', 'name', 'position', 'legacy_id'];
+    protected $fillable = ['difficulty_category_id', 'name', 'level_short', 'grades', 'position', 'status', 'legacy_id'];
 
     protected function casts(): array
     {
         return [
             'difficulty_category_id' => 'integer',
+            'grades' => 'array',
             'position' => 'integer',
             'legacy_id' => 'integer',
         ];

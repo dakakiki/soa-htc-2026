@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Domain\Assessment\Models\DifficultyCategory;
+use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
@@ -10,6 +12,8 @@ use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Models\Setting;
 use App\Models\User;
 use App\Policies\CountryPolicy;
+use App\Policies\DifficultyCategoryPolicy;
+use App\Policies\DifficultyLevelPolicy;
 use App\Policies\RegionPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\SchoolPolicy;
@@ -42,5 +46,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Country::class, CountryPolicy::class);
         Gate::policy(Region::class, RegionPolicy::class);
         Gate::policy(Setting::class, SettingPolicy::class);
+        Gate::policy(DifficultyCategory::class, DifficultyCategoryPolicy::class);
+        Gate::policy(DifficultyLevel::class, DifficultyLevelPolicy::class);
     }
 }

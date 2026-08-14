@@ -27,6 +27,7 @@ class RolePermissionSeeder extends Seeder
         'roles.manage' => 'Create and manage roles and their permissions',
         'locations.manage' => 'Create and update countries and regions',
         'settings.manage' => 'Manage branding and theme settings',
+        'difficulty.manage' => 'Manage difficulty categories and levels',
     ];
 
     /**

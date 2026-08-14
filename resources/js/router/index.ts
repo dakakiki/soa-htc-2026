@@ -94,6 +94,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'locations.manage' },
     },
     {
+        path: '/difficulty',
+        name: 'difficulty',
+        component: () => import('@/pages/difficulty/DifficultyListPage.vue'),
+        meta: { requiresAuth: true, permission: 'difficulty.manage' },
+    },
+    {
         path: '/settings/theme',
         name: 'settings.theme',
         component: () => import('@/pages/settings/ThemeSettingsPage.vue'),

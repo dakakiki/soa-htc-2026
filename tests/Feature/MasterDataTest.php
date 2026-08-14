@@ -19,7 +19,9 @@ class MasterDataTest extends TestCase
         $this->assertDatabaseCount('seasons', 1);
         $this->assertDatabaseCount('countries', 3);
         $this->assertDatabaseCount('schools', 3);
-        $this->assertDatabaseCount('difficulty_levels', 5);
+        // Regular Default (BH..H5 = 7) + Special Default (S1..S5 = 5).
+        $this->assertDatabaseCount('difficulty_categories', 2);
+        $this->assertDatabaseCount('difficulty_levels', 12);
 
         $assignment = SeasonUserAssignment::with(['user', 'season', 'role'])->firstOrFail();
         $this->assertSame('admin@soahtc.test', $assignment->user->email);

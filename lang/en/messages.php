@@ -39,4 +39,8 @@ return [
     'coordinator' => [
         'role_invalid' => 'Select a coordinator role (country or school coordinator).',
     ],
+    'difficulty' => [
+        'countries_required' => 'Select at least one country, or enable "all countries".',
+        'category_in_use' => 'This category has levels and cannot be deleted. Delete its levels first.',
+    ],
 ];

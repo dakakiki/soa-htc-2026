@@ -62,6 +62,27 @@ export interface Role {
     permissions?: string[];
 }
 
+export interface DifficultyLevel {
+    id: number;
+    difficulty_category_id: number;
+    name: string;
+    level_short: string;
+    grades: number[];
+    position: number;
+    status: string;
+}
+
+export interface DifficultyCategory {
+    id: number;
+    name: string;
+    type: string;
+    type_label: string;
+    countries_all: boolean;
+    countries?: { id: number; code: string; name: string }[];
+    levels_count?: number;
+    status: string;
+}
+
 export interface Permission {
     key: string;
     description: string | null;

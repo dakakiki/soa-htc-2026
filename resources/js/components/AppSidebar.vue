@@ -12,6 +12,7 @@ import {
     IconLock,
     IconWorld,
     IconPalette,
+    IconStairs,
     IconChevronDown,
     IconChevronUp,
     IconChevronsLeft,
@@ -58,6 +59,7 @@ const groups: NavGroup[] = [
         icon: IconSettings,
         children: [
             { label: t('nav.locations'), icon: IconWorld, to: 'locations', prefix: 'locations', perm: 'locations.manage' },
+            { label: t('nav.difficulty'), icon: IconStairs, to: 'difficulty', prefix: 'difficulty', perm: 'difficulty.manage' },
             { label: t('nav.theme'), icon: IconPalette, to: 'settings.theme', prefix: 'settings.theme', perm: 'settings.manage' },
             { label: t('nav.roles'), icon: IconLock, to: 'roles', prefix: 'roles', perm: 'roles.manage' },
         ],

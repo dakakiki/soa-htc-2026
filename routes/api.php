@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CoordinatorController;
 use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DifficultyCategoryController;
+use App\Http\Controllers\Api\DifficultyLevelController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\RoleController;
@@ -56,6 +58,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('regions', [RegionController::class, 'store']);
     Route::put('regions/{region}', [RegionController::class, 'update']);
     Route::delete('regions/{region}', [RegionController::class, 'destroy']);
+    // Difficulty configuration (admin-only; categories + their grade→level maps).
+    Route::apiResource('difficulty-categories', DifficultyCategoryController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['difficulty-categories' => 'difficulty_category']);
+    Route::apiResource('difficulty-levels', DifficultyLevelController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['difficulty-levels' => 'difficulty_level']);
+
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('schools', SchoolController::class);
