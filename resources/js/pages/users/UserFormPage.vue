@@ -7,6 +7,7 @@ import { listCountries, listRegions, listRoles } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import type { Country, Region, Role } from '@/types/models';
 
 const route = useRoute();
@@ -48,6 +49,8 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 
 const selectableRoles = computed(() => roles.value.filter((r) => !HIDDEN_ROLE_KEYS.includes(r.key)));
+const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
+const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
 const statusOptions = computed(() => [
     { value: 'active', label: t('user.statusActive'), activeClass: 'bg-green-500 text-white' },
     { value: 'inactive', label: t('user.statusInactive'), activeClass: 'bg-gray-400 text-white' },
@@ -69,6 +72,10 @@ async function loadRegions(): Promise<void> {
 async function onCountryChange(): Promise<void> {
     form.region_id = null;
     await loadRegions();
+}
+async function onCountrySelected(value: number | null): Promise<void> {
+    form.country_id = value;
+    await onCountryChange();
 }
 function onImageChange(event: Event): void {
     imageFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
@@ -178,105 +185,123 @@ const fileBtn =
         <h1 class="text-2xl font-semibold tracking-tight">{{ isEdit ? $t('user.edit') : $t('user.add') }}</h1>
 
         <form class="rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
-            <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-6">
-                <!-- Name, Role -->
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.name') }} *</label>
-                    <input v-model="form.name" type="text" required :class="field" />
-                </div>
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.role') }}</label>
-                    <select v-model="form.role_id" :class="field">
-                        <option :value="null">{{ $t('user.rolePlaceholder') }}</option>
-                        <option v-for="r in selectableRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
-                    </select>
-                </div>
+            <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                <!-- Left column: basic data -->
+                <div class="space-y-5 lg:order-1 lg:col-span-8">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('user.name') }} *</label>
+                        <input v-model="form.name" type="text" required :class="field" />
+                    </div>
 
-                <!-- City, Country, Region -->
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.city') }}</label>
-                    <input v-model="form.city" type="text" :class="field" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.country') }} *</label>
-                    <select v-model="form.country_id" required :class="field" @change="onCountryChange">
-                        <option :value="null" disabled>{{ $t('user.countryPlaceholder') }}</option>
-                        <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
-                    </select>
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.region') }}</label>
-                    <select v-model="form.region_id" :disabled="regions.length === 0" :class="[field, 'disabled:bg-gray-50']">
-                        <option :value="null">{{ form.country_id ? $t('user.regionOptional') : $t('user.regionFirst') }}</option>
-                        <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                    </select>
-                </div>
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('user.country') }} *</label>
+                            <SearchSelect
+                                :model-value="form.country_id"
+                                :options="countryOptions"
+                                :clearable="false"
+                                :placeholder="$t('user.countryPlaceholder')"
+                                :search-placeholder="$t('user.country')"
+                                @update:model-value="onCountrySelected"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('user.region') }}</label>
+                            <SearchSelect
+                                v-model="form.region_id"
+                                :options="regionOptions"
+                                :disabled="regions.length === 0"
+                                :placeholder="form.country_id ? $t('user.regionOptional') : $t('user.regionFirst')"
+                                :search-placeholder="$t('user.region')"
+                            />
+                        </div>
+                    </div>
 
-                <!-- Phone, Email -->
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.phone') }}</label>
-                    <input v-model="form.phone" type="text" :class="field" />
-                </div>
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.email') }} *</label>
-                    <input v-model="form.email" type="email" required :class="field" />
-                </div>
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('user.city') }}</label>
+                            <input v-model="form.city" type="text" :class="field" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('user.phone') }}</label>
+                            <input v-model="form.phone" type="text" :class="field" />
+                        </div>
+                    </div>
 
-                <!-- Password, Repeat password -->
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">
-                        {{ isEdit ? $t('user.passwordEditHint') : $t('user.passwordHint') }}
-                    </label>
-                    <input v-model="form.password" type="password" :required="!isEdit" autocomplete="new-password" :class="field" />
-                </div>
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.passwordRepeat') }}</label>
-                    <input v-model="form.password_confirm" type="password" :required="!isEdit && !!form.password"
-                        autocomplete="new-password" :class="field" />
-                </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('user.email') }} *</label>
+                        <input v-model="form.email" type="email" required :class="field" />
+                    </div>
 
-                <!-- Image, File upload -->
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.image') }}</label>
-                    <label :class="fileBtn">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
-                        </svg>
-                        <span class="truncate">{{ imageFile?.name || $t('user.chooseImage') }}</span>
-                        <input type="file" accept="image/*" class="hidden" @change="onImageChange" />
-                    </label>
-                    <a v-if="currentImageUrl && !imageFile" :href="currentImageUrl" target="_blank"
-                        class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('user.currentImage') }}</a>
-                </div>
-                <div class="sm:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.file') }}</label>
-                    <label :class="fileBtn">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
-                        </svg>
-                        <span class="truncate">{{ uploadFile?.name || $t('user.chooseFile') }}</span>
-                        <input type="file" accept="image/*,application/pdf" class="hidden" @change="onFileChange" />
-                    </label>
-                    <a v-if="currentFileUrl && !uploadFile" :href="currentFileUrl" target="_blank"
-                        class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('user.currentFile') }}</a>
-                </div>
+                    <hr class="border-gray-200" />
 
-                <!-- Permissions -->
-                <div class="sm:col-span-6">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.permissions') }}</label>
-                    <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-6">
-                        <label v-for="tog in studentToggles" :key="tog.key" class="flex items-center gap-2 text-sm text-gray-700">
-                            <ToggleSwitch v-model="form[tog.key]" :aria-label="tog.label" />
-                            <span>{{ tog.label }}</span>
-                        </label>
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">
+                                {{ isEdit ? $t('user.passwordEditHint') : $t('user.passwordHint') }}
+                            </label>
+                            <input v-model="form.password" type="password" :required="!isEdit" autocomplete="new-password" :class="field" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('user.passwordRepeat') }}</label>
+                            <input v-model="form.password_confirm" type="password" :required="!isEdit && !!form.password"
+                                autocomplete="new-password" :class="field" />
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-200" />
+
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('user.image') }}</label>
+                            <label :class="fileBtn">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
+                                </svg>
+                                <span class="truncate">{{ imageFile?.name || $t('user.chooseImage') }}</span>
+                                <input type="file" accept="image/*" class="hidden" @change="onImageChange" />
+                            </label>
+                            <a v-if="currentImageUrl && !imageFile" :href="currentImageUrl" target="_blank"
+                                class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('user.currentImage') }}</a>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('user.file') }}</label>
+                            <label :class="fileBtn">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
+                                </svg>
+                                <span class="truncate">{{ uploadFile?.name || $t('user.chooseFile') }}</span>
+                                <input type="file" accept="image/*,application/pdf" class="hidden" @change="onFileChange" />
+                            </label>
+                            <a v-if="currentFileUrl && !uploadFile" :href="currentFileUrl" target="_blank"
+                                class="mt-1 inline-block text-xs text-blue-600 hover:underline">{{ $t('user.currentFile') }}</a>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Status -->
-                <div class="sm:col-span-6">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('user.status') }}</label>
-                    <div class="mt-2">
-                        <ButtonGroup v-model="form.status" :options="statusOptions" />
+                <!-- Right column: role + permissions -->
+                <div class="space-y-5 lg:order-2 lg:col-span-4 lg:border-l lg:border-gray-200 lg:pl-8">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('user.role') }}</label>
+                        <select v-model="form.role_id" :class="field">
+                            <option :value="null">{{ $t('user.rolePlaceholder') }}</option>
+                            <option v-for="r in selectableRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('user.permissions') }}</label>
+                        <div class="mt-2 flex flex-col gap-3">
+                            <label v-for="tog in studentToggles" :key="tog.key" class="flex items-center gap-2 text-sm text-gray-700">
+                                <ToggleSwitch v-model="form[tog.key]" :aria-label="tog.label" />
+                                <span>{{ tog.label }}</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('user.status') }}</label>
+                        <div class="mt-2">
+                            <ButtonGroup v-model="form.status" :options="statusOptions" />
+                        </div>
                     </div>
                 </div>
             </div>
