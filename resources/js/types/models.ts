@@ -19,6 +19,14 @@ export interface School {
     status: string;
     country: { id: number; name?: string };
     region?: { id: number; name?: string | null };
+    city?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    hours_eng_per_week?: number | null;
+    invigilators_count?: number | null;
+    school_type?: string | null;
+    image_url?: string | null;
 }
 
 export interface Region {

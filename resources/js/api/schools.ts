@@ -6,6 +6,13 @@ export interface SchoolPayload {
     region_id?: number | null;
     name: string;
     status?: string;
+    city?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    hours_eng_per_week?: number | null;
+    invigilators_count?: number | null;
+    school_type?: string | null;
 }
 
 export interface SchoolListParams {
@@ -14,6 +21,7 @@ export interface SchoolListParams {
     region_id?: number;
     per_page?: number;
     search?: string;
+    status?: string;
 }
 
 export function listSchools(params: SchoolListParams = {}) {
@@ -24,12 +32,28 @@ export function getSchool(id: number) {
     return http.get<{ data: School }>(`/api/schools/${id}`);
 }
 
-export function createSchool(payload: SchoolPayload) {
-    return http.post<{ data: School }>('/api/schools', payload);
+function toFormData(payload: SchoolPayload, image?: File | null): FormData {
+    const fd = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+            fd.append(key, String(value));
+        }
+    });
+    if (image) {
+        fd.append('image', image);
+    }
+    return fd;
 }
 
-export function updateSchool(id: number, payload: Partial<SchoolPayload>) {
-    return http.put<{ data: School }>(`/api/schools/${id}`, payload);
+export function createSchool(payload: SchoolPayload, image?: File | null) {
+    return http.post<{ data: School }>('/api/schools', toFormData(payload, image));
+}
+
+export function updateSchool(id: number, payload: SchoolPayload, image?: File | null) {
+    // Method spoofing: multipart bodies aren't parsed on PUT, so POST with _method.
+    const fd = toFormData(payload, image);
+    fd.append('_method', 'PUT');
+    return http.post<{ data: School }>(`/api/schools/${id}`, fd);
 }
 
 export function deleteSchool(id: number) {

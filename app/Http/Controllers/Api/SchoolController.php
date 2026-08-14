@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 
 class SchoolController extends Controller
 {
@@ -30,7 +31,11 @@ class SchoolController extends Controller
             $query->where('region_id', $request->integer('region_id'));
         }
         if ($request->filled('search')) {
-            $query->where('name', 'like', '%'.$request->string('search').'%');
+            $term = '%'.$request->string('search').'%';
+            $query->where(fn ($w) => $w->where('name', 'like', $term)->orWhere('city', 'like', $term));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status'));
         }
 
         // Server-side scope: non-admins see only their allowed schools.
@@ -46,7 +51,12 @@ class SchoolController extends Controller
 
     public function store(StoreSchoolRequest $request): JsonResponse
     {
-        $school = School::create($request->validated());
+        $data = $request->safe()->except('image');
+        if ($request->hasFile('image')) {
+            $data['image_path'] = $request->file('image')->store('venues', 'public');
+        }
+
+        $school = School::create($data);
 
         return SchoolResource::make($school->load(['country', 'region']))
             ->response()
@@ -64,7 +74,15 @@ class SchoolController extends Controller
     {
         $this->authorize('update', $school);
 
-        $school->update($request->validated());
+        $data = $request->safe()->except('image');
+        if ($request->hasFile('image')) {
+            if ($school->image_path) {
+                Storage::disk('public')->delete($school->image_path);
+            }
+            $data['image_path'] = $request->file('image')->store('venues', 'public');
+        }
+
+        $school->update($data);
 
         return SchoolResource::make($school->load(['country', 'region']));
     }

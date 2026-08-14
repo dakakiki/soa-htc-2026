@@ -7,6 +7,7 @@ namespace App\Http\Resources;
 use App\Domain\Organization\Models\School;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /** @mixin School */
 class SchoolResource extends JsonResource
@@ -28,6 +29,14 @@ class SchoolResource extends JsonResource
                 'id' => $this->region_id,
                 'name' => $this->whenLoaded('region', fn () => $this->region?->name),
             ]),
+            'city' => $this->city,
+            'address' => $this->address,
+            'phone' => $this->phone,
+            'email' => $this->email,
+            'hours_eng_per_week' => $this->hours_eng_per_week,
+            'invigilators_count' => $this->invigilators_count,
+            'school_type' => $this->school_type?->value,
+            'image_url' => $this->image_path ? Storage::disk('public')->url($this->image_path) : null,
         ];
     }
 }

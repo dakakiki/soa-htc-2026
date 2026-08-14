@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { createSchool, getSchool, updateSchool, type SchoolPayload } from '@/api/schools';
 import { listCountries, listRegions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
+import ButtonGroup from '@/components/ButtonGroup.vue';
 import type { Country, Region } from '@/types/models';
 
 const route = useRoute();
@@ -14,17 +15,36 @@ const { t } = useI18n();
 const id = computed(() => (route.params.id ? Number(route.params.id) : null));
 const isEdit = computed(() => id.value !== null);
 
-const form = reactive<{ name: string; country_id: number | null; region_id: number | null; status: string }>({
+const form = reactive({
     name: '',
-    country_id: null,
-    region_id: null,
+    country_id: null as number | null,
+    region_id: null as number | null,
+    city: '',
+    address: '',
+    phone: '',
+    email: '',
+    hours: '',
+    school_type: 'all_categories',
+    invigilators_count: null as number | null,
     status: 'active',
 });
+const imageFile = ref<File | null>(null);
+const currentImageUrl = ref<string | null>(null);
+
 const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
-const loading = ref(false);
 const saving = ref(false);
 const error = ref<string | null>(null);
+
+const schoolTypes = computed(() => [
+    { value: 'all_categories', label: t('venue.typeAll') },
+    { value: 'only_regular', label: t('venue.typeRegular') },
+    { value: 'only_special', label: t('venue.typeSpecial') },
+]);
+const statusOptions = computed(() => [
+    { value: 'active', label: t('venue.statusActive') },
+    { value: 'inactive', label: t('venue.statusInactive') },
+]);
 
 async function loadRegions(): Promise<void> {
     regions.value = [];
@@ -33,10 +53,12 @@ async function loadRegions(): Promise<void> {
         regions.value = data.data;
     }
 }
-
 async function onCountryChange(): Promise<void> {
     form.region_id = null;
     await loadRegions();
+}
+function onFileChange(event: Event): void {
+    imageFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
 }
 
 async function submit(): Promise<void> {
@@ -46,20 +68,26 @@ async function submit(): Promise<void> {
     }
     saving.value = true;
     error.value = null;
+
     const payload: SchoolPayload = {
-        name: form.name,
         country_id: form.country_id,
         region_id: form.region_id,
+        name: form.name,
         status: form.status,
+        city: form.city || null,
+        address: form.address || null,
+        phone: form.phone || null,
+        email: form.email || null,
+        hours_eng_per_week: form.hours === '' ? null : Number(form.hours),
+        invigilators_count: form.invigilators_count,
+        school_type: form.school_type || null,
     };
+
     try {
-        if (isEdit.value && id.value !== null) {
-            await updateSchool(id.value, payload);
-            await router.push({ name: 'venues.view', params: { id: id.value } });
-        } else {
-            const { data } = await createSchool(payload);
-            await router.push({ name: 'venues.view', params: { id: data.data.id } });
-        }
+        const { data } = isEdit.value && id.value !== null
+            ? await updateSchool(id.value, payload, imageFile.value)
+            : await createSchool(payload, imageFile.value);
+        await router.push({ name: 'venues.view', params: { id: data.data.id } });
     } catch (e) {
         error.value = apiErrorMessage(e, t('venue.saveFailed'));
     } finally {
@@ -68,7 +96,6 @@ async function submit(): Promise<void> {
 }
 
 onMounted(async () => {
-    loading.value = true;
     try {
         const { data } = await listCountries();
         countries.value = data.data;
@@ -79,15 +106,23 @@ onMounted(async () => {
             form.name = s.name;
             form.country_id = s.country.id;
             form.region_id = s.region?.id ?? null;
+            form.city = s.city ?? '';
+            form.address = s.address ?? '';
+            form.phone = s.phone ?? '';
+            form.email = s.email ?? '';
+            form.hours = s.hours_eng_per_week != null ? String(s.hours_eng_per_week) : '';
+            form.invigilators_count = s.invigilators_count ?? null;
+            form.school_type = s.school_type ?? 'all_categories';
             form.status = s.status;
+            currentImageUrl.value = s.image_url ?? null;
             await loadRegions();
         }
     } catch (e) {
         error.value = apiErrorMessage(e);
-    } finally {
-        loading.value = false;
     }
 });
+
+const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 </script>
 
 <template>
@@ -100,39 +135,84 @@ onMounted(async () => {
 
         <h1 class="text-2xl font-semibold tracking-tight">{{ isEdit ? $t('venue.edit') : $t('venue.add') }}</h1>
 
-        <form class="space-y-4 rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">{{ $t('venue.name') }}</label>
-                <input v-model="form.name" type="text" required
-                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">{{ $t('venue.country') }}</label>
-                <select v-model="form.country_id" required @change="onCountryChange"
-                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-                    <option :value="null" disabled>{{ $t('venue.countryPlaceholder') }}</option>
-                    <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">{{ $t('venue.region') }}</label>
-                <select v-model="form.region_id" :disabled="regions.length === 0"
-                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50">
-                    <option :value="null">{{ form.country_id ? $t('venue.regionOptional') : $t('venue.regionFirst') }}</option>
-                    <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">{{ $t('venue.status') }}</label>
-                <select v-model="form.status" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-                    <option value="active">active</option>
-                    <option value="inactive">inactive</option>
-                </select>
+        <form class="rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
+            <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-4">
+                <div class="sm:col-span-4">
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.name') }} *</label>
+                    <input v-model="form.name" type="text" required :class="field" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.country') }} *</label>
+                    <select v-model="form.country_id" required :class="field" @change="onCountryChange">
+                        <option :value="null" disabled>{{ $t('venue.countryPlaceholder') }}</option>
+                        <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.region') }}</label>
+                    <select v-model="form.region_id" :disabled="regions.length === 0" :class="[field, 'disabled:bg-gray-50']">
+                        <option :value="null">{{ form.country_id ? $t('venue.regionOptional') : $t('venue.regionFirst') }}</option>
+                        <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.city') }}</label>
+                    <input v-model="form.city" type="text" :class="field" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.address') }}</label>
+                    <input v-model="form.address" type="text" :class="field" />
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.phone') }}</label>
+                    <input v-model="form.phone" type="text" :class="field" />
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.email') }}</label>
+                    <input v-model="form.email" type="email" :class="field" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.hoursEng') }}</label>
+                    <input v-model="form.hours" type="number" min="0" :class="field" />
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.schoolType') }}</label>
+                    <div class="mt-2 flex flex-wrap gap-4">
+                        <label v-for="opt in schoolTypes" :key="opt.value" class="flex items-center gap-2 text-sm">
+                            <input v-model="form.school_type" type="radio" :value="opt.value" />
+                            <span>{{ opt.label }}</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.invigilators') }}</label>
+                    <select v-model="form.invigilators_count" :class="field">
+                        <option :value="null">{{ $t('venue.choose') }}</option>
+                        <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
+                    </select>
+                </div>
+
+                <div class="sm:col-span-4">
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.file') }}</label>
+                    <input type="file" accept="image/*,application/pdf" class="mt-2 text-sm" @change="onFileChange" />
+                    <a v-if="currentImageUrl" :href="currentImageUrl" target="_blank"
+                        class="ml-3 text-sm text-blue-600 hover:underline">{{ $t('venue.currentFile') }}</a>
+                </div>
+
+                <div class="sm:col-span-4">
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.status') }}</label>
+                    <div class="mt-2">
+                        <ButtonGroup v-model="form.status" :options="statusOptions" />
+                    </div>
+                </div>
             </div>
 
-            <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+            <p v-if="error" class="mt-4 text-sm text-red-600">{{ error }}</p>
 
-            <div class="flex gap-2">
+            <div class="mt-6 flex gap-2">
                 <button type="submit" :disabled="saving"
                     class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                     {{ saving ? $t('common.saving') : isEdit ? $t('common.save') : $t('common.create') }}
