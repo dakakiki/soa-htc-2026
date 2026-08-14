@@ -10,6 +10,7 @@ import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import type { AdminUser, Country, Region } from '@/types/models';
 
 const { t } = useI18n();
@@ -32,6 +33,8 @@ const error = ref<string | null>(null);
 
 const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
+const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
+const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
 const filters = reactive<{ search: string; country_id: number | null; region_id: number | null; status: string }>({
     search: asString(route.query.search),
     country_id: asNumber(route.query.country_id),
@@ -84,6 +87,10 @@ async function onCountryFilterChange(): Promise<void> {
             cascadeLoading.value = false;
         }
     }
+}
+async function onCountryFilterSelected(value: number | null): Promise<void> {
+    filters.country_id = value;
+    await onCountryFilterChange();
 }
 
 async function onToggleStatus(user: AdminUser, value: boolean): Promise<void> {
@@ -145,15 +152,27 @@ onMounted(async () => {
         <form class="mt-2 flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
             <input v-model="filters.search" type="search" :placeholder="$t('user.searchNameEmail')"
                 class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <select v-model="filters.country_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="onCountryFilterChange">
-                <option :value="null">{{ $t('user.countryPlaceholder') }}</option>
-                <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-            <select v-model="filters.region_id" :disabled="regions.length === 0 || cascadeLoading"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-50">
-                <option :value="null">{{ cascadeLoading ? $t('common.loading') : $t('user.region') }}</option>
-                <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-            </select>
+            <div class="w-44">
+                <SearchSelect
+                    :model-value="filters.country_id"
+                    :options="countryOptions"
+                    dense
+                    :placeholder="$t('user.countryPlaceholder')"
+                    :search-placeholder="$t('user.country')"
+                    @update:model-value="onCountryFilterSelected"
+                />
+            </div>
+            <div class="w-44">
+                <SearchSelect
+                    v-model="filters.region_id"
+                    :options="regionOptions"
+                    dense
+                    :disabled="!filters.country_id"
+                    :loading="cascadeLoading"
+                    :placeholder="$t('user.region')"
+                    :search-placeholder="$t('user.region')"
+                />
+            </div>
             <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
                 <option value="">{{ $t('user.filterStatus') }}</option>
                 <option value="active">{{ $t('user.statusActive') }}</option>

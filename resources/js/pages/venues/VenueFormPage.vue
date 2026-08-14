@@ -7,6 +7,7 @@ import { listCountries, listRegions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import type { Country, Region } from '@/types/models';
 
 const route = useRoute();
@@ -38,6 +39,9 @@ const saving = ref(false);
 const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
 
+const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
+const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
+
 const schoolTypes = computed(() => [
     { value: 'all_categories', label: t('venue.typeAll') },
     { value: 'only_regular', label: t('venue.typeRegular') },
@@ -63,6 +67,10 @@ async function loadRegions(): Promise<void> {
 async function onCountryChange(): Promise<void> {
     form.region_id = null;
     await loadRegions();
+}
+async function onCountrySelected(value: number | null): Promise<void> {
+    form.country_id = value;
+    await onCountryChange();
 }
 function onFileChange(event: Event): void {
     imageFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
@@ -164,17 +172,25 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">{{ $t('venue.country') }} *</label>
-                    <select v-model="form.country_id" required :class="field" @change="onCountryChange">
-                        <option :value="null" disabled>{{ $t('venue.countryPlaceholder') }}</option>
-                        <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
-                    </select>
+                    <SearchSelect
+                        :model-value="form.country_id"
+                        :options="countryOptions"
+                        :clearable="false"
+                        :placeholder="$t('venue.countryPlaceholder')"
+                        :search-placeholder="$t('venue.country')"
+                        @update:model-value="onCountrySelected"
+                    />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">{{ $t('venue.region') }}</label>
-                    <select v-model="form.region_id" :disabled="regions.length === 0 || cascadeLoading" :class="[field, 'disabled:bg-gray-50']">
-                        <option :value="null">{{ cascadeLoading ? $t('common.loading') : (form.country_id ? $t('venue.regionOptional') : $t('venue.regionFirst')) }}</option>
-                        <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
-                    </select>
+                    <SearchSelect
+                        v-model="form.region_id"
+                        :options="regionOptions"
+                        :disabled="!form.country_id"
+                        :loading="cascadeLoading"
+                        :placeholder="form.country_id ? $t('venue.regionOptional') : $t('venue.regionFirst')"
+                        :search-placeholder="$t('venue.region')"
+                    />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">{{ $t('venue.city') }}</label>
