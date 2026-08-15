@@ -270,6 +270,18 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'roles.manage' },
     },
     {
+        path: '/grading',
+        name: 'grading',
+        component: () => import('@/pages/grading/GradingListPage.vue'),
+        meta: { requiresAuth: true, permission: 'results.manage' },
+    },
+    {
+        path: '/grading/:id',
+        name: 'grading.attempt',
+        component: () => import('@/pages/grading/GradingPage.vue'),
+        meta: { requiresAuth: true, permission: 'results.manage' },
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),

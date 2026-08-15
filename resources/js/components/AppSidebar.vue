@@ -18,6 +18,8 @@ import {
     IconListCheck,
     IconStack2,
     IconClipboardList,
+    IconClipboardCheck,
+    IconChecklist,
     IconHelpCircle,
     IconFileText,
     IconTag,
@@ -84,6 +86,14 @@ const groups: NavGroup[] = [
         children: [
             { label: t('nav.users'), icon: IconUsers, to: 'users', prefix: 'users', perm: 'users.manage' },
             { label: t('nav.roles'), icon: IconLock, to: 'roles', prefix: 'roles', perm: 'roles.manage' },
+        ],
+    },
+    {
+        key: 'results',
+        label: t('nav.results'),
+        icon: IconClipboardCheck,
+        children: [
+            { label: t('nav.grading'), icon: IconChecklist, to: 'grading', prefix: 'grading', perm: 'results.manage' },
         ],
     },
     {

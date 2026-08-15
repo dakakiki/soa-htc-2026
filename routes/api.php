@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DifficultyCategoryController;
 use App\Http\Controllers\Api\DifficultyLevelController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ExamRoundController;
+use App\Http\Controllers\Api\GradingController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\QuestionTagController;
@@ -137,4 +138,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Branding/theme (read is public via /theme above; writing is gated).
     // PUT so the SPA can send multipart via POST + _method spoofing (like schools).
     Route::put('settings/theme', [SettingsController::class, 'updateTheme']);
+
+    // Results: essay grading (5b). Gated by results.manage inside the controller.
+    Route::get('grading/attempts', [GradingController::class, 'index']);
+    Route::get('grading/attempts/{attempt}', [GradingController::class, 'show'])->whereNumber('attempt');
+    Route::put('grading/attempts/{attempt}/answers/{answer}', [GradingController::class, 'gradeEssay'])->whereNumber(['attempt', 'answer']);
 });

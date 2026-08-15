@@ -55,5 +55,8 @@ class AppServiceProvider extends ServiceProvider
         // Content hierarchy (lookups + questions) is admin-only and shares one
         // ability rather than a policy per lookup model.
         Gate::define('content.manage', fn (User $user): bool => $user->hasPermission('content.manage'));
+
+        // Results area: essay grading (5b), publication (5c) and reports.
+        Gate::define('results.manage', fn (User $user): bool => $user->hasPermission('results.manage'));
     }
 }

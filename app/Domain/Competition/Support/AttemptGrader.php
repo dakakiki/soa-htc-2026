@@ -8,6 +8,7 @@ use App\Domain\Assessment\Enums\QuestionType;
 use App\Domain\Assessment\Models\Question;
 use App\Domain\Competition\Enums\GradingStatus;
 use App\Domain\Competition\Models\Attempt;
+use App\Domain\Competition\Models\AttemptAnswer;
 
 /**
  * Auto-grades a completed attempt (Faza 5, ADR-0019). Multiple-choice and
@@ -35,6 +36,8 @@ final class AttemptGrader
 
             if ($question->question_type === QuestionType::Essay) {
                 $hasEssay = true;
+                // Ensure a row exists so an admin can grade it (even if unanswered).
+                AttemptAnswer::firstOrCreate(['attempt_id' => $attempt->id, 'question_id' => $question->id]);
 
                 continue;
             }
@@ -54,6 +57,30 @@ final class AttemptGrader
             'score' => $score,
             'max_score' => $maxScore,
             'grading_status' => $hasEssay ? GradingStatus::PendingGrading : GradingStatus::AutoGraded,
+        ]);
+    }
+
+    /**
+     * Recompute the total and grading status after a manual essay grade (5b):
+     * the score sums every awarded point, and the attempt becomes `graded` once
+     * every essay answer has been graded.
+     */
+    public static function recompute(Attempt $attempt): void
+    {
+        $test = $attempt->test;
+        $test->load(['questions' => fn ($q) => $q->where('questions.status', 'active')]);
+        $essayQuestionIds = $test->questions->where('question_type', QuestionType::Essay)->pluck('id');
+
+        $answers = $attempt->answers()->get();
+        $score = (float) $answers->sum(fn ($a) => (float) ($a->awarded_points ?? 0));
+
+        $allEssaysGraded = $essayQuestionIds->every(
+            fn ($id) => optional($answers->firstWhere('question_id', $id))->graded_at !== null,
+        );
+
+        $attempt->update([
+            'score' => $score,
+            'grading_status' => $allEssaysGraded ? GradingStatus::Graded : GradingStatus::PendingGrading,
         ]);
     }
 
