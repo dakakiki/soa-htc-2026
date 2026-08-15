@@ -8,6 +8,8 @@ use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\QuestionAnswer;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
+use App\Domain\Competition\Enums\AttemptStatus;
+use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
@@ -213,5 +215,77 @@ class AttemptTest extends TestCase
         $c = $this->quizWithTests('H2', 1);
 
         $this->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->assertUnauthorized();
+    }
+
+    public function test_resuming_past_the_grace_window_finalizes_the_attempt(): void
+    {
+        $c = $this->quizWithTests('H2', 1);
+        $token = $this->tokenFor('H2');
+        $attemptId = $this->withToken($token)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->json('attempt.id');
+
+        // The deadline passes well beyond the grace window.
+        Attempt::whereKey($attemptId)->update(['expires_at' => now()->subMinutes(5)]);
+
+        // Returning finalizes it as completed…
+        $this->withToken($token)->getJson("/api/student/attempts/{$attemptId}")
+            ->assertOk()
+            ->assertJsonPath('attempt.status', 'completed');
+        $this->assertDatabaseHas('attempts', ['id' => $attemptId, 'status' => 'completed']);
+
+        // …and it cannot be restarted.
+        $this->withToken($token)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->assertStatus(409);
+    }
+
+    public function test_submitting_past_the_grace_window_records_no_answers(): void
+    {
+        $c = $this->quizWithTests('H2', 1);
+        $token = $this->tokenFor('H2');
+        $test = $c['tests'][0];
+        $questionId = $test->questions()->value('questions.id');
+        $attemptId = $this->withToken($token)->postJson("/api/student/tests/{$test->id}/start")->json('attempt.id');
+
+        Attempt::whereKey($attemptId)->update(['expires_at' => now()->subMinutes(5)]);
+
+        $this->withToken($token)->postJson("/api/student/attempts/{$attemptId}/submit", [
+            'answers' => [['question_id' => $questionId, 'response' => ['selected' => [1]]]],
+        ])->assertOk()->assertJsonPath('attempt.status', 'completed');
+
+        // The late answers are ignored; the submission is stamped at the deadline.
+        $this->assertDatabaseCount('attempt_answers', 0);
+        $attempt = Attempt::findOrFail($attemptId);
+        $this->assertTrue($attempt->submitted_at->equalTo($attempt->expires_at));
+    }
+
+    public function test_submitting_within_the_grace_window_still_records_answers(): void
+    {
+        $c = $this->quizWithTests('H2', 1);
+        $token = $this->tokenFor('H2');
+        $test = $c['tests'][0];
+        $questionId = $test->questions()->value('questions.id');
+        $attemptId = $this->withToken($token)->postJson("/api/student/tests/{$test->id}/start")->json('attempt.id');
+
+        // The deadline has just passed, but within the grace window.
+        Attempt::whereKey($attemptId)->update(['expires_at' => now()->subSeconds(10)]);
+
+        $this->withToken($token)->postJson("/api/student/attempts/{$attemptId}/submit", [
+            'answers' => [['question_id' => $questionId, 'response' => ['selected' => [1]]]],
+        ])->assertOk()->assertJsonPath('attempt.status', 'completed');
+
+        $this->assertDatabaseHas('attempt_answers', ['attempt_id' => $attemptId, 'question_id' => $questionId]);
+    }
+
+    public function test_finalize_command_completes_stale_attempts(): void
+    {
+        $c = $this->quizWithTests('H2', 1);
+        $token = $this->tokenFor('H2');
+        $attemptId = $this->withToken($token)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->json('attempt.id');
+
+        Attempt::whereKey($attemptId)->update(['expires_at' => now()->subMinutes(5)]);
+
+        $this->artisan('attempts:finalize-expired')->assertExitCode(0);
+
+        $attempt = Attempt::findOrFail($attemptId);
+        $this->assertSame(AttemptStatus::Completed, $attempt->status);
+        $this->assertTrue($attempt->submitted_at->equalTo($attempt->expires_at));
     }
 }

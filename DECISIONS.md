@@ -311,7 +311,26 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
-## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
+## ADR-0018 — Timeout/gubitak mreže: server-owned clock + grejs (OD-5 razrešeno)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 4 Slice 4c. Odgovori se NE snimaju tokom rada (bez autosave-a,
+  §6.1); ako browser/mreža otkažu, nema sačuvanih odgovora. OD-5 je bio otvoren.
+- **Odluka:** Server je autoritet za vreme (`attempts.expires_at`). **Grejs prozor
+  `Attempt::SUBMIT_GRACE_SECONDS = 60`** posle isteka da klijentski auto-submit
+  stigne. Politika:
+  - unutar roka → normalno;
+  - `rok < now ≤ rok+grejs` → attempt i dalje „otvoren" (`remaining_seconds=0`),
+    submit **upisuje** odgovore (auto-submit sleće);
+  - `now > rok+grejs` → attempt se **finalizuje na svaki pristup** (start/show →
+    `completed`, `submitted_at = expires_at`), a submit **NE upisuje** odgovore
+    (propušteno). Izgubljen browser bez submit-a = **timeout = prazan/parcijalan**
+    (samo ono što je submit stigao pre roka).
+  - `start` na finalizovanom/završenom attempt-u → **409** (klijent → dashboard).
+  - Batch: **`php artisan attempts:finalize-expired`** zatvara zaostale
+    in_progress attempte (za studente koji se ne vrate; cron/Faza 5).
+- **Posledica:** napuštanje i povratak **ne daje dodatno vreme** (`submitted_at`
+  se pečatira na stvarni rok). Auto-submit po isteku ostaje idempotentan (CC-07).
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
 `PROJECT_CONTEXT.md` §14, i „Odluka" sekcije u `00`.
@@ -322,7 +341,7 @@ Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
 | OD-2 | Na šta se odnosi broj „10.000" (prijave / druga sezona / očekivani rast)? | Faza 6 / `05` | Otvoreno |
 | OD-3 | Zadržati mapiranje nivoa na quiz i pojedinačno pitanje, ili svesti na exam/test? | Faza 2/4 | Otvoreno |
 | OD-4 | Redosled testova i uslov otključavanja sledećeg. | Faza 4 | **Razrešeno → ADR-0017 (strogo redom)** |
-| OD-5 | Ponašanje pri gubitku browsera/mreže bez autosave-a. | Faza 4 | Otvoreno |
+| OD-5 | Ponašanje pri gubitku browsera/mreže bez autosave-a. | Faza 4 | **Razrešeno → ADR-0018 (grejs + finalize)** |
 | OD-6 | Nivo objave rezultata (ceo exam/quiz vs. pojedinačni test). | Faza 5 | Otvoreno |
 | OD-7 | Fill-the-gap normalizacija (case, razmaci, interpunkcija, dijakritici, varijante) i parcijalni bodovi. | Faza 4/5 | Otvoreno |
 | OD-8 | Kako se duplirani `competitor_number` (4 u ovoj sezoni) tretiraju u migraciji. | Migracija | Otvoreno |

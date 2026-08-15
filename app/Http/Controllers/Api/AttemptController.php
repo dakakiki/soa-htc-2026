@@ -38,6 +38,8 @@ class AttemptController extends Controller
 
         $existing = $this->attemptFor($registration, $test->id);
         if ($existing !== null) {
+            $this->finalizeIfExpired($existing);
+
             return $this->resumeOrRefuse($existing, $test);
         }
 
@@ -47,6 +49,8 @@ class AttemptController extends Controller
 
             $again = $this->attemptFor($registration, $test->id);
             if ($again !== null) {
+                $this->finalizeIfExpired($again);
+
                 return $this->resumeOrRefuse($again, $test);
             }
 
@@ -74,6 +78,7 @@ class AttemptController extends Controller
     public function show(Request $request, Attempt $attempt): JsonResponse
     {
         $this->assertOwned($request, $attempt);
+        $this->finalizeIfExpired($attempt);
 
         if ($attempt->status === AttemptStatus::Completed) {
             return response()->json($this->completedPayload($attempt));
@@ -91,6 +96,9 @@ class AttemptController extends Controller
     {
         $this->assertOwned($request, $attempt);
 
+        // Past the deadline + grace the attempt is finalized with no further
+        // answers recorded; an already-completed attempt is returned as-is.
+        $this->finalizeIfExpired($attempt);
         if ($attempt->status === AttemptStatus::Completed) {
             return response()->json($this->completedPayload($attempt));
         }
@@ -116,6 +124,22 @@ class AttemptController extends Controller
         });
 
         return response()->json($this->completedPayload($attempt->refresh()));
+    }
+
+    /**
+     * Finalize an attempt whose deadline (plus grace) has passed, stamping the
+     * submission at the real deadline so leaving and returning grants no extra
+     * time (OD-5, ADR-0018). Returns whether it was just finalized.
+     */
+    private function finalizeIfExpired(Attempt $attempt): bool
+    {
+        if ($attempt->status !== AttemptStatus::InProgress || ! $attempt->isPastGrace()) {
+            return false;
+        }
+
+        $attempt->update(['status' => AttemptStatus::Completed, 'submitted_at' => $attempt->expires_at]);
+
+        return true;
     }
 
     private function attemptFor(Registration $registration, int $testId): ?Attempt

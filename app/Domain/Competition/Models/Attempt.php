@@ -13,6 +13,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Attempt extends Model
 {
+    /**
+     * Slack after the deadline for the client's auto-submit to arrive (OD-5,
+     * ADR-0018). Within it the attempt is still submittable; past it the server
+     * finalizes the attempt and refuses to record further answers.
+     */
+    public const SUBMIT_GRACE_SECONDS = 60;
+
     protected $fillable = [
         'registration_id', 'test_id', 'quiz_id', 'status',
         'started_at', 'expires_at', 'submitted_at', 'channel',
@@ -29,6 +36,12 @@ class Attempt extends Model
             'expires_at' => 'datetime',
             'submitted_at' => 'datetime',
         ];
+    }
+
+    /** True once the deadline plus the grace window has passed. */
+    public function isPastGrace(): bool
+    {
+        return now()->getTimestamp() > $this->expires_at->getTimestamp() + self::SUBMIT_GRACE_SECONDS;
     }
 
     /** @return BelongsTo<Registration, $this> */
