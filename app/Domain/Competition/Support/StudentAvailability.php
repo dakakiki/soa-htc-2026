@@ -98,14 +98,23 @@ final class StudentAvailability
     }
 
     /**
-     * test_id => 'in_progress'|'completed' for the registration's attempts.
-     * `toBase()` bypasses the enum cast so the map holds plain string values.
+     * test_id => {status, published, score, max_score} for the registration's
+     * attempts. Scores are only meaningful to the client once published (CC-10).
      *
-     * @return array<int, string>
+     * @return array<int, array{status: string, published: bool, score: float, max_score: float}>
      */
     private static function attemptMap(Registration $registration): array
     {
-        return $registration->attempts()->toBase()->pluck('status', 'test_id')->all();
+        return $registration->attempts()
+            ->get(['test_id', 'status', 'published_at', 'score', 'max_score'])
+            ->keyBy('test_id')
+            ->map(fn ($a) => [
+                'status' => $a->status->value,
+                'published' => $a->published_at !== null,
+                'score' => (float) $a->score,
+                'max_score' => (float) $a->max_score,
+            ])
+            ->all();
     }
 
     private static function isOpen(Quiz $quiz, array $unlockedIds): bool
@@ -132,9 +141,9 @@ final class StudentAvailability
         $reachedFront = false;
 
         foreach (self::orderedTests($quiz) as $test) {
-            $attempt = $attempts[$test->id] ?? null;
+            $status = $attempts[$test->id]['status'] ?? null;
 
-            if ($attempt === 'completed') {
+            if ($status === 'completed') {
                 $statuses[$test->id] = 'completed';
 
                 continue;
@@ -144,7 +153,7 @@ final class StudentAvailability
 
                 continue;
             }
-            if ($attempt === 'in_progress') {
+            if ($status === 'in_progress') {
                 $statuses[$test->id] = 'in_progress';
                 $reachedFront = true;
 
@@ -176,13 +185,21 @@ final class StudentAvailability
                 'id' => $exam->id,
                 'title' => $exam->title,
                 'round' => $exam->round?->name,
-                'tests' => $exam->tests->map(fn (Test $test) => [
-                    'id' => $test->id,
-                    'title' => $test->title,
-                    'type' => $test->type?->name,
-                    'duration' => $test->duration,
-                    'status' => $statuses[$test->id] ?? 'locked',
-                ])->all(),
+                'tests' => $exam->tests->map(function (Test $test) use ($statuses, $attempts) {
+                    $attempt = $attempts[$test->id] ?? null;
+                    $published = $attempt['published'] ?? false;
+
+                    return [
+                        'id' => $test->id,
+                        'title' => $test->title,
+                        'type' => $test->type?->name,
+                        'duration' => $test->duration,
+                        'status' => $statuses[$test->id] ?? 'locked',
+                        'published' => $published,
+                        'score' => $published ? $attempt['score'] : null,
+                        'max_score' => $published ? $attempt['max_score'] : null,
+                    ];
+                })->all(),
             ])->all(),
         ];
     }

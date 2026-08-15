@@ -42,6 +42,9 @@ export interface AvailabilityTest {
     type: string | null;
     duration: number | null;
     status: TestStatus;
+    published: boolean;
+    score: number | null;
+    max_score: number | null;
 }
 
 export interface AvailabilityExam {

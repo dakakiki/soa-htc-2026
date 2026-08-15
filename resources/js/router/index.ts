@@ -282,6 +282,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'results.manage' },
     },
     {
+        path: '/publishing',
+        name: 'publishing',
+        component: () => import('@/pages/results/PublishingPage.vue'),
+        meta: { requiresAuth: true, permission: 'results.manage' },
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),

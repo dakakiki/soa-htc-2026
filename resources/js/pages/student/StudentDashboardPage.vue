@@ -183,6 +183,9 @@ onMounted(load);
                                         >
                                             <IconClock :size="16" />{{ $t('student.dashboard.durationMin', { n: test.duration }) }}
                                         </span>
+                                        <p v-if="test.published && test.score !== null" class="mt-4 text-xl font-extrabold text-brand-accent">
+                                            {{ $t('student.dashboard.result', { score: test.score, max: test.max_score }) }}
+                                        </p>
                                     </div>
 
                                     <RouterLink

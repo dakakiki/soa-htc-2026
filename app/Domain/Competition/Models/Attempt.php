@@ -23,7 +23,7 @@ class Attempt extends Model
 
     protected $fillable = [
         'registration_id', 'test_id', 'quiz_id', 'status',
-        'score', 'max_score', 'grading_status',
+        'score', 'max_score', 'grading_status', 'published_at', 'published_by',
         'started_at', 'expires_at', 'submitted_at', 'channel',
     ];
 
@@ -37,6 +37,8 @@ class Attempt extends Model
             'score' => 'decimal:2',
             'max_score' => 'decimal:2',
             'grading_status' => GradingStatus::class,
+            'published_at' => 'datetime',
+            'published_by' => 'integer',
             'started_at' => 'datetime',
             'expires_at' => 'datetime',
             'submitted_at' => 'datetime',

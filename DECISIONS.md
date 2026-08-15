@@ -358,6 +358,25 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0020 — Objava rezultata: batch po exam-u/testu, reverzibilno (OD-6 razrešeno)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 5 Slice 5c. CC-10: takmičar ne vidi bodove dok nije `published`;
+  akcija autorizovana, idempotentna, auditovana; nivo objave bio OD-6.
+- **Odluka:**
+  - Admin objavljuje **batch-om na DVA nivoa: ceo exam/round ILI pojedinačan test**
+    (`scope: exam|test`, `id`). Exam scope = svi attempti za testove tog exam-a.
+  - Objavljuju se samo attempti koji su **completed i NISU `pending_grading`**
+    (auto_graded/graded); pending se preskaču dok se ne ocene (vraća se broj).
+  - **Reverzibilno:** `unpublish` vraća `published_at=null` (idempotentno u oba smera).
+  - Audit: `attempts.published_at/published_by` + **`publication_batches`**
+    (scope_type/scope_id/action/attempts_count/published_by/created_at). Gate `results.manage`.
+  - Takmičar vidi **`score`/`max_score`** na dashboard-u samo kad je attempt `published`.
+- **Posledica:** vezuje se za 5d (objava round-a = „odobreno" → sledeći round se
+  otključava; sad auto). OD-9 (legacy active→status mapiranje) i dalje otvoren (migracija).
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
@@ -370,7 +389,7 @@ Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
 | OD-3 | Zadržati mapiranje nivoa na quiz i pojedinačno pitanje, ili svesti na exam/test? | Faza 2/4 | Otvoreno |
 | OD-4 | Redosled testova i uslov otključavanja sledećeg. | Faza 4 | **Razrešeno → ADR-0017 (strogo redom)** |
 | OD-5 | Ponašanje pri gubitku browsera/mreže bez autosave-a. | Faza 4 | **Razrešeno → ADR-0018 (grejs + finalize)** |
-| OD-6 | Nivo objave rezultata (ceo exam/quiz vs. pojedinačni test). | Faza 5 | Otvoreno |
+| OD-6 | Nivo objave rezultata (ceo exam/quiz vs. pojedinačni test). | Faza 5 | **Razrešeno → ADR-0020 (batch exam ILI test, reverzibilno)** |
 | OD-7 | Fill-the-gap normalizacija (case, razmaci, interpunkcija, dijakritici, varijante) i parcijalni bodovi. | Faza 4/5 | **Razrešeno → ADR-0019 (case+trim+razmaci, sve-ili-ništa, MC single)** |
 | OD-8 | Kako se duplirani `competitor_number` (4 u ovoj sezoni) tretiraju u migraciji. | Migracija | Otvoreno |
 | OD-9 | Mapiranje legacy `active` 0/1 na `pending/graded/published/void`. | Faza 5 / migracija | Otvoreno |

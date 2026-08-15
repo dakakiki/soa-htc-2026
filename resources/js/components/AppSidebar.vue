@@ -20,6 +20,7 @@ import {
     IconClipboardList,
     IconClipboardCheck,
     IconChecklist,
+    IconSend,
     IconHelpCircle,
     IconFileText,
     IconTag,
@@ -94,6 +95,7 @@ const groups: NavGroup[] = [
         icon: IconClipboardCheck,
         children: [
             { label: t('nav.grading'), icon: IconChecklist, to: 'grading', prefix: 'grading', perm: 'results.manage' },
+            { label: t('nav.publishing'), icon: IconSend, to: 'publishing', prefix: 'publishing', perm: 'results.manage' },
         ],
     },
     {

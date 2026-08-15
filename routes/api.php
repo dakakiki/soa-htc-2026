@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\QuestionTagController;
 use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\RegistrationController;
+use App\Http\Controllers\Api\ResultsController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
 use App\Http\Controllers\Api\SettingsController;
@@ -139,8 +140,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // PUT so the SPA can send multipart via POST + _method spoofing (like schools).
     Route::put('settings/theme', [SettingsController::class, 'updateTheme']);
 
-    // Results: essay grading (5b). Gated by results.manage inside the controller.
+    // Results: essay grading (5b) and publication (5c). Gated by results.manage.
     Route::get('grading/attempts', [GradingController::class, 'index']);
     Route::get('grading/attempts/{attempt}', [GradingController::class, 'show'])->whereNumber('attempt');
     Route::put('grading/attempts/{attempt}/answers/{answer}', [GradingController::class, 'gradeEssay'])->whereNumber(['attempt', 'answer']);
+    Route::get('results/overview', [ResultsController::class, 'overview']);
+    Route::post('results/publish', [ResultsController::class, 'publish']);
 });
