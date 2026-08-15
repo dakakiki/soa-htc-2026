@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AttemptAnswer extends Model
 {
-    protected $fillable = ['attempt_id', 'question_id', 'response'];
+    protected $fillable = ['attempt_id', 'question_id', 'response', 'is_correct', 'awarded_points'];
 
     protected function casts(): array
     {
@@ -18,6 +18,8 @@ class AttemptAnswer extends Model
             'attempt_id' => 'integer',
             'question_id' => 'integer',
             'response' => 'array',
+            'is_correct' => 'boolean',
+            'awarded_points' => 'decimal:2',
         ];
     }
 

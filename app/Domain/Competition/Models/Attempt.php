@@ -7,6 +7,7 @@ namespace App\Domain\Competition\Models;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Enums\AttemptStatus;
+use App\Domain\Competition\Enums\GradingStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,6 +23,7 @@ class Attempt extends Model
 
     protected $fillable = [
         'registration_id', 'test_id', 'quiz_id', 'status',
+        'score', 'max_score', 'grading_status',
         'started_at', 'expires_at', 'submitted_at', 'channel',
     ];
 
@@ -32,6 +34,9 @@ class Attempt extends Model
             'test_id' => 'integer',
             'quiz_id' => 'integer',
             'status' => AttemptStatus::class,
+            'score' => 'decimal:2',
+            'max_score' => 'decimal:2',
+            'grading_status' => GradingStatus::class,
             'started_at' => 'datetime',
             'expires_at' => 'datetime',
             'submitted_at' => 'datetime',

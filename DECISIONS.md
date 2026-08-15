@@ -332,6 +332,34 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 - **Posledica:** napuštanje i povratak **ne daje dodatno vreme** (`submitted_at`
   se pečatira na stvarni rok). Auto-submit po isteku ostaje idempotentan (CC-07).
 
+---
+
+## ADR-0019 — Auto-ocenjivanje: normalizacija, sve-ili-ništa, MC single (OD-7 razrešeno)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 5 Slice 5a. CC-09 traži auto-ocenjivanje MC/gap i essay
+  `pending_grading`. OD-7 (gap normalizacija + parcijalni poeni) bio otvoren.
+- **Odluka:**
+  - **MC = tačno jedan tačan odgovor** (radio na klijentu); tačno kada je skup
+    izabranih == skup tačnih (praktično jedan id). Više-tačnih se ne koristi.
+  - **Gap normalizacija:** `mb_strtolower` + `trim` + collapse razmaka (`\s+`→` `).
+    **BEZ** skidanja interpunkcije/dijakritike. Prihvatljivi po gap-u = pipe-lista
+    u `question_answers.text` (po `position`); tačan gap = normalizovani unos ∈
+    normalizovane opcije.
+  - **Parcijalni poeni: sve-ili-ništa PO PITANJU.** Puni poeni samo ako su svi
+    delovi tačni (svi gapovi / tačan MC), inače 0.
+  - **Trenutak:** ocenjuje se pri **završetku attempt-a** (submit i timeout/finalize;
+    CC-08). `AttemptGrader::grade()` idempotentan.
+  - **Essay:** bez auto-poena; ako test ima ijedan essay → attempt `pending_grading`
+    (score = auto-deo, essay 0 dok admin ne oceni u 5b), inače `auto_graded`.
+    `max_score` = zbir svih poena; nedovršeno auto-pitanje = 0.
+- **Posledica:** `attempts.score/max_score/grading_status` + `attempt_answers.
+  is_correct/awarded_points`; `GradingStatus` enum; `Domain/Competition/Support/AttemptGrader`.
+
+---
+
+## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
+
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
 `PROJECT_CONTEXT.md` §14, i „Odluka" sekcije u `00`.
 
@@ -343,7 +371,7 @@ Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
 | OD-4 | Redosled testova i uslov otključavanja sledećeg. | Faza 4 | **Razrešeno → ADR-0017 (strogo redom)** |
 | OD-5 | Ponašanje pri gubitku browsera/mreže bez autosave-a. | Faza 4 | **Razrešeno → ADR-0018 (grejs + finalize)** |
 | OD-6 | Nivo objave rezultata (ceo exam/quiz vs. pojedinačni test). | Faza 5 | Otvoreno |
-| OD-7 | Fill-the-gap normalizacija (case, razmaci, interpunkcija, dijakritici, varijante) i parcijalni bodovi. | Faza 4/5 | Otvoreno |
+| OD-7 | Fill-the-gap normalizacija (case, razmaci, interpunkcija, dijakritici, varijante) i parcijalni bodovi. | Faza 4/5 | **Razrešeno → ADR-0019 (case+trim+razmaci, sve-ili-ništa, MC single)** |
 | OD-8 | Kako se duplirani `competitor_number` (4 u ovoj sezoni) tretiraju u migraciji. | Migracija | Otvoreno |
 | OD-9 | Mapiranje legacy `active` 0/1 na `pending/graded/published/void`. | Faza 5 / migracija | Otvoreno |
 | OD-10 | Povezivanje mobilnog naloga sa sezonskom prijavom. | Mobilni tok | Otvoreno |

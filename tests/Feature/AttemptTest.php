@@ -288,4 +288,133 @@ class AttemptTest extends TestCase
         $this->assertSame(AttemptStatus::Completed, $attempt->status);
         $this->assertTrue($attempt->submitted_at->equalTo($attempt->expires_at));
     }
+
+    private function levelId(): int
+    {
+        return DifficultyLevel::where('level_short', 'H2')->firstOrFail()->id;
+    }
+
+    /** A fresh sample quiz → exam → test at H2 holding the given question. */
+    private function singleQuestionTest(Question $question): Test
+    {
+        $level = $this->levelId();
+        $quiz = Quiz::create(['title' => 'GQuiz', 'quiz_type' => 'sample', 'status' => 'active']);
+        $quiz->levels()->attach($level);
+        $exam = Exam::create(['title' => 'GExam', 'status' => 'active']);
+        $exam->levels()->attach($level);
+        $quiz->exams()->attach($exam->id, ['position' => 1]);
+        $test = Test::create(['title' => 'GTest', 'duration' => 30, 'status' => 'active']);
+        $test->levels()->attach($level);
+        $exam->tests()->attach($test->id, ['position' => 1]);
+        $test->questions()->attach($question->id, ['position' => 1]);
+
+        return $test;
+    }
+
+    /** @return array{question: Question, correct: int, wrong: int} */
+    private function makeMc(int $points = 2): array
+    {
+        $q = Question::create(['title' => 'MC', 'description' => 'Pick', 'question_type' => 'multiple_choice', 'points' => $points, 'status' => 'active']);
+        $q->levels()->attach($this->levelId());
+        $correct = QuestionAnswer::create(['question_id' => $q->id, 'text' => 'Right', 'is_correct' => true, 'position' => 1]);
+        $wrong = QuestionAnswer::create(['question_id' => $q->id, 'text' => 'Wrong', 'is_correct' => false, 'position' => 2]);
+
+        return ['question' => $q, 'correct' => $correct->id, 'wrong' => $wrong->id];
+    }
+
+    private function makeGap(): Question
+    {
+        $q = Question::create(['title' => 'Gap', 'description' => 'I [answer] every [answer].', 'question_type' => 'gap_filling', 'points' => 2, 'status' => 'active']);
+        $q->levels()->attach($this->levelId());
+        QuestionAnswer::create(['question_id' => $q->id, 'text' => 'go|walk', 'is_correct' => true, 'position' => 1]);
+        QuestionAnswer::create(['question_id' => $q->id, 'text' => 'day', 'is_correct' => true, 'position' => 2]);
+
+        return $q;
+    }
+
+    private function submitAttempt(string $token, Test $test, array $answers): int
+    {
+        $attemptId = (int) $this->withToken($token)->postJson("/api/student/tests/{$test->id}/start")->json('attempt.id');
+        $this->withToken($token)->postJson("/api/student/attempts/{$attemptId}/submit", ['answers' => $answers])->assertOk();
+
+        return $attemptId;
+    }
+
+    public function test_correct_multiple_choice_is_auto_graded(): void
+    {
+        $mc = $this->makeMc(2);
+        $test = $this->singleQuestionTest($mc['question']);
+        $token = $this->tokenFor('H2');
+
+        $attemptId = $this->submitAttempt($token, $test, [
+            ['question_id' => $mc['question']->id, 'response' => ['selected' => [$mc['correct']]]],
+        ]);
+
+        $attempt = Attempt::findOrFail($attemptId);
+        $this->assertSame('2.00', $attempt->score);
+        $this->assertSame('2.00', $attempt->max_score);
+        $this->assertDatabaseHas('attempts', ['id' => $attemptId, 'grading_status' => 'auto_graded']);
+        $this->assertDatabaseHas('attempt_answers', ['attempt_id' => $attemptId, 'question_id' => $mc['question']->id, 'is_correct' => true]);
+    }
+
+    public function test_wrong_multiple_choice_scores_zero(): void
+    {
+        $mc = $this->makeMc(2);
+        $test = $this->singleQuestionTest($mc['question']);
+        $token = $this->tokenFor('H2');
+
+        $attemptId = $this->submitAttempt($token, $test, [
+            ['question_id' => $mc['question']->id, 'response' => ['selected' => [$mc['wrong']]]],
+        ]);
+
+        $this->assertSame('0.00', Attempt::findOrFail($attemptId)->score);
+        $this->assertDatabaseHas('attempt_answers', ['attempt_id' => $attemptId, 'question_id' => $mc['question']->id, 'is_correct' => false]);
+    }
+
+    public function test_gap_filling_is_graded_case_and_space_insensitively(): void
+    {
+        $gap = $this->makeGap();
+        $test = $this->singleQuestionTest($gap);
+        $token = $this->tokenFor('H2');
+
+        // "  WALK " matches "walk", "Day" matches "day" — all gaps correct.
+        $attemptId = $this->submitAttempt($token, $test, [
+            ['question_id' => $gap->id, 'response' => ['gaps' => ['  WALK ', 'Day']]],
+        ]);
+
+        $this->assertSame('2.00', Attempt::findOrFail($attemptId)->score);
+        $this->assertDatabaseHas('attempt_answers', ['attempt_id' => $attemptId, 'question_id' => $gap->id, 'is_correct' => true]);
+    }
+
+    public function test_gap_filling_is_all_or_nothing(): void
+    {
+        $gap = $this->makeGap();
+        $test = $this->singleQuestionTest($gap);
+        $token = $this->tokenFor('H2');
+
+        // First gap wrong → the whole question scores nothing.
+        $attemptId = $this->submitAttempt($token, $test, [
+            ['question_id' => $gap->id, 'response' => ['gaps' => ['run', 'day']]],
+        ]);
+
+        $this->assertSame('0.00', Attempt::findOrFail($attemptId)->score);
+        $this->assertDatabaseHas('attempt_answers', ['attempt_id' => $attemptId, 'question_id' => $gap->id, 'is_correct' => false]);
+    }
+
+    public function test_essay_leaves_the_attempt_pending_grading(): void
+    {
+        $essay = Question::create(['title' => 'Essay', 'description' => 'Write.', 'question_type' => 'essay', 'points' => 5, 'status' => 'active']);
+        $essay->levels()->attach($this->levelId());
+        $test = $this->singleQuestionTest($essay);
+        $token = $this->tokenFor('H2');
+
+        $attemptId = $this->submitAttempt($token, $test, [
+            ['question_id' => $essay->id, 'response' => ['text' => 'My answer.']],
+        ]);
+
+        $attempt = Attempt::findOrFail($attemptId);
+        $this->assertSame('0.00', $attempt->score);
+        $this->assertSame('5.00', $attempt->max_score);
+        $this->assertDatabaseHas('attempts', ['id' => $attemptId, 'grading_status' => 'pending_grading']);
+    }
 }

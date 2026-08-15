@@ -64,9 +64,9 @@ function initAnswers(questions: AttemptQuestion[]): void {
     }
 }
 
-function toggleOption(questionId: number, optionId: number): void {
-    const set = mc[questionId] ?? [];
-    mc[questionId] = set.includes(optionId) ? set.filter((id) => id !== optionId) : [...set, optionId];
+function pickOption(questionId: number, optionId: number): void {
+    // Single correct answer per question (ADR-0019) — a radio replaces the choice.
+    mc[questionId] = [optionId];
 }
 
 function startTicker(): void {
@@ -191,7 +191,7 @@ onUnmounted(stopTicker);
                             class="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50"
                             :class="(mc[q.id] ?? []).includes(opt.id) ? 'border-brand-primary bg-brand-primary-soft' : ''"
                         >
-                            <input type="checkbox" :checked="(mc[q.id] ?? []).includes(opt.id)" class="accent-brand-primary" @change="toggleOption(q.id, opt.id)" />
+                            <input type="radio" :name="`q-${q.id}`" :checked="(mc[q.id] ?? []).includes(opt.id)" class="accent-brand-primary" @change="pickOption(q.id, opt.id)" />
                             <span>{{ opt.text }}</span>
                         </label>
                     </div>

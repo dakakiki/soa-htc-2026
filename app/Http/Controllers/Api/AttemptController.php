@@ -12,6 +12,7 @@ use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\AttemptAnswer;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Models\StudentSession;
+use App\Domain\Competition\Support\AttemptGrader;
 use App\Domain\Competition\Support\StudentAvailability;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -121,6 +122,7 @@ class AttemptController extends Controller
             }
 
             $attempt->update(['status' => AttemptStatus::Completed, 'submitted_at' => now()]);
+            AttemptGrader::grade($attempt);
         });
 
         return response()->json($this->completedPayload($attempt->refresh()));
@@ -138,6 +140,7 @@ class AttemptController extends Controller
         }
 
         $attempt->update(['status' => AttemptStatus::Completed, 'submitted_at' => $attempt->expires_at]);
+        AttemptGrader::grade($attempt);
 
         return true;
     }

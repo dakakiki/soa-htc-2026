@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Domain\Competition\Enums\AttemptStatus;
 use App\Domain\Competition\Models\Attempt;
+use App\Domain\Competition\Support\AttemptGrader;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Completes attempts left open past their deadline + grace by competitors who
@@ -26,15 +26,17 @@ class FinalizeExpiredAttempts extends Command
     {
         $cutoff = now()->subSeconds(Attempt::SUBMIT_GRACE_SECONDS);
 
-        $count = Attempt::query()
+        $attempts = Attempt::query()
             ->where('status', AttemptStatus::InProgress)
             ->where('expires_at', '<', $cutoff)
-            ->update([
-                'status' => AttemptStatus::Completed,
-                'submitted_at' => DB::raw('expires_at'),
-            ]);
+            ->get();
 
-        $this->info("Finalized {$count} expired attempt(s).");
+        foreach ($attempts as $attempt) {
+            $attempt->update(['status' => AttemptStatus::Completed, 'submitted_at' => $attempt->expires_at]);
+            AttemptGrader::grade($attempt);
+        }
+
+        $this->info("Finalized {$attempts->count()} expired attempt(s).");
 
         return self::SUCCESS;
     }
