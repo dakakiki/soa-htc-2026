@@ -13,6 +13,7 @@ use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -27,6 +28,11 @@ class AttemptTest extends TestCase
     {
         parent::setUp();
         $this->seed();
+    }
+
+    private function admin(): User
+    {
+        return User::where('email', 'admin@soahtc.test')->firstOrFail();
     }
 
     private function tokenFor(string $levelShort = 'H2'): string
@@ -111,7 +117,7 @@ class AttemptTest extends TestCase
         $this->assertDatabaseHas('attempts', ['test_id' => $c['tests'][0]->id, 'status' => 'in_progress']);
     }
 
-    public function test_next_test_stays_locked_until_the_previous_is_completed(): void
+    public function test_next_test_unlocks_only_after_an_admin_publishes_the_previous(): void
     {
         $c = $this->quizWithTests('H2', 2);
         $token = $this->tokenFor('H2');
@@ -123,9 +129,19 @@ class AttemptTest extends TestCase
         // Starting the second test out of order is refused.
         $this->withToken($token)->postJson("/api/student/tests/{$c['tests'][1]->id}/start")->assertStatus(403);
 
-        // Complete the first, then the second becomes next and startable.
+        // Completing the first is not enough: until an admin publishes it, the
+        // second stays locked and unstartable (5d, ADR-0021).
         $attemptId = $this->withToken($token)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->json('attempt.id');
         $this->withToken($token)->postJson("/api/student/attempts/{$attemptId}/submit")->assertOk();
+
+        $this->withToken($token)->getJson('/api/student/availability')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'completed')
+            ->assertJsonPath('quizzes.0.exams.0.tests.1.status', 'locked');
+        $this->withToken($token)->postJson("/api/student/tests/{$c['tests'][1]->id}/start")->assertStatus(403);
+
+        // The admin publishes the first test's result → the second opens up.
+        $this->actingAs($this->admin())->postJson('/api/results/publish', ['scope' => 'test', 'id' => $c['tests'][0]->id])
+            ->assertOk()->assertJsonPath('attempts_count', 1);
 
         $this->withToken($token)->getJson('/api/student/availability')
             ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'completed')

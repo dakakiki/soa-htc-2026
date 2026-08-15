@@ -308,6 +308,8 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 - **Posledica:** `StudentAvailability` statusi testa = **`locked`/`next`/
   `in_progress`/`completed`** (raniji `available` iz 3c-1 zamenjen sa `next`).
   Grading/publish statusi (`published`) ostaju results sloj (Faza 5).
+- **Ažuriranje (5d):** uslov napredovanja fronta pooštren — sledeći test se
+  otključava tek na `published`, ne na `completed`. Vidi **ADR-0021**.
 
 ---
 
@@ -374,6 +376,29 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   - Takmičar vidi **`score`/`max_score`** na dashboard-u samo kad je attempt `published`.
 - **Posledica:** vezuje se za 5d (objava round-a = „odobreno" → sledeći round se
   otključava; sad auto). OD-9 (legacy active→status mapiranje) i dalje otvoren (migracija).
+
+---
+
+## ADR-0021 — Admin-approval gate: sledeći test se otključava tek na `published` (proširuje ADR-0017)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 5 Slice 5d. Po ADR-0017 „front" sekvence napreduje čim je
+  prethodni test `completed`, pa se sledeći test/round nudi takmičaru pre nego što
+  admin proveri/objavi rezultat. Originalni zahtev sa dashboard-a: sledeći round
+  se pojavljuje **tek kad admin objavi** prethodni.
+- **Odluka:** U `StudentAvailability::testStatuses()` front napreduje preko
+  `completed` testa **samo ako je i `published`** (`attempts.published_at != null`).
+  Completed-ali-neobjavljen test sam ostaje `completed`, ali sledeći test ostaje
+  `locked` (umesto `next`) — i start (CC-07) vraća **403** dok admin ne objavi.
+  - **Granularnost = svaka granica testa** (ne samo između round-ova): važi za
+    svaki `test→test` i `exam→exam` prelaz u spljoštenoj sekvenci.
+  - Pošto publish preskače `pending_grading` (ADR-0020), gate **prirodno čeka i
+    ocenjivanje essay-a** pre otključavanja sledećeg.
+  - **Monotono / reverzibilno:** `unpublish` prethodnog re-zaključava sledeći
+    (retrakcija pristupa); front se zaustavlja na najranijem neobjavljenom testu.
+- **Posledica:** jedna izmena u `testStatuses()` pokriva i prikaz (`/availability`)
+  i server-side enforcement (`startableQuizId`). Bez izmene payload-oblika
+  (statusi ostaju `locked/next/in_progress/completed`) i bez izmene frontenda.
 
 ---
 

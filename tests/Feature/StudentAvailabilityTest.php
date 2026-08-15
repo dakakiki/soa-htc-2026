@@ -6,6 +6,7 @@ use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
+use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
@@ -18,6 +19,8 @@ class StudentAvailabilityTest extends TestCase
     use RefreshDatabase;
 
     private int $seq = 0;
+
+    private Registration $lastRegistration;
 
     protected function setUp(): void
     {
@@ -39,6 +42,7 @@ class StudentAvailabilityTest extends TestCase
             'difficulty_level_id' => $level->id, 'name' => 'Test Student',
             'date_of_birth' => '2010-05-01', 'grade' => 6, 'status' => 'active',
         ]);
+        $this->lastRegistration = $registration;
 
         return $this->postJson('/api/student/identify', [
             'competitor_number' => $registration->competitor_number,
@@ -200,5 +204,72 @@ class StudentAvailabilityTest extends TestCase
         // B never unlocked it, so B still sees it locked.
         $this->withToken($tokenB)->getJson('/api/student/availability')
             ->assertJsonPath('quizzes.0.unlocked', false);
+    }
+
+    public function test_next_test_stays_locked_while_the_previous_is_completed_but_unpublished(): void
+    {
+        $chain = $this->twoTestChain('H2');
+        $token = $this->tokenFor('H2');
+        $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: false);
+
+        // The first shows completed, but the front does not advance until the
+        // result is published, so the second stays locked (5d, ADR-0021).
+        $this->withToken($token)->getJson('/api/student/availability')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'completed')
+            ->assertJsonPath('quizzes.0.exams.0.tests.1.status', 'locked');
+    }
+
+    public function test_publishing_the_previous_test_unlocks_the_next(): void
+    {
+        $chain = $this->twoTestChain('H2');
+        $token = $this->tokenFor('H2');
+        $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: true);
+
+        $this->withToken($token)->getJson('/api/student/availability')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'completed')
+            ->assertJsonPath('quizzes.0.exams.0.tests.1.status', 'next');
+    }
+
+    /**
+     * A sample quiz whose single exam holds two ordered tests at $levelShort.
+     *
+     * @return array{quiz: Quiz, exam: Exam, tests: array{0: Test, 1: Test}}
+     */
+    private function twoTestChain(string $levelShort = 'H2'): array
+    {
+        $level = DifficultyLevel::where('level_short', $levelShort)->firstOrFail();
+
+        $quiz = Quiz::create(['title' => 'Two-test', 'quiz_type' => 'sample', 'status' => 'active']);
+        $quiz->levels()->attach($level->id);
+
+        $exam = Exam::create(['title' => 'Exam', 'status' => 'active']);
+        $exam->levels()->attach($level->id);
+        $quiz->exams()->attach($exam->id, ['position' => 1]);
+
+        $tests = [];
+        for ($i = 1; $i <= 2; $i++) {
+            $test = Test::create(['title' => "Test {$i}", 'duration' => 30, 'status' => 'active']);
+            $test->levels()->attach($level->id);
+            $exam->tests()->attach($test->id, ['position' => $i]);
+            $tests[] = $test;
+        }
+
+        return ['quiz' => $quiz, 'exam' => $exam, 'tests' => $tests];
+    }
+
+    /** Record a completed attempt at $test for the last registration, optionally published. */
+    private function completeAttempt(Quiz $quiz, Test $test, bool $published): void
+    {
+        Attempt::create([
+            'registration_id' => $this->lastRegistration->id,
+            'quiz_id' => $quiz->id,
+            'test_id' => $test->id,
+            'status' => 'completed',
+            'grading_status' => 'auto_graded',
+            'score' => 0, 'max_score' => 0,
+            'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+            'published_at' => $published ? now() : null,
+            'channel' => 'web',
+        ]);
     }
 }

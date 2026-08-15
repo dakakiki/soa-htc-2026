@@ -19,15 +19,19 @@ use Illuminate\Support\Collection;
  * (PROJECT_CONTEXT §5.7). This is the server-side authority; the client only
  * renders the returned statuses.
  *
- * Test status (ADR-0017, strict sequential):
+ * Test status (ADR-0017 strict sequential, extended by ADR-0021 publish gate):
  *  - `completed`     — the registration has a completed attempt at this test;
  *  - `in_progress`   — it has an open attempt;
  *  - `next`          — the first not-completed test in an open quiz's sequence
  *                      (the only test that may be started right now);
  *  - `locked`        — the quiz's password is not cleared, or an earlier test in
- *                      the sequence is not yet completed.
+ *                      the sequence is not yet completed, or the earlier test is
+ *                      completed but its result has not yet been published.
  *
- * Grading/publication statuses stay in the results layer (Faza 5, ADR-0013).
+ * The sequence front advances past a completed test only once an admin has
+ * published its result (5d), so the next round stays closed until the previous
+ * one is approved. Grading/publication statuses stay in the results layer
+ * (Faza 5, ADR-0013).
  */
 final class StudentAvailability
 {
@@ -131,8 +135,10 @@ final class StudentAvailability
     /**
      * Walk the quiz's flattened test sequence and assign each a status. Only the
      * first not-completed test in an open quiz is `next`; the rest are `locked`.
+     * A completed test whose result is not yet published holds the front, so the
+     * following test stays `locked` until an admin publishes it (5d, ADR-0021).
      *
-     * @param  array<int, string>  $attempts
+     * @param  array<int, array{status: string, published: bool, score: float, max_score: float}>  $attempts
      * @return array<int, string>
      */
     private static function testStatuses(Quiz $quiz, bool $open, array $attempts): array
@@ -145,6 +151,14 @@ final class StudentAvailability
 
             if ($status === 'completed') {
                 $statuses[$test->id] = 'completed';
+
+                // 5d: the front advances past a completed test only once an
+                // admin has published its result; until then the next test
+                // stays locked, so a competitor cannot proceed to the next
+                // round before the previous one is approved (ADR-0021).
+                if (! ($attempts[$test->id]['published'] ?? false)) {
+                    $reachedFront = true;
+                }
 
                 continue;
             }
