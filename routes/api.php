@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\StudentAuthController;
 use App\Http\Controllers\Api\TestController;
 use App\Http\Controllers\Api\TestTypeController;
 use App\Http\Controllers\Api\UserController;
@@ -51,6 +52,19 @@ Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::get('user', [AuthController::class, 'user'])->middleware('auth:sanctum');
+});
+
+/*
+ * Competitor (student) web identification — no classic login. A short-lived
+ * bearer-token session is issued after matching competitor_number + country +
+ * date of birth. Identification is rate-limited against guessing.
+ */
+Route::prefix('student')->group(function () {
+    Route::post('identify', [StudentAuthController::class, 'identify'])->middleware('throttle:8,1');
+    Route::middleware('student.session')->group(function () {
+        Route::get('me', [StudentAuthController::class, 'me']);
+        Route::post('logout', [StudentAuthController::class, 'logout']);
+    });
 });
 
 /*
