@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Identity\Enums\SystemRole;
+use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,8 +34,8 @@ class MasterDataTest extends TestCase
     {
         $this->seed();
 
-        $admin = \App\Domain\Identity\Models\Role::where('key', SystemRole::Admin->value)->firstOrFail();
-        $coordinator = \App\Domain\Identity\Models\Role::where('key', SystemRole::SchoolCoordinator->value)->firstOrFail();
+        $admin = Role::where('key', SystemRole::Admin->value)->firstOrFail();
+        $coordinator = Role::where('key', SystemRole::SchoolCoordinator->value)->firstOrFail();
 
         $this->assertTrue($admin->permissions()->where('key', 'schools.manage')->exists());
         $this->assertTrue($admin->permissions()->where('key', 'schools.view.all')->exists());

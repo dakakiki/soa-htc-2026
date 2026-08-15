@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -180,7 +181,7 @@ class CoordinatorController extends Controller
         $assignment->schools()->sync($schoolIds);
     }
 
-    /** @return \Illuminate\Support\Collection<int, int> */
+    /** @return Collection<int, int> */
     private function coordinatorRoleIds()
     {
         return Role::whereIn('key', CoordinatorScope::ROLE_KEYS)->pluck('id');

@@ -10,6 +10,7 @@ use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -44,7 +45,7 @@ class DashboardController extends Controller
         ];
 
         if ($user->hasPermission('users.manage')) {
-            $data['users'] = ['count' => \App\Models\User::query()->count()];
+            $data['users'] = ['count' => User::query()->count()];
             $data['coordinators'] = ['count' => $this->coordinatorCount($season?->id)];
         }
 

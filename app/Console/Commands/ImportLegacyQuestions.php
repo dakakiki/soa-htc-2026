@@ -102,7 +102,7 @@ class ImportLegacyQuestions extends Command
                     continue;
                 }
                 if ($type === 2) {
-                    $accepted = trim((string) $a->answers, " |");
+                    $accepted = trim((string) $a->answers, ' |');
                     if ($accepted === '') {
                         continue;
                     }

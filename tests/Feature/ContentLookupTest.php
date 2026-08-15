@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Season;
@@ -82,7 +83,7 @@ class ContentLookupTest extends TestCase
 
     public function test_exam_round_active_can_be_toggled(): void
     {
-        $round = \App\Domain\Assessment\Models\ExamRound::firstOrFail();
+        $round = ExamRound::firstOrFail();
 
         $this->actingAs($this->admin())
             ->putJson("/api/exam-rounds/{$round->id}", ['active' => false])

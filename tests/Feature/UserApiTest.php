@@ -7,6 +7,7 @@ use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
+use App\Domain\Organization\Support\SeasonContext;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -187,7 +188,7 @@ class UserApiTest extends TestCase
 
     public function test_creating_user_with_role_assigns_it_for_the_active_season(): void
     {
-        $season = \App\Domain\Organization\Support\SeasonContext::active();
+        $season = SeasonContext::active();
         $this->assertNotNull($season, 'Expected an active season from the seeder.');
         $role = Role::where('key', SystemRole::Admin->value)->firstOrFail();
 

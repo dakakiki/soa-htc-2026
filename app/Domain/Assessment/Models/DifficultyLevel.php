@@ -48,4 +48,3 @@ class DifficultyLevel extends Model
             ->all();
     }
 }
-

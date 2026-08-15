@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
+use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\School;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -91,7 +92,7 @@ class CoordinatorApiTest extends TestCase
     public function test_school_must_belong_to_the_coordinator_country(): void
     {
         $school = School::first();
-        $otherCountry = \App\Domain\Organization\Models\Country::where('id', '!=', $school->country_id)->firstOrFail();
+        $otherCountry = Country::where('id', '!=', $school->country_id)->firstOrFail();
         $otherCountrySchool = School::create([
             'name' => 'Foreign School',
             'country_id' => $otherCountry->id,
