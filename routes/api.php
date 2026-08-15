@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StudentAuthController;
+use App\Http\Controllers\Api\StudentAvailabilityController;
 use App\Http\Controllers\Api\TestController;
 use App\Http\Controllers\Api\TestTypeController;
 use App\Http\Controllers\Api\UserController;
@@ -64,6 +65,12 @@ Route::prefix('student')->group(function () {
     Route::middleware('student.session')->group(function () {
         Route::get('me', [StudentAuthController::class, 'me']);
         Route::post('logout', [StudentAuthController::class, 'logout']);
+
+        // Level-gated assessment list (CC-06) and the competition password gate.
+        Route::get('availability', [StudentAvailabilityController::class, 'index']);
+        Route::post('quizzes/{quiz}/unlock', [StudentAvailabilityController::class, 'unlock'])
+            ->whereNumber('quiz')
+            ->middleware('throttle:8,1');
     });
 });
 

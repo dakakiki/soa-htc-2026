@@ -7,6 +7,7 @@ namespace App\Domain\Assessment\Models;
 use App\Domain\Assessment\Enums\QuizType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\Hash;
 
 class Quiz extends Model
 {
@@ -25,6 +26,21 @@ class Quiz extends Model
             'quiz_type' => QuizType::class,
             'legacy_id' => 'integer',
         ];
+    }
+
+    /**
+     * A competition quiz with an access code is gated (CC-06); sample quizzes and
+     * competition quizzes left without a code are open.
+     */
+    public function requiresPassword(): bool
+    {
+        return $this->quiz_type === QuizType::Competition && $this->quiz_password !== null;
+    }
+
+    /** Verify a candidate access code against the stored bcrypt hash. */
+    public function passwordMatches(string $candidate): bool
+    {
+        return $this->quiz_password !== null && Hash::check($candidate, $this->quiz_password);
     }
 
     /** @return BelongsToMany<DifficultyLevel, $this> */

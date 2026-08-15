@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domain\Competition\Models;
 
+use App\Domain\Assessment\Models\Quiz;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class StudentSession extends Model
 {
@@ -30,6 +32,16 @@ class StudentSession extends Model
     public function registration(): BelongsTo
     {
         return $this->belongsTo(Registration::class);
+    }
+
+    /**
+     * Competition quizzes whose password this session has cleared (CC-06).
+     *
+     * @return BelongsToMany<Quiz, $this>
+     */
+    public function unlockedQuizzes(): BelongsToMany
+    {
+        return $this->belongsToMany(Quiz::class, 'student_session_quiz')->withPivot('unlocked_at');
     }
 
     /** @param  Builder<StudentSession>  $query */

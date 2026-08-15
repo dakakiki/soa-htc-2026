@@ -248,6 +248,37 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0015 — Dostupnost sadržaja (CC-06): level gate + session-scoped unlock
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 3 Slice 3c-1. CC-06 (`03` §CC-06) traži da backend računa
+  dostupne testove iz: aktivne sezone/quiz-a, sample/competition moda,
+  registracionog nivoa, konfigurisanog redosleda, attempt/result statusa i
+  reset/void stanja. Attempt/result slojevi (Faza 4–5) još ne postoje.
+  `PROJECT_CONTEXT.md` §5.7 zahteva level gate na listanju i pri pristupu.
+- **Odluka:**
+  - `GET /api/student/availability` (iza `student.session`) vraća stablo
+    quiz→exam→test **filtrirano po `difficulty_level_id` registracije na svakom
+    sloju** (ne samo quiz), redosled preko `exam_quiz.position` /
+    `exam_test.position`. Server je autoritet; klijent samo prikazuje statuse.
+  - Statusi testa su zasad **`available` / `locked`**. Attempt-izvedeni statusi
+    (`in_progress`/`completed`/`published`) i progresivno test-po-test
+    otključavanje (**OD-4, otvoreno**) NISU ovde — dolaze u Fazi 4–5.
+  - Competition quiz sa lozinkom je `locked` dok sesija ne položi lozinku;
+    `POST /api/student/quizzes/{quiz}/unlock` (`Hash::check`, `throttle:8,1`).
+    **Uniformna 422 greška** za sve slučajeve (quiz van nivoa / nije gejtovan /
+    pogrešna lozinka) — ne otkriva postojanje ni nivo. Sample i competition-bez-
+    lozinke su otvoreni.
+  - **Unlock se pamti u pivotu `student_session_quiz`** (session-scoped,
+    `unlocked_at`, cascade sa sesijom). `student_sessions` ostaje quiz-agnostična
+    (nastavak ADR-0013 / Slice 3b linije).
+- **Posledica:** `Quiz::requiresPassword()/passwordMatches()`; availability logika
+  u `Domain/Competition/Support/StudentAvailability`. Start testa (Faza 4) mora
+  **ponovo** proveriti level + unlock neposredno pre kreiranja attempt-a (CC-07);
+  ova lista nije autorizacioni dokaz.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
