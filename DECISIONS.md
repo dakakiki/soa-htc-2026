@@ -193,6 +193,27 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0013 — Registracioni model: samo roster (bez rezultata/round-flagova)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Legacy `el_student` je denormalizovan — spaja registraciju (ime, škola,
+  zemlja, level, razred) SA rezultatima (read/use/score marks, semi_*, q_semi/q_quali/
+  q_final round-flagovi, absent). Faza 3 (registracije) je odvojena od Faze 4–5 (attempt/
+  ocenjivanje/results) po 3-slojnom modelu rezultata.
+- **Odluka:** `registrations` tabela nosi **samo roster**: season_id, competitor_number
+  (round+6cifara=8), school_id (Venue), `school_external` (free-text „School" kad polaže
+  drugde), country_id (izveden), difficulty_level_id, name, dob, grade, status. Level se
+  bira **filtrirano po grade-u** (nivoi čiji `grades` sadrže razred; `difficulty-level-options`
+  sada vraća `grades`). Country→Venue cascade (obavezan izbor zemlje pa škole po zemlji).
+  **NE nosi** ocene ni round pass-flagove — to je results sloj (Faza 4–5).
+- **Odloženo za Faza 4–5 (vlasnik naglasio 2026-08-15, radi količine/provere):**
+  round pass-flagovi (Semifinal/Qualifiers/Final prošao?) + ocene po **exam_round → test-type**;
+  **export odgovora studenata po ispitu** (šta je čekirao/uneo) → **provera** → tek onda
+  **import finalnih rezultata** (ili zadržati već upisano); **admin odobrava prikaz rezultata**
+  kada su svi postavljeni (vezano za OD-6 publish gate).
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

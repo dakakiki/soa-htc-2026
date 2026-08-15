@@ -6,6 +6,7 @@ import { useSessionStore } from '@/stores/session';
 import {
     IconLayoutDashboard,
     IconBuilding,
+    IconUsersGroup,
     IconUsers,
     IconUserStar,
     IconSettings,
@@ -56,6 +57,7 @@ function toggleCollapsed(): void {
 
 const items: NavItem[] = [
     { label: t('nav.dashboard'), icon: IconLayoutDashboard, to: 'dashboard', prefix: 'dashboard' },
+    { label: t('nav.students'), icon: IconUsersGroup, to: 'registrations', prefix: 'registrations', perm: 'schools.view' },
     { label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.view' },
     { label: t('nav.coordinators'), icon: IconUserStar, to: 'coordinators', prefix: 'coordinators', perm: 'users.manage' },
 ];

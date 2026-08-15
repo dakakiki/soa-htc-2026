@@ -22,6 +22,9 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'is_admin' => $this->isAdmin(),
+            'can_student_insert' => (bool) $this->can_student_insert,
+            'can_student_edit' => (bool) $this->can_student_edit,
+            'can_student_delete' => (bool) $this->can_student_delete,
             'roles' => $this->activeSeasonAssignments()
                 ->map(fn (SeasonUserAssignment $a) => $a->role?->key)
                 ->filter()

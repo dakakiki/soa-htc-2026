@@ -3,6 +3,9 @@ export interface AuthUser {
     name: string;
     email: string;
     is_admin: boolean;
+    can_student_insert: boolean;
+    can_student_edit: boolean;
+    can_student_delete: boolean;
     roles: string[];
     permissions: string[];
 }
@@ -89,6 +92,7 @@ export interface LevelOption {
     id: number;
     level_short: string;
     name: string;
+    grades: number[];
     category_name: string;
     category_type: string;
 }
@@ -195,6 +199,19 @@ export interface Quiz {
     levels?: { id: number; level_short: string }[];
     exams?: QuizExamRef[];
     exams_count?: number;
+}
+
+export interface Registration {
+    id: number;
+    competitor_number: string;
+    name: string;
+    date_of_birth: string | null;
+    grade: number | null;
+    status: string;
+    school_external: string | null;
+    school?: { id: number; name?: string };
+    country?: { id: number; name?: string };
+    level?: { id: number; level_short?: string };
 }
 
 export interface Permission {

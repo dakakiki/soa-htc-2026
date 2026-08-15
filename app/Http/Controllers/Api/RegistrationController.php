@@ -1,0 +1,128 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Api;
+
+use App\Domain\Competition\Models\Registration;
+use App\Domain\Organization\Models\School;
+use App\Domain\Organization\Support\SeasonContext;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreRegistrationRequest;
+use App\Http\Requests\UpdateRegistrationRequest;
+use App\Http\Resources\RegistrationResource;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
+
+class RegistrationController extends Controller
+{
+    public function index(Request $request): AnonymousResourceCollection
+    {
+        $this->authorize('viewAny', Registration::class);
+
+        $query = Registration::query()->with(['school', 'country', 'level'])->latest('id');
+
+        // Row-level scope: coordinators only see registrations for their schools.
+        $allowed = $request->user()->allowedSchoolIds();
+        if ($allowed !== null) {
+            $query->whereIn('school_id', $allowed);
+        }
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->string('search'));
+            if (ctype_digit($search)) {
+                // Numbers search competitor_number by prefix, which uses its unique index.
+                $query->where('competitor_number', 'like', $search.'%');
+            } else {
+                $query->where('name', 'like', '%'.$search.'%');
+            }
+        }
+        if ($request->filled('school_id')) {
+            $query->where('school_id', $request->integer('school_id'));
+        }
+        if ($request->filled('country_id')) {
+            $query->where('country_id', $request->integer('country_id'));
+        }
+        if ($request->filled('level_id')) {
+            $query->where('difficulty_level_id', $request->integer('level_id'));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status'));
+        }
+
+        $perPage = min(max($request->integer('per_page', 20), 1), 200);
+
+        return RegistrationResource::collection($query->paginate($perPage));
+    }
+
+    public function show(Registration $registration): RegistrationResource
+    {
+        $this->authorize('view', $registration);
+
+        return RegistrationResource::make($registration->load(['school', 'country', 'level']));
+    }
+
+    public function store(StoreRegistrationRequest $request): JsonResponse
+    {
+        $this->authorize('create', Registration::class);
+
+        $registration = $this->createWithNumber($request->validated());
+
+        return RegistrationResource::make($registration->load(['school', 'country', 'level']))
+            ->response()->setStatusCode(201);
+    }
+
+    public function update(UpdateRegistrationRequest $request, Registration $registration): RegistrationResource
+    {
+        $this->authorize('update', $registration);
+
+        $data = $request->validated();
+        // Country stays derived from the school.
+        if (isset($data['school_id'])) {
+            $data['country_id'] = School::whereKey($data['school_id'])->value('country_id');
+        }
+        $registration->update($data);
+
+        return RegistrationResource::make($registration->load(['school', 'country', 'level']));
+    }
+
+    public function destroy(Registration $registration): Response
+    {
+        $this->authorize('delete', $registration);
+
+        $registration->delete();
+
+        return response()->noContent();
+    }
+
+    /**
+     * Create a registration with a freshly allocated competitor_number
+     * (round_number + zero-padded per-season sequence). The sequence is
+     * allocated under a row lock so concurrent inserts never collide.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function createWithNumber(array $data): Registration
+    {
+        return DB::transaction(function () use ($data): Registration {
+            $season = SeasonContext::active();
+
+            $maxSequence = Registration::query()
+                ->where('season_id', $season->id)
+                ->lockForUpdate()
+                ->max('sequence') ?? 0;
+            $sequence = $maxSequence + 1;
+
+            $data['season_id'] = $season->id;
+            $data['sequence'] = $sequence;
+            $data['competitor_number'] = $season->round_number.str_pad((string) $sequence, 6, '0', STR_PAD_LEFT);
+            $data['country_id'] = School::whereKey($data['school_id'])->value('country_id');
+            $data['status'] ??= 'active';
+
+            return Registration::create($data);
+        });
+    }
+}

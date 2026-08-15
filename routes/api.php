@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\QuestionTagController;
 use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\RegionController;
+use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
 use App\Http\Controllers\Api\SettingsController;
@@ -91,11 +92,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('difficulty-level-options', fn () => ['data' => DifficultyLevel::query()
         ->join('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
         ->orderBy('difficulty_categories.type')->orderBy('difficulty_categories.id')->orderBy('difficulty_levels.position')
-        ->get(['difficulty_levels.id', 'difficulty_levels.level_short', 'difficulty_levels.name', 'difficulty_categories.name as category_name', 'difficulty_categories.type as category_type'])]);
+        ->get(['difficulty_levels.id', 'difficulty_levels.level_short', 'difficulty_levels.name', 'difficulty_levels.grades', 'difficulty_categories.name as category_name', 'difficulty_categories.type as category_type'])]);
 
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('schools', SchoolController::class);
+    Route::apiResource('registrations', RegistrationController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
 
     // Staff users and their season role/scope assignments.
     Route::apiResource('users', UserController::class)->only(['index', 'show', 'store', 'update', 'destroy']);

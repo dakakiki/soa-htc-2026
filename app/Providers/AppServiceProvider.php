@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Competition\Models\Registration;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
@@ -15,6 +16,7 @@ use App\Policies\CountryPolicy;
 use App\Policies\DifficultyCategoryPolicy;
 use App\Policies\DifficultyLevelPolicy;
 use App\Policies\RegionPolicy;
+use App\Policies\RegistrationPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\SchoolPolicy;
 use App\Policies\SeasonUserAssignmentPolicy;
@@ -48,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Setting::class, SettingPolicy::class);
         Gate::policy(DifficultyCategory::class, DifficultyCategoryPolicy::class);
         Gate::policy(DifficultyLevel::class, DifficultyLevelPolicy::class);
+        Gate::policy(Registration::class, RegistrationPolicy::class);
 
         // Content hierarchy (lookups + questions) is admin-only and shares one
         // ability rather than a policy per lookup model.

@@ -34,6 +34,24 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'schools.view' },
     },
     {
+        path: '/students',
+        name: 'registrations',
+        component: () => import('@/pages/students/RegistrationsListPage.vue'),
+        meta: { requiresAuth: true, permission: 'schools.view' },
+    },
+    {
+        path: '/students/new',
+        name: 'registrations.new',
+        component: () => import('@/pages/students/RegistrationFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'schools.view' },
+    },
+    {
+        path: '/students/:id/edit',
+        name: 'registrations.edit',
+        component: () => import('@/pages/students/RegistrationFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'schools.view' },
+    },
+    {
         path: '/venues/new',
         name: 'venues.new',
         component: () => import('@/pages/venues/VenueFormPage.vue'),
