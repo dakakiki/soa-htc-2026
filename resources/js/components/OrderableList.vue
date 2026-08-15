@@ -1,0 +1,75 @@
+<script setup lang="ts" generic="T extends { id: number }">
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { IconGripVertical, IconArrowUp, IconArrowDown, IconTrash, IconPlus } from '@tabler/icons-vue';
+
+const props = defineProps<{
+    modelValue: T[];
+    emptyText: string;
+}>();
+const emit = defineEmits<{ 'update:modelValue': [T[]] }>();
+
+const { t } = useI18n();
+
+// Index of the row currently being dragged (for the dimmed style).
+const dragIndex = ref<number | null>(null);
+
+function move(from: number, to: number): void {
+    if (to < 0 || to >= props.modelValue.length || from === to) {
+        return;
+    }
+    const list = props.modelValue.slice();
+    const [item] = list.splice(from, 1);
+    list.splice(to, 0, item);
+    emit('update:modelValue', list);
+}
+
+function removeAt(i: number): void {
+    const list = props.modelValue.slice();
+    list.splice(i, 1);
+    emit('update:modelValue', list);
+}
+
+function onDragStart(i: number): void {
+    dragIndex.value = i;
+}
+
+// Live-reorder as the pointer passes over another row.
+function onDragOver(i: number): void {
+    if (dragIndex.value === null || dragIndex.value === i) {
+        return;
+    }
+    move(dragIndex.value, i);
+    dragIndex.value = i;
+}
+
+function onDragEnd(): void {
+    dragIndex.value = null;
+}
+</script>
+
+<template>
+    <ol class="space-y-2">
+        <li v-for="(item, i) in modelValue" :key="item.id" draggable="true"
+            class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+            :class="{ 'opacity-50': dragIndex === i }"
+            @dragstart="onDragStart(i)" @dragover.prevent="onDragOver(i)" @dragend="onDragEnd" @drop.prevent="onDragEnd">
+            <span class="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing" :aria-label="t('common.dragReorder')" :title="t('common.dragReorder')">
+                <IconGripVertical :size="16" />
+            </span>
+            <span class="w-6 shrink-0 text-center text-xs font-medium text-gray-400">{{ i + 1 }}</span>
+            <div class="flex min-w-0 flex-1 items-center gap-2">
+                <slot name="item" :item="item" :index="i" />
+            </div>
+            <button type="button" class="shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === 0"
+                :aria-label="t('common.moveUp')" @click="move(i, i - 1)"><IconArrowUp :size="16" /></button>
+            <button type="button" class="shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === modelValue.length - 1"
+                :aria-label="t('common.moveDown')" @click="move(i, i + 1)"><IconArrowDown :size="16" /></button>
+            <button type="button" class="shrink-0 text-red-500 hover:text-red-700"
+                :aria-label="t('common.remove')" @click="removeAt(i)"><IconTrash :size="16" /></button>
+        </li>
+        <li v-if="modelValue.length === 0" class="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-400">
+            <IconPlus :size="16" /> {{ emptyText }}
+        </li>
+    </ol>
+</template>

@@ -118,6 +118,24 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'content.manage' },
     },
     {
+        path: '/content/quizzes',
+        name: 'quizzes',
+        component: () => import('@/pages/content/QuizzesListPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
+        path: '/content/quizzes/new',
+        name: 'quizzes.new',
+        component: () => import('@/pages/content/QuizFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
+        path: '/content/quizzes/:id/edit',
+        name: 'quizzes.edit',
+        component: () => import('@/pages/content/QuizFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'content.manage' },
+    },
+    {
         path: '/content/exams',
         name: 'exams',
         component: () => import('@/pages/content/ExamsListPage.vue'),

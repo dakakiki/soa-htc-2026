@@ -178,6 +178,25 @@ export interface Exam {
     tests_count?: number;
 }
 
+export interface QuizExamRef {
+    id: number;
+    title: string;
+    position: number;
+}
+
+export interface Quiz {
+    id: number;
+    title: string;
+    description: string | null;
+    quiz_type: string;
+    quiz_type_label: string;
+    status: string;
+    has_password: boolean;
+    levels?: { id: number; level_short: string }[];
+    exams?: QuizExamRef[];
+    exams_count?: number;
+}
+
 export interface Permission {
     key: string;
     description: string | null;
