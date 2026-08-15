@@ -12,7 +12,7 @@ import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
-import { IconTrash, IconArrowUp, IconArrowDown, IconPlus } from '@tabler/icons-vue';
+import OrderableList from '@/components/OrderableList.vue';
 import type { Lookup } from '@/api/content';
 import type { LevelOption, ExamTestRef, Test } from '@/types/models';
 
@@ -70,19 +70,6 @@ function add(t2: Test): void {
         return;
     }
     selected.value.push({ id: t2.id, title: t2.title, position: selected.value.length + 1 });
-}
-function removeAt(i: number): void {
-    selected.value.splice(i, 1);
-}
-function moveUp(i: number): void {
-    if (i > 0) {
-        [selected.value[i - 1], selected.value[i]] = [selected.value[i], selected.value[i - 1]];
-    }
-}
-function moveDown(i: number): void {
-    if (i < selected.value.length - 1) {
-        [selected.value[i + 1], selected.value[i]] = [selected.value[i], selected.value[i + 1]];
-    }
 }
 
 function goBack(): void {
@@ -185,22 +172,11 @@ onMounted(async () => {
                             </div>
                         </div>
 
-                        <ol class="mt-3 space-y-2">
-                            <li v-for="(tt, i) in selected" :key="tt.id"
-                                class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-                                <span class="w-6 shrink-0 text-center text-xs font-medium text-gray-400">{{ i + 1 }}</span>
-                                <span class="flex-1 truncate">{{ tt.title }}</span>
-                                <button type="button" class="shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === 0"
-                                    :aria-label="$t('exam.moveUp')" @click="moveUp(i)"><IconArrowUp :size="16" /></button>
-                                <button type="button" class="shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === selected.length - 1"
-                                    :aria-label="$t('exam.moveDown')" @click="moveDown(i)"><IconArrowDown :size="16" /></button>
-                                <button type="button" class="shrink-0 text-red-500 hover:text-red-700"
-                                    :aria-label="$t('exam.removeTest')" @click="removeAt(i)"><IconTrash :size="16" /></button>
-                            </li>
-                            <li v-if="selected.length === 0" class="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-400">
-                                <IconPlus :size="16" /> {{ $t('exam.noTests') }}
-                            </li>
-                        </ol>
+                        <OrderableList v-model="selected" :empty-text="$t('exam.noTests')" class="mt-3">
+                            <template #item="{ item }">
+                                <span class="flex-1 truncate">{{ item.title }}</span>
+                            </template>
+                        </OrderableList>
                     </div>
                 </div>
 

@@ -12,7 +12,7 @@ import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
-import { IconTrash, IconArrowUp, IconArrowDown, IconPlus } from '@tabler/icons-vue';
+import OrderableList from '@/components/OrderableList.vue';
 import type { Lookup } from '@/api/content';
 import type { LevelOption, Question, TestQuestionRef } from '@/types/models';
 
@@ -70,19 +70,6 @@ function add(q: Question): void {
         return;
     }
     selected.value.push({ id: q.id, title: q.title, points: q.points, position: selected.value.length + 1 });
-}
-function removeAt(i: number): void {
-    selected.value.splice(i, 1);
-}
-function moveUp(i: number): void {
-    if (i > 0) {
-        [selected.value[i - 1], selected.value[i]] = [selected.value[i], selected.value[i - 1]];
-    }
-}
-function moveDown(i: number): void {
-    if (i < selected.value.length - 1) {
-        [selected.value[i + 1], selected.value[i]] = [selected.value[i], selected.value[i + 1]];
-    }
 }
 
 function goBack(): void {
@@ -187,23 +174,12 @@ onMounted(async () => {
                             </div>
                         </div>
 
-                        <ol class="mt-3 space-y-2">
-                            <li v-for="(q, i) in selected" :key="q.id"
-                                class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-                                <span class="w-6 shrink-0 text-center text-xs font-medium text-gray-400">{{ i + 1 }}</span>
-                                <span class="flex-1 truncate">{{ q.title }}</span>
-                                <span class="shrink-0 text-xs text-gray-400">{{ q.points }}</span>
-                                <button type="button" class="shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === 0"
-                                    :aria-label="$t('test.moveUp')" @click="moveUp(i)"><IconArrowUp :size="16" /></button>
-                                <button type="button" class="shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === selected.length - 1"
-                                    :aria-label="$t('test.moveDown')" @click="moveDown(i)"><IconArrowDown :size="16" /></button>
-                                <button type="button" class="shrink-0 text-red-500 hover:text-red-700"
-                                    :aria-label="$t('test.removeQuestion')" @click="removeAt(i)"><IconTrash :size="16" /></button>
-                            </li>
-                            <li v-if="selected.length === 0" class="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-400">
-                                <IconPlus :size="16" /> {{ $t('test.noQuestions') }}
-                            </li>
-                        </ol>
+                        <OrderableList v-model="selected" :empty-text="$t('test.noQuestions')" class="mt-3">
+                            <template #item="{ item }">
+                                <span class="flex-1 truncate">{{ item.title }}</span>
+                                <span class="shrink-0 text-xs text-gray-400">{{ item.points }}</span>
+                            </template>
+                        </OrderableList>
                     </div>
                 </div>
 
