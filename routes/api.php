@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\QuestionTagController;
 use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\RegistrationController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ResultsController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
@@ -147,4 +148,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('results/overview', [ResultsController::class, 'overview']);
     Route::post('results/publish', [ResultsController::class, 'publish']);
     Route::post('results/attempts/{attempt}/reset', [ResultsController::class, 'reset'])->whereNumber('attempt');
+
+    // Reports (5f, CC-12). Gated by reports.view.
+    Route::get('reports/summary', [ReportController::class, 'summary']);
 });

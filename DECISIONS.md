@@ -435,6 +435,38 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0023 — Osnovni reporting: live-data agregacija, snapshot odložen (CC-12)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 5 Slice 5f. CC-12 traži admin „osnovni pregled" sa filterima
+  (season/geo/koordinator/level/quiz-exam-test/težina) i merama (registered,
+  started, submitted, published, void; avg/min/max/median; prolaznost tek uz prag).
+  „Istorijski snapshot" da kasnija promena master-podataka ne menja stare izveštaje.
+- **Odluka:**
+  - **Live-data reporting** nad tekućim `registrations`/`attempts` (bez novih
+    tabela). **Snapshot je ODLOŽEN** — vezuje se za 3-slojni archive (Layer C
+    `archive_test_results`), Faza 6+ (ADR-0013). **Ranking izostavljen** (nema
+    formule); **prolaznost izostavljena** (nema definisanog praga).
+  - **`GET /api/reports/summary`** (gated **`reports.view`** — NOVA permisija,
+    13, odvojena od `results.manage`) → `totals` + opcioni `group_by`
+    (`country|region|school|level|quiz|exam|test`) daje redove po dimenziji.
+    Logika u `Domain/Competition/Support/ReportSummary`.
+  - **Particija mera** (čist rez attempt redova): `started` = ne-void
+    (in_progress+completed), `submitted` = completed, `published` = completed &
+    `published_at`, `void` = void (5e). `registered` je **registration-level**
+    (season/geo/koordinator/level filteri) → **ignoriše content filtere** i
+    **null je za content group_by** redove (nije po testu). `avg/min/max/median`
+    nad submitted skorovima; **median app-side** (MySQL nema percentil).
+  - **Koordinator filter** = razreši `User::allowedSchoolIds()` → `whereIn`
+    škole (prazan skup → 0 redova). Season default = `SeasonContext::active()`.
+- **Posledica:** samo backend + testovi (admin Reports UI = kasniji slice).
+  ⚠️ nova permisija → `db:seed --class=RolePermissionSeeder --force`. Perf:
+  score-stat čita submitted redove (skalira s brojem submitted) — revidirati sa
+  archive slojem za 10k. Caveat: `group_by=exam` join-uje `exam_test` (test u 2
+  exama → dupli broj; retko). **OD-9** (legacy active→status) i dalje otvoren.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

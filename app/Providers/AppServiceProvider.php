@@ -56,7 +56,10 @@ class AppServiceProvider extends ServiceProvider
         // ability rather than a policy per lookup model.
         Gate::define('content.manage', fn (User $user): bool => $user->hasPermission('content.manage'));
 
-        // Results area: essay grading (5b), publication (5c) and reports.
+        // Results area: essay grading (5b), publication (5c) and attempt reset (5e).
         Gate::define('results.manage', fn (User $user): bool => $user->hasPermission('results.manage'));
+
+        // Competition reports (5f) — a distinct read permission from results.manage.
+        Gate::define('reports.view', fn (User $user): bool => $user->hasPermission('reports.view'));
     }
 }
