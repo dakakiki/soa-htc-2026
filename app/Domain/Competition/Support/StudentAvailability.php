@@ -110,6 +110,7 @@ final class StudentAvailability
     private static function attemptMap(Registration $registration): array
     {
         return $registration->attempts()
+            ->active()
             ->get(['test_id', 'status', 'published_at', 'score', 'max_score'])
             ->keyBy('test_id')
             ->map(fn ($a) => [

@@ -9,10 +9,12 @@ use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Enums\AttemptStatus;
 use App\Domain\Competition\Models\Attempt;
+use App\Domain\Competition\Models\AttemptReset;
 use App\Domain\Competition\Models\PublicationBatch;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Result publication (Faza 5 Slice 5c, CC-10 / ADR-0020). An admin publishes or
@@ -102,5 +104,46 @@ class ResultsController extends Controller
         ]);
 
         return response()->json(['action' => $unpublish ? 'unpublish' : 'publish', 'attempts_count' => $count]);
+    }
+
+    /**
+     * Reset (void) one attempt so the competitor may take the test again (CC-11,
+     * ADR-0022). The reason is mandatory. The attempt is not deleted: its pre-void
+     * state is snapshotted in `attempt_resets`, the row is marked `void` (and
+     * unpublished), and — being excluded from availability and start eligibility —
+     * it frees a fresh attempt the competitor starts themselves. Idempotent: a
+     * second reset of an already-void attempt is rejected.
+     */
+    public function reset(Request $request, Attempt $attempt): JsonResponse
+    {
+        $this->authorize('results.manage');
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:1000'],
+        ]);
+
+        if ($attempt->status === AttemptStatus::Void) {
+            return response()->json(['message' => __('This attempt has already been reset.')], 422);
+        }
+
+        DB::transaction(function () use ($attempt, $validated, $request) {
+            AttemptReset::create([
+                'attempt_id' => $attempt->id,
+                'previous_status' => $attempt->status->value,
+                'previous_score' => $attempt->score,
+                'previous_grading_status' => $attempt->grading_status?->value,
+                'previous_published_at' => $attempt->published_at,
+                'reason' => $validated['reason'],
+                'reset_by' => $request->user()?->id,
+            ]);
+
+            $attempt->update([
+                'status' => AttemptStatus::Void,
+                'published_at' => null,
+                'published_by' => null,
+            ]);
+        });
+
+        return response()->json(['status' => AttemptStatus::Void->value]);
     }
 }

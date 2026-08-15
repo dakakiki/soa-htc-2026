@@ -8,6 +8,7 @@ use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Enums\AttemptStatus;
 use App\Domain\Competition\Enums\GradingStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -51,6 +52,18 @@ class Attempt extends Model
         return now()->getTimestamp() > $this->expires_at->getTimestamp() + self::SUBMIT_GRACE_SECONDS;
     }
 
+    /**
+     * Attempts that still count: everything a competitor has not had reset. Voided
+     * attempts are kept for audit but excluded from availability, grading, start
+     * eligibility and publication (CC-11, ADR-0022).
+     *
+     * @param  Builder<Attempt>  $query
+     */
+    public function scopeActive(Builder $query): void
+    {
+        $query->where('status', '!=', AttemptStatus::Void->value);
+    }
+
     /** @return BelongsTo<Registration, $this> */
     public function registration(): BelongsTo
     {
@@ -73,5 +86,11 @@ class Attempt extends Model
     public function answers(): HasMany
     {
         return $this->hasMany(AttemptAnswer::class);
+    }
+
+    /** @return HasMany<AttemptReset, $this> */
+    public function resets(): HasMany
+    {
+        return $this->hasMany(AttemptReset::class);
     }
 }

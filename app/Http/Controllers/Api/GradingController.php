@@ -29,6 +29,7 @@ class GradingController extends Controller
         $this->authorize('results.manage');
 
         $attempts = Attempt::query()
+            ->active()
             ->where('grading_status', GradingStatus::PendingGrading)
             ->with(['registration:id,competitor_number,name', 'test:id,title'])
             ->orderBy('submitted_at')

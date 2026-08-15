@@ -145,9 +145,14 @@ class AttemptController extends Controller
         return true;
     }
 
+    /**
+     * The competitor's single ACTIVE attempt at a test (a voided one no longer
+     * counts, so a reset frees a fresh start — CC-11, ADR-0022).
+     */
     private function attemptFor(Registration $registration, int $testId): ?Attempt
     {
         return Attempt::query()
+            ->active()
             ->where('registration_id', $registration->id)
             ->where('test_id', $testId)
             ->first();

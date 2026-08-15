@@ -140,10 +140,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // PUT so the SPA can send multipart via POST + _method spoofing (like schools).
     Route::put('settings/theme', [SettingsController::class, 'updateTheme']);
 
-    // Results: essay grading (5b) and publication (5c). Gated by results.manage.
+    // Results: essay grading (5b), publication (5c), attempt reset (5e). Gated by results.manage.
     Route::get('grading/attempts', [GradingController::class, 'index']);
     Route::get('grading/attempts/{attempt}', [GradingController::class, 'show'])->whereNumber('attempt');
     Route::put('grading/attempts/{attempt}/answers/{answer}', [GradingController::class, 'gradeEssay'])->whereNumber(['attempt', 'answer']);
     Route::get('results/overview', [ResultsController::class, 'overview']);
     Route::post('results/publish', [ResultsController::class, 'publish']);
+    Route::post('results/attempts/{attempt}/reset', [ResultsController::class, 'reset'])->whereNumber('attempt');
 });

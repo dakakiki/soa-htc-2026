@@ -402,6 +402,39 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0022 — Reset pokušaja: void in-place + generated-column unique (CC-11)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 5 Slice 5e. CC-11 / PROJECT_CONTEXT §7.2/§7.5: admin odobrava
+  novo polaganje → stari attempt postaje `void` (ne briše se), **razlog obavezan**,
+  akcija autorizovana + auditovana, novi attempt ima svoj trag. Prepreka:
+  `unique(registration_id, test_id)` (ADR-0016) blokira drugi pokušaj ako void red
+  ostane u tabeli.
+- **Odluka:**
+  - **Novi status `AttemptStatus::Void`.** Reset flipuje attempt na `void`, nuluje
+    `published_at/published_by`, i snapshot-uje pre-void stanje (status/score/
+    grading_status/published_at) + `reason` + `reset_by` u **`attempt_resets`**
+    (audit, po uzoru na `grade_revisions` iz 5b).
+  - **Uniqueness = generated-column.** `unique(reg, test_id)` → `unique(reg,
+    active_test_id)`, gde je `active_test_id` **VIRTUAL** generated `case when
+    status='void' then null else test_id end`. Void redovi (NULL) ne kolidiraju;
+    **tačno 1 aktivan pokušaj po (reg,test)** ostaje HARD DB-garancija (ADR-0016
+    očuvan za aktivne). ⚠️ **VIRTUAL, ne STORED** — STORED tera table-copy koji
+    MySQL odbija na tabeli sa FK-ovima (err 1215); VIRTUAL se dodaje in-place i i
+    dalje indeksira. Migracija dodaje novi unique PRE dropa starog (leftmost
+    `registration_id` pokriva FK indeks).
+  - **Reset NE pravi nov attempt** — takmičar ga sam ponovo starta; void (isključen
+    iz availability/start/grading/publish preko `Attempt::scopeActive`) sam vraća
+    test na `next`. `POST /api/results/attempts/{attempt}/reset` `{reason}` (gated
+    `results.manage`, idempotentno: drugi reset void-a → 422).
+- **Posledica:** `active()` scope filtrira void u `StudentAvailability::attemptMap`,
+  `AttemptController::attemptFor`, `GradingController::index` (publish/overview već
+  filtriraju `status=completed`). Backend-only (admin UI za per-takmičar reset =
+  zaseban kasniji slice). Edge: reset ranijeg testa ne dira kasnije `completed`
+  testove (ciljana admin akcija). **OD-9** (legacy active→status) i dalje otvoren.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
