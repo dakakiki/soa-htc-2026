@@ -113,6 +113,13 @@ class StudentIdentifyTest extends TestCase
         $this->withToken($second)->getJson('/api/student/me')->assertOk();
     }
 
+    public function test_countries_are_publicly_listable_for_the_identify_form(): void
+    {
+        $this->getJson('/api/student/countries')
+            ->assertOk()
+            ->assertJsonStructure(['data' => [['id', 'name', 'code']]]);
+    }
+
     public function test_expired_session_is_rejected(): void
     {
         $r = $this->registration();

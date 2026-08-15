@@ -27,6 +27,7 @@ const year = new Date().getFullYear();
 
                 <nav class="hidden items-center gap-4 text-sm sm:flex">
                     <RouterLink :to="{ name: 'home' }" class="text-gray-600 hover:text-gray-900">{{ $t('public.nav.home') }}</RouterLink>
+                    <RouterLink :to="{ name: 'student.access' }" class="text-gray-600 hover:text-gray-900">{{ $t('student.nav.access') }}</RouterLink>
                 </nav>
 
                 <div class="ml-auto flex items-center gap-3 text-sm">

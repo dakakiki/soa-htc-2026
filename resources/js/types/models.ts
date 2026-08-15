@@ -18,6 +18,48 @@ export interface Country {
     schools_count?: number;
 }
 
+/** The student-safe view of a registration returned after web identification. */
+export interface StudentRegistrationSummary {
+    competitor_number: string;
+    name: string;
+    grade: number | null;
+    level: string | null;
+    venue: string | null;
+    country: string | null;
+}
+
+export interface StudentIdentifyResult {
+    token: string;
+    expires_at: string;
+    registration: StudentRegistrationSummary;
+}
+
+export type TestStatus = 'available' | 'locked';
+
+export interface AvailabilityTest {
+    id: number;
+    title: string;
+    type: string | null;
+    duration: number | null;
+    status: TestStatus;
+}
+
+export interface AvailabilityExam {
+    id: number;
+    title: string;
+    round: string | null;
+    tests: AvailabilityTest[];
+}
+
+export interface AvailabilityQuiz {
+    id: number;
+    title: string;
+    mode: 'sample' | 'competition';
+    requires_password: boolean;
+    unlocked: boolean;
+    exams: AvailabilityExam[];
+}
+
 export type ThemeColorKey =
     | 'primary'
     | 'primary_hover'

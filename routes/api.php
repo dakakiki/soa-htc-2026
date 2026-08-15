@@ -62,6 +62,7 @@ Route::prefix('auth')->group(function () {
  */
 Route::prefix('student')->group(function () {
     Route::post('identify', [StudentAuthController::class, 'identify'])->middleware('throttle:8,1');
+    Route::get('countries', [StudentAuthController::class, 'countries']);
     Route::middleware('student.session')->group(function () {
         Route::get('me', [StudentAuthController::class, 'me']);
         Route::post('logout', [StudentAuthController::class, 'logout']);

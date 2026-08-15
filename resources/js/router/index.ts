@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useSessionStore } from '@/stores/session';
+import { useStudentSessionStore } from '@/stores/studentSession';
 
 /**
  * Which application shell a route renders in (ADR-0014). `App.vue` maps this to
@@ -13,6 +14,8 @@ declare module 'vue-router' {
         guestOnly?: boolean;
         permission?: string;
         zone?: Zone;
+        /** Redirect an already-identified competitor away (e.g. the access form). */
+        studentGuestOnly?: boolean;
     }
 }
 
@@ -28,6 +31,18 @@ const routes: RouteRecordRaw[] = [
         name: 'login',
         component: () => import('@/pages/LoginPage.vue'),
         meta: { guestOnly: true, zone: 'public' },
+    },
+    {
+        path: '/student/access',
+        name: 'student.access',
+        component: () => import('@/pages/student/StudentAccessPage.vue'),
+        meta: { zone: 'public', studentGuestOnly: true },
+    },
+    {
+        path: '/student',
+        name: 'student.dashboard',
+        component: () => import('@/pages/student/StudentDashboardPage.vue'),
+        meta: { zone: 'student' },
     },
     {
         path: '/dashboard',
@@ -275,6 +290,20 @@ router.beforeEach(async (to) => {
 
     if (to.meta.permission && !session.can(to.meta.permission)) {
         return { name: 'home' };
+    }
+
+    // Competitor (student) session — separate from the admin session above.
+    if (to.meta.zone === 'student' || to.meta.studentGuestOnly) {
+        const student = useStudentSessionStore();
+        await student.ensureLoaded();
+
+        if (to.meta.studentGuestOnly && student.isIdentified) {
+            return { name: 'student.dashboard' };
+        }
+
+        if (to.meta.zone === 'student' && !student.isIdentified) {
+            return { name: 'student.access' };
+        }
     }
 
     return true;

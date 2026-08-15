@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Models\StudentSession;
+use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\IdentifyStudentRequest;
@@ -55,6 +56,17 @@ class StudentAuthController extends Controller
             'token' => $plain,
             'expires_at' => $session->expires_at->toIso8601String(),
             'registration' => $this->summary($registration),
+        ]);
+    }
+
+    /**
+     * Public country list for the identification form's dropdown. Country names
+     * are not sensitive; the three-factor match still happens in identify().
+     */
+    public function countries(): JsonResponse
+    {
+        return response()->json([
+            'data' => Country::query()->orderBy('name')->get(['id', 'name', 'code']),
         ]);
     }
 
