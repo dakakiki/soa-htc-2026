@@ -1,5 +1,13 @@
 import { http } from '@/api/http';
-import type { AvailabilityQuiz, Country, StudentIdentifyResult, StudentRegistrationSummary } from '@/types/models';
+import type {
+    AttemptSession,
+    AttemptSummary,
+    AvailabilityQuiz,
+    Country,
+    StudentIdentifyResult,
+    StudentRegistrationSummary,
+    SubmitAnswer,
+} from '@/types/models';
 
 /**
  * Student endpoints authenticate with the bearer token issued at identification
@@ -36,4 +44,17 @@ export function availability(token: string) {
 
 export function unlockQuiz(token: string, quizId: number, password: string) {
     return http.post<{ unlocked: boolean }>(`/api/student/quizzes/${quizId}/unlock`, { password }, auth(token));
+}
+
+/** Start (or resume) the single attempt at a test. */
+export function startTest(token: string, testId: number) {
+    return http.post<AttemptSession>(`/api/student/tests/${testId}/start`, {}, auth(token));
+}
+
+export function getAttempt(token: string, attemptId: number) {
+    return http.get<AttemptSession>(`/api/student/attempts/${attemptId}`, auth(token));
+}
+
+export function submitAttempt(token: string, attemptId: number, answers: SubmitAnswer[]) {
+    return http.post<{ attempt: AttemptSummary }>(`/api/student/attempts/${attemptId}/submit`, { answers }, auth(token));
 }

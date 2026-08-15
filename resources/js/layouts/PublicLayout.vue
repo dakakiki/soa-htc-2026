@@ -19,15 +19,16 @@ const year = new Date().getFullYear();
 <template>
     <div class="flex min-h-screen flex-col bg-white text-gray-900">
         <header class="border-b border-gray-200">
-            <div class="mx-auto flex w-full max-w-6xl items-center gap-6 px-6 py-4">
+            <div class="mx-auto flex w-full max-w-[1200px] items-center gap-6 px-6 py-4">
                 <RouterLink :to="{ name: 'home' }" class="flex items-center gap-2 text-lg font-semibold tracking-tight">
                     <img v-if="themeStore.theme?.logo_url" :src="themeStore.theme.logo_url" :alt="$t('app.name')" class="h-8 max-w-[12rem] object-contain" />
                     <span v-else>{{ $t('app.name') }}</span>
                 </RouterLink>
 
-                <nav class="hidden items-center gap-4 text-sm sm:flex">
+                <nav class="hidden items-center gap-5 text-sm sm:flex">
                     <RouterLink :to="{ name: 'home' }" class="text-gray-600 hover:text-gray-900">{{ $t('public.nav.home') }}</RouterLink>
-                    <RouterLink :to="{ name: 'student.access' }" class="text-gray-600 hover:text-gray-900">{{ $t('student.nav.access') }}</RouterLink>
+                    <RouterLink :to="{ name: 'student.access.form', params: { mode: 'competition' } }" class="text-gray-600 hover:text-gray-900">{{ $t('student.nav.startQuiz') }}</RouterLink>
+                    <RouterLink :to="{ name: 'student.access.form', params: { mode: 'sample' } }" class="text-gray-600 hover:text-gray-900">{{ $t('student.nav.sampleExam') }}</RouterLink>
                 </nav>
 
                 <div class="ml-auto flex items-center gap-3 text-sm">
@@ -50,12 +51,12 @@ const year = new Date().getFullYear();
             </div>
         </header>
 
-        <main class="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+        <main class="mx-auto w-full max-w-[1200px] flex-1 px-6 py-10">
             <slot />
         </main>
 
         <footer class="border-t border-gray-200">
-            <div class="mx-auto w-full max-w-6xl px-6 py-6 text-sm text-gray-500">
+            <div class="mx-auto w-full max-w-[1200px] px-6 py-6 text-sm text-gray-500">
                 {{ $t('public.footer.copyright', { year, name: $t('app.name') }) }}
             </div>
         </footer>

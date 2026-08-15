@@ -18,12 +18,14 @@ const props = withDefaults(
         clearable?: boolean;
         /** Compact control (filter rows) instead of the taller form control. */
         dense?: boolean;
+        /** Oversized control to match large form inputs (student access form). */
+        large?: boolean;
         /** Shows a spinner and blocks interaction while options load (cascade). */
         loading?: boolean;
         /** Maximum matches rendered at once; the rest require refining search. */
         limit?: number;
     }>(),
-    { placeholder: '', searchPlaceholder: '', disabled: false, clearable: true, dense: false, loading: false, limit: 200 },
+    { placeholder: '', searchPlaceholder: '', disabled: false, clearable: true, dense: false, large: false, loading: false, limit: 200 },
 );
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: number | null): void }>();
@@ -78,8 +80,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
         <button
             type="button"
             :disabled="disabled || loading"
-            class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 text-left text-sm disabled:bg-gray-50"
-            :class="[dense ? 'py-1.5' : 'mt-1 py-2', open ? 'border-blue-400 ring-1 ring-blue-200' : '']"
+            class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white text-left disabled:bg-gray-50"
+            :class="[large ? 'px-4 py-4 text-lg' : dense ? 'px-3 py-1.5 text-sm' : 'mt-1 px-3 py-2 text-sm', open ? 'border-blue-400 ring-1 ring-blue-200' : '']"
             @click="toggleOpen"
         >
             <span v-if="selected" class="truncate" :class="disabled ? 'text-gray-400' : 'text-gray-900'">{{ selected.label }}</span>

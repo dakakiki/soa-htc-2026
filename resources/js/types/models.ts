@@ -60,6 +60,50 @@ export interface AvailabilityQuiz {
     exams: AvailabilityExam[];
 }
 
+export type QuestionType = 'multiple_choice' | 'gap_filling' | 'essay';
+
+export interface AttemptQuestionOption {
+    id: number;
+    text: string;
+}
+
+export interface AttemptQuestion {
+    id: number;
+    title: string;
+    description: string | null;
+    question_type: QuestionType;
+    points: number;
+    position: number;
+    image_url: string | null;
+    audio_url: string | null;
+    options: AttemptQuestionOption[];
+}
+
+export interface AttemptSummary {
+    id: number;
+    status: 'in_progress' | 'completed';
+    expires_at?: string;
+    remaining_seconds?: number;
+    submitted_at?: string | null;
+}
+
+export interface AttemptSession {
+    attempt: AttemptSummary;
+    test: { id: number; title: string; description: string | null; duration: number | null };
+    questions: AttemptQuestion[];
+}
+
+/** A submitted answer's response payload, shaped by the question type. */
+export type AnswerResponse =
+    | { selected: number[] }
+    | { gaps: string[] }
+    | { text: string };
+
+export interface SubmitAnswer {
+    question_id: number;
+    response: AnswerResponse;
+}
+
 export type ThemeColorKey =
     | 'primary'
     | 'primary_hover'

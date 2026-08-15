@@ -1,10 +1,33 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, type Component } from 'vue';
+import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IconLock, IconLockOpen, IconClock } from '@tabler/icons-vue';
+import {
+    IconLock,
+    IconClock,
+    IconCircleCheck,
+    IconPlayerPlay,
+    IconBook,
+    IconPencil,
+    IconAbc,
+    IconMicrophone,
+    IconHeadphones,
+    IconFileText,
+} from '@tabler/icons-vue';
 import { availability, unlockQuiz } from '@/api/student';
 import { useStudentSessionStore } from '@/stores/studentSession';
-import type { AvailabilityQuiz } from '@/types/models';
+import type { AvailabilityExam, AvailabilityQuiz } from '@/types/models';
+
+/** A playful icon per skill so the cards read at a glance for young competitors. */
+function typeIcon(type: string | null): Component {
+    const t = (type ?? '').toLowerCase();
+    if (t.includes('read')) return IconBook;
+    if (t.includes('writ')) return IconPencil;
+    if (t.includes('speak')) return IconMicrophone;
+    if (t.includes('listen')) return IconHeadphones;
+    if (t.includes('english')) return IconAbc;
+    return IconFileText;
+}
 
 const { t } = useI18n();
 const student = useStudentSessionStore();
@@ -13,9 +36,44 @@ const quizzes = ref<AvailabilityQuiz[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
+// Show only the stream the competitor entered through (sample vs competition).
+const visibleQuizzes = computed(() => (student.mode ? quizzes.value.filter((q) => q.mode === student.mode) : quizzes.value));
+
 const passwords = reactive<Record<number, string>>({});
 const unlocking = reactive<Record<number, boolean>>({});
 const unlockError = reactive<Record<number, string | null>>({});
+
+type ExamState = 'active' | 'completed' | 'locked';
+
+function examState(exam: AvailabilityExam): ExamState {
+    if (exam.tests.length === 0) {
+        return 'locked';
+    }
+    if (exam.tests.some((test) => test.status === 'next' || test.status === 'in_progress')) {
+        return 'active';
+    }
+    if (exam.tests.every((test) => test.status === 'completed')) {
+        return 'completed';
+    }
+    return 'locked';
+}
+
+/**
+ * Only the round the competitor is currently working on (active) and rounds they
+ * have already finished are shown; a not-yet-reached round stays hidden until the
+ * previous round is finished (and, in Faza 5, admin-approved). The active round
+ * sits on top, with completed rounds beneath it (most recent first).
+ */
+function visibleExams(quiz: AvailabilityQuiz): AvailabilityExam[] {
+    const withIndex = quiz.exams.map((exam, index) => ({ exam, index, state: examState(exam) }));
+    const active = withIndex.filter((x) => x.state === 'active').map((x) => x.exam);
+    const completed = withIndex
+        .filter((x) => x.state === 'completed')
+        .sort((a, b) => b.index - a.index)
+        .map((x) => x.exam);
+
+    return [...active, ...completed];
+}
 
 async function load(): Promise<void> {
     loading.value = true;
@@ -48,48 +106,32 @@ onMounted(load);
 </script>
 
 <template>
-    <section class="space-y-6">
-        <h1 class="text-2xl font-semibold tracking-tight">{{ $t('student.dashboard.title') }}</h1>
+    <section class="space-y-8">
+        <p v-if="loading" class="text-center text-sm text-gray-400">{{ $t('common.loading') }}</p>
+        <p v-else-if="error" class="text-center text-sm text-red-600">{{ error }}</p>
+        <p v-else-if="visibleQuizzes.length === 0" class="text-center text-sm text-gray-500">{{ $t('student.dashboard.empty') }}</p>
 
-        <p v-if="loading" class="text-sm text-gray-400">{{ $t('common.loading') }}</p>
-        <p v-else-if="error" class="text-sm text-red-600">{{ error }}</p>
-        <p v-else-if="quizzes.length === 0" class="text-sm text-gray-500">{{ $t('student.dashboard.empty') }}</p>
-
-        <div v-else class="space-y-5">
-            <article v-for="quiz in quizzes" :key="quiz.id" class="rounded-lg border border-gray-200 bg-white">
-                <header class="flex items-center gap-3 border-b border-gray-100 px-5 py-3">
-                    <h2 class="font-semibold">{{ quiz.title }}</h2>
-                    <span
-                        class="rounded-full px-2 py-0.5 text-xs font-medium"
-                        :class="quiz.mode === 'competition' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'"
-                    >
-                        {{ quiz.mode === 'competition' ? $t('student.dashboard.competition') : $t('student.dashboard.sample') }}
-                    </span>
-                    <span
-                        v-if="quiz.requires_password"
-                        class="ml-auto inline-flex items-center gap-1 text-xs font-medium"
-                        :class="quiz.unlocked ? 'text-green-600' : 'text-gray-500'"
-                    >
-                        <component :is="quiz.unlocked ? IconLockOpen : IconLock" :size="14" />
-                        {{ quiz.unlocked ? $t('student.dashboard.available') : $t('student.dashboard.locked') }}
-                    </span>
+        <div v-else class="space-y-10">
+            <article v-for="quiz in visibleQuizzes" :key="quiz.id" class="overflow-hidden rounded-xl border border-brand-border bg-white shadow-sm">
+                <header class="bg-brand-primary px-6 py-6">
+                    <h2 class="text-center text-3xl font-bold tracking-tight text-brand-on-primary">{{ quiz.title }}</h2>
                 </header>
 
-                <div class="px-5 py-4">
+                <div class="px-6 py-8">
                     <form
                         v-if="quiz.requires_password && !quiz.unlocked"
-                        class="mb-4 space-y-2"
+                        class="mb-8 space-y-2"
                         @submit.prevent="unlock(quiz.id)"
                     >
-                        <p class="text-sm text-gray-500">{{ $t('student.dashboard.lockedHint') }}</p>
-                        <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-center text-sm text-gray-500">{{ $t('student.dashboard.lockedHint') }}</p>
+                        <div class="mx-auto flex max-w-md flex-wrap items-center gap-2">
                             <input
                                 v-model="passwords[quiz.id]"
                                 type="password"
                                 :aria-label="t('student.dashboard.passwordLabel')"
                                 :placeholder="t('student.dashboard.passwordPlaceholder')"
                                 autocomplete="off"
-                                class="min-w-[16rem] flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                class="min-w-[12rem] flex-1 rounded-md border border-brand-border px-3 py-2 text-center text-sm focus:border-brand-primary focus:outline-none"
                             />
                             <button
                                 type="submit"
@@ -99,32 +141,66 @@ onMounted(load);
                                 {{ unlocking[quiz.id] ? $t('student.dashboard.unlocking') : $t('student.dashboard.unlock') }}
                             </button>
                         </div>
-                        <p v-if="unlockError[quiz.id]" class="text-sm text-red-600">{{ unlockError[quiz.id] }}</p>
+                        <p v-if="unlockError[quiz.id]" class="text-center text-sm text-red-600">{{ unlockError[quiz.id] }}</p>
                     </form>
 
-                    <div class="space-y-4">
-                        <div v-for="exam in quiz.exams" :key="exam.id">
-                            <div class="flex items-baseline gap-2">
-                                <h3 class="text-sm font-medium text-gray-800">{{ exam.title }}</h3>
-                                <span v-if="exam.round" class="text-xs text-gray-400">{{ exam.round }}</span>
+                    <div class="space-y-10">
+                        <section v-for="exam in visibleExams(quiz)" :key="exam.id">
+                            <div class="mb-6 text-center">
+                                <h3 class="text-2xl font-extrabold text-gray-900">{{ exam.title }}</h3>
+                                <span
+                                    v-if="exam.round"
+                                    class="mt-2 inline-block rounded-full bg-brand-primary-soft px-4 py-1 text-xs font-bold uppercase tracking-widest text-brand-primary"
+                                >{{ exam.round }}</span>
                             </div>
-                            <ul class="mt-2 space-y-1">
-                                <li v-if="exam.tests.length === 0" class="text-xs text-gray-400">{{ $t('student.dashboard.noTests') }}</li>
-                                <li
+
+                            <p v-if="exam.tests.length === 0" class="text-center text-xs text-gray-400">{{ $t('student.dashboard.noTests') }}</p>
+
+                            <div v-else class="flex flex-wrap justify-center gap-6">
+                                <div
                                     v-for="test in exam.tests"
                                     :key="test.id"
-                                    class="flex items-center gap-3 rounded-md border border-gray-100 px-3 py-2 text-sm"
-                                    :class="test.status === 'locked' ? 'text-gray-400' : 'text-gray-800'"
+                                    class="group flex w-full max-w-[290px] flex-col overflow-hidden rounded-3xl border-2 shadow-sm transition duration-200"
+                                    :class="test.status === 'locked' ? 'border-gray-100 bg-gray-50' : 'border-brand-primary-soft bg-white hover:-translate-y-1 hover:shadow-xl'"
                                 >
-                                    <component :is="test.status === 'locked' ? IconLock : IconLockOpen" :size="16" class="shrink-0" />
-                                    <span class="min-w-0 flex-1 truncate">{{ test.title }}</span>
-                                    <span v-if="test.type" class="text-xs text-gray-400">{{ test.type }}</span>
-                                    <span v-if="test.duration" class="inline-flex items-center gap-1 text-xs text-gray-400">
-                                        <IconClock :size="14" />{{ $t('student.dashboard.durationMin', { n: test.duration }) }}
-                                    </span>
-                                </li>
-                            </ul>
-                        </div>
+                                    <div class="flex flex-1 flex-col items-center px-6 pb-6 pt-8 text-center">
+                                        <div
+                                            class="mb-4 flex h-20 w-20 items-center justify-center rounded-full ring-4 transition"
+                                            :class="test.status === 'locked'
+                                                ? 'bg-gray-100 text-gray-300 ring-gray-50'
+                                                : test.status === 'completed'
+                                                    ? 'bg-brand-accent text-white ring-brand-accent/20'
+                                                    : 'bg-brand-primary text-brand-on-primary ring-brand-primary-soft group-hover:scale-110'"
+                                        >
+                                            <component :is="typeIcon(test.type)" :size="40" :stroke-width="1.6" />
+                                        </div>
+                                        <p v-if="test.type" class="text-xs font-bold uppercase tracking-widest" :class="test.status === 'locked' ? 'text-gray-400' : 'text-brand-primary'">{{ test.type }}</p>
+                                        <h4 class="mt-1 text-xl font-extrabold leading-snug" :class="test.status === 'locked' ? 'text-gray-400' : 'text-gray-900'">{{ test.title }}</h4>
+                                        <span
+                                            v-if="test.duration"
+                                            class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-4 py-1.5 text-sm font-bold"
+                                            :class="test.status === 'locked' ? 'text-gray-400' : 'text-gray-600'"
+                                        >
+                                            <IconClock :size="16" />{{ $t('student.dashboard.durationMin', { n: test.duration }) }}
+                                        </span>
+                                    </div>
+
+                                    <RouterLink
+                                        v-if="test.status === 'next' || test.status === 'in_progress'"
+                                        :to="{ name: 'student.test', params: { testId: test.id } }"
+                                        class="flex items-center justify-center gap-2 bg-brand-primary py-4 text-base font-extrabold uppercase tracking-wide text-brand-on-primary transition hover:bg-brand-primary-hover"
+                                    >
+                                        <IconPlayerPlay :size="20" />{{ test.status === 'in_progress' ? $t('student.dashboard.resume') : $t('student.dashboard.start') }}
+                                    </RouterLink>
+                                    <div v-else-if="test.status === 'completed'" class="flex items-center justify-center gap-2 bg-brand-accent py-4 text-base font-bold text-white">
+                                        <IconCircleCheck :size="20" />{{ $t('student.dashboard.completedLabel') }}
+                                    </div>
+                                    <div v-else class="flex items-center justify-center gap-2 bg-gray-100 py-4 text-sm font-semibold text-gray-400">
+                                        <IconLock :size="18" />{{ $t('student.dashboard.locked') }}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </article>

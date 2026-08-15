@@ -33,15 +33,21 @@ const routes: RouteRecordRaw[] = [
         meta: { guestOnly: true, zone: 'public' },
     },
     {
-        path: '/student/access',
-        name: 'student.access',
-        component: () => import('@/pages/student/StudentAccessPage.vue'),
+        path: '/student/access/:mode(sample|competition)',
+        name: 'student.access.form',
+        component: () => import('@/pages/student/StudentAccessFormPage.vue'),
         meta: { zone: 'public', studentGuestOnly: true },
     },
     {
         path: '/student',
         name: 'student.dashboard',
         component: () => import('@/pages/student/StudentDashboardPage.vue'),
+        meta: { zone: 'student' },
+    },
+    {
+        path: '/student/tests/:testId',
+        name: 'student.test',
+        component: () => import('@/pages/student/StudentTestPage.vue'),
         meta: { zone: 'student' },
     },
     {
@@ -302,7 +308,7 @@ router.beforeEach(async (to) => {
         }
 
         if (to.meta.zone === 'student' && !student.isIdentified) {
-            return { name: 'student.access' };
+            return { name: 'home' };
         }
     }
 
