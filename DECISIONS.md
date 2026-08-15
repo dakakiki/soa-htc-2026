@@ -279,6 +279,38 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0016 — Attempt: jedan pokušaj po (registraciji, testu) (OD-1 razrešeno)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 4 Slice 4a. Legacy je dozvoljavao neograničeno ponavljanje
+  (naročito na rezultatu 0, uz brisanje prethodnog). OD-1 je bio otvoren.
+- **Odluka:** Attempt pripada **REGISTRACIJI** (ne 180min student sesiji — attempt
+  je nadživljava), unique **`(registration_id, test_id)`**. Po `completed`/isteku
+  attempt je terminalno zaključan — **bez retake-a**. Start je **idempotentan**:
+  ponovljeni start vraća otvoreni attempt; završeni → 409. Eventualni budući
+  retake ide kroz zaseban auditovan tok, ne menja ovo.
+- **Posledica:** legacy „retake na rezultatu 0" se **ukida**. `attempts` +
+  `attempt_answers` (JSON `response`, upis samo pri submit-u, negrejdovan — grading
+  je Faza 5 / ADR-0013).
+
+---
+
+## ADR-0017 — Redosled testova: strogo sekvencijalno (OD-4 razrešeno)
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Faza 4 Slice 4a. OD-4 (moraju li testovi strogo redom) bio otvoren.
+- **Odluka:** Unutar **otključanog** quiz-a, testovi se rade po **spljoštenoj
+  sekvenci** `exam_quiz.position` → `exam_test.position`. Sledeći test je `next`
+  (jedini startabilan) tek kad je prethodni `completed`. **Bez min-praga** —
+  samo završetak otključava sledeći. Start (CC-07) ponovo proverava eligibilnost
+  server-side (`StudentAvailability::startableQuizId`); forge zahtev za zaključan/
+  van-reda test → 403.
+- **Posledica:** `StudentAvailability` statusi testa = **`locked`/`next`/
+  `in_progress`/`completed`** (raniji `available` iz 3c-1 zamenjen sa `next`).
+  Grading/publish statusi (`published`) ostaju results sloj (Faza 5).
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
@@ -286,10 +318,10 @@ Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
 
 | # | Pitanje | Blokira | Status |
 | --- | --- | --- | --- |
-| OD-1 | Retake na rezultatu 0 — zadržati legacy ponašanje (neograničeno ponavljanje uz brisanje) ili ukinuti? | Faza 4 | Otvoreno |
+| OD-1 | Retake na rezultatu 0 — zadržati legacy ponašanje (neograničeno ponavljanje uz brisanje) ili ukinuti? | Faza 4 | **Razrešeno → ADR-0016 (jedan pokušaj)** |
 | OD-2 | Na šta se odnosi broj „10.000" (prijave / druga sezona / očekivani rast)? | Faza 6 / `05` | Otvoreno |
 | OD-3 | Zadržati mapiranje nivoa na quiz i pojedinačno pitanje, ili svesti na exam/test? | Faza 2/4 | Otvoreno |
-| OD-4 | Redosled testova i uslov otključavanja sledećeg. | Faza 4 | Otvoreno |
+| OD-4 | Redosled testova i uslov otključavanja sledećeg. | Faza 4 | **Razrešeno → ADR-0017 (strogo redom)** |
 | OD-5 | Ponašanje pri gubitku browsera/mreže bez autosave-a. | Faza 4 | Otvoreno |
 | OD-6 | Nivo objave rezultata (ceo exam/quiz vs. pojedinačni test). | Faza 5 | Otvoreno |
 | OD-7 | Fill-the-gap normalizacija (case, razmaci, interpunkcija, dijakritici, varijante) i parcijalni bodovi. | Faza 4/5 | Otvoreno |

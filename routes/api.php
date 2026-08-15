@@ -2,6 +2,7 @@
 
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Http\Controllers\Api\AssignmentController;
+use App\Http\Controllers\Api\AttemptController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CoordinatorController;
 use App\Http\Controllers\Api\CountryController;
@@ -72,6 +73,11 @@ Route::prefix('student')->group(function () {
         Route::post('quizzes/{quiz}/unlock', [StudentAvailabilityController::class, 'unlock'])
             ->whereNumber('quiz')
             ->middleware('throttle:8,1');
+
+        // Attempt engine (Faza 4): start / resume / submit a test.
+        Route::post('tests/{test}/start', [AttemptController::class, 'start'])->whereNumber('test');
+        Route::get('attempts/{attempt}', [AttemptController::class, 'show'])->whereNumber('attempt');
+        Route::post('attempts/{attempt}/submit', [AttemptController::class, 'submit'])->whereNumber('attempt');
     });
 });
 

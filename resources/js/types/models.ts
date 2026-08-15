@@ -34,7 +34,7 @@ export interface StudentIdentifyResult {
     registration: StudentRegistrationSummary;
 }
 
-export type TestStatus = 'available' | 'locked';
+export type TestStatus = 'locked' | 'next' | 'in_progress' | 'completed';
 
 export interface AvailabilityTest {
     id: number;

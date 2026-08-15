@@ -97,7 +97,7 @@ class StudentAvailabilityTest extends TestCase
             ->assertJsonPath('quizzes.0.mode', 'sample')
             ->assertJsonPath('quizzes.0.requires_password', false)
             ->assertJsonPath('quizzes.0.unlocked', true)
-            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'available');
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'next');
     }
 
     public function test_competition_quiz_tests_are_locked_until_unlocked(): void
@@ -123,7 +123,7 @@ class StudentAvailabilityTest extends TestCase
 
         $this->withToken($token)->getJson('/api/student/availability')
             ->assertJsonPath('quizzes.0.unlocked', true)
-            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'available');
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'next');
     }
 
     public function test_unlock_with_wrong_password_fails_uniformly_and_stays_locked(): void

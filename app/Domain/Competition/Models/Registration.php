@@ -10,6 +10,7 @@ use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Registration extends Model
 {
@@ -54,5 +55,11 @@ class Registration extends Model
     public function level(): BelongsTo
     {
         return $this->belongsTo(DifficultyLevel::class, 'difficulty_level_id');
+    }
+
+    /** @return HasMany<Attempt, $this> */
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(Attempt::class);
     }
 }
