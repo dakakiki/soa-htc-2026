@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DifficultyCategoryController;
 use App\Http\Controllers\Api\DifficultyLevelController;
+use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ExamRoundController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\QuestionController;
@@ -82,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('questions', QuestionController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::get('tests/{test}/preview', [TestController::class, 'preview']);
     Route::apiResource('tests', TestController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    Route::apiResource('exams', ExamController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
 
     // Difficulty levels as pickable options for content forms (id + short + category).
     Route::get('difficulty-level-options', fn () => ['data' => DifficultyLevel::query()

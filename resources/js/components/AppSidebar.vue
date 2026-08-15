@@ -15,6 +15,7 @@ import {
     IconPalette,
     IconStairs,
     IconListCheck,
+    IconClipboardList,
     IconHelpCircle,
     IconFileText,
     IconTag,
@@ -64,6 +65,7 @@ const groups: NavGroup[] = [
         label: t('nav.quizzes'),
         icon: IconListCheck,
         children: [
+            { label: t('nav.exams'), icon: IconClipboardList, to: 'exams', prefix: 'exams', perm: 'content.manage' },
             { label: t('nav.tests'), icon: IconFileText, to: 'tests', prefix: 'tests', perm: 'content.manage' },
             { label: t('nav.questions'), icon: IconHelpCircle, to: 'questions', prefix: 'questions', perm: 'content.manage' },
             { label: t('nav.tags'), icon: IconTag, to: 'content.tags', prefix: 'content.tags', perm: 'content.manage' },

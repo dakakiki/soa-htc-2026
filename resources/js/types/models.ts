@@ -161,6 +161,23 @@ export interface TestPreview {
     questions: TestPreviewQuestion[];
 }
 
+export interface ExamTestRef {
+    id: number;
+    title: string;
+    position: number;
+}
+
+export interface Exam {
+    id: number;
+    title: string;
+    description: string | null;
+    status: string;
+    round?: { id: number; name?: string };
+    levels?: { id: number; level_short: string }[];
+    tests?: ExamTestRef[];
+    tests_count?: number;
+}
+
 export interface Permission {
     key: string;
     description: string | null;
