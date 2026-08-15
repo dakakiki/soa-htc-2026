@@ -1,11 +1,18 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useSessionStore } from '@/stores/session';
 
+/**
+ * Which application shell a route renders in (ADR-0014). `App.vue` maps this to
+ * a layout component. Routes without a zone default to `admin` (fail-safe).
+ */
+export type Zone = 'public' | 'admin' | 'student';
+
 declare module 'vue-router' {
     interface RouteMeta {
         requiresAuth?: boolean;
         guestOnly?: boolean;
         permission?: string;
+        zone?: Zone;
     }
 }
 
@@ -14,12 +21,13 @@ const routes: RouteRecordRaw[] = [
         path: '/',
         name: 'home',
         component: () => import('@/pages/HomePage.vue'),
+        meta: { zone: 'public' },
     },
     {
         path: '/login',
         name: 'login',
         component: () => import('@/pages/LoginPage.vue'),
-        meta: { guestOnly: true },
+        meta: { guestOnly: true, zone: 'public' },
     },
     {
         path: '/dashboard',
@@ -244,6 +252,7 @@ const routes: RouteRecordRaw[] = [
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),
+        meta: { zone: 'public' },
     },
 ];
 

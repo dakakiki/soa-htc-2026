@@ -78,6 +78,16 @@ export default {
         submitting: 'Signing in…',
         failed: 'Sign in failed.',
     },
+    public: {
+        nav: {
+            home: 'Home',
+            login: 'Login',
+        },
+        backToDashboard: 'Back to dashboard',
+        footer: {
+            copyright: '© {year} {name}',
+        },
+    },
     home: {
         title: 'SOA HTC — Competition Core',
         subtitle: 'Vue 3 + TypeScript SPA · Laravel API · MySQL / InnoDB',

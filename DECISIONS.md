@@ -214,6 +214,40 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0014 — Zone-based layout: public/admin/student shell odvojen od auth stanja
+
+- **Status:** Prihvaćeno (2026-08-15); vlasnik proizvoda
+- **Kontekst:** Dotadašnji `App.vue` je birao chrome po `session.isAuthenticated`:
+  ulogovan → admin header + `AppSidebar` obavija SVE rute, uključujući `/`. Zbog
+  toga admin na javnoj stranici vidi admin navigaciju. `PROJECT_CONTEXT.md` §8.6
+  i prijemni zahtevi (:584–585) traže DVA odvojena aplikaciona shell-a (public:
+  header→content→footer; admin: top+content+right sidebar), a §8 (:319, :333)
+  tretira javni sajt, studentski interfejs i admin panel kao tri odvojena
+  interfejsa koja dele samo temu. Faza 3 Slice 3c uvodi prvu public/student oblast.
+- **Odluka:** Layout se bira po `route.meta.zone ∈ {public, admin, student}`,
+  NE po auth stanju. `App.vue` je tanak switch nad tri layout komponente
+  (`resources/js/layouts/`):
+  - `PublicLayout` — header (logo + public nav + Login + uslovni „Back to
+    dashboard" za ulogovanog admina) → content → footer;
+  - `AdminLayout` — postojeći tanak top bar + left `AppSidebar` (ADR-0010,
+    nepromenjen);
+  - `StudentLayout` — minimalni shell za takmičarsku sesiju.
+  **Default zona je `admin`** (fail-safe: ruta bez `meta.zone` ide u zaštićeni
+  shell; eksplicitno se taguju samo `public`/`student` rute). Ulogovan admin na
+  `public` ruti dobija čist public shell + samo „Back to dashboard" link; nijedan
+  admin element se ne renderuje van `admin` zone.
+- **Odnos prema ADR-0010:** ADR-0010 (admin shell) ostaje na snazi; ovaj ADR ga
+  ne menja, samo ograničava njegov doseg na `zone: admin`.
+- **Obim sada vs. Faza 8:** Uvodi se shell SKELET i zone-routing sada. Public nav
+  je privremeno hardkodovan; CMS-driven navigacije (`public.header`,
+  `public.footer`) i upravljanje sadržajem ostaju Faza 8. `StudentLayout` dobija
+  sadržaj i student-session guard u Slice 3c-2.
+- **Posledica:** Vidljivost shell-a NIJE bezbednosna granica — svaka zaštićena
+  ruta i dalje nosi `requiresAuth`/`permission` (admin), odn. student-session
+  guard (3c-2); backend policy/autorizacija ostaje jedini merodavni sloj.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
