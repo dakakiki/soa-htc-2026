@@ -61,7 +61,7 @@ const testOptions = computed(() => titled(opts.value.tests));
 async function loadOptions(): Promise<void> {
     optionsLoading.value = true;
     try {
-        const { data } = await reportFilters({ country_id: q.country_id, quiz_id: q.quiz_id });
+        const { data } = await reportFilters({ country_id: q.country_id, quiz_id: q.quiz_id, exam_id: q.exam_id });
         opts.value = data;
     } finally {
         optionsLoading.value = false;
@@ -107,6 +107,14 @@ async function onCountryChange(id: number | null): Promise<void> {
 async function onQuizChange(id: number | null): Promise<void> {
     q.quiz_id = id;
     q.exam_id = null;
+    q.test_id = null;
+    await loadOptions();
+    await loadCandidates();
+}
+
+// Choosing an exam cascades the test list down to that exam's tests.
+async function onExamChange(id: number | null): Promise<void> {
+    q.exam_id = id;
     q.test_id = null;
     await loadOptions();
     await loadCandidates();
@@ -251,7 +259,7 @@ onMounted(async () => {
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.exam') }}</span>
                     <SearchSelect dense clearable :options="examOptions" :model-value="q.exam_id ?? null"
                         :disabled="!q.quiz_id" :loading="optionsLoading" :placeholder="$t('reports.anyOption')"
-                        @update:model-value="(v: number | null) => { q.exam_id = v; loadCandidates(); }" />
+                        @update:model-value="onExamChange" />
                 </label>
                 <label class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.test') }}</span>
@@ -276,16 +284,16 @@ onMounted(async () => {
                 </label>
             </div>
 
-            <!-- Footer: reset action. With rows checked it targets them; otherwise the
-                 whole matching set. The exact counts are confirmed in the modal. -->
+            <!-- Filters apply live as you change them; this button makes that explicit. -->
+            <!-- Footer: filters apply live; this button makes that explicit. -->
             <div class="mt-4 flex justify-end border-t border-gray-100 pt-3">
                 <button
                     type="button"
-                    :disabled="total === 0 || frozen"
-                    class="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-40"
-                    @click="openModal"
+                    :disabled="!q.quiz_id || loading || frozen"
+                    class="rounded-md bg-brand-primary px-4 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
+                    @click="loadCandidates"
                 >
-                    {{ hasSelection ? $t('reset.resetSelected', { n: resetStudents }) : $t('reset.resetAll', { n: resetStudents }) }}
+                    {{ $t('common.filter') }}
                 </button>
             </div>
         </div>
@@ -355,6 +363,19 @@ onMounted(async () => {
                     </tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- Footer: the reset action sits under the list it acts on. With rows
+                 checked it targets them; otherwise the whole matching set. -->
+            <div class="mt-4 flex justify-end border-t border-gray-100 pt-3">
+                <button
+                    type="button"
+                    :disabled="total === 0 || frozen"
+                    class="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-40"
+                    @click="openModal"
+                >
+                    {{ hasSelection ? $t('reset.resetSelected', { n: resetStudents }) : $t('reset.resetAll', { n: resetStudents }) }}
+                </button>
             </div>
         </div>
 

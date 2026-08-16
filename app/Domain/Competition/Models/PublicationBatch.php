@@ -15,12 +15,14 @@ class PublicationBatch extends Model
 {
     public const UPDATED_AT = null;
 
-    protected $fillable = ['scope_type', 'scope_id', 'action', 'attempts_count', 'published_by'];
+    protected $fillable = ['scope_type', 'scope_id', 'country_id', 'school_id', 'action', 'attempts_count', 'published_by'];
 
     protected function casts(): array
     {
         return [
             'scope_id' => 'integer',
+            'country_id' => 'integer',
+            'school_id' => 'integer',
             'attempts_count' => 'integer',
             'published_by' => 'integer',
             'created_at' => 'datetime',

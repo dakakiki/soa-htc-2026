@@ -55,12 +55,14 @@ export interface ReportQuery {
 
 /**
  * Bounded option lists for the filter controls. Pass a country to fill
- * regions/schools, and a quiz to fill exams/tests (two independent cascades).
+ * regions/schools, a quiz to fill exams/tests, and an exam to narrow tests to
+ * that exam (quiz → exam → test cascade).
  */
-export function reportFilters(scope?: { country_id?: number | null; quiz_id?: number | null }) {
+export function reportFilters(scope?: { country_id?: number | null; quiz_id?: number | null; exam_id?: number | null }) {
     const params: Record<string, number> = {};
     if (scope?.country_id) params.country_id = scope.country_id;
     if (scope?.quiz_id) params.quiz_id = scope.quiz_id;
+    if (scope?.exam_id) params.exam_id = scope.exam_id;
 
     return http.get<ReportFilterOptions>('/api/reports/filters', { params });
 }

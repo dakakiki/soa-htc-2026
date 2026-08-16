@@ -467,6 +467,37 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0024 — Objava rezultata scope-ovana po državi/venue (proširuje ADR-0020)
+
+- **Status:** Prihvaćeno (2026-08-16); vlasnik proizvoda
+- **Kontekst:** Redizajn Publishing strane. Originalna objava (ADR-0020) otkriva
+  ceo test/exam **globalno** — svaki `completed` pokušaj tog testa, bez obzira na
+  državu takmičara. Nova strana dobija filtere **country/venue**; pitanje je da li
+  oni samo sužavaju prikaz ili **scope-uju samu objavu**. Takmičenja se polažu i
+  ocenjuju po državama u različito vreme, pa koordinator hoće da pusti rezultate
+  svoje države kad su spremni, a ne da čeka sve.
+- **Odluka:**
+  - country/venue filteri **scope-uju samu objavu**: publish/unpublish deluje samo
+    na pokušaje takmičara iz filtrirane populacije (**season + country + school/
+    venue**). Reuse `populationRegistrationIds` — **isti helper kao reset** (ADR-0022).
+    Test tako može biti **delimično objavljen** (npr. Srbija objavljena, S. Makedonija
+    skrivena dok se ne objavi zasebno) — to je namerno.
+  - Publish **lista** (`GET results/overview`) i **akcija** (`POST results/publish`)
+    oba scope-ovani preko iste populacije; brojači `completed/published/pending`
+    prate filter. **Quiz je OBAVEZAN**; exam/test sužavaju unutar kviza; **bez
+    country/venue = cela season populacija** (globalno = ranije ponašanje, kompatibilno).
+  - `quiz_id` u publish payload-u je **nullable** → 6 postojećih publish testova
+    (bez scope-a) prolazi nepromenjeno (aktivna sezona = round 14, isti brojači).
+  - **Audit potpun:** `publication_batches` proširen `country_id`/`school_id` da se
+    zabeleži scope SVAKE objave (bez toga bi „objavljeno za Srbiju" bilo neraspoznatljivo
+    u auditu).
+- **Posledica:** proširuje ADR-0020; objava je sada **per-populacija**, delimično-
+  objavljeno stanje po testu je moguće i očekivano. Reset i publishing dele isti
+  populacioni helper (konzistentnost). ⚠️ Migracija dodaje 2 kolone na
+  `publication_batches` — obična `migrate` (NE `fresh`); bez nove permisije.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

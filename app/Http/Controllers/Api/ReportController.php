@@ -61,10 +61,11 @@ class ReportController extends Controller
     }
 
     /**
-     * Bounded option lists that populate the report's filter controls. Two
-     * cascades: regions + schools are returned only for a chosen country, and
-     * exams + tests only for a chosen quiz (both empty otherwise, so the client
-     * keeps those selects disabled until the parent is picked). Everything else is
+     * Bounded option lists that populate the report's filter controls. Cascades:
+     * regions + schools are returned only for a chosen country; exams for a chosen
+     * quiz; and tests for the chosen quiz — narrowed to a single exam's tests when
+     * an exam is also chosen (quiz → exam → test). Empty otherwise, so the client
+     * keeps those selects disabled until the parent is picked. Everything else is
      * small enough to send in full.
      */
     public function filters(Request $request): JsonResponse
@@ -73,6 +74,7 @@ class ReportController extends Controller
 
         $countryId = $request->integer('country_id') ?: null;
         $quizId = $request->integer('quiz_id') ?: null;
+        $examId = $request->integer('exam_id') ?: null;
 
         // Exams and tests belong to the chosen quiz (quiz → exams → tests).
         $quiz = $quizId
@@ -86,8 +88,14 @@ class ReportController extends Controller
             ? $quiz->exams->map(fn (Exam $e) => ['id' => $e->id, 'title' => $e->title])->sortBy('title')->values()
             : [];
 
+        // With an exam chosen, tests cascade to just that exam's tests; otherwise
+        // the union of every test in the quiz.
+        $testSource = $quiz && $examId
+            ? ($quiz->exams->firstWhere('id', $examId)?->tests ?? collect())
+            : ($quiz?->exams->flatMap(fn (Exam $e) => $e->tests) ?? collect());
+
         $tests = $quiz
-            ? $quiz->exams->flatMap(fn (Exam $e) => $e->tests)
+            ? $testSource
                 ->unique('id')
                 ->map(fn (Test $t) => ['id' => $t->id, 'title' => $t->title])
                 ->sortBy('title')

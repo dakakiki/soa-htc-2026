@@ -10,6 +10,7 @@ use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
 use App\Models\User;
@@ -144,6 +145,100 @@ class ResultsTest extends TestCase
         $this->assertDatabaseHas('publication_batches', [
             'scope_type' => 'test', 'scope_id' => $c['test'], 'action' => 'publish', 'attempts_count' => 1,
         ]);
+    }
+
+    public function test_overview_needs_a_quiz_then_lists_its_tests(): void
+    {
+        $c = $this->attempt();
+
+        // Without a quiz nothing is listed — the whole tree of every quiz is impractical.
+        $this->actingAs($this->admin())->getJson('/api/results/overview')
+            ->assertOk()
+            ->assertJsonPath('needs_quiz', true)
+            ->assertJsonPath('exams', []);
+
+        // With the quiz, its round/test appears with the completed count.
+        $this->actingAs($this->admin())->getJson('/api/results/overview?quiz_id='.$c['quiz'])
+            ->assertOk()
+            ->assertJsonPath('needs_quiz', false)
+            ->assertJsonPath('quiz.id', $c['quiz'])
+            ->assertJsonPath('exams.0.id', $c['exam'])
+            ->assertJsonPath('exams.0.tests.0.id', $c['test'])
+            ->assertJsonPath('exams.0.tests.0.completed', 1)
+            ->assertJsonPath('exams.0.tests.0.published', 0);
+    }
+
+    public function test_publishing_is_scoped_by_country(): void
+    {
+        $level = DifficultyLevel::where('level_short', 'H2')->firstOrFail();
+        $quiz = Quiz::create(['title' => 'Q', 'quiz_type' => 'sample', 'status' => 'active']);
+        $quiz->levels()->attach($level->id);
+        $exam = Exam::create(['title' => 'E', 'status' => 'active']);
+        $exam->levels()->attach($level->id);
+        $quiz->exams()->attach($exam->id, ['position' => 1]);
+        $test = Test::create(['title' => 'T', 'duration' => 30, 'status' => 'active']);
+        $test->levels()->attach($level->id);
+        $exam->tests()->attach($test->id, ['position' => 1]);
+
+        $question = Question::create(['title' => 'MC', 'description' => 'Pick', 'question_type' => 'multiple_choice', 'points' => 2, 'status' => 'active']);
+        $correct = QuestionAnswer::create(['question_id' => $question->id, 'text' => 'Right', 'is_correct' => true, 'position' => 1])->id;
+        QuestionAnswer::create(['question_id' => $question->id, 'text' => 'Wrong', 'is_correct' => false, 'position' => 2]);
+        $question->levels()->attach($level->id);
+        $test->questions()->attach($question->id, ['position' => 1]);
+
+        // Two competitors on the same test, one in Serbia and one in North Macedonia.
+        $rs = Country::where('code', 'RS')->firstOrFail();
+        $mk = Country::where('code', 'MK')->firstOrFail();
+        $rsAttempt = $this->completeSharedAttempt($rs, $level, $test, $question, $correct);
+        $mkAttempt = $this->completeSharedAttempt($mk, $level, $test, $question, $correct);
+
+        // Publishing scoped to Serbia reveals only the Serbian attempt.
+        $this->actingAs($this->admin())->postJson('/api/results/publish', [
+            'scope' => 'test', 'id' => $test->id, 'quiz_id' => $quiz->id, 'country_id' => $rs->id,
+        ])->assertOk()->assertJsonPath('attempts_count', 1);
+
+        $this->assertNotNull(Attempt::findOrFail($rsAttempt)->published_at);
+        $this->assertNull(Attempt::findOrFail($mkAttempt)->published_at, 'North Macedonia must stay hidden.');
+
+        // The audit records which country the action was scoped to (ADR-0024).
+        $this->assertDatabaseHas('publication_batches', [
+            'scope_type' => 'test', 'scope_id' => $test->id, 'country_id' => $rs->id, 'action' => 'publish', 'attempts_count' => 1,
+        ]);
+
+        // A second publish, scoped to North Macedonia, reveals the other.
+        $this->actingAs($this->admin())->postJson('/api/results/publish', [
+            'scope' => 'test', 'id' => $test->id, 'quiz_id' => $quiz->id, 'country_id' => $mk->id,
+        ])->assertOk()->assertJsonPath('attempts_count', 1);
+
+        $this->assertNotNull(Attempt::findOrFail($mkAttempt)->published_at);
+    }
+
+    /** Complete an attempt at a shared test for a fresh competitor in the given country. */
+    private function completeSharedAttempt(Country $country, DifficultyLevel $level, Test $test, Question $question, int $correct): int
+    {
+        $school = School::firstOrCreate(
+            ['country_id' => $country->id, 'name' => 'School '.$country->code],
+            ['status' => 'active'],
+        );
+        $this->seq++;
+        $number = '14'.str_pad((string) $this->seq, 6, '0', STR_PAD_LEFT);
+        Registration::create([
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'competitor_number' => $number, 'sequence' => $this->seq,
+            'school_id' => $school->id, 'country_id' => $country->id,
+            'difficulty_level_id' => $level->id, 'name' => 'Student',
+            'date_of_birth' => '2010-05-01', 'grade' => 6, 'status' => 'active',
+        ]);
+        $token = $this->postJson('/api/student/identify', [
+            'competitor_number' => $number, 'country_id' => $country->id, 'date_of_birth' => '2010-05-01',
+        ])->json('token');
+
+        $attemptId = (int) $this->withToken($token)->postJson("/api/student/tests/{$test->id}/start")->json('attempt.id');
+        $this->withToken($token)->postJson("/api/student/attempts/{$attemptId}/submit", [
+            'answers' => [['question_id' => $question->id, 'response' => ['selected' => [$correct]]]],
+        ])->assertOk();
+
+        return $attemptId;
     }
 
     public function test_publishing_requires_the_results_permission(): void

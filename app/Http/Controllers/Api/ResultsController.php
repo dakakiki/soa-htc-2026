@@ -29,51 +29,83 @@ use Illuminate\Support\Facades\DB;
  */
 class ResultsController extends Controller
 {
-    /** Quizzes → exams → tests with per-test attempt counts for the publish tree. */
-    public function overview(): JsonResponse
+    /**
+     * The publish list: the chosen quiz's exams → tests with per-test attempt
+     * counts, scoped to a population (season + optional country/venue) so the admin
+     * publishes exactly the subset they filtered to. A quiz is mandatory — nothing
+     * is listed until one is chosen (the whole tree of every quiz is impractical).
+     * exam_id/test_id narrow within the quiz; country_id/school_id narrow the
+     * competitor population the counts and publish actions apply to.
+     */
+    public function overview(Request $request): JsonResponse
     {
         $this->authorize('results.manage');
 
+        $f = $request->validate($this->publishFilterRules());
+
+        // A quiz is required to scope the list (everything else only narrows it).
+        if (empty($f['quiz_id'])) {
+            return response()->json(['needs_quiz' => true, 'quiz' => null, 'exams' => []]);
+        }
+
+        // Per-test completed-attempt counts, restricted to the filtered population
+        // (the same registration scope the publish action will act on).
         $counts = Attempt::query()
             ->where('status', AttemptStatus::Completed)
+            ->whereIn('registration_id', $this->populationRegistrationIds($f))
+            ->when($f['exam_id'] ?? null, fn ($q, $v) => $q->whereIn(
+                'test_id',
+                fn ($sub) => $sub->from('exam_test')->select('test_id')->where('exam_id', $v)
+            ))
+            ->when($f['test_id'] ?? null, fn ($q, $v) => $q->where('test_id', $v))
             ->selectRaw("test_id, count(*) as completed, sum(published_at is not null) as published, sum(grading_status = 'pending_grading') as pending")
             ->groupBy('test_id')
             ->get()
             ->keyBy('test_id');
 
-        $quizzes = Quiz::query()
-            ->where('status', 'active')
+        $quiz = Quiz::query()
             ->with([
-                'exams' => fn ($q) => $q->where('exams.status', 'active'),
-                'exams.tests' => fn ($q) => $q->where('tests.status', 'active'),
+                'exams' => fn ($q) => $q->where('exams.status', 'active')
+                    ->when($f['exam_id'] ?? null, fn ($q, $v) => $q->whereKey($v)),
+                'exams.tests' => fn ($q) => $q->where('tests.status', 'active')
+                    ->when($f['test_id'] ?? null, fn ($q, $v) => $q->whereKey($v)),
             ])
-            ->orderBy('id')
-            ->get();
+            ->findOrFail($f['quiz_id']);
+
+        $exams = $quiz->exams
+            ->map(fn (Exam $exam) => [
+                'id' => $exam->id,
+                'title' => $exam->title,
+                'tests' => $exam->tests->map(function (Test $test) use ($counts) {
+                    $row = $counts->get($test->id);
+
+                    return [
+                        'id' => $test->id,
+                        'title' => $test->title,
+                        'completed' => (int) ($row->completed ?? 0),
+                        'published' => (int) ($row->published ?? 0),
+                        'pending' => (int) ($row->pending ?? 0),
+                    ];
+                })->values()->all(),
+            ])
+            // A test_id narrowing can leave an exam with no tests — drop it.
+            ->filter(fn ($exam) => count($exam['tests']) > 0)
+            ->values()
+            ->all();
 
         return response()->json([
-            'quizzes' => $quizzes->map(fn (Quiz $quiz) => [
-                'id' => $quiz->id,
-                'title' => $quiz->title,
-                'exams' => $quiz->exams->map(fn (Exam $exam) => [
-                    'id' => $exam->id,
-                    'title' => $exam->title,
-                    'tests' => $exam->tests->map(function (Test $test) use ($counts) {
-                        $row = $counts->get($test->id);
-
-                        return [
-                            'id' => $test->id,
-                            'title' => $test->title,
-                            'completed' => (int) ($row->completed ?? 0),
-                            'published' => (int) ($row->published ?? 0),
-                            'pending' => (int) ($row->pending ?? 0),
-                        ];
-                    })->all(),
-                ])->all(),
-            ])->all(),
+            'needs_quiz' => false,
+            'quiz' => ['id' => $quiz->id, 'title' => $quiz->title],
+            'exams' => $exams,
         ]);
     }
 
-    /** Publish or unpublish every eligible attempt in the given scope. */
+    /**
+     * Publish or unpublish every eligible attempt in the given scope, restricted to
+     * the filtered competitor population (season + optional country/venue). Publishing
+     * a test/round for one country reveals only that country's attempts; the rest stay
+     * hidden until published in turn.
+     */
     public function publish(Request $request): JsonResponse
     {
         $this->authorize('results.manage');
@@ -82,6 +114,9 @@ class ResultsController extends Controller
             'scope' => ['required', 'in:test,exam'],
             'id' => ['required', 'integer'],
             'unpublish' => ['sometimes', 'boolean'],
+            'quiz_id' => ['nullable', 'integer'],
+            'country_id' => ['nullable', 'integer'],
+            'school_id' => ['nullable', 'integer'],
         ]);
 
         $unpublish = (bool) ($validated['unpublish'] ?? false);
@@ -89,7 +124,10 @@ class ResultsController extends Controller
             ? Exam::query()->whereKey($validated['id'])->firstOrFail()->tests()->pluck('tests.id')->all()
             : [$validated['id']];
 
-        $query = Attempt::query()->whereIn('test_id', $testIds)->where('status', AttemptStatus::Completed);
+        $query = Attempt::query()
+            ->whereIn('test_id', $testIds)
+            ->where('status', AttemptStatus::Completed)
+            ->whereIn('registration_id', $this->populationRegistrationIds($validated));
 
         if ($unpublish) {
             $count = $query->whereNotNull('published_at')->update(['published_at' => null, 'published_by' => null]);
@@ -104,6 +142,9 @@ class ResultsController extends Controller
         PublicationBatch::create([
             'scope_type' => $validated['scope'],
             'scope_id' => $validated['id'],
+            // Record the population the action was scoped to (null = whole season).
+            'country_id' => $validated['country_id'] ?? null,
+            'school_id' => $validated['school_id'] ?? null,
             'action' => $unpublish ? 'unpublish' : 'publish',
             'attempts_count' => $count,
             'published_by' => $request->user()?->id,
@@ -190,7 +231,9 @@ class ResultsController extends Controller
         // may have several), for the "select all matching" summary.
         $totalAttempts = $this->scopedAttempts($filters, void: false, allMatching: true)->count();
 
-        $limit = 500;
+        // Compact preview: a small sample of who matches. The reset itself targets
+        // the whole matching set (all_matching), so the cap never limits its reach.
+        $limit = 5;
         $rows = (clone $base)
             ->with(['country:id,name', 'level:id,level_short', 'school:id,name'])
             ->withCount(['attempts as resettable' => $scope])
@@ -318,6 +361,24 @@ class ResultsController extends Controller
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
+    }
+
+    /**
+     * Filters for the publish list (and the scoped publish action): a quiz plus the
+     * geography/exam/test narrowing. Only quiz + country + venue actually scope the
+     * competitor population; exam/test narrow which tests are shown/acted on.
+     *
+     * @return array<string, mixed>
+     */
+    private function publishFilterRules(): array
+    {
+        return [
+            'country_id' => ['nullable', 'integer'],
+            'school_id' => ['nullable', 'integer'],
+            'quiz_id' => ['nullable', 'integer'],
+            'exam_id' => ['nullable', 'integer'],
+            'test_id' => ['nullable', 'integer'],
+        ];
     }
 
     /** @return array<string, mixed> */

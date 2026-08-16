@@ -14,18 +14,31 @@ export interface PublishExam {
     tests: PublishTest[];
 }
 
-export interface PublishQuiz {
-    id: number;
-    title: string;
+/** Filter scope for the publish list: quiz required, the rest narrow it. */
+export interface PublishScope {
+    country_id?: number | null;
+    school_id?: number | null;
+    quiz_id?: number | null;
+    exam_id?: number | null;
+    test_id?: number | null;
+}
+
+export interface PublishOverview {
+    needs_quiz: boolean;
+    quiz: { id: number; title: string } | null;
     exams: PublishExam[];
 }
 
-export function overview() {
-    return http.get<{ quizzes: PublishQuiz[] }>('/api/results/overview');
+/** The chosen quiz's exams/tests with counts, scoped to the filtered population. */
+export function overview(scope: PublishScope) {
+    return http.get<PublishOverview>('/api/results/overview', { params: cleanParams(scope) });
 }
 
-export function publish(payload: { scope: 'test' | 'exam'; id: number; unpublish?: boolean }) {
-    return http.post<{ action: string; attempts_count: number }>('/api/results/publish', payload);
+/** Publish/unpublish a test or round, restricted to the filtered country/venue population. */
+export function publish(
+    payload: { scope: 'test' | 'exam'; id: number; unpublish?: boolean } & PublishScope
+) {
+    return http.post<{ action: string; attempts_count: number }>('/api/results/publish', cleanParams(payload));
 }
 
 // --- Bulk attempt reset (CC-11) ---

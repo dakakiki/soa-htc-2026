@@ -253,6 +253,38 @@ class ReportTest extends TestCase
         $this->assertSame($c['test']->id, $response->json('tests.0.id'));
     }
 
+    public function test_filters_cascade_tests_to_a_chosen_exam(): void
+    {
+        $level = DifficultyLevel::where('level_short', 'H2')->firstOrFail();
+        $quiz = Quiz::create(['title' => 'Q', 'quiz_type' => 'sample', 'status' => 'active']);
+        $quiz->levels()->attach($level->id);
+
+        $examA = Exam::create(['title' => 'Round A', 'status' => 'active']);
+        $examA->levels()->attach($level->id);
+        $quiz->exams()->attach($examA->id, ['position' => 1]);
+        $testA = Test::create(['title' => 'Test A', 'duration' => 30, 'status' => 'active']);
+        $testA->levels()->attach($level->id);
+        $examA->tests()->attach($testA->id, ['position' => 1]);
+
+        $examB = Exam::create(['title' => 'Round B', 'status' => 'active']);
+        $examB->levels()->attach($level->id);
+        $quiz->exams()->attach($examB->id, ['position' => 2]);
+        $testB = Test::create(['title' => 'Test B', 'duration' => 30, 'status' => 'active']);
+        $testB->levels()->attach($level->id);
+        $examB->tests()->attach($testB->id, ['position' => 1]);
+
+        // Quiz only → both rounds and both tests.
+        $all = $this->actingAs($this->admin())->getJson("/api/reports/filters?quiz_id={$quiz->id}")->assertOk();
+        $this->assertCount(2, $all->json('exams'));
+        $this->assertEqualsCanonicalizing([$testA->id, $testB->id], collect($all->json('tests'))->pluck('id')->all());
+
+        // Quiz + round A → rounds stay full (so you can switch), tests narrow to round A.
+        $narrowed = $this->actingAs($this->admin())
+            ->getJson("/api/reports/filters?quiz_id={$quiz->id}&exam_id={$examA->id}")->assertOk();
+        $this->assertCount(2, $narrowed->json('exams'));
+        $this->assertSame([$testA->id], collect($narrowed->json('tests'))->pluck('id')->all());
+    }
+
     public function test_invalid_group_by_is_rejected(): void
     {
         $this->actingAs($this->admin())->getJson('/api/reports/summary?group_by=teacher')
