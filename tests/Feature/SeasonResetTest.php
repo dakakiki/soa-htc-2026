@@ -116,6 +116,9 @@ class SeasonResetTest extends TestCase
             'scope_type' => 'exam', 'scope_id' => 1, 'action' => 'publish',
             'attempts_count' => 1, 'published_by' => $this->admin()->id, 'created_at' => now(),
         ]);
+        DB::table('audit_logs')->insert([
+            'action' => 'results.publish', 'actor_label' => 'Dev Admin', 'created_at' => now(),
+        ]);
 
         // Preconditions: data exists, everyone active, schools active.
         $this->assertGreaterThan(0, Registration::count());
@@ -126,7 +129,7 @@ class SeasonResetTest extends TestCase
         $this->artisan('season:reset', ['--force' => true])->assertExitCode(0);
 
         // Transactional chain is empty.
-        foreach (['registrations', 'attempts', 'attempt_answers', 'attempt_resets', 'grade_revisions', 'student_sessions', 'student_session_quiz', 'publication_batches'] as $table) {
+        foreach (['registrations', 'attempts', 'attempt_answers', 'attempt_resets', 'grade_revisions', 'student_sessions', 'student_session_quiz', 'publication_batches', 'audit_logs'] as $table) {
             $this->assertSame(0, DB::table($table)->count(), "{$table} should be empty");
         }
 

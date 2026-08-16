@@ -17,11 +17,12 @@ use Illuminate\Support\Facades\DB;
  * It clears the season-transactional data and normalizes accounts/venues back to
  * a clean baseline, while leaving everything that persists across seasons intact.
  *
- * WIPE (delete rows)      registrations + the whole attempt/result/session/publication chain
+ * WIPE (delete rows)      registrations + the whole attempt/result/session/publication chain,
+ *                         plus the audit_logs trail (a new season starts on a fresh log)
  * DELETE (accounts)       users who are SCHOOL coordinators in the active season
  * DEACTIVATE (status)     all remaining non-admin users (country coordinators, etc.) + all schools
  * KEEP untouched          content library (quizzes/exams/tests/questions), countries/regions,
- *                         difficulty, roles/permissions, lookups, seasons, settings, audit_logs
+ *                         difficulty, roles/permissions, lookups, seasons, settings
  *
  * Real schools and coordinators arrive via the legacy import; this command never
  * deletes a school (venues are persistent config — they are only deactivated) and
@@ -45,6 +46,7 @@ class ResetSeasonData extends Command
         'student_session_quiz',
         'student_sessions',
         'publication_batches',
+        'audit_logs',
         'registrations',
     ];
 
