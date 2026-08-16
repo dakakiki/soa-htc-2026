@@ -288,6 +288,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'results.manage' },
     },
     {
+        path: '/reports',
+        name: 'reports',
+        component: () => import('@/pages/results/ReportsPage.vue'),
+        meta: { requiresAuth: true, permission: 'reports.view' },
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),

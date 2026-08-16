@@ -4,7 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Assessment\Models\Exam;
+use App\Domain\Assessment\Models\Quiz;
+use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Support\ReportSummary;
+use App\Domain\Identity\Enums\SystemRole;
+use App\Domain\Identity\Models\Role;
+use App\Domain\Organization\Models\Country;
+use App\Domain\Organization\Models\Region;
+use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -48,6 +57,72 @@ class ReportController extends Controller
         return response()->json([
             'filters' => $echoedFilters,
             ...ReportSummary::build($filters),
+        ]);
+    }
+
+    /**
+     * Bounded option lists that populate the report's filter controls. Two
+     * cascades: regions + schools are returned only for a chosen country, and
+     * exams + tests only for a chosen quiz (both empty otherwise, so the client
+     * keeps those selects disabled until the parent is picked). Everything else is
+     * small enough to send in full.
+     */
+    public function filters(Request $request): JsonResponse
+    {
+        $this->authorize('reports.view');
+
+        $countryId = $request->integer('country_id') ?: null;
+        $quizId = $request->integer('quiz_id') ?: null;
+
+        // Exams and tests belong to the chosen quiz (quiz → exams → tests).
+        $quiz = $quizId
+            ? Quiz::query()->with([
+                'exams' => fn ($q) => $q->where('exams.status', 'active'),
+                'exams.tests' => fn ($q) => $q->where('tests.status', 'active'),
+            ])->find($quizId)
+            : null;
+
+        $exams = $quiz
+            ? $quiz->exams->map(fn (Exam $e) => ['id' => $e->id, 'title' => $e->title])->sortBy('title')->values()
+            : [];
+
+        $tests = $quiz
+            ? $quiz->exams->flatMap(fn (Exam $e) => $e->tests)
+                ->unique('id')
+                ->map(fn (Test $t) => ['id' => $t->id, 'title' => $t->title])
+                ->sortBy('title')
+                ->values()
+            : [];
+
+        $coordinatorRoleIds = Role::query()
+            ->whereIn('key', [SystemRole::CountryCoordinator->value, SystemRole::SchoolCoordinator->value])
+            ->pluck('id');
+
+        $seasonId = SeasonContext::active()?->id;
+
+        $coordinators = User::query()
+            ->when($seasonId, fn ($q) => $q->whereHas('seasonAssignments', fn ($a) => $a
+                ->where('season_id', $seasonId)
+                ->where('status', 'active')
+                ->whereIn('role_id', $coordinatorRoleIds)))
+            ->when(! $seasonId, fn ($q) => $q->whereRaw('1 = 0'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json([
+            'countries' => Country::query()->orderBy('name')->get(['id', 'name']),
+            'regions' => $countryId
+                ? Region::query()->where('country_id', $countryId)->orderBy('name')->get(['id', 'name'])
+                : [],
+            'schools' => $countryId
+                ? School::query()->where('country_id', $countryId)->orderBy('name')->get(['id', 'name'])
+                : [],
+            'levels' => DifficultyLevel::query()->orderBy('position')->get(['id', 'level_short'])
+                ->map(fn (DifficultyLevel $l) => ['id' => $l->id, 'label' => $l->level_short]),
+            'quizzes' => Quiz::query()->where('status', 'active')->orderBy('title')->get(['id', 'title']),
+            'exams' => $exams,
+            'tests' => $tests,
+            'coordinators' => $coordinators,
         ]);
     }
 

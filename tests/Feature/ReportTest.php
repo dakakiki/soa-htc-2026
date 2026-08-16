@@ -207,8 +207,50 @@ class ReportTest extends TestCase
 
     public function test_reports_require_the_reports_permission(): void
     {
+        // Guest checks first: actingAs persists for the rest of the test.
         $this->getJson('/api/reports/summary')->assertUnauthorized();
+        $this->getJson('/api/reports/filters')->assertUnauthorized();
         $this->actingAs(User::factory()->create())->getJson('/api/reports/summary')->assertForbidden();
+        $this->actingAs(User::factory()->create())->getJson('/api/reports/filters')->assertForbidden();
+    }
+
+    public function test_filters_return_bounded_option_lists(): void
+    {
+        $this->content();
+
+        $response = $this->actingAs($this->admin())->getJson('/api/reports/filters')->assertOk()
+            ->assertJsonStructure(['countries', 'regions', 'schools', 'levels', 'quizzes', 'exams', 'tests', 'coordinators']);
+
+        // Regions/schools need a country; exams/tests need a quiz.
+        $this->assertCount(0, $response->json('regions'));
+        $this->assertCount(0, $response->json('schools'));
+        $this->assertCount(0, $response->json('exams'));
+        $this->assertCount(0, $response->json('tests'));
+        $this->assertNotEmpty($response->json('countries'));
+        $this->assertNotEmpty($response->json('quizzes'));
+    }
+
+    public function test_filters_return_regions_and_schools_for_a_country(): void
+    {
+        $rs = Country::where('code', 'RS')->value('id');
+
+        $response = $this->actingAs($this->admin())->getJson("/api/reports/filters?country_id={$rs}")->assertOk();
+
+        // The seeder puts regions and schools under Serbia.
+        $this->assertNotEmpty($response->json('regions'));
+        $this->assertNotEmpty($response->json('schools'));
+    }
+
+    public function test_filters_return_exams_and_tests_for_a_quiz(): void
+    {
+        $c = $this->content();
+
+        $response = $this->actingAs($this->admin())->getJson("/api/reports/filters?quiz_id={$c['quiz']->id}")->assertOk();
+
+        // The quiz's exam and test appear only when the quiz is chosen (cascade).
+        $this->assertNotEmpty($response->json('exams'));
+        $this->assertNotEmpty($response->json('tests'));
+        $this->assertSame($c['test']->id, $response->json('tests.0.id'));
     }
 
     public function test_invalid_group_by_is_rejected(): void

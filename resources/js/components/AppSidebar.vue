@@ -21,6 +21,7 @@ import {
     IconClipboardCheck,
     IconChecklist,
     IconSend,
+    IconChartBar,
     IconHelpCircle,
     IconFileText,
     IconTag,
@@ -96,6 +97,7 @@ const groups: NavGroup[] = [
         children: [
             { label: t('nav.grading'), icon: IconChecklist, to: 'grading', prefix: 'grading', perm: 'results.manage' },
             { label: t('nav.publishing'), icon: IconSend, to: 'publishing', prefix: 'publishing', perm: 'results.manage' },
+            { label: t('nav.reports'), icon: IconChartBar, to: 'reports', prefix: 'reports', perm: 'reports.view' },
         ],
     },
     {
