@@ -106,6 +106,8 @@ class ReportController extends Controller
     {
         $this->authorize('reports.view');
 
+        $dims = ['country', 'region', 'school', 'level', 'quiz', 'exam', 'test'];
+
         $validated = $request->validate([
             'season_id' => ['nullable', 'integer'],
             'country_id' => ['nullable', 'integer'],
@@ -116,7 +118,13 @@ class ReportController extends Controller
             'quiz_id' => ['nullable', 'integer'],
             'exam_id' => ['nullable', 'integer'],
             'test_id' => ['nullable', 'integer'],
-            'group_by' => ['nullable', Rule::in(['country', 'region', 'school', 'level', 'quiz', 'exam', 'test'])],
+            'group_by' => ['nullable', Rule::in($dims)],
+            // The on-screen heatmap + compare selections, so the PDF mirrors the page.
+            'heat_row_by' => ['nullable', Rule::in($dims)],
+            'heat_col_by' => ['nullable', Rule::in($dims)],
+            'compare_by' => ['nullable', Rule::in($dims)],
+            'compare_ids' => ['nullable', 'array'],
+            'compare_ids.*' => ['integer'],
         ]);
 
         $echoed = $validated;
@@ -128,7 +136,23 @@ class ReportController extends Controller
         );
 
         $data = ReportSummary::build($filters);
-        $pdf = PdfWriter::toString($this->reportHtml($data, $echoed), 'Competition report', 'L');
+
+        $matrix = (! empty($validated['heat_row_by']) && ! empty($validated['heat_col_by']))
+            ? ReportSummary::matrix($filters, $validated['heat_row_by'], $validated['heat_col_by'])
+            : null;
+
+        // Compare: the chosen dimension, narrowed to the picked members.
+        $compareBy = $validated['compare_by'] ?? null;
+        $compareRows = [];
+        if ($compareBy !== null) {
+            $ids = array_map('intval', $validated['compare_ids'] ?? []);
+            $compareRows = collect(ReportSummary::build($filters + ['group_by' => $compareBy])['rows'])
+                ->when($ids !== [], fn ($rows) => $rows->filter(fn ($r) => in_array($r['key'], $ids, true)))
+                ->values()->all();
+        }
+
+        $html = $this->reportHtml($data, $echoed, $matrix, $compareRows, $compareBy);
+        $pdf = PdfWriter::toString($html, 'Competition report', 'L');
 
         $filename = 'report-'.now()->format('Y-m-d_His').'.pdf';
 
@@ -144,8 +168,10 @@ class ReportController extends Controller
      *
      * @param  array<string, mixed>  $data  ReportSummary::build() output
      * @param  array<string, mixed>  $f  echoed filters (for the scope line)
+     * @param  array<string, mixed>|null  $matrix  ReportSummary::matrix() output (heatmap)
+     * @param  list<array<string, mixed>>  $compareRows  the picked members to compare
      */
-    private function reportHtml(array $data, array $f): string
+    private function reportHtml(array $data, array $f, ?array $matrix = null, array $compareRows = [], ?string $compareBy = null): string
     {
         $setting = Setting::current();
         $brand = $setting->color_primary ?: '#2563eb';
@@ -204,34 +230,163 @@ class ReportController extends Controller
                     .'<td style="text-align:right;padding:4px 5px;">'.($r['score']['median'] ?? '—').'</td>'
                     .'</tr>';
             }
-            $breakdown = '<h3 style="font-size:10pt;margin:12px 0 4px;">Breakdown — '.$dim.'</h3>'
-                .'<table width="100%" cellspacing="0" cellpadding="0" style="border:0.6pt solid #e5e7eb;font-size:8pt;">'.$head.$rows.'</table>';
+            $breakdown = '<h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Breakdown — '.$dim.'</h3>'
+                .'<table width="100%" cellspacing="0" cellpadding="0" style="border:0.6pt solid #e5e7eb;font-size:8pt;"><thead>'.$head.'</thead><tbody>'.$rows.'</tbody></table>';
         }
 
         $scoreLine = 'Avg: <b>'.($s['avg'] ?? '—').'</b> &nbsp; Min: <b>'.($s['min'] ?? '—').'</b> &nbsp; Max: <b>'.($s['max'] ?? '—').'</b> &nbsp; Median: <b>'.($s['median'] ?? '—').'</b> &nbsp; Scored: '.$s['count'];
+
+        $heatmap = $matrix !== null ? $this->heatmapHtml($matrix, $brand) : '';
+        $compare = $this->compareHtml($compareRows, $compareBy, $brand, $onBrand);
 
         return <<<HTML
             <div style="font-size:9pt;color:#111827;">
                 <h1 style="font-size:15pt;margin:0;">Competition report</h1>
                 <div style="font-size:8pt;color:#6b7280;margin:2px 0 10px;">Generated {$stamp} &nbsp;&middot;&nbsp; {$scope}</div>
 
-                <h3 style="font-size:10pt;margin:6px 0 4px;">Totals</h3>
+                <h3 style="font-size:10pt;margin:6px 0 4px;page-break-after:avoid;">Totals</h3>
                 <table width="100%" cellspacing="0" cellpadding="0"><tr>{$totCells}</tr></table>
                 <div style="font-size:8pt;color:#374151;margin:6px 0 10px;padding:5px;border:0.6pt solid #e5e7eb;">{$scoreLine}</div>
 
-                <h3 style="font-size:10pt;margin:6px 0 4px;">Rates</h3>
+                <h3 style="font-size:10pt;margin:6px 0 4px;page-break-after:avoid;">Rates</h3>
                 <table width="100%" cellspacing="0" cellpadding="0"><tr>
                     <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PARTICIPATION</div><div style="font-size:13pt;font-weight:bold;">{$participation}</div><div style="font-size:7pt;color:#9ca3af;">Started / Registered</div></td>
                     <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">COMPLETION</div><div style="font-size:13pt;font-weight:bold;">{$completion}</div><div style="font-size:7pt;color:#9ca3af;">Submitted / Started</div></td>
                     <td width="34%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PUBLISH RATE</div><div style="font-size:13pt;font-weight:bold;">{$publish}</div><div style="font-size:7pt;color:#9ca3af;">Published / Submitted</div></td>
                 </tr></table>
 
-                <h3 style="font-size:10pt;margin:12px 0 4px;">Participation funnel</h3>
+                <h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Participation funnel</h3>
                 <table width="100%" cellspacing="0" cellpadding="0">{$funnel}</table>
 
                 {$breakdown}
+
+                {$heatmap}
+
+                {$compare}
             </div>
             HTML;
+    }
+
+    /**
+     * Heatmap (average score cross-tab) as solid-tinted cells — mPDF can't do the
+     * screen's color-mix gradient, so the tint is computed to a flat hex here. Caps
+     * to the busiest rows/columns like the UI.
+     *
+     * @param  array<string, mixed>  $matrix  ReportSummary::matrix() output
+     */
+    private function heatmapHtml(array $matrix, string $brand): string
+    {
+        if (empty($matrix['cells'])) {
+            return '';
+        }
+
+        $cells = [];
+        $rowTot = [];
+        $colTot = [];
+        foreach ($matrix['cells'] as $c) {
+            $cells[$c['row_key'].':'.$c['col_key']] = $c;
+            $rowTot[$c['row_key']] = ($rowTot[$c['row_key']] ?? 0) + $c['count'];
+            $colTot[$c['col_key']] = ($colTot[$c['col_key']] ?? 0) + $c['count'];
+        }
+
+        $byBusiest = fn (array $axis, array $tot, int $n) => array_slice(
+            collect($axis)->sortByDesc(fn ($a) => $tot[$a['key']] ?? 0)->values()->all(), 0, $n
+        );
+        $rows = $byBusiest($matrix['rows'], $rowTot, 12);
+        $cols = $byBusiest($matrix['cols'], $colTot, 8);
+
+        $min = (float) $matrix['min'];
+        $max = (float) $matrix['max'];
+
+        $head = '<tr><th style="padding:4px;"></th>';
+        foreach ($cols as $col) {
+            $head .= '<th style="padding:4px;text-align:center;font-size:7pt;color:#6b7280;">'.e($col['label'] ?? '—').'</th>';
+        }
+        $head .= '</tr>';
+
+        $body = '';
+        foreach ($rows as $row) {
+            $body .= '<tr><th style="padding:4px;text-align:left;font-size:8pt;color:#374151;">'.e($row['label'] ?? '—').'</th>';
+            foreach ($cols as $col) {
+                $cell = $cells[$row['key'].':'.$col['key']] ?? null;
+                if ($cell === null) {
+                    $body .= '<td style="background:#f9fafb;color:#d1d5db;text-align:center;padding:5px;">—</td>';
+
+                    continue;
+                }
+                $ratio = $max > $min ? ($cell['avg'] - $min) / ($max - $min) : 0.5;
+                $mix = 0.15 + $ratio * 0.70;
+                $bg = self::tint($brand, $mix);
+                $fg = $mix >= 0.55 ? '#ffffff' : '#1f2937';
+                $body .= '<td style="background:'.$bg.';color:'.$fg.';text-align:center;padding:5px;font-weight:bold;">'.$cell['avg'].'</td>';
+            }
+            $body .= '</tr>';
+        }
+
+        return '<h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Heatmap — average score</h3>'
+            .'<table cellspacing="2" cellpadding="0" style="font-size:8pt;"><thead>'.$head.'</thead><tbody>'.$body.'</tbody></table>'
+            .'<div style="font-size:7pt;color:#9ca3af;margin-top:2px;">Darker = higher average score.</div>';
+    }
+
+    /**
+     * Compare table: the picked members as rows, measures as columns, with the
+     * leader in each measure highlighted — the flipped on-screen layout.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function compareHtml(array $rows, ?string $compareBy, string $brand, string $onBrand): string
+    {
+        if ($compareBy === null || $rows === []) {
+            return '';
+        }
+
+        $measures = [
+            ['Registered', fn ($r) => $r['registered']],
+            ['Started', fn ($r) => $r['started']],
+            ['Submitted', fn ($r) => $r['submitted']],
+            ['Published', fn ($r) => $r['published']],
+            ['Void', fn ($r) => $r['void']],
+            ['Avg', fn ($r) => $r['score']['avg']],
+            ['Median', fn ($r) => $r['score']['median']],
+        ];
+
+        // Max per measure (for the leader highlight), only when comparing 2+.
+        $maxes = [];
+        foreach ($measures as [$label, $get]) {
+            $vals = array_filter(array_map($get, $rows), fn ($v) => $v !== null);
+            $maxes[$label] = count($rows) > 1 && $vals !== [] ? max($vals) : null;
+        }
+
+        $head = '<tr style="background:'.$brand.';color:'.$onBrand.';"><th style="text-align:left;padding:5px;">'.ucfirst($compareBy).'</th>';
+        foreach ($measures as [$label]) {
+            $head .= '<th style="text-align:center;padding:5px;">'.$label.'</th>';
+        }
+        $head .= '</tr>';
+
+        $body = '';
+        foreach ($rows as $i => $r) {
+            $body .= '<tr style="'.($i % 2 === 1 ? 'background:#f9fafb;' : '').'">'
+                .'<td style="padding:4px 5px;">'.e($r['label'] ?? '—').'</td>';
+            foreach ($measures as [$label, $get]) {
+                $v = $get($r);
+                $lead = $maxes[$label] !== null && $v !== null && $v === $maxes[$label];
+                $style = 'text-align:center;padding:4px 5px;'.($lead ? 'background:'.self::tint($brand, 0.18).';font-weight:bold;' : '');
+                $body .= '<td style="'.$style.'">'.($v ?? '—').'</td>';
+            }
+            $body .= '</tr>';
+        }
+
+        return '<h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Compare — '.ucfirst($compareBy).'</h3>'
+            .'<table width="100%" cellspacing="0" cellpadding="0" style="border:0.6pt solid #e5e7eb;font-size:8pt;"><thead>'.$head.'</thead><tbody>'.$body.'</tbody></table>';
+    }
+
+    /** Mix a brand hex with white by ratio (1 = full brand, 0 = white). */
+    private static function tint(string $hex, float $ratio): string
+    {
+        [$r, $g, $b] = sscanf(ltrim($hex, '#'), '%02x%02x%02x') ?: [37, 99, 235];
+        $mix = fn (int $c) => (int) round($c * $ratio + 255 * (1 - $ratio));
+
+        return sprintf('#%02x%02x%02x', $mix($r), $mix($g), $mix($b));
     }
 
     /**

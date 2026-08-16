@@ -154,7 +154,13 @@ async function onQuizChange(id: number | null): Promise<void> {
 async function exportPdf(): Promise<void> {
     exporting.value = true;
     try {
-        const { data } = await exportReportPdf(q);
+        const { data } = await exportReportPdf({
+            ...q,
+            heat_row_by: rowBy.value,
+            heat_col_by: colBy.value,
+            compare_by: compareBy.value,
+            compare_ids: pinnedIds.value,
+        });
         const stamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '');
         const url = URL.createObjectURL(data as Blob);
         const a = document.createElement('a');
@@ -600,7 +606,7 @@ onMounted(async () => {
                         <thead class="bg-brand-primary text-left text-xs uppercase tracking-wide text-brand-on-primary">
                             <tr>
                                 <th class="px-4 py-3">{{ compareMemberHeader }}</th>
-                                <th v-for="m in compareMeasures" :key="m.label" class="px-4 py-3 text-right">{{ m.label }}</th>
+                                <th v-for="m in compareMeasures" :key="m.label" class="px-4 py-3 text-center">{{ m.label }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -609,7 +615,7 @@ onMounted(async () => {
                                 <td
                                     v-for="m in compareMeasures"
                                     :key="m.label"
-                                    class="px-4 py-2 text-right tabular-nums"
+                                    class="px-4 py-2 text-center tabular-nums"
                                     :class="isMaxInMeasure(m.raw, r) ? 'bg-brand-primary-soft font-semibold text-brand-primary' : ''"
                                 >
                                     {{ num(m.raw(r)) }}

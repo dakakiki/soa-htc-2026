@@ -99,13 +99,13 @@ export interface ReportMatrix {
     max: number | null;
 }
 
-/** The current report (with filters) as a branded PDF blob. */
-export function exportReportPdf(query: ReportQuery) {
-    const params = Object.fromEntries(
-        Object.entries(query).filter(([, v]) => v !== null && v !== undefined && v !== '')
+/** The current report (filters + on-screen heatmap/compare selections) as a PDF blob. */
+export function exportReportPdf(params: Record<string, unknown>) {
+    const clean = Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== null && v !== undefined && v !== '')
     );
 
-    return http.get('/api/reports/export-pdf', { params, responseType: 'blob' });
+    return http.get('/api/reports/export-pdf', { params: clean, responseType: 'blob' });
 }
 
 /** Two-dimension average-score cross-tab (heatmap). group_by is ignored here. */
