@@ -7,6 +7,40 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Console commands
+
+### `season:reset` — start-of-season cleanup
+
+Run once when a new season begins (or to clear a testing round). It resets the
+season-transactional data and normalises accounts and venues to a clean baseline,
+while leaving everything that persists across seasons untouched.
+
+| Action | Targets |
+| --- | --- |
+| **Wipe** (delete rows) | `registrations`, the full attempt chain (`attempts`, `attempt_answers`, `attempt_resets`, `grade_revisions`), student sessions (`student_sessions`, `student_session_quiz`), `publication_batches`, and the `audit_logs` trail |
+| **Delete** (accounts) | users who are **school coordinators** in the active season — their school scope cascades away |
+| **Deactivate** (`status = inactive`) | every remaining non-admin user (e.g. country coordinators) and **all schools** — records are kept, never deleted |
+| **Keep untouched** | content library (quizzes / exams / tests / questions), countries & regions, difficulty, roles & permissions, lookups, seasons, settings |
+
+Competitors ("students") are `registrations` rows, so they are wiped. **Admin
+accounts are never touched.** Schools and coordinators arrive via the legacy import,
+so schools are only deactivated (never deleted); real coordinators are re-enrolled per season.
+
+Preview the counts without writing anything:
+
+```bash
+php artisan season:reset --dry-run
+```
+
+Apply it — all writes run in a single transaction; a confirmation is required unless `--force` is passed:
+
+```bash
+php artisan season:reset --force
+```
+
+**Out of scope (Phase 6):** archiving the previous season's results before the wipe,
+and bumping the season round in settings. This command only deletes/deactivates data.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
