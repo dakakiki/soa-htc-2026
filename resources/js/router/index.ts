@@ -294,6 +294,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'reports.view' },
     },
     {
+        path: '/reset',
+        name: 'reset',
+        component: () => import('@/pages/results/ResetPage.vue'),
+        meta: { requiresAuth: true, permission: 'results.manage' },
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),

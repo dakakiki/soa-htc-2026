@@ -147,6 +147,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('grading/attempts/{attempt}/answers/{answer}', [GradingController::class, 'gradeEssay'])->whereNumber(['attempt', 'answer']);
     Route::get('results/overview', [ResultsController::class, 'overview']);
     Route::post('results/publish', [ResultsController::class, 'publish']);
+    Route::get('results/reset-candidates', [ResultsController::class, 'resetCandidates']);
+    Route::post('results/attempts/bulk-reset', [ResultsController::class, 'bulkReset']);
+    Route::post('results/reset-export', [ResultsController::class, 'resetExport']);
     Route::post('results/attempts/{attempt}/reset', [ResultsController::class, 'reset'])->whereNumber('attempt');
 
     // Reports (5f, CC-12). Gated by reports.view.

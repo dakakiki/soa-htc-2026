@@ -22,6 +22,7 @@ import {
     IconChecklist,
     IconSend,
     IconChartBar,
+    IconRotate,
     IconHelpCircle,
     IconFileText,
     IconTag,
@@ -61,12 +62,20 @@ function toggleCollapsed(): void {
 
 const items: NavItem[] = [
     { label: t('nav.dashboard'), icon: IconLayoutDashboard, to: 'dashboard', prefix: 'dashboard' },
-    { label: t('nav.students'), icon: IconUsersGroup, to: 'registrations', prefix: 'registrations', perm: 'schools.view' },
     { label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.view' },
     { label: t('nav.coordinators'), icon: IconUserStar, to: 'coordinators', prefix: 'coordinators', perm: 'users.manage' },
 ];
 
 const groups: NavGroup[] = [
+    {
+        key: 'students',
+        label: t('nav.students'),
+        icon: IconUsersGroup,
+        children: [
+            { label: t('nav.students'), icon: IconUsersGroup, to: 'registrations', prefix: 'registrations', perm: 'schools.view' },
+            { label: t('nav.difficulty'), icon: IconStairs, to: 'difficulty', prefix: 'difficulty', perm: 'difficulty.manage' },
+        ],
+    },
     {
         key: 'quizzes',
         label: t('nav.quizzes'),
@@ -82,6 +91,18 @@ const groups: NavGroup[] = [
         ],
     },
     {
+        key: 'results',
+        label: t('nav.results'),
+        icon: IconClipboardCheck,
+        children: [
+            { label: t('nav.grading'), icon: IconChecklist, to: 'grading', prefix: 'grading', perm: 'results.manage' },
+            { label: t('nav.publishing'), icon: IconSend, to: 'publishing', prefix: 'publishing', perm: 'results.manage' },
+            { label: t('nav.reports'), icon: IconChartBar, to: 'reports', prefix: 'reports', perm: 'reports.view' },
+            { label: t('nav.reset'), icon: IconRotate, to: 'reset', prefix: 'reset', perm: 'results.manage' },
+        ],
+    },
+    // Access and Settings stay last.
+    {
         key: 'access',
         label: t('nav.access'),
         icon: IconShieldLock,
@@ -91,22 +112,11 @@ const groups: NavGroup[] = [
         ],
     },
     {
-        key: 'results',
-        label: t('nav.results'),
-        icon: IconClipboardCheck,
-        children: [
-            { label: t('nav.grading'), icon: IconChecklist, to: 'grading', prefix: 'grading', perm: 'results.manage' },
-            { label: t('nav.publishing'), icon: IconSend, to: 'publishing', prefix: 'publishing', perm: 'results.manage' },
-            { label: t('nav.reports'), icon: IconChartBar, to: 'reports', prefix: 'reports', perm: 'reports.view' },
-        ],
-    },
-    {
         key: 'settings',
         label: t('nav.settings'),
         icon: IconSettings,
         children: [
             { label: t('nav.locations'), icon: IconWorld, to: 'locations', prefix: 'locations', perm: 'locations.manage' },
-            { label: t('nav.difficulty'), icon: IconStairs, to: 'difficulty', prefix: 'difficulty', perm: 'difficulty.manage' },
             { label: t('nav.theme'), icon: IconPalette, to: 'settings.theme', prefix: 'settings.theme', perm: 'settings.manage' },
         ],
     },
