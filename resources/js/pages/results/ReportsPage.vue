@@ -249,16 +249,28 @@ const pinnedRows = computed(() =>
     compareRows.value.filter((r) => r.key !== null && pinnedIds.value.includes(r.key as number))
 );
 
-// Measures shown as rows in the side-by-side compare table.
-const compareMeasures = computed<{ label: string; get: (r: ReportRow) => string }[]>(() => [
-    { label: t('reports.registered'), get: (r) => num(r.registered) },
-    { label: t('reports.started'), get: (r) => String(r.started) },
-    { label: t('reports.submitted'), get: (r) => String(r.submitted) },
-    { label: t('reports.publishedMeasure'), get: (r) => String(r.published) },
-    { label: t('reports.void'), get: (r) => String(r.void) },
-    { label: t('reports.scoreAvg'), get: (r) => num(r.score.avg) },
-    { label: t('reports.scoreMedian'), get: (r) => num(r.score.median) },
+// Measures are the columns; each member is a row (flipped table so 20+ members
+// still fit — they scroll vertically instead of overflowing as columns).
+const compareMeasures = computed<{ label: string; raw: (r: ReportRow) => number | null }[]>(() => [
+    { label: t('reports.registered'), raw: (r) => r.registered },
+    { label: t('reports.started'), raw: (r) => r.started },
+    { label: t('reports.submitted'), raw: (r) => r.submitted },
+    { label: t('reports.publishedMeasure'), raw: (r) => r.published },
+    { label: t('reports.void'), raw: (r) => r.void },
+    { label: t('reports.scoreAvg'), raw: (r) => r.score.avg },
+    { label: t('reports.scoreMedian'), raw: (r) => r.score.median },
 ]);
+
+const compareMemberHeader = computed(() => groupLabel[compareBy.value]);
+
+// Highlight the leading member in each measure column (neutral: just the max),
+// so the comparison reads at a glance without scanning every number.
+function isMaxInMeasure(raw: (r: ReportRow) => number | null, r: ReportRow): boolean {
+    if (pinnedRows.value.length < 2) return false;
+    const vals = pinnedRows.value.map(raw).filter((v): v is number => v !== null && v !== undefined);
+    const v = raw(r);
+    return vals.length > 0 && v !== null && v !== undefined && v === Math.max(...vals);
+}
 
 onMounted(async () => {
     await loadOptions();
@@ -554,17 +566,20 @@ onMounted(async () => {
                     <table class="w-full text-sm">
                         <thead class="bg-brand-primary text-left text-xs uppercase tracking-wide text-brand-on-primary">
                             <tr>
-                                <th class="px-4 py-3">{{ $t('reports.compareMeasure') }}</th>
-                                <th v-for="r in pinnedRows" :key="String(r.key)" class="px-4 py-3 text-right">
-                                    {{ r.label ?? $t('common.dash') }}
-                                </th>
+                                <th class="px-4 py-3">{{ compareMemberHeader }}</th>
+                                <th v-for="m in compareMeasures" :key="m.label" class="px-4 py-3 text-right">{{ m.label }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <tr v-for="m in compareMeasures" :key="m.label" class="hover:bg-gray-50">
-                                <td class="px-4 py-2 font-medium text-gray-700">{{ m.label }}</td>
-                                <td v-for="r in pinnedRows" :key="String(r.key)" class="px-4 py-2 text-right tabular-nums">
-                                    {{ m.get(r) }}
+                            <tr v-for="r in pinnedRows" :key="String(r.key)" class="hover:bg-gray-50">
+                                <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-700">{{ r.label ?? $t('common.dash') }}</td>
+                                <td
+                                    v-for="m in compareMeasures"
+                                    :key="m.label"
+                                    class="px-4 py-2 text-right tabular-nums"
+                                    :class="isMaxInMeasure(m.raw, r) ? 'bg-brand-primary-soft font-semibold text-brand-primary' : ''"
+                                >
+                                    {{ num(m.raw(r)) }}
                                 </td>
                             </tr>
                         </tbody>
