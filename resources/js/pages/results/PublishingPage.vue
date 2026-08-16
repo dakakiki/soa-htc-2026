@@ -228,10 +228,10 @@ onMounted(loadOptions);
                         <table class="w-full text-sm">
                             <thead class="bg-brand-primary text-left text-xs uppercase tracking-wide text-brand-on-primary">
                                 <tr>
-                                    <th class="px-4 py-2">{{ $t('publishing.colTest') }}</th>
-                                    <th class="px-4 py-2 text-center">{{ $t('publishing.colCompleted') }}</th>
-                                    <th class="px-4 py-2 text-center">{{ $t('publishing.colPublished') }}</th>
-                                    <th class="px-4 py-2 text-center">{{ $t('publishing.colPending') }}</th>
+                                    <th class="w-full px-4 py-2">{{ $t('publishing.colTest') }}</th>
+                                    <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('publishing.colCompleted') }}</th>
+                                    <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('publishing.colPublished') }}</th>
+                                    <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('publishing.colPending') }}</th>
                                     <th class="px-4 py-2"></th>
                                 </tr>
                             </thead>
