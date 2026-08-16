@@ -83,6 +83,70 @@ final class ReportSummary
     }
 
     /**
+     * A two-dimension cross-tab of average score (the heatmap): completed, scored
+     * attempts grouped by rowBy × colBy. Each cell carries the average and the
+     * count; min/max bound the colour scale. Absent combinations simply have no
+     * cell. Reuses the same population/content scope as the rest of the report.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public static function matrix(array $filters, string $rowBy, string $colBy): array
+    {
+        $needExam = in_array('exam', [$rowBy, $colBy], true);
+        $rowCol = self::groupColumn($rowBy);
+        $colCol = self::groupColumn($colBy);
+
+        $rows = self::attemptBase($filters, $needExam ? 'exam' : null)
+            ->where('attempts.status', 'completed')
+            ->whereNotNull('attempts.score')
+            ->select([
+                DB::raw("$rowCol as rkey"),
+                DB::raw("$colCol as ckey"),
+                DB::raw('avg(attempts.score) as avg_score'),
+                DB::raw('count(*) as n'),
+            ])
+            ->groupBy(DB::raw($rowCol), DB::raw($colCol))
+            ->get();
+
+        $cells = [];
+        $rowKeys = [];
+        $colKeys = [];
+        $min = null;
+        $max = null;
+        foreach ($rows as $row) {
+            $avg = round((float) $row->avg_score, 2);
+            $rowKeys[(int) $row->rkey] = true;
+            $colKeys[(int) $row->ckey] = true;
+            $cells[] = ['row_key' => (int) $row->rkey, 'col_key' => (int) $row->ckey, 'avg' => $avg, 'count' => (int) $row->n];
+            $min = $min === null ? $avg : min($min, $avg);
+            $max = $max === null ? $avg : max($max, $avg);
+        }
+
+        $rowKeyList = array_keys($rowKeys);
+        $colKeyList = array_keys($colKeys);
+        $rowLabels = self::labels($rowBy, $rowKeyList);
+        $colLabels = self::labels($colBy, $colKeyList);
+
+        $axis = function (array $keys, array $labels): array {
+            $out = array_map(fn ($k) => ['key' => $k, 'label' => $labels[$k] ?? null], $keys);
+            usort($out, fn ($a, $b) => strcmp((string) $a['label'], (string) $b['label']));
+
+            return $out;
+        };
+
+        return [
+            'row_by' => $rowBy,
+            'col_by' => $colBy,
+            'rows' => $axis($rowKeyList, $rowLabels),
+            'cols' => $axis($colKeyList, $colLabels),
+            'cells' => $cells,
+            'min' => $min,
+            'max' => $max,
+        ];
+    }
+
+    /**
      * Attempt count rows keyed by group value (or the single key null when not
      * grouping).
      *

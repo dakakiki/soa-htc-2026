@@ -155,4 +155,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // Reports (5f, CC-12). Gated by reports.view.
     Route::get('reports/filters', [ReportController::class, 'filters']);
     Route::get('reports/summary', [ReportController::class, 'summary']);
+    Route::get('reports/matrix', [ReportController::class, 'matrix']);
 });

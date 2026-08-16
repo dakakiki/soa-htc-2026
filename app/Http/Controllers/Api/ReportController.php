@@ -61,6 +61,40 @@ class ReportController extends Controller
     }
 
     /**
+     * A two-dimension cross-tab of average score (heatmap) — e.g. country × level.
+     * Same filters as the summary; the two dimensions are validated against the
+     * same set as group_by. Read-only, gated by reports.view.
+     */
+    public function matrix(Request $request): JsonResponse
+    {
+        $this->authorize('reports.view');
+
+        $dims = ['country', 'region', 'school', 'level', 'quiz', 'exam', 'test'];
+
+        $validated = $request->validate([
+            'row_by' => ['required', Rule::in($dims)],
+            'col_by' => ['required', Rule::in($dims)],
+            'season_id' => ['nullable', 'integer'],
+            'country_id' => ['nullable', 'integer'],
+            'region_id' => ['nullable', 'integer'],
+            'school_id' => ['nullable', 'integer'],
+            'coordinator_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'difficulty_level_id' => ['nullable', 'integer'],
+            'quiz_id' => ['nullable', 'integer'],
+            'exam_id' => ['nullable', 'integer'],
+            'test_id' => ['nullable', 'integer'],
+        ]);
+
+        $filters = $validated;
+        $filters['season_id'] = $validated['season_id'] ?? SeasonContext::active()?->id;
+        $filters['coordinator_school_ids'] = $this->coordinatorSchoolIds(
+            isset($validated['coordinator_user_id']) ? (int) $validated['coordinator_user_id'] : null
+        );
+
+        return response()->json(ReportSummary::matrix($filters, $validated['row_by'], $validated['col_by']));
+    }
+
+    /**
      * Bounded option lists that populate the report's filter controls. Cascades:
      * regions + schools are returned only for a chosen country; exams for a chosen
      * quiz; and tests for the chosen quiz — narrowed to a single exam's tests when

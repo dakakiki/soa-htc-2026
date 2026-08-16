@@ -285,6 +285,36 @@ class ReportTest extends TestCase
         $this->assertSame([$testA->id], collect($narrowed->json('tests'))->pluck('id')->all());
     }
 
+    public function test_matrix_cross_tabs_average_score_by_country_and_level(): void
+    {
+        $c = $this->content();
+        $rs = School::firstOrFail();
+        $this->attempt($this->registration($rs), $c, 'completed', 6.0);
+        $this->attempt($this->registration($rs), $c, 'completed', 8.0);
+
+        $mk = Country::where('code', 'MK')->firstOrFail();
+        $mkSchool = School::create(['country_id' => $mk->id, 'name' => 'MK School', 'status' => 'active']);
+        $this->attempt($this->registration($mkSchool), $c, 'completed', 4.0);
+
+        $response = $this->actingAs($this->admin())
+            ->getJson('/api/reports/matrix?row_by=country&col_by=level')
+            ->assertOk()
+            ->assertJsonPath('row_by', 'country')
+            ->assertJsonPath('col_by', 'level');
+
+        $h2 = (int) DifficultyLevel::where('level_short', 'H2')->value('id');
+        $cells = collect($response->json('cells'));
+
+        // Serbia × H2 averages the two Serbian scores (6, 8) = 7 over 2 attempts.
+        $rsCell = $cells->first(fn ($x) => $x['row_key'] === $rs->country_id && $x['col_key'] === $h2);
+        $this->assertSame(7.0, (float) $rsCell['avg']);
+        $this->assertSame(2, $rsCell['count']);
+
+        // North Macedonia × H2 has the single score of 4.
+        $mkCell = $cells->first(fn ($x) => $x['row_key'] === $mk->id && $x['col_key'] === $h2);
+        $this->assertSame(4.0, (float) $mkCell['avg']);
+    }
+
     public function test_invalid_group_by_is_rejected(): void
     {
         $this->actingAs($this->admin())->getJson('/api/reports/summary?group_by=teacher')

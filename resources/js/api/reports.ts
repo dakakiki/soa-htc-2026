@@ -74,3 +74,38 @@ export function reportSummary(query: ReportQuery) {
 
     return http.get<ReportSummary>('/api/reports/summary', { params });
 }
+
+// --- Heatmap cross-tab (CC-12+) ---
+
+export interface MatrixAxis {
+    key: number;
+    label: string | null;
+}
+
+export interface MatrixCell {
+    row_key: number;
+    col_key: number;
+    avg: number;
+    count: number;
+}
+
+export interface ReportMatrix {
+    row_by: GroupBy;
+    col_by: GroupBy;
+    rows: MatrixAxis[];
+    cols: MatrixAxis[];
+    cells: MatrixCell[];
+    min: number | null;
+    max: number | null;
+}
+
+/** Two-dimension average-score cross-tab (heatmap). group_by is ignored here. */
+export function reportMatrix(query: ReportQuery, rowBy: GroupBy, colBy: GroupBy) {
+    const { group_by: _group, ...rest } = query;
+    const params: Record<string, unknown> = { row_by: rowBy, col_by: colBy };
+    for (const [k, v] of Object.entries(rest)) {
+        if (v !== null && v !== undefined) params[k] = v;
+    }
+
+    return http.get<ReportMatrix>('/api/reports/matrix', { params });
+}
