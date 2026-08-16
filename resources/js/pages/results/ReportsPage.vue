@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { IconFileTypePdf } from '@tabler/icons-vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import ExportButton from '@/components/ExportButton.vue';
 import Tooltip from '@/components/Tooltip.vue';
 import {
     reportFilters,
     reportSummary,
     reportMatrix,
+    exportReportPdf,
     type GroupBy,
     type ReportFilterOptions,
     type ReportMatrix,
@@ -32,6 +35,7 @@ const q = reactive<ReportQuery>({
 const summary = ref<Awaited<ReturnType<typeof reportSummary>>['data'] | null>(null);
 const loading = ref(false);
 const optionsLoading = ref(false);
+const exporting = ref(false);
 const error = ref<string | null>(null);
 
 // Heatmap cross-tab: average score by two dimensions (defaults country × level).
@@ -144,6 +148,25 @@ async function onQuizChange(id: number | null): Promise<void> {
     q.test_id = null;
     await loadOptions();
     await loadSummary();
+}
+
+/** Download the current report (with its filters) as a branded PDF. */
+async function exportPdf(): Promise<void> {
+    exporting.value = true;
+    try {
+        const { data } = await exportReportPdf(q);
+        const stamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '');
+        const url = URL.createObjectURL(data as Blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report-${stamp}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } finally {
+        exporting.value = false;
+    }
 }
 
 function resetFilters(): void {
@@ -280,9 +303,19 @@ onMounted(async () => {
 
 <template>
     <section class="space-y-6">
-        <div>
-            <h1 class="text-2xl font-semibold tracking-tight">{{ $t('reports.title') }}</h1>
-            <p class="mt-1 text-sm text-gray-600">{{ $t('reports.subtitle') }}</p>
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-semibold tracking-tight">{{ $t('reports.title') }}</h1>
+                <p class="mt-1 text-sm text-gray-600">{{ $t('reports.subtitle') }}</p>
+            </div>
+            <ExportButton
+                :icon="IconFileTypePdf"
+                :label="$t('reports.exportPdf')"
+                :tooltip="$t('reports.exportPdfTooltip')"
+                :loading="exporting"
+                :disabled="!summary"
+                @click="exportPdf"
+            />
         </div>
 
         <!-- Filters -->

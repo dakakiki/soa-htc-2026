@@ -99,6 +99,15 @@ export interface ReportMatrix {
     max: number | null;
 }
 
+/** The current report (with filters) as a branded PDF blob. */
+export function exportReportPdf(query: ReportQuery) {
+    const params = Object.fromEntries(
+        Object.entries(query).filter(([, v]) => v !== null && v !== undefined && v !== '')
+    );
+
+    return http.get('/api/reports/export-pdf', { params, responseType: 'blob' });
+}
+
 /** Two-dimension average-score cross-tab (heatmap). group_by is ignored here. */
 export function reportMatrix(query: ReportQuery, rowBy: GroupBy, colBy: GroupBy) {
     const { group_by: _group, ...rest } = query;

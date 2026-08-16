@@ -14,11 +14,14 @@ use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
+use App\Domain\Organization\Models\Setting;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\PdfWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 
 /**
@@ -92,6 +95,171 @@ class ReportController extends Controller
         );
 
         return response()->json(ReportSummary::matrix($filters, $validated['row_by'], $validated['col_by']));
+    }
+
+    /**
+     * The current report (with its filters) as a branded PDF — same data as the
+     * summary, rendered through the reusable {@see PdfWriter} (SOA HTC header +
+     * logo). Landscape so the breakdown table breathes.
+     */
+    public function exportPdf(Request $request): Response
+    {
+        $this->authorize('reports.view');
+
+        $validated = $request->validate([
+            'season_id' => ['nullable', 'integer'],
+            'country_id' => ['nullable', 'integer'],
+            'region_id' => ['nullable', 'integer'],
+            'school_id' => ['nullable', 'integer'],
+            'coordinator_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'difficulty_level_id' => ['nullable', 'integer'],
+            'quiz_id' => ['nullable', 'integer'],
+            'exam_id' => ['nullable', 'integer'],
+            'test_id' => ['nullable', 'integer'],
+            'group_by' => ['nullable', Rule::in(['country', 'region', 'school', 'level', 'quiz', 'exam', 'test'])],
+        ]);
+
+        $echoed = $validated;
+        $echoed['season_id'] = $validated['season_id'] ?? SeasonContext::active()?->id;
+
+        $filters = $echoed;
+        $filters['coordinator_school_ids'] = $this->coordinatorSchoolIds(
+            isset($validated['coordinator_user_id']) ? (int) $validated['coordinator_user_id'] : null
+        );
+
+        $data = ReportSummary::build($filters);
+        $pdf = PdfWriter::toString($this->reportHtml($data, $echoed), 'Competition report', 'L');
+
+        $filename = 'report-'.now()->format('Y-m-d_His').'.pdf';
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * The report body as mPDF-friendly HTML (tables + inline styles; no flex or
+     * color-mix). Totals, rates, funnel and — when grouped — the breakdown table.
+     *
+     * @param  array<string, mixed>  $data  ReportSummary::build() output
+     * @param  array<string, mixed>  $f  echoed filters (for the scope line)
+     */
+    private function reportHtml(array $data, array $f): string
+    {
+        $setting = Setting::current();
+        $brand = $setting->color_primary ?: '#2563eb';
+        $onBrand = $setting->color_on_primary ?: '#ffffff';
+
+        $t = $data['totals'];
+        $s = $t['score'];
+        $stamp = now()->format('Y-m-d H:i');
+        $scope = $this->filterSummary($f);
+
+        $pct = fn (int $n, int $d): string => $d > 0 ? round($n / $d * 100).'%' : '—';
+        $participation = $pct((int) $t['started'], (int) $t['registered']);
+        $completion = $pct((int) $t['submitted'], (int) $t['started']);
+        $publish = $pct((int) $t['published'], (int) $t['submitted']);
+
+        $totCells = '';
+        foreach ([['Registered', $t['registered'], '#111827'], ['Started', $t['started'], '#111827'], ['Submitted', $t['submitted'], '#111827'], ['Published', $t['published'], '#059669'], ['Void', $t['void'], '#d97706']] as [$label, $val, $color]) {
+            $totCells .= '<td width="20%" style="border:0.6pt solid #e5e7eb;padding:6px;">'
+                .'<div style="font-size:7pt;color:#6b7280;">'.$label.'</div>'
+                .'<div style="font-size:15pt;font-weight:bold;color:'.$color.';">'.$val.'</div></td>';
+        }
+
+        $base = max(1, (int) $t['registered']);
+        $funnel = '';
+        foreach ([['Registered', $t['registered']], ['Started', $t['started']], ['Submitted', $t['submitted']], ['Published', $t['published']]] as [$label, $val]) {
+            $w = (int) round((int) $val / $base * 100);
+            $funnel .= '<tr>'
+                .'<td width="16%" style="font-size:8pt;color:#6b7280;padding:2px 0;">'.$label.'</td>'
+                .'<td width="68%"><table width="100%" cellspacing="0" cellpadding="0"><tr>'
+                    .($w > 0 ? '<td width="'.$w.'%" style="background:'.$brand.';font-size:3pt;line-height:10px;">&nbsp;</td>' : '')
+                    .($w < 100 ? '<td style="background:#eef2f7;font-size:3pt;line-height:10px;">&nbsp;</td>' : '')
+                .'</tr></table></td>'
+                .'<td width="16%" style="text-align:right;font-size:8pt;padding:2px 0;">'.$val.' ('.$w.'%)</td>'
+                .'</tr>';
+        }
+
+        $breakdown = '';
+        if (! empty($data['group_by'])) {
+            $dim = ucfirst((string) $data['group_by']);
+            $head = '<tr style="background:'.$brand.';color:'.$onBrand.';">'
+                .'<th style="text-align:left;padding:5px;">'.$dim.'</th>'
+                .'<th style="text-align:right;padding:5px;">Reg.</th><th style="text-align:right;padding:5px;">Started</th>'
+                .'<th style="text-align:right;padding:5px;">Submitted</th><th style="text-align:right;padding:5px;">Published</th>'
+                .'<th style="text-align:right;padding:5px;">Void</th><th style="text-align:right;padding:5px;">Avg</th><th style="text-align:right;padding:5px;">Median</th></tr>';
+            $rows = '';
+            foreach ($data['rows'] as $i => $r) {
+                $bg = $i % 2 === 1 ? 'background:#f9fafb;' : '';
+                $rows .= '<tr style="'.$bg.'">'
+                    .'<td style="padding:4px 5px;">'.e($r['label'] ?? '—').'</td>'
+                    .'<td style="text-align:right;padding:4px 5px;">'.($r['registered'] ?? '—').'</td>'
+                    .'<td style="text-align:right;padding:4px 5px;">'.$r['started'].'</td>'
+                    .'<td style="text-align:right;padding:4px 5px;">'.$r['submitted'].'</td>'
+                    .'<td style="text-align:right;padding:4px 5px;color:#059669;">'.$r['published'].'</td>'
+                    .'<td style="text-align:right;padding:4px 5px;color:#d97706;">'.$r['void'].'</td>'
+                    .'<td style="text-align:right;padding:4px 5px;">'.($r['score']['avg'] ?? '—').'</td>'
+                    .'<td style="text-align:right;padding:4px 5px;">'.($r['score']['median'] ?? '—').'</td>'
+                    .'</tr>';
+            }
+            $breakdown = '<h3 style="font-size:10pt;margin:12px 0 4px;">Breakdown — '.$dim.'</h3>'
+                .'<table width="100%" cellspacing="0" cellpadding="0" style="border:0.6pt solid #e5e7eb;font-size:8pt;">'.$head.$rows.'</table>';
+        }
+
+        $scoreLine = 'Avg: <b>'.($s['avg'] ?? '—').'</b> &nbsp; Min: <b>'.($s['min'] ?? '—').'</b> &nbsp; Max: <b>'.($s['max'] ?? '—').'</b> &nbsp; Median: <b>'.($s['median'] ?? '—').'</b> &nbsp; Scored: '.$s['count'];
+
+        return <<<HTML
+            <div style="font-size:9pt;color:#111827;">
+                <h1 style="font-size:15pt;margin:0;">Competition report</h1>
+                <div style="font-size:8pt;color:#6b7280;margin:2px 0 10px;">Generated {$stamp} &nbsp;&middot;&nbsp; {$scope}</div>
+
+                <h3 style="font-size:10pt;margin:6px 0 4px;">Totals</h3>
+                <table width="100%" cellspacing="0" cellpadding="0"><tr>{$totCells}</tr></table>
+                <div style="font-size:8pt;color:#374151;margin:6px 0 10px;padding:5px;border:0.6pt solid #e5e7eb;">{$scoreLine}</div>
+
+                <h3 style="font-size:10pt;margin:6px 0 4px;">Rates</h3>
+                <table width="100%" cellspacing="0" cellpadding="0"><tr>
+                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PARTICIPATION</div><div style="font-size:13pt;font-weight:bold;">{$participation}</div><div style="font-size:7pt;color:#9ca3af;">Started / Registered</div></td>
+                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">COMPLETION</div><div style="font-size:13pt;font-weight:bold;">{$completion}</div><div style="font-size:7pt;color:#9ca3af;">Submitted / Started</div></td>
+                    <td width="34%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PUBLISH RATE</div><div style="font-size:13pt;font-weight:bold;">{$publish}</div><div style="font-size:7pt;color:#9ca3af;">Published / Submitted</div></td>
+                </tr></table>
+
+                <h3 style="font-size:10pt;margin:12px 0 4px;">Participation funnel</h3>
+                <table width="100%" cellspacing="0" cellpadding="0">{$funnel}</table>
+
+                {$breakdown}
+            </div>
+            HTML;
+    }
+
+    /**
+     * A compact human line of the applied filters for the PDF scope caption.
+     *
+     * @param  array<string, mixed>  $f
+     */
+    private function filterSummary(array $f): string
+    {
+        $map = [
+            'country_id' => ['Country', fn ($id) => Country::find($id)?->name],
+            'region_id' => ['Region', fn ($id) => Region::find($id)?->name],
+            'school_id' => ['Venue', fn ($id) => School::find($id)?->name],
+            'difficulty_level_id' => ['Level', fn ($id) => DifficultyLevel::find($id)?->level_short],
+            'coordinator_user_id' => ['Coordinator', fn ($id) => User::find($id)?->name],
+            'quiz_id' => ['Quiz', fn ($id) => Quiz::find($id)?->title],
+            'exam_id' => ['Exam', fn ($id) => Exam::find($id)?->title],
+            'test_id' => ['Test', fn ($id) => Test::find($id)?->title],
+        ];
+
+        $parts = [];
+        foreach ($map as $key => [$label, $resolve]) {
+            if (! empty($f[$key]) && ($name = $resolve($f[$key])) !== null) {
+                $parts[] = $label.': '.e($name);
+            }
+        }
+
+        return $parts === [] ? 'All competitors (no filters)' : implode(' &middot; ', $parts);
     }
 
     /**

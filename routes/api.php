@@ -156,4 +156,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('reports/filters', [ReportController::class, 'filters']);
     Route::get('reports/summary', [ReportController::class, 'summary']);
     Route::get('reports/matrix', [ReportController::class, 'matrix']);
+    Route::get('reports/export-pdf', [ReportController::class, 'exportPdf']);
 });

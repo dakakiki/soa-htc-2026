@@ -315,6 +315,24 @@ class ReportTest extends TestCase
         $this->assertSame(4.0, (float) $mkCell['avg']);
     }
 
+    public function test_export_pdf_returns_a_branded_pdf(): void
+    {
+        $c = $this->content();
+        $this->attempt($this->registration(), $c, 'completed', 7.0);
+
+        $response = $this->actingAs($this->admin())->get('/api/reports/export-pdf?group_by=country');
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_export_pdf_requires_the_reports_permission(): void
+    {
+        $this->getJson('/api/reports/export-pdf')->assertUnauthorized();
+        $this->actingAs(User::factory()->create())->getJson('/api/reports/export-pdf')->assertForbidden();
+    }
+
     public function test_invalid_group_by_is_rejected(): void
     {
         $this->actingAs($this->admin())->getJson('/api/reports/summary?group_by=teacher')

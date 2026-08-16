@@ -789,6 +789,8 @@ export default {
         noGroup: 'Choose a “break down by” dimension to see a per-group table.',
         error: 'Could not load the report.',
         anyOption: 'All',
+        exportPdf: 'Export PDF',
+        exportPdfTooltip: 'Download this report as a PDF with the SOA HTC header.',
     },
     reset: {
         title: 'Reset attempts',
