@@ -554,7 +554,7 @@ onMounted(async () => {
                     <MultiSelect
                         :model-value="pinnedIds"
                         :options="compareOptions"
-                        :max-chips="8"
+                        :max-chips="2"
                         :placeholder="$t('reports.comparePlaceholder')"
                         :search-placeholder="$t('common.search')"
                         :summary="(n: number) => $t('reports.compareSelected', { n })"
