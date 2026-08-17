@@ -28,3 +28,29 @@ export const http = axios.create({
         'X-Requested-With': 'XMLHttpRequest',
     },
 });
+
+/** Statuses that mean the server session is no longer valid. */
+const SESSION_EXPIRED_STATUSES = new Set([401, 419]);
+
+let unauthorizedHandler: (() => void) | null = null;
+
+/**
+ * Register a callback fired when any request fails because the session has
+ * expired (401 Unauthenticated / 419 Page Expired). Wired in `app.ts` to drop
+ * the stale admin identity and redirect to the login screen — without it a
+ * cached session keeps rendering the admin shell while every call is rejected.
+ */
+export function onUnauthorized(handler: () => void): void {
+    unauthorizedHandler = handler;
+}
+
+http.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (axios.isAxiosError(error) && error.response && SESSION_EXPIRED_STATUSES.has(error.response.status)) {
+            unauthorizedHandler?.();
+        }
+
+        return Promise.reject(error);
+    },
+);

@@ -44,5 +44,14 @@ export const useSessionStore = defineStore('session', () => {
         user.value = null;
     }
 
-    return { user, ready, isAuthenticated, can, ensureLoaded, login, logout };
+    /**
+     * Drop the identity locally without calling the API — used when the server
+     * has already reported the session expired (a 401/419), so there is nothing
+     * left to log out on the backend.
+     */
+    function forceLogout(): void {
+        user.value = null;
+    }
+
+    return { user, ready, isAuthenticated, can, ensureLoaded, login, logout, forceLogout };
 });
