@@ -223,3 +223,24 @@ Predloženi postupak:
 - da li je potreban paralelni rad oba sistema jednu sezonu;
 - ko poslovno potpisuje reconciliation po sezoni.
 
+## 12. Status implementacije (2026-08-17)
+
+**Redosled (vlasnik):** master-data migracija PRVO → 50k sintetičkih studenata → load-test 10k → dizajn arhive (Layer C) iz realnih podataka + poređenje sa starim appom TEK ONDA. Arhiva se ne dizajnira unapred naslepo.
+
+**Urađeno (commit `4b73b38`, push-ovano; dev baza — ostaje lokalno):**
+
+- **`legacy_id_maps`** (§6, kičma linijaže): `(source, source_table, source_pk, target_type) → target_id`, unique — dozvoljava many-to-one dedup da ostane reconcilable i čini svaki import idempotentnim.
+- **`legacy:import-countries`** — 96; 1:1; reconcile postojećeg seed-a po imenu (+alias „N.Macedonia"); `countries.code` proširen `char(2)→char(3)` za legacy short (2–3 znaka).
+- **`legacy:import-regions`** — 126; 1:1; mapiranje na zemlju preko `legacy_id`.
+- **`legacy:import-schools`** — 3878 (od 3896): **dedup** — merge SAMO kad se poklapaju zemlja + normalizovano ime + **neprazan grad** (16 grupa spojeno); isto ime u istoj zemlji ali drugi/prazan grad = **zasebne škole**; 2 škole sa nemapiranom zemljom = **karantin** (ne importuju se, u izveštaj); status/type/hours mapirani; SVI legacy id (uklj. merged-away) upisani u `legacy_id_maps`. **0 orphan FK.**
+- **`legacy:import-coordinators`** — 127 (12 admin + 115 country-coord; school-coord level 1 se **ne** migrira). Users upsert po email-u; **bcrypt hash kopiran verbatim** (koordinatori zadržavaju lozinke — `hashed` cast preskače re-hash); assignment na aktivnu sezonu; **admin bez scope-a** (`schools.view.all`); country-coord scope iz `user_schools` razrešen preko `legacy_id_maps`; **20 country-coord bez legacy scope-a ostavljeno prazno** (ne izmišlja se).
+- **50k sintetičkih registracija** (`registrations:seed-synthetic 50000`) — 86 zemalja, svih 3878 škola, 24 nivoa, `competitor_number` 14000001–14050000; osnova za load-test.
+
+**Razrešeno iz §11:** pravila deduplikacije schools/regions/countries su definisana (gore). Ostaju otvorena: kanonski izvor zbirnih rezultata, kompletna lista istorijskih baza, retention/cutover prozor.
+
+**Odluke:** vidi **ADR-0025** (`DECISIONS.md`).
+
+**Verifikacija:** reconciliation upiti (brojevi ulaz/izlaz, FK integritet, 0 orphan). Import komande nemaju unit-test (operativne alatke, kao ostale `legacy:import-*`); suite 208/208 zelen (migracije ne lome postojeće).
+
+**SLEDEĆI KORAK (sutra):** load harness (k6) — identify → start → submit, do 10k paralelno, radi validacije upisa pod kontencijom (attempt start pod lock-om, race-safe `competitor_number`, unique aktivni attempt). ⚠️ Sintetički studenti su round-robin preko svih 24 nivoa (uklj. „…7" varijante bez sadržaja) — za test-taking pod opterećenjem vezati ih za nivoe koji imaju quiz/exam/test, inače `availability` vraća prazno. Zatim: uneti rezultate → dizajn arhive (Layer C) iz realnih podataka.
+

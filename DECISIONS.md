@@ -498,6 +498,39 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0025 — Master-data migracija: legacy_id_maps + dedup + hash + anonimizacija samo studenti
+
+- **Status:** Prihvaćeno (2026-08-17); vlasnik proizvoda
+- **Kontekst:** Faza 6, prvi implementirani slice. Vlasnik promenio redosled: umesto
+  „archive-first", prvo se migriraju **persistentni entiteti** (zemlje/regioni/venue/
+  admini/country-koordinatori — prenose se kroz sezone) i generiše **50k sintetičkih
+  studenata** za load-test 10k; **arhiva (Layer C) se dizajnira TEK POSLE**, iz realnih
+  rezultata + poređenja sa starim appom (a ne naslepo unapred).
+- **Odluka:**
+  - **`legacy_id_maps`** (04 §6) kao kičma linijaže: `(source, source_table, source_pk,
+    target_type) → target_id` (unique). Omogućava many-to-one dedup da ostane
+    reconcilable i idempotentnost svih import komandi.
+  - **Dedup škola:** merge SAMO kad se poklapaju **zemlja + normalizovano ime + neprazan
+    grad**; isto ime u istoj zemlji sa drugim/praznim gradom = **zasebne škole** (škola sme
+    isti naziv u istoj zemlji u drugom gradu). Škole sa nemapiranom zemljom = **karantin**
+    (ne importuju se, u izveštaj). Countries/regions su čisti → 1:1.
+  - **Lozinke:** bcrypt hash se **kopira verbatim** (Laravel `hashed` cast preskače
+    re-hash za već-hešovanu vrednost) → koordinatori zadržavaju lozinke.
+  - **Anonimizacija SAMO studenti** (kad se budu migrirali realni). Useri/koordinatori se
+    migriraju sa realnim imenom/emailom — **dev baza ostaje lokalno i NIKAD ne ide na git**
+    (svesno, dokumentovano odstupanje od ADR-0004, prihvatljivo jer nema izlaganja PII-ja).
+  - **Scope:** admini bez `assignment_schools` (drže `schools.view.all`); country-koordinatori
+    scope iz `user_schools` (razrešen kroz `legacy_id_maps`); country-coord bez legacy scope-a
+    **ostaje bez scope-a** (ne izmišlja se). School-koordinatori (level 1) se NE migriraju
+    (per-sezona). `countries.code` proširen `char(2)→char(3)` (legacy short 2–3 znaka).
+- **Posledica:** 4 idempotentne `legacy:import-*` komande + `legacy_id_maps` + model
+  `App\Domain\Migration\Models\LegacyIdMap`. Verifikovano reconciliation-om (96 countries,
+  126 regions, 3878 schools 0-orphan-FK, 127 staff). Realne registracije/rezultati i
+  **OD-8/OD-9** ostaju za kasnije (koriste se sintetički za load-test). Import komande nemaju
+  unit-test (operativne). Vidi status u `docs/04 §12`.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
