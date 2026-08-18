@@ -61,6 +61,12 @@ return [
             'engine' => 'InnoDB',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // READ COMMITTED avoids the gap-lock INSERT deadlocks that MySQL's
+                // default REPEATABLE READ causes under high concurrency (measured
+                // on student_sessions). Correctness still rests on unique
+                // constraints + SELECT ... FOR UPDATE. Set per connection so it
+                // travels with the app — no server-side my.ini change on deploy.
+                PDO::MYSQL_ATTR_INIT_COMMAND => 'SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED',
             ]) : [],
         ],
 
@@ -99,6 +105,12 @@ return [
             'engine' => 'InnoDB',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // READ COMMITTED avoids the gap-lock INSERT deadlocks that MySQL's
+                // default REPEATABLE READ causes under high concurrency (measured
+                // on student_sessions). Correctness still rests on unique
+                // constraints + SELECT ... FOR UPDATE. Set per connection so it
+                // travels with the app — no server-side my.ini change on deploy.
+                PDO::MYSQL_ATTR_INIT_COMMAND => 'SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED',
             ]) : [],
         ],
 

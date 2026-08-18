@@ -8,11 +8,12 @@ use App\Domain\Assessment\Enums\QuestionType;
 use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Enums\AttemptStatus;
+use App\Domain\Competition\Enums\GradingStatus;
+use App\Domain\Competition\Jobs\GradeAttempt;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\AttemptAnswer;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Models\StudentSession;
-use App\Domain\Competition\Support\AttemptGrader;
 use App\Domain\Competition\Support\StudentAvailability;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +45,8 @@ class AttemptController extends Controller
             return $this->resumeOrRefuse($existing, $test);
         }
 
+        // Retry on a transient InnoDB deadlock/lock-wait so a concurrency spike
+        // never turns a valid start into an error (the body is idempotent).
         return DB::transaction(function () use ($session, $registration, $test) {
             // Serialise concurrent starts for this competitor.
             Registration::whereKey($registration->id)->lockForUpdate()->first();
@@ -72,7 +75,7 @@ class AttemptController extends Controller
             ]);
 
             return response()->json($this->openPayload($attempt, $test), 201);
-        });
+        }, 5);
     }
 
     /** Resume an open attempt (server-authoritative remaining time). */
@@ -121,9 +124,16 @@ class AttemptController extends Controller
                 );
             }
 
-            $attempt->update(['status' => AttemptStatus::Completed, 'submitted_at' => now()]);
-            AttemptGrader::grade($attempt);
-        });
+            // Complete now; auto-grading is deferred to a queued job so the submit
+            // response stays fast and the answers are durably saved beforehand.
+            $attempt->update([
+                'status' => AttemptStatus::Completed,
+                'submitted_at' => now(),
+                'grading_status' => GradingStatus::Queued,
+            ]);
+        }, 5);
+
+        GradeAttempt::dispatch($attempt);
 
         return response()->json($this->completedPayload($attempt->refresh()));
     }
@@ -139,8 +149,12 @@ class AttemptController extends Controller
             return false;
         }
 
-        $attempt->update(['status' => AttemptStatus::Completed, 'submitted_at' => $attempt->expires_at]);
-        AttemptGrader::grade($attempt);
+        $attempt->update([
+            'status' => AttemptStatus::Completed,
+            'submitted_at' => $attempt->expires_at,
+            'grading_status' => GradingStatus::Queued,
+        ]);
+        GradeAttempt::dispatch($attempt);
 
         return true;
     }

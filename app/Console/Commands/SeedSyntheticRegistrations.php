@@ -60,6 +60,7 @@ class SeedSyntheticRegistrations extends Command
         for ($i = 1; $i <= $count; $i++) {
             $seq = $start + $i;
             $school = $schools[($i - 1) % $schoolCount];
+            $grade = (($i - 1) % 13) + 1;
             $buffer[] = [
                 'season_id' => $season->id,
                 'competitor_number' => $season->round_number.str_pad((string) $seq, 6, '0', STR_PAD_LEFT),
@@ -68,8 +69,10 @@ class SeedSyntheticRegistrations extends Command
                 'country_id' => $school->country_id,
                 'difficulty_level_id' => $levelIds[($i - 1) % $levelCount],
                 'name' => 'Synthetic Student '.$seq,
-                'date_of_birth' => null,
-                'grade' => (($i - 1) % 13) + 1,
+                // Deterministic DOB derived from grade so the identify 3-factor
+                // check works in load tests (real registrations always have one).
+                'date_of_birth' => sprintf('%04d-05-01', 2019 - $grade),
+                'grade' => $grade,
                 'status' => 'active',
                 'legacy_id' => null,
                 'created_at' => $now,

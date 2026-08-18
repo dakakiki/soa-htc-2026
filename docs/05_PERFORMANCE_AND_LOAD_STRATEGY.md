@@ -241,3 +241,64 @@ Posle događaja:
 - da li je multi-region potreban;
 - očekivani start/submit profil;
 - dozvoljeni nivo degradacije za reporting/CMS tokom takmičenja.
+
+## Status validacije (2026-08-18) — prvi lokalni load test
+
+**Setup:** k6 (v2.2.0, standalone binar), 50k sintetičkih registracija raspoređenih po realnim
+(migriranim) zemljama/venuima/nivoima; **DOB izveden iz razreda** (identify je 3-faktorski). Tok po VU =
+**identify → availability → unlock (jedna quiz-lozinka) → start → submit** nad competition kvizom (test-lozinka
+`123456` postavljena na sve kvizove za test). Distinct student po iteraciji (`iterationInTest`); attempt lanac
+se prazni između run-ova. `identify`/`unlock` throttle privremeno podignut (jedna mašina = jedan IP; u produkciji
+10k = 10k IP-jeva).
+
+**Izmereni plafoni (lokalni WAMP, Windows):**
+
+| Konkurentnih (VU) | checks uspeh | latenca p95 | dupli aktivni attempt |
+| --- | --- | --- | --- |
+| 100 | 100% | ~8,8s | **0** |
+| 500 (posle tuninga) | 99,76% | ~38s | **0** |
+| 1000 (posle tuninga) | 94,1% | ~60s (timeout) | **0** |
+
+**Ključni nalaz (glavni cilj):** **upis je korektan pod kontencijom** — `unique(registration_id, active_test_id)`
+(ADR-0016/0022) drži na svim nivoima; **0 duplih aktivnih attempt-a** čak i pri potpunoj saturaciji sa timeout-ima,
+bez deadlock-a. Konkurentni „start" je siguran.
+
+**Dva otkrivena/rešena uska grla:**
+1. **`config:cache` je obavezan pod konkurentnošću.** Bez keširanog config-a, `env()` se čita u runtime-u i paralelno
+   čitanje `.env` (Windows, mnogo Apache thread-ova) povremeno vrati `null` → app padne na default konekciju
+   (`mysql/laravel`, `sqlite`) → HTTP 500. `php artisan config:cache` (produkcija ionako uvek kešira) → 100% uspeh.
+   ⚠️ U dev-u posle toga `.env` izmene ne važe dok se ne uradi `config:clear`.
+2. **Apache `mpm_winnt` plafon.** Default `ThreadsPerChild=150` = plafon konkurentnih konekcija → iznad toga zahtevi
+   se odbijaju/čekaju. Podignuto na **1000** (`conf/extra/httpd-mpm.conf`) + MySQL `max_connections` **151→1100**
+   (`my.ini`). Rezultat: 500 konkurentnih sa 59%→99,76% uspeha.
+
+**Zaključak:** jedan Windows WAMP (mod_php, jednoprocesni `mpm_winnt`) čisto obrađuje **~500 konkurentnih** uz
+visoku latencu; iznad je CPU-bound (obrada, ne odbijanje). **Čist 10k sa SLO latencom = produkciona infra**
+(Linux + php-fpm/nginx ili Apache `event` MPM + tuned MySQL + horizontalno skaliranje/LB) — potvrđuje §6/§12.
+**Otvoreno:** pravi 10k load test na prod-like okruženju (vezano za OD-2 i izbor hostinga).
+
+## Status validacije — dorada (2026-08-18): write reliability pod kontencijom
+
+Cilj pooštren na **100% upisa na 100–1000 konkurentnih**. Dodatna dijagnostika (statusi padova) je pokazala da
+preostali padovi na 500/1000 VU NISU timeout već **HTTP 500 = InnoDB deadlock** (`SQLSTATE[40001] 1213`) na
+`student_sessions` INSERT-u: revoke UPDATE (`revoked_at IS NULL`) uzima **gap lock** pod MySQL default
+**REPEATABLE READ**, a paralelni INSERT-ov insert-intention čeka → zaključavanje i za različite takmičare
+(susedni gap-ovi u `(registration_id, revoked_at)` indeksu).
+
+**Rešenje (prenosivo, bez server-zavisnosti):**
+1. **READ COMMITTED izolacija** — nema gap lock-ova; postavljeno **u aplikaciji** (`config/database.php`,
+   `PDO::MYSQL_ATTR_INIT_COMMAND`) da putuje na deploy, ne zavisi od server `my.ini`. Korektnost i dalje na
+   unique constraint-ima + `SELECT … FOR UPDATE`.
+2. **Deadlock-retry na write transakcijama** — `DB::transaction($cb, 5)` na identify/start/submit/unlock; Laravel
+   sam ponovi na `40001`. Sigurnosna mreža za retki preostali deadlock.
+3. **Odloženo auto-grading (queue)** — submit persistira odgovore + kompletira attempt (`grading_status=queued`)
+   i vraća ODMAH; `GradeAttempt` job (**database** queue = prenosivo) ocenjuje van request-putanje, idempotentno,
+   uz retry → **nijedan predati test se ne gubi** ni pod udarom. Publish gate objavljuje samo stvarno ocenjene
+   (`auto_graded`/`graded`), nikad `queued`/`pending_grading`.
+
+**Rezultat posle dorade (500 VU):** deadlock **eliminisan** — ~99,7% uspeh, **0 server-error-a, 0 duplih**; svi
+preostali padovi su `status=0` (60s klijentski timeout) = **čista latenca**, ne greška.
+
+**Preostalo za 100% na 500–1000:** samo **kapacitet/latenca** jednog Windows mod_php boxa (CPU/thread-scheduling).
+Rešava se prenosivo: **produkcioni Linux + nginx + php-fpm** (standard, svuda) drži konkurentnost daleko bolje —
+**Octane NIJE potreban** (ima hosting-zavisnost). Uz to **klijentski retry** (idempotentno) kao otpornost.

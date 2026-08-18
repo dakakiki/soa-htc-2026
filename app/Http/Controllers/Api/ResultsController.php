@@ -58,7 +58,7 @@ class ResultsController extends Controller
                 fn ($sub) => $sub->from('exam_test')->select('test_id')->where('exam_id', $v)
             ))
             ->when($f['test_id'] ?? null, fn ($q, $v) => $q->where('test_id', $v))
-            ->selectRaw("test_id, count(*) as completed, sum(published_at is not null) as published, sum(grading_status = 'pending_grading') as pending")
+            ->selectRaw("test_id, count(*) as completed, sum(published_at is not null) as published, sum(grading_status in ('pending_grading', 'queued')) as pending")
             ->groupBy('test_id')
             ->get()
             ->keyBy('test_id');
@@ -132,10 +132,11 @@ class ResultsController extends Controller
         if ($unpublish) {
             $count = $query->whereNotNull('published_at')->update(['published_at' => null, 'published_by' => null]);
         } else {
-            // Never reveal an attempt that still awaits essay grading.
+            // Only publish attempts whose scoring is final — never one still
+            // awaiting essay grading (pending_grading) or the auto-grade job (queued).
             $count = $query
                 ->whereNull('published_at')
-                ->where('grading_status', '!=', 'pending_grading')
+                ->whereIn('grading_status', ['auto_graded', 'graded'])
                 ->update(['published_at' => now(), 'published_by' => $request->user()?->id]);
         }
 

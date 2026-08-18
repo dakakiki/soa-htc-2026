@@ -9,6 +9,8 @@ use App\Domain\Assessment\Models\QuestionAnswer;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Enums\AttemptStatus;
+use App\Domain\Competition\Enums\GradingStatus;
+use App\Domain\Competition\Jobs\GradeAttempt;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Organization\Models\School;
@@ -16,6 +18,7 @@ use App\Domain\Organization\Models\Season;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class AttemptTest extends TestCase
@@ -432,5 +435,23 @@ class AttemptTest extends TestCase
         $this->assertSame('0.00', $attempt->score);
         $this->assertSame('5.00', $attempt->max_score);
         $this->assertDatabaseHas('attempts', ['id' => $attemptId, 'grading_status' => 'pending_grading']);
+    }
+
+    public function test_submit_completes_the_attempt_but_defers_auto_grading_to_a_queued_job(): void
+    {
+        Queue::fake();
+
+        $token = $this->tokenFor('H2');
+        ['tests' => $tests] = $this->quizWithTests('H2', 1);
+
+        $attemptId = $this->submitAttempt($token, $tests[0], []);
+
+        // The attempt is completed and the answers are durably saved, but scoring
+        // is left to the queue — nothing is graded on the request path.
+        $attempt = Attempt::findOrFail($attemptId);
+        $this->assertSame(AttemptStatus::Completed, $attempt->status);
+        $this->assertSame(GradingStatus::Queued, $attempt->grading_status);
+        $this->assertNull($attempt->score);
+        Queue::assertPushed(GradeAttempt::class, fn (GradeAttempt $job) => $job->attempt->id === $attemptId);
     }
 }

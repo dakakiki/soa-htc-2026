@@ -13,6 +13,7 @@ use App\Http\Requests\IdentifyStudentRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class StudentAuthController extends Controller
@@ -40,17 +41,22 @@ class StudentAuthController extends Controller
             return response()->json(['message' => __('We could not verify your details. Please check and try again.')], 422);
         }
 
-        // One active session per registration: retire any earlier ones.
-        StudentSession::query()->where('registration_id', $registration->id)->active()->update(['revoked_at' => now()]);
-
         $plain = Str::random(64);
-        $session = StudentSession::query()->create([
-            'registration_id' => $registration->id,
-            'token_hash' => hash('sha256', $plain),
-            'expires_at' => now()->addMinutes(StudentSession::LIFETIME_MINUTES),
-            'ip_address' => $request->ip(),
-            'user_agent' => Str::limit((string) $request->userAgent(), 250, ''),
-        ]);
+
+        // One active session per registration (prior ones revoked). Wrapped in a
+        // transaction retried on a transient InnoDB deadlock so a concurrency
+        // spike on the session table never fails a valid identification.
+        $session = DB::transaction(function () use ($registration, $plain, $request) {
+            StudentSession::query()->where('registration_id', $registration->id)->active()->update(['revoked_at' => now()]);
+
+            return StudentSession::query()->create([
+                'registration_id' => $registration->id,
+                'token_hash' => hash('sha256', $plain),
+                'expires_at' => now()->addMinutes(StudentSession::LIFETIME_MINUTES),
+                'ip_address' => $request->ip(),
+                'user_agent' => Str::limit((string) $request->userAgent(), 250, ''),
+            ]);
+        }, 5);
 
         return response()->json([
             'token' => $plain,

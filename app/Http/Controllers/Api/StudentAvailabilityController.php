@@ -10,6 +10,7 @@ use App\Domain\Competition\Support\StudentAvailability;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StudentAvailabilityController extends Controller
 {
@@ -43,7 +44,10 @@ class StudentAvailabilityController extends Controller
             return response()->json(['message' => __('We could not unlock this quiz. Please check the password and try again.')], 422);
         }
 
-        $session->unlockedQuizzes()->syncWithoutDetaching([$quiz->id => ['unlocked_at' => now()]]);
+        // Retry on a transient deadlock on the session-quiz pivot under load.
+        DB::transaction(function () use ($session, $quiz) {
+            $session->unlockedQuizzes()->syncWithoutDetaching([$quiz->id => ['unlocked_at' => now()]]);
+        }, 5);
 
         return response()->json(['unlocked' => true]);
     }
