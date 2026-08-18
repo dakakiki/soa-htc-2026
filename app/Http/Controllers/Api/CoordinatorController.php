@@ -69,7 +69,7 @@ class CoordinatorController extends Controller
                 });
             })
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate(min(max($request->integer('per_page', 20), 1), 200))
             ->withQueryString();
 
         return CoordinatorResource::collection($users);

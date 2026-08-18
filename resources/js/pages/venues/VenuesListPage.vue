@@ -60,6 +60,7 @@ async function load(target = page.value): Promise<void> {
     try {
         const { data } = await listSchools({
             page: target,
+            per_page: 10,
             search: filters.search || undefined,
             country_id: filters.country_id ?? undefined,
             region_id: filters.region_id ?? undefined,
