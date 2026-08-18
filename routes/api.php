@@ -128,6 +128,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('schools', SchoolController::class);
+    // Results grid: column definition + one competitor's per-round breakdown.
+    // Declared before the resource so the static path isn't caught by {registration}.
+    Route::get('registrations/result-columns', [RegistrationController::class, 'resultColumns']);
+    Route::get('registrations/{registration}/results', [RegistrationController::class, 'results']);
     Route::apiResource('registrations', RegistrationController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
 
     // Staff users and their season role/scope assignments.

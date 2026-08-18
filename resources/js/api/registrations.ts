@@ -1,5 +1,5 @@
 import { http } from '@/api/http';
-import type { Paginated, Registration } from '@/types/models';
+import type { Paginated, Registration, ResultColumn, ResultDetailRound } from '@/types/models';
 
 export interface RegistrationPayload {
     school_id: number;
@@ -48,4 +48,14 @@ export function setRegistrationStatus(id: number, status: string) {
 
 export function deleteRegistration(id: number) {
     return http.delete(`/api/registrations/${id}`);
+}
+
+/** Results-grid column definition (rounds and their test-type heads). */
+export function resultColumns() {
+    return http.get<{ data: ResultColumn[] }>('/api/registrations/result-columns');
+}
+
+/** One competitor's published results grouped by round, for the details modal. */
+export function registrationResults(id: number) {
+    return http.get<{ data: ResultDetailRound[] }>(`/api/registrations/${id}/results`);
 }

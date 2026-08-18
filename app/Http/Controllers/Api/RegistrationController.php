@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\RegistrationResults;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
@@ -75,8 +76,31 @@ class RegistrationController extends Controller
         }
 
         $perPage = min(max($request->integer('per_page', 20), 1), 200);
+        $paginated = $query->paginate($perPage);
 
-        return RegistrationResource::collection($query->paginate($perPage));
+        // Attach each competitor's published per-round scores for the results grid.
+        $results = RegistrationResults::forRegistrations($paginated->pluck('id')->all());
+        $paginated->getCollection()->each(function (Registration $reg) use ($results): void {
+            $reg->results_grid = $results[$reg->id] ?? [];
+        });
+
+        return RegistrationResource::collection($paginated);
+    }
+
+    /** The results-grid column definition (rounds and their test-type heads). */
+    public function resultColumns(): JsonResponse
+    {
+        $this->authorize('viewAny', Registration::class);
+
+        return response()->json(['data' => RegistrationResults::columns()]);
+    }
+
+    /** One competitor's published results, grouped by round, for the details modal. */
+    public function results(Registration $registration): JsonResponse
+    {
+        $this->authorize('view', $registration);
+
+        return response()->json(['data' => RegistrationResults::detail($registration->id)]);
     }
 
     public function show(Registration $registration): RegistrationResource

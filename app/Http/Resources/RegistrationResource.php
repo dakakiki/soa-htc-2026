@@ -37,6 +37,8 @@ class RegistrationResource extends JsonResource
                 'id' => $this->difficulty_level_id,
                 'level_short' => $this->level?->level_short,
             ]),
+            // Published per-round scores for the results grid (set by the list query).
+            'results' => (object) ($this->results_grid ?? []),
         ];
     }
 }

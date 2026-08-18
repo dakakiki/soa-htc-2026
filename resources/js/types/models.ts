@@ -302,6 +302,35 @@ export interface Registration {
     school?: { id: number; name?: string };
     country?: { id: number; name?: string };
     level?: { id: number; level_short?: string };
+    results?: Record<string, RegistrationResultCell>;
+}
+
+/** One test-type column within a round (first letter is the column head). */
+export interface ResultTypeCol {
+    id: number;
+    name: string;
+    letter: string;
+}
+
+/** A round in the results grid: its test-type columns (empty for future rounds). */
+export interface ResultColumn {
+    round_id: number;
+    round: string;
+    short: string;
+    types: ResultTypeCol[];
+}
+
+/** A competitor's summed published scores for one round: per test-type + total. */
+export interface RegistrationResultCell {
+    types: Record<string, number>;
+    sum: number;
+}
+
+/** One round's detailed breakdown for the results modal. */
+export interface ResultDetailRound {
+    round_id: number;
+    round: string;
+    tests: { test: string; type: string; score: number | null; max_score: number | null }[];
 }
 
 export interface Permission {
