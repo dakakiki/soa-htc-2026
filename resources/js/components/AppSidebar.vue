@@ -47,6 +47,9 @@ interface NavGroup {
     icon: Component;
     children: NavItem[];
 }
+// A nav entry is either a single link or an expandable group. They share one
+// ordered list so groups and links can be interleaved in any order.
+type NavNode = ({ kind: 'item' } & NavItem) | ({ kind: 'group' } & NavGroup);
 
 const { t } = useI18n();
 const route = useRoute();
@@ -60,14 +63,12 @@ function toggleCollapsed(): void {
     localStorage.setItem(STORAGE_KEY, collapsed.value ? '1' : '0');
 }
 
-const items: NavItem[] = [
-    { label: t('nav.dashboard'), icon: IconLayoutDashboard, to: 'dashboard', prefix: 'dashboard' },
-    { label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.view' },
-    { label: t('nav.coordinators'), icon: IconUserStar, to: 'coordinators', prefix: 'coordinators', perm: 'users.manage' },
-];
-
-const groups: NavGroup[] = [
+// One ordered list: Dashboard, Students, Coordinators, Venues, Quizzes,
+// then Results, Access, Settings (last).
+const nav: NavNode[] = [
+    { kind: 'item', label: t('nav.dashboard'), icon: IconLayoutDashboard, to: 'dashboard', prefix: 'dashboard' },
     {
+        kind: 'group',
         key: 'students',
         label: t('nav.students'),
         icon: IconUsersGroup,
@@ -76,7 +77,10 @@ const groups: NavGroup[] = [
             { label: t('nav.difficulty'), icon: IconStairs, to: 'difficulty', prefix: 'difficulty', perm: 'difficulty.manage' },
         ],
     },
+    { kind: 'item', label: t('nav.coordinators'), icon: IconUserStar, to: 'coordinators', prefix: 'coordinators', perm: 'users.manage' },
+    { kind: 'item', label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.view' },
     {
+        kind: 'group',
         key: 'quizzes',
         label: t('nav.quizzes'),
         icon: IconListCheck,
@@ -91,6 +95,7 @@ const groups: NavGroup[] = [
         ],
     },
     {
+        kind: 'group',
         key: 'results',
         label: t('nav.results'),
         icon: IconClipboardCheck,
@@ -103,6 +108,7 @@ const groups: NavGroup[] = [
     },
     // Access and Settings stay last.
     {
+        kind: 'group',
         key: 'access',
         label: t('nav.access'),
         icon: IconShieldLock,
@@ -112,6 +118,7 @@ const groups: NavGroup[] = [
         ],
     },
     {
+        kind: 'group',
         key: 'settings',
         label: t('nav.settings'),
         icon: IconSettings,
@@ -123,11 +130,10 @@ const groups: NavGroup[] = [
 ];
 
 const canSee = (perm?: string): boolean => !perm || session.can(perm);
-const visibleItems = computed(() => items.filter((i) => canSee(i.perm)));
-const visibleGroups = computed(() =>
-    groups
-        .map((g) => ({ ...g, children: g.children.filter((c) => canSee(c.perm)) }))
-        .filter((g) => g.children.length > 0)
+const visibleNav = computed<NavNode[]>(() =>
+    nav
+        .map((n) => (n.kind === 'group' ? { ...n, children: n.children.filter((c) => canSee(c.perm)) } : n))
+        .filter((n) => (n.kind === 'group' ? n.children.length > 0 : canSee(n.perm)))
 );
 
 function isActive(prefix: string): boolean {
@@ -161,52 +167,53 @@ const railTip =
         :class="collapsed ? 'w-16' : 'w-60'"
     >
         <nav class="flex-1 space-y-1 p-2" :class="collapsed ? 'overflow-visible' : 'overflow-y-auto'">
-            <RouterLink
-                v-for="item in visibleItems"
-                :key="item.to"
-                :to="{ name: item.to }"
-                class="group/tt relative flex items-center gap-3 rounded-md px-3 py-2 text-sm"
-                :class="[itemClass(isActive(item.prefix)), { 'justify-center': collapsed }]"
-            >
-                <component :is="item.icon" :size="20" class="shrink-0" />
-                <span v-show="!collapsed">{{ item.label }}</span>
-                <span v-if="collapsed" :class="railTip">{{ item.label }}</span>
-            </RouterLink>
-
-            <div v-for="g in visibleGroups" :key="g.key">
-                <button
-                    type="button"
-                    class="group/tt relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm"
-                    :class="[
-                        groupActive(g) ? 'text-brand-primary hover:bg-gray-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
-                        { 'justify-center': collapsed },
-                    ]"
-                    @click="toggle(g)"
+            <template v-for="node in visibleNav" :key="node.kind === 'group' ? node.key : node.to">
+                <RouterLink
+                    v-if="node.kind === 'item'"
+                    :to="{ name: node.to }"
+                    class="group/tt relative flex items-center gap-3 rounded-md px-3 py-2 text-sm"
+                    :class="[itemClass(isActive(node.prefix)), { 'justify-center': collapsed }]"
                 >
-                    <component :is="g.icon" :size="20" class="shrink-0" />
-                    <span v-show="!collapsed">{{ g.label }}</span>
-                    <component
-                        v-show="!collapsed"
-                        :is="isOpen(g) ? IconChevronUp : IconChevronDown"
-                        :size="16"
-                        class="ml-auto"
-                    />
-                    <span v-if="collapsed" :class="railTip">{{ g.label }}</span>
-                </button>
-                <div v-show="isOpen(g)" class="space-y-1">
-                    <RouterLink
-                        v-for="c in g.children"
-                        :key="c.to"
-                        :to="{ name: c.to }"
-                        class="group/tt relative flex items-center gap-3 rounded-md px-3 py-2 text-sm"
-                        :class="[itemClass(isActive(c.prefix)), collapsed ? 'justify-center' : 'pl-9']"
+                    <component :is="node.icon" :size="20" class="shrink-0" />
+                    <span v-show="!collapsed">{{ node.label }}</span>
+                    <span v-if="collapsed" :class="railTip">{{ node.label }}</span>
+                </RouterLink>
+
+                <div v-else>
+                    <button
+                        type="button"
+                        class="group/tt relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm"
+                        :class="[
+                            groupActive(node) ? 'text-brand-primary hover:bg-gray-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                            { 'justify-center': collapsed },
+                        ]"
+                        @click="toggle(node)"
                     >
-                        <component :is="c.icon" :size="18" class="shrink-0" />
-                        <span v-show="!collapsed">{{ c.label }}</span>
-                        <span v-if="collapsed" :class="railTip">{{ c.label }}</span>
-                    </RouterLink>
+                        <component :is="node.icon" :size="20" class="shrink-0" />
+                        <span v-show="!collapsed">{{ node.label }}</span>
+                        <component
+                            v-show="!collapsed"
+                            :is="isOpen(node) ? IconChevronUp : IconChevronDown"
+                            :size="16"
+                            class="ml-auto"
+                        />
+                        <span v-if="collapsed" :class="railTip">{{ node.label }}</span>
+                    </button>
+                    <div v-show="isOpen(node)" class="space-y-1">
+                        <RouterLink
+                            v-for="c in node.children"
+                            :key="c.to"
+                            :to="{ name: c.to }"
+                            class="group/tt relative flex items-center gap-3 rounded-md px-3 py-2 text-sm"
+                            :class="[itemClass(isActive(c.prefix)), collapsed ? 'justify-center' : 'pl-9']"
+                        >
+                            <component :is="c.icon" :size="18" class="shrink-0" />
+                            <span v-show="!collapsed">{{ c.label }}</span>
+                            <span v-if="collapsed" :class="railTip">{{ c.label }}</span>
+                        </RouterLink>
+                    </div>
                 </div>
-            </div>
+            </template>
         </nav>
 
         <div class="flex border-t border-gray-200 p-2" :class="collapsed ? 'justify-center' : 'justify-end'">
