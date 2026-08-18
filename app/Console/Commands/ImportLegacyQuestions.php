@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\QuestionTag;
+use App\Domain\Migration\LegacyText;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -64,8 +65,8 @@ class ImportLegacyQuestions extends Command
             $question = Question::query()->updateOrCreate(
                 ['legacy_id' => (int) $lq->id],
                 [
-                    'title' => mb_substr((string) $lq->title, 0, 3000),
-                    'description' => $lq->description,
+                    'title' => LegacyText::fix(mb_substr((string) $lq->title, 0, 3000)),
+                    'description' => LegacyText::fix($lq->description),
                     'question_type' => self::TYPE_MAP[(int) $lq->type] ?? 'multiple_choice',
                     'points' => min((float) ($lq->number_of_points ?? 1), 999),
                     'question_tag_id' => $lq->tag ? ($tagMap[(int) $lq->tag] ?? null) : null,
@@ -106,12 +107,12 @@ class ImportLegacyQuestions extends Command
                     if ($accepted === '') {
                         continue;
                     }
-                    $question->answers()->create(['text' => $accepted, 'is_correct' => true, 'position' => $position]);
+                    $question->answers()->create(['text' => LegacyText::fix($accepted), 'is_correct' => true, 'position' => $position]);
 
                     continue;
                 }
                 $question->answers()->create([
-                    'text' => (string) $a->title,
+                    'text' => LegacyText::fix((string) $a->title),
                     'is_correct' => (bool) $a->correct_answer,
                     'position' => $position,
                 ]);

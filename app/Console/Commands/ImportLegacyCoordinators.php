@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
+use App\Domain\Migration\LegacyText;
 use App\Domain\Migration\Models\LegacyIdMap;
 use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
@@ -82,13 +83,13 @@ class ImportLegacyCoordinators extends Command
                 $user = User::query()->updateOrCreate(
                     ['email' => $lu->email],
                     [
-                        'name' => mb_substr((string) $lu->name, 0, 191),
+                        'name' => LegacyText::fix(mb_substr((string) $lu->name, 0, 191)),
                         'password' => $lu->password, // $2y$ bcrypt; hashed cast keeps it as-is
                         'country_id' => $country,
                         'region_id' => $lu->region_id === null ? null : ($regionMap[(int) $lu->region_id] ?? null),
                         'status' => $status,
-                        'city' => $lu->city === null ? null : mb_substr((string) $lu->city, 0, 255),
-                        'address' => $lu->address === null ? null : mb_substr((string) $lu->address, 0, 255),
+                        'city' => $lu->city === null ? null : LegacyText::fix(mb_substr((string) $lu->city, 0, 255)),
+                        'address' => $lu->address === null ? null : LegacyText::fix(mb_substr((string) $lu->address, 0, 255)),
                         'phone' => $lu->phone === null ? null : mb_substr((string) $lu->phone, 0, 100),
                         'image_path' => $lu->image === null || $lu->image === '' ? null : mb_substr((string) $lu->image, 0, 255),
                         'can_student_insert' => (bool) (int) $lu->can_student_insert,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Domain\Migration\LegacyText;
 use App\Domain\Migration\Models\LegacyIdMap;
 use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
@@ -108,10 +109,10 @@ class ImportLegacySchools extends Command
         return [
             'country_id' => $ls->_country,
             'region_id' => $region,
-            'name' => mb_substr(trim((string) $ls->name), 0, 255),
+            'name' => LegacyText::fix(mb_substr(trim((string) $ls->name), 0, 255)),
             'status' => ((int) $ls->status === 1) ? 'active' : 'inactive',
-            'city' => $ls->city === null ? null : mb_substr(trim((string) $ls->city), 0, 255),
-            'address' => $ls->address === null ? null : mb_substr((string) $ls->address, 0, 255),
+            'city' => $ls->city === null ? null : LegacyText::fix(mb_substr(trim((string) $ls->city), 0, 255)),
+            'address' => $ls->address === null ? null : LegacyText::fix(mb_substr((string) $ls->address, 0, 255)),
             'phone' => $ls->phone === null ? null : mb_substr((string) $ls->phone, 0, 100),
             'email' => $ls->email === null ? null : mb_substr((string) $ls->email, 0, 255),
             'image_path' => $ls->image === null || $ls->image === '' ? null : mb_substr((string) $ls->image, 0, 255),

@@ -531,6 +531,38 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0026 — Legacy mojibake: CP850 double-encoding, reverzija na import-boundary-ju
+
+- **Status:** Prihvaćeno (2026-08-18)
+- **Kontekst:** Nazivi škola/koordinatora i sadržaj pitanja prikazivali su se pokvareno
+  (npr. `─░.T.├£. Geli┼ƒtirme Vakf─▒…` umesto `İ.T.Ü. Geliştirme Vakfı…`,
+  `Kri┼¥evci` umesto `Križevci`). Legacy dump je učitan u MySQL kroz **Windows
+  konzolu na code page 850**, pa je svaki bajt originalnog UTF-8 reinterpretiran kao
+  CP850 glif i re-snimljen kao UTF-8 (double-encoding). Korupcija je već u `legacy`
+  bazi; import ju je verno kopirao.
+- **Odluka:**
+  - **Codepage je CP850, ne CP437.** Empirijski dokazano na celom skupu: 109 redova
+    gde se dva codepage-a razlikuju (`ž/Ž/®/ø/â`) razrešava se ispravno **samo** pod
+    CP850 (`Kri┼¥evci`→`Križevci`, CP437 bi dao `Kriŝevci`). CP850 čisti svih **1352**
+    pogođena polja u `schools` + 2 u `users` + 1 u `questions`, **0 residual, 0 fail**.
+  - **Reverzija = deterministička, na app-boundary-ju:** `iconv('UTF-8','CP850',$s)`
+    vrati originalne bajtove → čitaju se kao UTF-8. Legacy baza se NE re-učitava
+    (temp/one-off; reverzija je pouzdanija i reproducibilna).
+  - **Jedan izvor istine:** `App\Domain\Migration\LegacyText::fix()`. Sigurno +
+    idempotentno — dira samo string sa box-drawing/block glifovima (`U+2500–U+259F`)
+    i prihvata reverziju samo kad da validan, više-ne-pokvaren UTF-8; sve ostalo
+    (već-čist tekst, legit dijakritici van CP850) vraća netaknuto.
+  - **Dve odbrane:** (a) `php artisan legacy:fix-encoding [--dry-run]` popravlja
+    postojeće podatke in-place (surgical, ne remeti id-jeve/relacije — bezbednije od
+    re-importa); (b) `LegacyText::fix()` uklopljen u mappere `legacy:import-schools`,
+    `-coordinators`, `-questions` da re-import ne vrati korupciju.
+- **Posledica:** `LegacyText` (unit-testiran, 15 slučajeva uklj. safety/idempotentnost)
+  + `FixLegacyEncoding` komanda. Countries/regions/quizzes/exams/tests/difficulty_categories
+  su čisti (ASCII u legacy izvoru). Pretpostavka: nema Cyrillic-origin korupcije (marker
+  je Latin-box-glif); ako se pojavi, vidljivo je i rešava se tada.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
