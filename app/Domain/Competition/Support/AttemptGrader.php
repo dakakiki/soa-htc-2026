@@ -5,57 +5,79 @@ declare(strict_types=1);
 namespace App\Domain\Competition\Support;
 
 use App\Domain\Assessment\Enums\QuestionType;
-use App\Domain\Assessment\Models\Question;
 use App\Domain\Competition\Enums\GradingStatus;
 use App\Domain\Competition\Models\Attempt;
-use App\Domain\Competition\Models\AttemptAnswer;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Auto-grades a completed attempt (Faza 5, ADR-0019). Multiple-choice and
  * gap-filling are scored immediately, all-or-nothing per question; essays are
  * left for an admin (the attempt stays `pending_grading` if the test has any).
  * Idempotent — re-running produces the same result.
+ *
+ * The scoring inputs (questions, their points, and the correct-answer sets) are
+ * read as plain rows rather than hydrated Eloquent models, and every answer is
+ * written in a handful of set-based UPDATEs — grading runs over whole cohorts,
+ * so per-answer model hydration and per-answer writes are the cost to avoid.
  */
 final class AttemptGrader
 {
     public static function grade(Attempt $attempt): void
     {
-        $test = $attempt->test;
-        $test->load([
-            'questions' => fn ($q) => $q->where('questions.status', 'active'),
-            'questions.answers',
-        ]);
-        $answers = $attempt->answers()->get()->keyBy('question_id');
+        $spec = self::loadTestSpec((int) $attempt->test_id);
+
+        $answers = DB::table('attempt_answers')
+            ->where('attempt_id', $attempt->id)
+            ->get(['id', 'question_id', 'response'])
+            ->keyBy('question_id');
 
         $score = 0.0;
-        $maxScore = 0.0;
         $hasEssay = false;
+        // Answer ids grouped by their "<is_correct>|<awarded_points>" outcome, so the
+        // whole attempt is written in a few UPDATEs rather than one per answer.
+        $updates = [];
+        $now = now();
 
-        foreach ($test->questions as $question) {
-            $maxScore += (float) $question->points;
-
-            if ($question->question_type === QuestionType::Essay) {
+        foreach ($spec['questions'] as $question) {
+            if ($question['is_essay']) {
                 $hasEssay = true;
                 // Ensure a row exists so an admin can grade it (even if unanswered).
-                AttemptAnswer::firstOrCreate(['attempt_id' => $attempt->id, 'question_id' => $question->id]);
+                if (! $answers->has($question['id'])) {
+                    DB::table('attempt_answers')->insertOrIgnore([
+                        'attempt_id' => $attempt->id,
+                        'question_id' => $question['id'],
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
 
                 continue;
             }
 
-            $answer = $answers->get($question->id);
+            $answer = $answers->get($question['id']);
             if ($answer === null) {
                 continue; // Unanswered auto-gradable question scores nothing.
             }
 
-            $correct = self::isCorrect($question, is_array($answer->response) ? $answer->response : []);
-            $awarded = $correct ? (float) $question->points : 0.0;
-            $answer->update(['is_correct' => $correct, 'awarded_points' => $awarded]);
+            $response = json_decode((string) $answer->response, true);
+            $correct = self::responseMatches($question, is_array($response) ? $response : []);
+            $awarded = $correct ? $question['points'] : 0.0;
+            $updates[($correct ? '1' : '0').'|'.$awarded][] = $answer->id;
             $score += $awarded;
+        }
+
+        foreach ($updates as $key => $ids) {
+            [$correct, $awarded] = explode('|', $key, 2);
+            DB::table('attempt_answers')->whereIn('id', $ids)->update([
+                'is_correct' => $correct === '1',
+                'awarded_points' => (float) $awarded,
+                'updated_at' => $now,
+            ]);
         }
 
         $attempt->update([
             'score' => $score,
-            'max_score' => $maxScore,
+            'max_score' => $spec['max_score'],
             'grading_status' => $hasEssay ? GradingStatus::PendingGrading : GradingStatus::AutoGraded,
         ]);
     }
@@ -85,26 +107,79 @@ final class AttemptGrader
     }
 
     /**
+     * The gradeable shape of a test: total points plus, per active question, its
+     * type, points, and precomputed correct-answer set (sorted answer ids for
+     * multiple-choice; per-gap acceptable-option lists for gap-filling). Read as
+     * plain rows so grading never hydrates the question/answer models.
+     *
+     * @return array{max_score: float, questions: list<array{id:int,is_essay:bool,type:string,points:float,correctIds:list<int>,gaps:list<list<string>>}>}
+     */
+    private static function loadTestSpec(int $testId): array
+    {
+        $questions = DB::table('question_test')
+            ->join('questions', 'questions.id', '=', 'question_test.question_id')
+            ->where('question_test.test_id', $testId)
+            ->where('questions.status', 'active')
+            ->get(['questions.id', 'questions.question_type', 'questions.points']);
+
+        $optionsByQuestion = DB::table('question_answers')
+            ->whereIn('question_id', $questions->pluck('id'))
+            ->get(['id', 'question_id', 'text', 'is_correct', 'position'])
+            ->groupBy('question_id');
+
+        $spec = ['max_score' => 0.0, 'questions' => []];
+
+        foreach ($questions as $q) {
+            $spec['max_score'] += (float) $q->points;
+            $options = $optionsByQuestion->get($q->id, collect());
+
+            $entry = [
+                'id' => (int) $q->id,
+                'is_essay' => $q->question_type === QuestionType::Essay->value,
+                'type' => (string) $q->question_type,
+                'points' => (float) $q->points,
+                'correctIds' => [],
+                'gaps' => [],
+            ];
+
+            if ($q->question_type === QuestionType::MultipleChoice->value) {
+                $entry['correctIds'] = $options->where('is_correct', 1)
+                    ->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            } elseif ($q->question_type === QuestionType::GapFilling->value) {
+                $entry['gaps'] = $options->sortBy('position')->values()
+                    ->map(fn ($a) => array_map([self::class, 'normalize'], explode('|', (string) $a->text)))
+                    ->all();
+            }
+
+            $spec['questions'][] = $entry;
+        }
+
+        return $spec;
+    }
+
+    /**
+     * All-or-nothing match against a precomputed question spec.
+     *
+     * @param  array{type:string,correctIds:list<int>,gaps:list<list<string>>}  $question
      * @param  array<string, mixed>  $response
      */
-    private static function isCorrect(Question $question, array $response): bool
+    private static function responseMatches(array $question, array $response): bool
     {
-        if ($question->question_type === QuestionType::MultipleChoice) {
-            $correctIds = $question->answers->where('is_correct', true)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
-            $selected = collect($response['selected'] ?? [])->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+        if ($question['type'] === QuestionType::MultipleChoice->value) {
+            $selected = collect($response['selected'] ?? [])
+                ->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
 
-            return $selected === $correctIds;
+            return $selected === $question['correctIds'];
         }
 
         // Gap-filling: every gap must match one of its acceptable answers.
         $gaps = is_array($response['gaps'] ?? null) ? $response['gaps'] : [];
-        $acceptable = $question->answers->sortBy('position')->values();
-        if (count($gaps) !== $acceptable->count() || $acceptable->isEmpty()) {
+        $acceptable = $question['gaps'];
+        if (count($gaps) !== count($acceptable) || $acceptable === []) {
             return false;
         }
 
-        foreach ($acceptable as $i => $answer) {
-            $options = array_map([self::class, 'normalize'], explode('|', (string) $answer->text));
+        foreach ($acceptable as $i => $options) {
             if (! in_array(self::normalize((string) ($gaps[$i] ?? '')), $options, true)) {
                 return false;
             }
