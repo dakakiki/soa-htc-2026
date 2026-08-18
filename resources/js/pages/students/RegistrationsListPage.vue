@@ -231,6 +231,7 @@ onMounted(async () => {
             </RouterLink>
         </div>
 
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
         <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6" @submit.prevent="load(1)">
             <!-- Column 1: search (stays first) with the filter buttons beneath it. -->
             <input v-model="filters.search" type="search" :placeholder="$t('registration.searchPlaceholder')"
@@ -282,6 +283,7 @@ onMounted(async () => {
                 {{ $t('registration.filterReset') }}
             </button>
         </form>
+        </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
@@ -294,11 +296,11 @@ onMounted(async () => {
                     <tr>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.number') }}</th>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.name') }}</th>
-                        <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.dob') }}</th>
+                        <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.dobCol') }}</th>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.country') }}</th>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.venue') }}</th>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-center text-gray-500">{{ $t('registration.grade') }}</th>
-                        <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.diffCat') }}</th>
+                        <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-center text-gray-500">{{ $t('registration.diffCat') }}</th>
                         <template v-for="col in resultCols" :key="col.round_id">
                             <th v-if="col.types.length" :colspan="col.types.length + 1" class="bg-amber-500 px-2 py-2 text-center text-white">{{ col.round }}</th>
                             <th v-else rowspan="2" class="bg-slate-600 px-3 py-2 text-center align-bottom text-white">{{ col.short }}</th>
@@ -329,15 +331,15 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-600">{{ x.country?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ x.school?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ x.grade ?? $t('common.dash') }}</td>
-                        <td class="px-4 py-3 text-gray-600">{{ x.level?.level_short ?? $t('common.dash') }}</td>
+                        <td class="px-4 py-3 text-center text-gray-600">{{ x.level?.level_short ?? $t('common.dash') }}</td>
                         <template v-for="col in resultCols" :key="col.round_id">
                             <template v-if="col.types.length">
-                                <td v-for="ty in col.types" :key="ty.id" class="px-2 py-3 text-center text-gray-700">{{ cellScore(x, col.round_id, ty.id) }}</td>
-                                <td class="px-2 py-3 text-center font-semibold text-gray-900">{{ roundSum(x, col.round_id) }}</td>
+                                <td v-for="ty in col.types" :key="ty.id" class="bg-amber-50 px-2 py-3 text-center text-gray-700">{{ cellScore(x, col.round_id, ty.id) }}</td>
+                                <td class="bg-amber-100 px-2 py-3 text-center font-semibold text-gray-900">{{ roundSum(x, col.round_id) }}</td>
                             </template>
-                            <td v-else class="px-2 py-3 text-center text-gray-300">·</td>
+                            <td v-else class="bg-slate-100 px-2 py-3 text-center text-gray-300">·</td>
                         </template>
-                        <td class="px-3 py-3 text-center">
+                        <td class="bg-sky-100 px-3 py-3 text-center">
                             <button type="button" class="text-brand-primary hover:text-brand-primary-hover" :title="$t('registration.results.view')" @click="selected = x">
                                 <IconListCheck :size="18" />
                             </button>
