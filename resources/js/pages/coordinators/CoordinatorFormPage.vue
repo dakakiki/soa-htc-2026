@@ -53,6 +53,11 @@ const schools = ref<School[]>([]);
 const roles = ref<Role[]>([]);
 const saving = ref(false);
 const cascadeLoading = ref(false);
+const schoolSearching = ref(false);
+const schoolTotal = ref(0);
+// Options for already-scoped venues so their chips render even when they sit
+// outside the current server page (edit forms).
+const preselectedSchools = ref<MultiSelectOption[]>([]);
 const error = ref<string | null>(null);
 
 const coordinatorRoles = computed(() => roles.value.filter((r) => COORDINATOR_ROLE_KEYS.includes(r.key)));
@@ -79,23 +84,49 @@ const permissionToggles = computed(() => [
 async function loadCountryScoped(): Promise<void> {
     regions.value = [];
     schools.value = [];
+    schoolTotal.value = 0;
     if (form.country_id) {
         cascadeLoading.value = true;
         try {
             const [regionRes, schoolRes] = await Promise.all([
                 listRegions(form.country_id),
-                listSchools({ country_id: form.country_id, per_page: 200 }),
+                listSchools({ country_id: form.country_id, per_page: 50 }),
             ]);
             regions.value = regionRes.data.data;
             schools.value = schoolRes.data.data;
+            schoolTotal.value = schoolRes.data.meta.total;
         } finally {
             cascadeLoading.value = false;
         }
     }
 }
+
+// Server-side venue search — a country can hold hundreds of venues; refetch a page
+// per keystroke instead of client-filtering a truncated first page.
+async function loadSchools(term: string): Promise<void> {
+    if (!form.country_id) {
+        schools.value = [];
+        schoolTotal.value = 0;
+        return;
+    }
+    schoolSearching.value = true;
+    try {
+        const { data } = await listSchools({ country_id: form.country_id, search: term || undefined, per_page: 50 });
+        schools.value = data.data;
+        schoolTotal.value = data.meta.total;
+    } finally {
+        schoolSearching.value = false;
+    }
+}
+
+function onSchoolSearch(term: string): void {
+    void loadSchools(term);
+}
+
 async function onCountryChange(): Promise<void> {
     form.region_id = null;
     form.school_ids = [];
+    preselectedSchools.value = [];
     await loadCountryScoped();
 }
 async function onCountrySelected(value: number | null): Promise<void> {
@@ -189,6 +220,7 @@ onMounted(async () => {
             currentFileUrl.value = c.file_url ?? null;
             await loadCountryScoped();
             form.school_ids = c.schools.map((s) => s.id);
+            preselectedSchools.value = c.schools.map((s) => ({ id: s.id, label: s.name, sub: s.city }));
         }
     } catch (e) {
         error.value = apiErrorMessage(e);
@@ -228,8 +260,13 @@ const fileBtn =
                             v-model="form.school_ids"
                             :options="schoolOptions"
                             :single="isSingleSchool"
-                            :disabled="schools.length === 0"
+                            remote
+                            :searching="schoolSearching"
+                            :total="schoolTotal"
+                            :preselected-options="preselectedSchools"
+                            :disabled="!form.country_id"
                             :loading="cascadeLoading"
+                            @search="onSchoolSearch"
                             :placeholder="form.country_id ? $t('coordinator.venuesPlaceholder') : $t('coordinator.schoolsPlaceholder')"
                             :search-placeholder="$t('coordinator.venuesLabel')"
                             :summary="(n: number) => $t('coordinator.venuesSelected', { count: n })"

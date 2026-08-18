@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 export interface MultiSelectOption {
@@ -25,11 +25,26 @@ const props = withDefaults(
         maxChips?: number;
         /** Formats the count summary, e.g. (n) => `${n} venues selected`. */
         summary?: (count: number) => string;
+        /**
+         * Remote mode: options are supplied already filtered by the server. The
+         * component stops filtering locally and emits `search` (debounced) so the
+         * parent can refetch. Use for large sets that exceed one page (venues).
+         */
+        remote?: boolean;
+        /** Remote mode: spinner inside the dropdown while the parent is fetching. */
+        searching?: boolean;
+        /** Remote mode: total server-side matches, drives the "+N — refine" hint. */
+        total?: number;
+        /** Options for already-selected values that may sit outside the current page (edit forms). */
+        preselectedOptions?: MultiSelectOption[];
     }>(),
-    { placeholder: '', searchPlaceholder: '', disabled: false, single: false, loading: false, limit: 200, maxChips: 5 },
+    { placeholder: '', searchPlaceholder: '', disabled: false, single: false, loading: false, limit: 200, maxChips: 5, remote: false, searching: false },
 );
 
-const emit = defineEmits<{ (e: 'update:modelValue', value: number[]): void }>();
+const emit = defineEmits<{
+    (e: 'update:modelValue', value: number[]): void;
+    (e: 'search', term: string): void;
+}>();
 
 const { t } = useI18n();
 
@@ -37,8 +52,21 @@ const root = ref<HTMLElement | null>(null);
 const open = ref(false);
 const search = ref('');
 
+// Remember every option we've seen or selected so chip labels survive a remote
+// refetch whose page no longer contains the selected ids.
+const cache = reactive(new Map<number, MultiSelectOption>());
+function remember(list: MultiSelectOption[] | undefined): void {
+    for (const o of list ?? []) {
+        cache.set(o.id, o);
+    }
+}
+watch(() => props.options, (v) => remember(v), { immediate: true });
+watch(() => props.preselectedOptions, (v) => remember(v), { immediate: true });
+
 const selectedSet = computed(() => new Set(props.modelValue));
-const selectedOptions = computed(() => props.options.filter((o) => selectedSet.value.has(o.id)));
+const selectedOptions = computed(() =>
+    props.modelValue.map((id) => cache.get(id)).filter((o): o is MultiSelectOption => o !== undefined),
+);
 
 // Above maxChips, collapse the chips into a single "N selected" summary.
 const showSummary = computed(() => selectedOptions.value.length > props.maxChips);
@@ -46,26 +74,44 @@ const summaryText = computed(() =>
     props.summary ? props.summary(props.modelValue.length) : String(props.modelValue.length),
 );
 
-const filtered = computed(() => {
+// In remote mode the server has already filtered; render options as given.
+const matches = computed(() => {
+    if (props.remote) {
+        return props.options;
+    }
     const term = search.value.trim().toLowerCase();
-    const matches = term
+    return term
         ? props.options.filter((o) => o.label.toLowerCase().includes(term) || (o.sub ?? '').toLowerCase().includes(term))
         : props.options;
-    return matches.slice(0, props.limit);
 });
-const hiddenCount = computed(() => {
-    const term = search.value.trim().toLowerCase();
-    const total = term
-        ? props.options.filter((o) => o.label.toLowerCase().includes(term) || (o.sub ?? '').toLowerCase().includes(term)).length
-        : props.options.length;
-    return Math.max(0, total - props.limit);
+const filtered = computed(() => matches.value.slice(0, props.limit));
+const hiddenCount = computed(() =>
+    props.remote
+        ? Math.max(0, (props.total ?? props.options.length) - props.options.length)
+        : Math.max(0, matches.value.length - props.limit),
+);
+
+let timer: ReturnType<typeof setTimeout> | undefined;
+watch(search, (term) => {
+    if (!props.remote) {
+        return;
+    }
+    if (timer) {
+        clearTimeout(timer);
+    }
+    timer = setTimeout(() => emit('search', term.trim()), 300);
 });
+onBeforeUnmount(() => timer && clearTimeout(timer));
 
 function toggleOpen(): void {
     if (props.disabled || props.loading) {
         return;
     }
     open.value = !open.value;
+    if (open.value && props.remote) {
+        search.value = '';
+        emit('search', '');
+    }
 }
 
 function isSelected(id: number): boolean {
@@ -73,6 +119,7 @@ function isSelected(id: number): boolean {
 }
 
 function toggle(id: number): void {
+    remember(props.options.filter((o) => o.id === id));
     if (props.single) {
         emit('update:modelValue', isSelected(id) ? [] : [id]);
         open.value = false;
@@ -146,16 +193,22 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
         <!-- Dropdown -->
         <div v-if="open" class="absolute z-30 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
             <div class="border-b border-gray-100 p-2">
-                <input
-                    v-model="search"
-                    type="search"
-                    :placeholder="searchPlaceholder || t('common.search')"
-                    class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-                    @keydown.stop
-                />
+                <div class="relative">
+                    <input
+                        v-model="search"
+                        type="search"
+                        :placeholder="searchPlaceholder || t('common.search')"
+                        class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                        @keydown.stop
+                    />
+                    <svg v-if="remote && searching" class="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                </div>
             </div>
             <ul class="max-h-56 overflow-y-auto py-1 text-sm">
-                <li v-if="filtered.length === 0" class="px-3 py-2 text-gray-400">{{ t('common.dash') }}</li>
+                <li v-if="filtered.length === 0" class="px-3 py-2 text-gray-400">{{ remote && searching ? t('common.loading') : t('common.dash') }}</li>
                 <li
                     v-for="opt in filtered"
                     :key="opt.id"

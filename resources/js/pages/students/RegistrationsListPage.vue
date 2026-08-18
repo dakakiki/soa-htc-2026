@@ -39,6 +39,8 @@ const loading = ref(false);
 const searched = ref(false);
 const regionLoading = ref(false);
 const schoolLoading = ref(false);
+const schoolSearching = ref(false);
+const schoolTotal = ref(0);
 const error = ref<string | null>(null);
 
 const GRADES = Array.from({ length: 13 }, (_, i) => i + 1);
@@ -112,20 +114,35 @@ async function loadRegions(): Promise<void> {
     }
 }
 
-async function loadSchools(): Promise<void> {
+// Server-side venue search: countries can hold hundreds of schools, so the picker
+// fetches a page at a time and refetches on each keystroke (see SearchSelect remote).
+async function loadSchools(term = '', viaSearch = false): Promise<void> {
     if (filters.country_id === null) {
         schools.value = [];
+        schoolTotal.value = 0;
         return;
     }
-    schoolLoading.value = true;
+    const flag = viaSearch ? schoolSearching : schoolLoading;
+    flag.value = true;
     try {
-        const { data } = await listSchools({ country_id: filters.country_id, region_id: filters.region_id ?? undefined, per_page: 200 });
+        const { data } = await listSchools({
+            country_id: filters.country_id,
+            region_id: filters.region_id ?? undefined,
+            search: term || undefined,
+            per_page: 50,
+        });
         schools.value = data.data;
+        schoolTotal.value = data.meta.total;
     } catch {
         schools.value = [];
+        schoolTotal.value = 0;
     } finally {
-        schoolLoading.value = false;
+        flag.value = false;
     }
+}
+
+function onSchoolSearch(term: string): void {
+    void loadSchools(term, true);
 }
 
 async function onCountry(v: number | null): Promise<void> {
@@ -246,8 +263,9 @@ onMounted(async () => {
                 :placeholder="$t('registration.filterRegion')" :search-placeholder="$t('reports.region')"
                 @update:model-value="onRegion" />
 
-            <!-- Column 3: Venue -->
+            <!-- Column 3: Venue (server-side search — all venues reachable, not just first page) -->
             <SearchSelect :model-value="filters.school_id" :options="schoolOptions" dense :loading="schoolLoading"
+                remote :searching="schoolSearching" :total="schoolTotal" @search="onSchoolSearch"
                 class="lg:col-start-3 lg:row-start-1" :disabled="filters.country_id === null"
                 :placeholder="$t('registration.filterVenue')" :search-placeholder="$t('registration.venue')"
                 @update:model-value="(v: number | null) => { filters.school_id = v; load(1); }" />

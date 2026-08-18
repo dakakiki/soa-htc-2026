@@ -34,6 +34,8 @@ const lastPage = ref(1);
 const total = ref(0);
 const loading = ref(true);
 const cascadeLoading = ref(false);
+const schoolSearching = ref(false);
+const schoolTotal = ref(0);
 const error = ref<string | null>(null);
 
 const countries = ref<Country[]>([]);
@@ -99,19 +101,48 @@ async function onCountryFilterChange(): Promise<void> {
     filters.school_id = null;
     regions.value = [];
     schools.value = [];
+    schoolTotal.value = 0;
     if (filters.country_id) {
         cascadeLoading.value = true;
         try {
             const [regionRes, schoolRes] = await Promise.all([
                 listRegions(filters.country_id),
-                listSchools({ country_id: filters.country_id, per_page: 200 }),
+                listSchools({ country_id: filters.country_id, per_page: 50 }),
             ]);
             regions.value = regionRes.data.data;
             schools.value = schoolRes.data.data;
+            schoolTotal.value = schoolRes.data.meta.total;
         } finally {
             cascadeLoading.value = false;
         }
     }
+}
+
+// Server-side venue search — a country can hold hundreds of venues; refetch a page
+// per keystroke instead of client-filtering a truncated first page.
+async function loadSchools(term: string): Promise<void> {
+    if (!filters.country_id) {
+        schools.value = [];
+        schoolTotal.value = 0;
+        return;
+    }
+    schoolSearching.value = true;
+    try {
+        const { data } = await listSchools({
+            country_id: filters.country_id,
+            region_id: filters.region_id ?? undefined,
+            search: term || undefined,
+            per_page: 50,
+        });
+        schools.value = data.data;
+        schoolTotal.value = data.meta.total;
+    } finally {
+        schoolSearching.value = false;
+    }
+}
+
+function onSchoolSearch(term: string): void {
+    void loadSchools(term);
 }
 async function onCountryFilterSelected(value: number | null): Promise<void> {
     filters.country_id = value;
@@ -200,10 +231,14 @@ onMounted(async () => {
                     v-model="filters.school_id"
                     :options="venueOptions"
                     dense
-                    :disabled="schools.length === 0"
+                    remote
+                    :searching="schoolSearching"
+                    :total="schoolTotal"
+                    :disabled="!filters.country_id"
                     :loading="cascadeLoading"
                     :placeholder="$t('coordinator.filterVenue')"
                     :search-placeholder="$t('coordinator.venuesLabel')"
+                    @search="onSchoolSearch"
                 />
             </div>
             <!-- Coordinator level over Status -->

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 export interface SearchSelectOption {
@@ -24,11 +24,26 @@ const props = withDefaults(
         loading?: boolean;
         /** Maximum matches rendered at once; the rest require refining search. */
         limit?: number;
+        /**
+         * Remote mode: options are supplied already filtered by the server. The
+         * component stops filtering locally and emits `search` (debounced) so the
+         * parent can refetch. Use for large sets that exceed one page (venues).
+         */
+        remote?: boolean;
+        /** Remote mode: spinner inside the dropdown while the parent is fetching. */
+        searching?: boolean;
+        /** Remote mode: total server-side matches, drives the "+N — refine" hint. */
+        total?: number;
+        /** Fallback option for a preselected value that isn't in the current page (edit forms). */
+        selectedOption?: SearchSelectOption | null;
     }>(),
-    { placeholder: '', searchPlaceholder: '', disabled: false, clearable: true, dense: false, large: false, loading: false, limit: 200 },
+    { placeholder: '', searchPlaceholder: '', disabled: false, clearable: true, dense: false, large: false, loading: false, limit: 200, remote: false, searching: false },
 );
 
-const emit = defineEmits<{ (e: 'update:modelValue', value: number | null): void }>();
+const emit = defineEmits<{
+    (e: 'update:modelValue', value: number | null): void;
+    (e: 'search', term: string): void;
+}>();
 
 const { t } = useI18n();
 
@@ -36,16 +51,54 @@ const root = ref<HTMLElement | null>(null);
 const open = ref(false);
 const search = ref('');
 
-const selected = computed(() => props.options.find((o) => o.id === props.modelValue) ?? null);
+// Remember options we've selected so their label survives a remote refetch that
+// no longer includes them (the selected id can sit outside the current page).
+const chosen = ref<SearchSelectOption | null>(props.selectedOption ?? null);
+watch(
+    () => props.selectedOption,
+    (v) => {
+        if (v) {
+            chosen.value = v;
+        }
+    },
+);
 
+const selected = computed(() => {
+    const inPage = props.options.find((o) => o.id === props.modelValue);
+    if (inPage) {
+        return inPage;
+    }
+    return chosen.value && chosen.value.id === props.modelValue ? chosen.value : null;
+});
+
+// In remote mode the server has already filtered; render options as given.
 const matches = computed(() => {
+    if (props.remote) {
+        return props.options;
+    }
     const term = search.value.trim().toLowerCase();
     return term
         ? props.options.filter((o) => o.label.toLowerCase().includes(term) || (o.sub ?? '').toLowerCase().includes(term))
         : props.options;
 });
 const filtered = computed(() => matches.value.slice(0, props.limit));
-const hiddenCount = computed(() => Math.max(0, matches.value.length - props.limit));
+const hiddenCount = computed(() =>
+    props.remote
+        ? Math.max(0, (props.total ?? props.options.length) - props.options.length)
+        : Math.max(0, matches.value.length - props.limit),
+);
+
+let timer: ReturnType<typeof setTimeout> | undefined;
+watch(search, (term) => {
+    if (!props.remote) {
+        return;
+    }
+    if (timer) {
+        clearTimeout(timer);
+    }
+    timer = setTimeout(() => emit('search', term.trim()), 300);
+});
+onBeforeUnmount(() => timer && clearTimeout(timer));
 
 function toggleOpen(): void {
     if (props.disabled || props.loading) {
@@ -54,10 +107,15 @@ function toggleOpen(): void {
     open.value = !open.value;
     if (open.value) {
         search.value = '';
+        // Remote: load the first (unfiltered) page fresh each time it opens.
+        if (props.remote) {
+            emit('search', '');
+        }
     }
 }
 
 function choose(id: number): void {
+    chosen.value = props.options.find((o) => o.id === id) ?? chosen.value;
     emit('update:modelValue', id);
     open.value = false;
 }
@@ -108,16 +166,22 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
 
         <div v-if="open" class="absolute z-30 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
             <div class="border-b border-gray-100 p-2">
-                <input
-                    v-model="search"
-                    type="search"
-                    :placeholder="searchPlaceholder || t('common.search')"
-                    class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-                    @keydown.stop
-                />
+                <div class="relative">
+                    <input
+                        v-model="search"
+                        type="search"
+                        :placeholder="searchPlaceholder || t('common.search')"
+                        class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                        @keydown.stop
+                    />
+                    <svg v-if="remote && searching" class="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                </div>
             </div>
             <ul class="max-h-56 overflow-y-auto py-1 text-sm">
-                <li v-if="filtered.length === 0" class="px-3 py-2 text-gray-400">{{ t('common.dash') }}</li>
+                <li v-if="filtered.length === 0" class="px-3 py-2 text-gray-400">{{ remote && searching ? t('common.loading') : t('common.dash') }}</li>
                 <li
                     v-for="opt in filtered"
                     :key="opt.id"

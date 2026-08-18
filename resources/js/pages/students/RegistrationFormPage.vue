@@ -33,6 +33,10 @@ const competitorNumber = ref<string | null>(null);
 const countries = ref<Country[]>([]);
 const schools = ref<School[]>([]);
 const levels = ref<LevelOption[]>([]);
+// Keeps the chosen venue's label visible when it sits outside the current server page.
+const selectedSchool = ref<SearchSelectOption | null>(null);
+const schoolSearching = ref(false);
+const schoolTotal = ref(0);
 
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const schoolOptions = computed<SearchSelectOption[]>(() => schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })));
@@ -54,23 +58,33 @@ const error = ref<string | null>(null);
 
 const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 
-async function loadSchools(): Promise<void> {
+// Server-side venue search: a country can hold hundreds of venues, so the picker
+// fetches a page at a time and refetches per keystroke (see SearchSelect remote).
+async function loadSchools(term = '', viaSearch = false): Promise<void> {
     if (form.country_id === null) {
         schools.value = [];
+        schoolTotal.value = 0;
         return;
     }
-    cascadeLoading.value = true;
+    const flag = viaSearch ? schoolSearching : cascadeLoading;
+    flag.value = true;
     try {
-        const { data } = await listSchools({ country_id: form.country_id, per_page: 200 });
+        const { data } = await listSchools({ country_id: form.country_id, search: term || undefined, per_page: 50 });
         schools.value = data.data;
+        schoolTotal.value = data.meta.total;
     } finally {
-        cascadeLoading.value = false;
+        flag.value = false;
     }
+}
+
+function onSchoolSearch(term: string): void {
+    void loadSchools(term, true);
 }
 
 async function onCountrySelected(value: number | null): Promise<void> {
     form.country_id = value;
     form.school_id = null;
+    selectedSchool.value = null;
     await loadSchools();
 }
 
@@ -132,6 +146,7 @@ onMounted(async () => {
             form.country_id = x.country?.id ?? null;
             await loadSchools();
             form.school_id = x.school?.id ?? null;
+            selectedSchool.value = x.school ? { id: x.school.id, label: x.school.name ?? '' } : null;
             form.school_external = x.school_external ?? '';
             form.grade = x.grade;
             form.difficulty_level_id = x.level?.id ?? null;
@@ -185,6 +200,7 @@ onMounted(async () => {
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">{{ $t('registration.venue') }} <span class="text-red-500">*</span></label>
                                 <SearchSelect v-model="form.school_id" :options="schoolOptions" :loading="cascadeLoading"
+                                    remote :searching="schoolSearching" :total="schoolTotal" :selected-option="selectedSchool" @search="onSchoolSearch"
                                     :placeholder="form.country_id ? $t('registration.venuePlaceholder') : $t('registration.venueCountryFirst')"
                                     :search-placeholder="$t('registration.venue')" />
                             </div>
