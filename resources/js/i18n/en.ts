@@ -214,6 +214,7 @@ export default {
         total: 'Total',
         searchNameCity: 'Name, City',
         filterStatus: 'Status…',
+        filterReset: 'Reset filters',
         empty: 'No venues.',
         error: 'Could not load venues.',
         notFound: 'Venue not found.',

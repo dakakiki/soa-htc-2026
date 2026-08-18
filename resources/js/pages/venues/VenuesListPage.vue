@@ -96,6 +96,15 @@ async function onCountryFilterSelected(value: number | null): Promise<void> {
     await onCountryFilterChange();
 }
 
+async function resetFilters(): Promise<void> {
+    filters.search = '';
+    filters.country_id = null;
+    filters.region_id = null;
+    filters.status = '';
+    regions.value = [];
+    await load(1);
+}
+
 async function onToggleStatus(school: School, value: boolean): Promise<void> {
     const previous = school.status;
     school.status = value ? 'active' : 'inactive';
@@ -153,43 +162,38 @@ onMounted(async () => {
             >{{ $t('venue.add') }}</RouterLink>
         </div>
 
-        <form class="mt-2 flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="load(1)">
+            <!-- Column 1: search -->
             <input v-model="filters.search" type="search" :placeholder="$t('venue.searchNameCity')"
-                class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <div class="w-44">
-                <SearchSelect
-                    :model-value="filters.country_id"
-                    :options="countryOptions"
-                    dense
-                    :placeholder="$t('venue.countryPlaceholder')"
-                    :search-placeholder="$t('venue.country')"
-                    @update:model-value="onCountryFilterSelected"
-                />
-            </div>
-            <div class="w-44">
-                <SearchSelect
-                    v-model="filters.region_id"
-                    :options="regionOptions"
-                    dense
-                    :disabled="!filters.country_id"
-                    :loading="cascadeLoading"
-                    :placeholder="$t('venue.region')"
-                    :search-placeholder="$t('venue.region')"
-                />
-            </div>
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
+
+            <!-- Column 2: Country / Region -->
+            <SearchSelect :model-value="filters.country_id" :options="countryOptions" dense
+                class="lg:col-start-2 lg:row-start-1" :placeholder="$t('venue.countryPlaceholder')"
+                :search-placeholder="$t('venue.country')" @update:model-value="onCountryFilterSelected" />
+            <SearchSelect v-model="filters.region_id" :options="regionOptions" dense :loading="cascadeLoading"
+                class="lg:col-start-2 lg:row-start-2" :disabled="!filters.country_id"
+                :placeholder="$t('venue.region')" :search-placeholder="$t('venue.region')" />
+
+            <!-- Column 3: Status -->
+            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-3 lg:row-start-1">
                 <option value="">{{ $t('venue.filterStatus') }}</option>
                 <option value="active">{{ $t('venue.statusActive') }}</option>
                 <option value="inactive">{{ $t('venue.statusInactive') }}</option>
             </select>
-            <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
-                {{ $t('common.search') }}
+
+            <!-- Column 4: Filter above Reset -->
+            <button type="submit" class="w-full rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover lg:col-start-4 lg:row-start-1">
+                {{ $t('common.filter') }}
+            </button>
+            <button type="button" class="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 lg:col-start-4 lg:row-start-2" @click="resetFilters">
+                {{ $t('venue.filterReset') }}
             </button>
         </form>
+        </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-
-        <p class="text-sm text-gray-500">{{ $t('common.results', { count: total }) }}</p>
 
         <div class="relative min-h-[8rem] overflow-x-auto rounded-lg border border-gray-200 bg-white">
             <LoadingOverlay v-if="loading" />
