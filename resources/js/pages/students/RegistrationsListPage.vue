@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconListCheck } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
 import { listRegistrations, deleteRegistration, resultColumns } from '@/api/registrations';
 import { listCountries, listRegions, listLevelOptions } from '@/api/reference';
-import { listSchools } from '@/api/schools';
+import { listSchools, getSchool } from '@/api/schools';
 import { examRoundsApi, type Lookup } from '@/api/content';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
@@ -17,8 +17,13 @@ import RegistrationResultsModal from '@/pages/students/RegistrationResultsModal.
 import type { Country, LevelOption, Region, Registration, ResultColumn, School } from '@/types/models';
 
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const session = useSessionStore();
 const confirm = useConfirmStore();
+
+const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
+const asNumber = (v: unknown): number | null => (v ? Number(v) : null);
 const canInsert = computed(() => session.user?.can_student_insert ?? false);
 const canEdit = computed(() => session.user?.can_student_edit ?? false);
 const canDelete = computed(() => session.user?.can_student_delete ?? false);
@@ -55,9 +60,17 @@ const filters = reactive<{
     exam_round_id: number | null;
     attendance: string;
 }>({
-    search: '', country_id: null, region_id: null, school_id: null,
-    grade: null, level_id: null, exam_round_id: null, attendance: '',
+    search: asString(route.query.search),
+    country_id: asNumber(route.query.country_id),
+    region_id: asNumber(route.query.region_id),
+    school_id: asNumber(route.query.school_id),
+    grade: asNumber(route.query.grade),
+    level_id: asNumber(route.query.level_id),
+    exam_round_id: asNumber(route.query.exam_round_id),
+    attendance: asString(route.query.attendance),
 });
+// Fallback label for a restored venue that isn't in the current server page.
+const selectedSchoolFilter = ref<SearchSelectOption | null>(null);
 
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
@@ -149,6 +162,7 @@ async function onCountry(v: number | null): Promise<void> {
     filters.country_id = v;
     filters.region_id = null;
     filters.school_id = null;
+    selectedSchoolFilter.value = null;
     await Promise.all([loadRegions(), loadSchools()]);
     await load(1);
 }
@@ -156,6 +170,7 @@ async function onCountry(v: number | null): Promise<void> {
 async function onRegion(v: number | null): Promise<void> {
     filters.region_id = v;
     filters.school_id = null;
+    selectedSchoolFilter.value = null;
     await loadSchools();
     await load(1);
 }
@@ -169,12 +184,30 @@ async function resetFilters(): Promise<void> {
     filters.level_id = null;
     filters.exam_round_id = null;
     filters.attendance = '';
+    selectedSchoolFilter.value = null;
     regions.value = [];
     schools.value = [];
     // Back to the empty prompt — a cleared filter shows nothing, not the whole roster.
     rows.value = [];
     total.value = 0;
     searched.value = false;
+    router.replace({ query: {} });
+}
+
+// Mirror the active filters into the URL so returning from add/edit (router.back)
+// lands on the same filtered result.
+function syncUrl(p: number): void {
+    const query: Record<string, string> = {};
+    if (filters.search) query.search = filters.search;
+    if (filters.country_id) query.country_id = String(filters.country_id);
+    if (filters.region_id) query.region_id = String(filters.region_id);
+    if (filters.school_id) query.school_id = String(filters.school_id);
+    if (filters.grade) query.grade = String(filters.grade);
+    if (filters.level_id) query.level_id = String(filters.level_id);
+    if (filters.exam_round_id) query.exam_round_id = String(filters.exam_round_id);
+    if (filters.attendance) query.attendance = filters.attendance;
+    if (p > 1) query.page = String(p);
+    router.replace({ query });
 }
 
 async function load(target = page.value): Promise<void> {
@@ -198,6 +231,7 @@ async function load(target = page.value): Promise<void> {
         page.value = data.meta.current_page;
         lastPage.value = data.meta.last_page;
         total.value = data.meta.total;
+        syncUrl(page.value);
     } catch (e) {
         error.value = apiErrorMessage(e, t('registration.error'));
     } finally {
@@ -231,7 +265,24 @@ onMounted(async () => {
         const { data } = await examRoundsApi.list();
         rounds.value = data.data;
     } catch { /* round filter optional */ }
+
     // No initial list — the roster is huge; results appear once the user filters.
+    // But if the URL already carries filters (e.g. returning from add/edit), restore
+    // that same filtered result: rebuild the cascade options and reload the page.
+    const hasFilters = filters.search || filters.country_id || filters.region_id || filters.school_id
+        || filters.grade || filters.level_id || filters.exam_round_id || filters.attendance;
+    if (hasFilters) {
+        if (filters.country_id) {
+            await Promise.all([loadRegions(), loadSchools()]);
+            if (filters.school_id) {
+                try {
+                    const { data } = await getSchool(filters.school_id);
+                    selectedSchoolFilter.value = { id: data.data.id, label: data.data.name, sub: data.data.city };
+                } catch { /* venue label is optional */ }
+            }
+        }
+        await load(asNumber(route.query.page) ?? 1);
+    }
 });
 </script>
 
@@ -265,7 +316,7 @@ onMounted(async () => {
 
             <!-- Column 3: Venue (server-side search — all venues reachable, not just first page) -->
             <SearchSelect :model-value="filters.school_id" :options="schoolOptions" dense :loading="schoolLoading"
-                remote :searching="schoolSearching" :total="schoolTotal" @search="onSchoolSearch"
+                remote :searching="schoolSearching" :total="schoolTotal" :selected-option="selectedSchoolFilter" @search="onSchoolSearch"
                 class="lg:col-start-3 lg:row-start-1" :disabled="filters.country_id === null"
                 :placeholder="$t('registration.filterVenue')" :search-placeholder="$t('registration.venue')"
                 @update:model-value="(v: number | null) => { filters.school_id = v; load(1); }" />

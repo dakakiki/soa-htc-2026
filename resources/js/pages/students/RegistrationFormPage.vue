@@ -104,8 +104,14 @@ function onGradeChange(): void {
     setTimeout(() => { levelLoading.value = false; }, 250);
 }
 
+// Return to the exact filtered list the user came from (its filters live in the
+// URL), falling back to the plain list on a direct load.
 function goBack(): void {
-    router.push({ name: 'registrations' });
+    if (window.history.state?.back) {
+        router.back();
+    } else {
+        router.push({ name: 'registrations' });
+    }
 }
 
 async function save(): Promise<void> {

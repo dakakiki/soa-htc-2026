@@ -6,7 +6,7 @@ import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
 import { deleteCoordinator, listCoordinators, setCoordinatorStatus } from '@/api/coordinators';
 import { listCountries, listRegions, listRoles, listLevelColumns } from '@/api/reference';
-import { listSchools } from '@/api/schools';
+import { listSchools, getSchool } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
@@ -47,6 +47,8 @@ const coordinatorRoles = computed(() => roles.value.filter((r) => COORDINATOR_RO
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
 const venueOptions = computed<SearchSelectOption[]>(() => schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })));
+// Fallback label for a restored venue that isn't in the current server page.
+const selectedSchoolFilter = ref<SearchSelectOption | null>(null);
 
 const filters = reactive<{ search: string; country_id: number | null; region_id: number | null; role_id: number | null; school_id: number | null; status: string }>({
     search: asString(route.query.search),
@@ -96,26 +98,34 @@ async function load(target = page.value): Promise<void> {
     }
 }
 
+// Load the region + venue options for the current country without touching the
+// selected filter values — used both on country change and on URL restore.
+async function loadCascade(): Promise<void> {
+    if (!filters.country_id) {
+        return;
+    }
+    cascadeLoading.value = true;
+    try {
+        const [regionRes, schoolRes] = await Promise.all([
+            listRegions(filters.country_id),
+            listSchools({ country_id: filters.country_id, per_page: 50 }),
+        ]);
+        regions.value = regionRes.data.data;
+        schools.value = schoolRes.data.data;
+        schoolTotal.value = schoolRes.data.meta.total;
+    } finally {
+        cascadeLoading.value = false;
+    }
+}
+
 async function onCountryFilterChange(): Promise<void> {
     filters.region_id = null;
     filters.school_id = null;
+    selectedSchoolFilter.value = null;
     regions.value = [];
     schools.value = [];
     schoolTotal.value = 0;
-    if (filters.country_id) {
-        cascadeLoading.value = true;
-        try {
-            const [regionRes, schoolRes] = await Promise.all([
-                listRegions(filters.country_id),
-                listSchools({ country_id: filters.country_id, per_page: 50 }),
-            ]);
-            regions.value = regionRes.data.data;
-            schools.value = schoolRes.data.data;
-            schoolTotal.value = schoolRes.data.meta.total;
-        } finally {
-            cascadeLoading.value = false;
-        }
-    }
+    await loadCascade();
 }
 
 // Server-side venue search — a country can hold hundreds of venues; refetch a page
@@ -156,6 +166,7 @@ async function resetFilters(): Promise<void> {
     filters.role_id = null;
     filters.school_id = null;
     filters.status = '';
+    selectedSchoolFilter.value = null;
     regions.value = [];
     schools.value = [];
     schoolTotal.value = 0;
@@ -194,8 +205,16 @@ onMounted(async () => {
     } catch {
         // filters are optional
     }
+    // Restore the cascade options for a filter carried in the URL (e.g. returning
+    // from add/edit) without clearing the region/venue the user had chosen.
     if (filters.country_id) {
-        await onCountryFilterChange().catch(() => undefined);
+        await loadCascade().catch(() => undefined);
+        if (filters.school_id) {
+            try {
+                const { data } = await getSchool(filters.school_id);
+                selectedSchoolFilter.value = { id: data.data.id, label: data.data.name, sub: data.data.city };
+            } catch { /* venue label is optional */ }
+        }
     }
     await load(asNumber(route.query.page) ?? 1);
 });
@@ -231,7 +250,8 @@ onMounted(async () => {
 
             <!-- Column 3: Venue (server-side search) -->
             <SearchSelect v-model="filters.school_id" :options="venueOptions" dense remote
-                :searching="schoolSearching" :total="schoolTotal" :disabled="!filters.country_id" :loading="cascadeLoading"
+                :searching="schoolSearching" :total="schoolTotal" :selected-option="selectedSchoolFilter"
+                :disabled="!filters.country_id" :loading="cascadeLoading"
                 class="lg:col-start-3 lg:row-start-1" :placeholder="$t('coordinator.filterVenue')"
                 :search-placeholder="$t('coordinator.venuesLabel')" @search="onSchoolSearch" />
 
