@@ -9,6 +9,7 @@ import { listLevelOptions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
+import ButtonGroup from '@/components/ButtonGroup.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import type { Country, LevelOption, School } from '@/types/models';
 
@@ -49,6 +50,10 @@ const levelOptions = computed<SearchSelectOption[]>(() => {
         .filter((l) => l.grades.includes(form.grade as number))
         .map((l) => ({ id: l.id, label: l.level_short, sub: `${l.name} · ${l.category_name}` }));
 });
+const statusOptions = computed(() => [
+    { value: 'active', label: t('registration.statusActive'), activeClass: 'bg-green-500 text-white' },
+    { value: 'inactive', label: t('registration.statusInactive'), activeClass: 'bg-gray-400 text-white' },
+]);
 
 const cascadeLoading = ref(false);
 const levelLoading = ref(false);
@@ -235,10 +240,11 @@ onMounted(async () => {
                                 @update:model-value="(v: boolean) => (form.attendance = v ? 'present' : 'absent')" />
                             <span class="text-sm text-gray-700">{{ $t('registration.attendance') }}: {{ form.attendance === 'present' ? $t('registration.attendancePresent') : $t('registration.attendanceAbsent') }}</span>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <ToggleSwitch :model-value="form.status === 'active'" :aria-label="$t('registration.status')"
-                                @update:model-value="(v: boolean) => (form.status = v ? 'active' : 'inactive')" />
-                            <span class="text-sm text-gray-700">{{ $t('registration.status') }}: {{ form.status === 'active' ? $t('registration.statusActive') : $t('registration.statusInactive') }}</span>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('registration.status') }}</label>
+                            <div class="mt-2">
+                                <ButtonGroup v-model="form.status" :options="statusOptions" />
+                            </div>
                         </div>
                     </div>
                 </div>
