@@ -41,6 +41,33 @@ php artisan season:reset --force
 **Out of scope (Phase 6):** archiving the previous season's results before the wipe,
 and bumping the season round in settings. This command only deletes/deactivates data.
 
+### `legacy:fix-encoding` — repair legacy mojibake
+
+The legacy dump was loaded through a Windows **CP850** console, so imported text
+(school / coordinator names, question content) was double-encoded — e.g.
+`İ.T.Ü. Geliştirme Vakfı` was stored as `─░.T.├£. Geli┼ƒtirme Vakf─▒`, and
+`Križevci` as `Kri┼¥evci`. This command reverses the CP850 mojibake **in place**
+across the imported tables (`schools`, `users`, `questions`, …).
+
+It is idempotent and safe to re-run: only strings carrying the tell-tale
+box-drawing glyphs are touched, and a reversal is applied only when it yields
+valid, no-longer-corrupted UTF-8. The same reversal
+(`App\Domain\Migration\LegacyText`) is wired into the `legacy:import-*` mappers,
+so a fresh re-import stays clean without this command. See **ADR-0026** in
+`DECISIONS.md`.
+
+Preview what would change (nothing is written):
+
+```bash
+php artisan legacy:fix-encoding --dry-run
+```
+
+Apply the repair:
+
+```bash
+php artisan legacy:fix-encoding
+```
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
