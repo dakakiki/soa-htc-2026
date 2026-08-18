@@ -8,9 +8,9 @@ export async function csrf(): Promise<void> {
     await http.get('/sanctum/csrf-cookie');
 }
 
-export async function login(email: string, password: string): Promise<AuthUser> {
+export async function login(email: string, password: string, remember = false): Promise<AuthUser> {
     await csrf();
-    const { data } = await http.post<{ data: AuthUser }>('/api/auth/login', { email, password });
+    const { data } = await http.post<{ data: AuthUser }>('/api/auth/login', { email, password, remember });
 
     return data.data;
 }

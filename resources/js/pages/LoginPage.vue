@@ -14,6 +14,7 @@ const { t } = useI18n();
 
 const email = ref('admin@soahtc.test');
 const password = ref('');
+const remember = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
@@ -21,7 +22,7 @@ async function submit(): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
-        await session.login(email.value, password.value);
+        await session.login(email.value, password.value, remember.value);
     } catch (e) {
         error.value = apiErrorMessage(e, t('login.failed'));
         return;
@@ -67,6 +68,15 @@ async function submit(): Promise<void> {
                         class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
                     />
                 </div>
+
+                <label class="flex items-center gap-2 text-sm text-gray-700 select-none">
+                    <input
+                        v-model="remember"
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+                    />
+                    {{ $t('login.remember') }}
+                </label>
 
                 <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 

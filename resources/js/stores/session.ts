@@ -34,8 +34,8 @@ export const useSessionStore = defineStore('session', () => {
         }
     }
 
-    async function login(email: string, password: string): Promise<void> {
-        user.value = await authApi.login(email, password);
+    async function login(email: string, password: string, remember = false): Promise<void> {
+        user.value = await authApi.login(email, password, remember);
         ready.value = true;
     }
 

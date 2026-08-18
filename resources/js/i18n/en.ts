@@ -84,6 +84,7 @@ export default {
         submit: 'Sign in',
         submitting: 'Signing in…',
         failed: 'Sign in failed.',
+        remember: 'Remember me',
     },
     public: {
         nav: {
