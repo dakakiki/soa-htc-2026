@@ -29,6 +29,7 @@ class UpdateRegistrationRequest extends FormRequest
             'date_of_birth' => ['nullable', 'date'],
             'grade' => ['sometimes', 'required', 'integer', 'min:1', 'max:13'],
             'status' => ['sometimes', 'in:active,inactive'],
+            'attendance' => ['sometimes', 'in:present,absent'],
         ];
     }
 

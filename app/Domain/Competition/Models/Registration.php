@@ -16,7 +16,7 @@ class Registration extends Model
 {
     protected $fillable = [
         'season_id', 'competitor_number', 'sequence', 'school_id', 'school_external',
-        'country_id', 'difficulty_level_id', 'name', 'date_of_birth', 'grade', 'status', 'legacy_id',
+        'country_id', 'difficulty_level_id', 'name', 'date_of_birth', 'grade', 'status', 'attendance', 'legacy_id',
     ];
 
     protected function casts(): array

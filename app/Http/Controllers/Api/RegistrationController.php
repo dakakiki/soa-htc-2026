@@ -46,11 +46,32 @@ class RegistrationController extends Controller
         if ($request->filled('country_id')) {
             $query->where('country_id', $request->integer('country_id'));
         }
+        if ($request->filled('region_id')) {
+            $query->whereHas('school', fn ($s) => $s->where('region_id', $request->integer('region_id')));
+        }
         if ($request->filled('level_id')) {
             $query->where('difficulty_level_id', $request->integer('level_id'));
         }
+        if ($request->filled('grade')) {
+            $query->where('grade', $request->integer('grade'));
+        }
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
+        }
+        if ($request->filled('attendance')) {
+            $query->where('attendance', $request->string('attendance'));
+        }
+        // Exam round: competitors with an attempt on a test belonging to an exam
+        // of that round (participation, mirroring the legacy per-round flags).
+        if ($request->filled('exam_round_id')) {
+            $round = $request->integer('exam_round_id');
+            $query->whereIn('registrations.id', function ($sub) use ($round) {
+                $sub->select('attempts.registration_id')
+                    ->from('attempts')
+                    ->join('exam_test', 'exam_test.test_id', '=', 'attempts.test_id')
+                    ->join('exams', 'exams.id', '=', 'exam_test.exam_id')
+                    ->where('exams.exam_round_id', $round);
+            });
         }
 
         $perPage = min(max($request->integer('per_page', 20), 1), 200);

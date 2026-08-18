@@ -23,6 +23,7 @@ class RegistrationResource extends JsonResource
             'date_of_birth' => $this->date_of_birth?->toDateString(),
             'grade' => $this->grade,
             'status' => $this->status,
+            'attendance' => $this->attendance,
             'school_external' => $this->school_external,
             'school' => $this->whenLoaded('school', fn () => [
                 'id' => $this->school_id,

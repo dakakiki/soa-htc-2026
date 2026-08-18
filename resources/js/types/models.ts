@@ -297,6 +297,7 @@ export interface Registration {
     date_of_birth: string | null;
     grade: number | null;
     status: string;
+    attendance: string;
     school_external: string | null;
     school?: { id: number; name?: string };
     country?: { id: number; name?: string };

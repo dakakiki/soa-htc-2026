@@ -23,10 +23,10 @@ const GRADES = Array.from({ length: 13 }, (_, i) => i + 1);
 
 const form = reactive<{
     name: string; country_id: number | null; school_id: number | null; school_external: string;
-    grade: number | null; difficulty_level_id: number | null; date_of_birth: string; status: string;
+    grade: number | null; difficulty_level_id: number | null; date_of_birth: string; status: string; attendance: string;
 }>({
     name: '', country_id: null, school_id: null, school_external: '',
-    grade: null, difficulty_level_id: null, date_of_birth: '', status: 'active',
+    grade: null, difficulty_level_id: null, date_of_birth: '', status: 'active', attendance: 'present',
 });
 const competitorNumber = ref<string | null>(null);
 
@@ -104,6 +104,7 @@ async function save(): Promise<void> {
         grade: form.grade,
         date_of_birth: form.date_of_birth || null,
         status: form.status,
+        attendance: form.attendance,
     };
     try {
         if (isEdit.value) {
@@ -136,6 +137,7 @@ onMounted(async () => {
             form.difficulty_level_id = x.level?.id ?? null;
             form.date_of_birth = x.date_of_birth ?? '';
             form.status = x.status;
+            form.attendance = x.attendance ?? 'present';
             competitorNumber.value = x.competitor_number;
         }
     } catch (e) {
@@ -154,59 +156,78 @@ onMounted(async () => {
 
         <div class="relative rounded-lg border border-gray-200 bg-white p-6">
             <LoadingOverlay v-if="loading" />
-            <form class="grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-2" @submit.prevent="save">
-                <div v-if="isEdit" class="lg:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('registration.number') }}</label>
-                    <p class="mt-1 font-mono text-lg font-semibold text-gray-900">{{ competitorNumber }}</p>
+            <form @submit.prevent="save">
+                <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                    <!-- Left column: student data -->
+                    <div class="space-y-5 lg:order-1 lg:col-span-8">
+                        <div v-if="isEdit">
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('registration.number') }}</label>
+                            <p class="mt-1 font-mono text-lg font-semibold text-gray-900">{{ competitorNumber }}</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">{{ $t('registration.name') }} <span class="text-red-500">*</span></label>
+                                <input v-model="form.name" type="text" required :class="field" :placeholder="$t('registration.namePlaceholder')" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">{{ $t('registration.dob') }}</label>
+                                <input v-model="form.date_of_birth" type="date" :class="field" />
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">{{ $t('registration.country') }} <span class="text-red-500">*</span></label>
+                                <SearchSelect :model-value="form.country_id" :options="countryOptions" :placeholder="$t('registration.countryPlaceholder')"
+                                    :search-placeholder="$t('registration.country')" @update:model-value="onCountrySelected" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">{{ $t('registration.venue') }} <span class="text-red-500">*</span></label>
+                                <SearchSelect v-model="form.school_id" :options="schoolOptions" :loading="cascadeLoading"
+                                    :placeholder="form.country_id ? $t('registration.venuePlaceholder') : $t('registration.venueCountryFirst')"
+                                    :search-placeholder="$t('registration.venue')" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('registration.school') }}</label>
+                            <input v-model="form.school_external" type="text" :class="field" :placeholder="$t('registration.schoolPlaceholder')" />
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">{{ $t('registration.grade') }} <span class="text-red-500">*</span></label>
+                                <select v-model.number="form.grade" :class="field" @change="onGradeChange">
+                                    <option :value="null" disabled>{{ $t('registration.gradePlaceholder') }}</option>
+                                    <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">{{ $t('registration.level') }} <span class="text-red-500">*</span></label>
+                                <SearchSelect v-model="form.difficulty_level_id" :options="levelOptions" :loading="levelLoading"
+                                    :placeholder="form.grade ? $t('registration.levelPlaceholder') : $t('registration.levelGradeFirst')"
+                                    :search-placeholder="$t('registration.level')" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right column: attendance + status -->
+                    <div class="space-y-5 lg:order-2 lg:col-span-4 lg:border-l lg:border-gray-200 lg:pl-8">
+                        <div class="flex items-center gap-3">
+                            <ToggleSwitch :model-value="form.attendance === 'present'" :aria-label="$t('registration.attendance')"
+                                @update:model-value="(v: boolean) => (form.attendance = v ? 'present' : 'absent')" />
+                            <span class="text-sm text-gray-700">{{ $t('registration.attendance') }}: {{ form.attendance === 'present' ? $t('registration.attendancePresent') : $t('registration.attendanceAbsent') }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <ToggleSwitch :model-value="form.status === 'active'" :aria-label="$t('registration.status')"
+                                @update:model-value="(v: boolean) => (form.status = v ? 'active' : 'inactive')" />
+                            <span class="text-sm text-gray-700">{{ $t('registration.status') }}: {{ form.status === 'active' ? $t('registration.statusActive') : $t('registration.statusInactive') }}</span>
+                        </div>
+                    </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('registration.name') }} <span class="text-red-500">*</span></label>
-                    <input v-model="form.name" type="text" required :class="field" :placeholder="$t('registration.namePlaceholder')" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('registration.dob') }}</label>
-                    <input v-model="form.date_of_birth" type="date" :class="field" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('registration.country') }} <span class="text-red-500">*</span></label>
-                    <SearchSelect :model-value="form.country_id" :options="countryOptions" :placeholder="$t('registration.countryPlaceholder')"
-                        :search-placeholder="$t('registration.country')" @update:model-value="onCountrySelected" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('registration.venue') }} <span class="text-red-500">*</span></label>
-                    <SearchSelect v-model="form.school_id" :options="schoolOptions" :loading="cascadeLoading"
-                        :placeholder="form.country_id ? $t('registration.venuePlaceholder') : $t('registration.venueCountryFirst')"
-                        :search-placeholder="$t('registration.venue')" />
-                </div>
-
-                <div class="lg:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('registration.school') }}</label>
-                    <input v-model="form.school_external" type="text" :class="field" :placeholder="$t('registration.schoolPlaceholder')" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('registration.grade') }} <span class="text-red-500">*</span></label>
-                    <select v-model.number="form.grade" :class="field" @change="onGradeChange">
-                        <option :value="null" disabled>{{ $t('registration.gradePlaceholder') }}</option>
-                        <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('registration.level') }} <span class="text-red-500">*</span></label>
-                    <SearchSelect v-model="form.difficulty_level_id" :options="levelOptions" :loading="levelLoading"
-                        :placeholder="form.grade ? $t('registration.levelPlaceholder') : $t('registration.levelGradeFirst')"
-                        :search-placeholder="$t('registration.level')" />
-                </div>
-
-                <div class="flex items-center gap-3 lg:col-span-2">
-                    <ToggleSwitch :model-value="form.status === 'active'" :aria-label="$t('registration.status')"
-                        @update:model-value="(v: boolean) => (form.status = v ? 'active' : 'inactive')" />
-                    <span class="text-sm text-gray-700">{{ $t('registration.status') }}: {{ form.status === 'active' ? $t('registration.statusActive') : $t('registration.statusInactive') }}</span>
-                </div>
-
-                <div class="flex items-center justify-between border-t border-gray-200 pt-4 lg:col-span-2">
+                <div class="mt-8 flex items-center justify-end gap-3 border-t border-gray-200 pt-4">
                     <button type="button" class="rounded-md border border-gray-300 bg-gray-100 px-5 py-2 text-sm text-gray-700 hover:bg-gray-200" @click="goBack">{{ $t('common.cancel') }}</button>
                     <button type="submit" :disabled="saving" class="rounded-md bg-brand-primary px-5 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                         {{ saving ? $t('common.saving') : $t('common.save') }}

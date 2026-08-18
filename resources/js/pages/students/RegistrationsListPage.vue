@@ -5,13 +5,16 @@ import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
 import { listRegistrations, deleteRegistration, setRegistrationStatus } from '@/api/registrations';
-import { listLevelOptions } from '@/api/reference';
+import { listCountries, listRegions, listLevelOptions } from '@/api/reference';
+import { listSchools } from '@/api/schools';
+import { examRoundsApi, type Lookup } from '@/api/content';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
-import type { LevelOption, Registration } from '@/types/models';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
+import type { Country, LevelOption, Region, Registration, School } from '@/types/models';
 
 const { t } = useI18n();
 const session = useSessionStore();
@@ -22,15 +25,37 @@ const canDelete = computed(() => session.user?.can_student_delete ?? false);
 
 const rows = ref<Registration[]>([]);
 const levels = ref<LevelOption[]>([]);
+const countries = ref<Country[]>([]);
+const regions = ref<Region[]>([]);
+const schools = ref<School[]>([]);
+const rounds = ref<Lookup[]>([]);
 const page = ref(1);
 const lastPage = ref(1);
 const total = ref(0);
 const loading = ref(true);
+const regionLoading = ref(false);
+const schoolLoading = ref(false);
 const error = ref<string | null>(null);
 
-const filters = reactive<{ search: string; level_id: number | null; status: string }>({
-    search: '', level_id: null, status: '',
+const GRADES = Array.from({ length: 13 }, (_, i) => i + 1);
+
+const filters = reactive<{
+    search: string;
+    country_id: number | null;
+    region_id: number | null;
+    school_id: number | null;
+    grade: number | null;
+    level_id: number | null;
+    exam_round_id: number | null;
+    attendance: string;
+}>({
+    search: '', country_id: null, region_id: null, school_id: null,
+    grade: null, level_id: null, exam_round_id: null, attendance: '',
 });
+
+const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
+const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
+const schoolOptions = computed<SearchSelectOption[]>(() => schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })));
 
 const levelGroups = computed(() => {
     const groups: { label: string; levels: LevelOption[] }[] = [];
@@ -45,6 +70,67 @@ const levelGroups = computed(() => {
     return groups;
 });
 
+async function loadRegions(): Promise<void> {
+    if (filters.country_id === null) {
+        regions.value = [];
+        return;
+    }
+    regionLoading.value = true;
+    try {
+        const { data } = await listRegions(filters.country_id);
+        regions.value = data.data;
+    } catch {
+        regions.value = [];
+    } finally {
+        regionLoading.value = false;
+    }
+}
+
+async function loadSchools(): Promise<void> {
+    if (filters.country_id === null) {
+        schools.value = [];
+        return;
+    }
+    schoolLoading.value = true;
+    try {
+        const { data } = await listSchools({ country_id: filters.country_id, region_id: filters.region_id ?? undefined, per_page: 200 });
+        schools.value = data.data;
+    } catch {
+        schools.value = [];
+    } finally {
+        schoolLoading.value = false;
+    }
+}
+
+async function onCountry(v: number | null): Promise<void> {
+    filters.country_id = v;
+    filters.region_id = null;
+    filters.school_id = null;
+    await Promise.all([loadRegions(), loadSchools()]);
+    await load(1);
+}
+
+async function onRegion(v: number | null): Promise<void> {
+    filters.region_id = v;
+    filters.school_id = null;
+    await loadSchools();
+    await load(1);
+}
+
+async function resetFilters(): Promise<void> {
+    filters.search = '';
+    filters.country_id = null;
+    filters.region_id = null;
+    filters.school_id = null;
+    filters.grade = null;
+    filters.level_id = null;
+    filters.exam_round_id = null;
+    filters.attendance = '';
+    regions.value = [];
+    schools.value = [];
+    await load(1);
+}
+
 async function load(target = page.value): Promise<void> {
     loading.value = true;
     error.value = null;
@@ -53,8 +139,13 @@ async function load(target = page.value): Promise<void> {
             page: target,
             per_page: 10,
             search: filters.search || undefined,
+            country_id: filters.country_id ?? undefined,
+            region_id: filters.region_id ?? undefined,
+            school_id: filters.school_id ?? undefined,
+            grade: filters.grade ?? undefined,
             level_id: filters.level_id ?? undefined,
-            status: filters.status || undefined,
+            exam_round_id: filters.exam_round_id ?? undefined,
+            attendance: filters.attendance || undefined,
         });
         rows.value = data.data;
         page.value = data.meta.current_page;
@@ -92,9 +183,15 @@ async function remove(x: Registration): Promise<void> {
 
 onMounted(async () => {
     try {
-        const { data } = await listLevelOptions();
-        levels.value = data.data;
-    } catch { /* filter optional */ }
+        const [{ data: countryData }, { data: levelData }] = await Promise.all([listCountries(), listLevelOptions()]);
+        countries.value = countryData.data;
+        levels.value = levelData.data;
+    } catch { /* filters optional */ }
+    try {
+        // Exam rounds populate the Round filter; needs content access, so degrade quietly.
+        const { data } = await examRoundsApi.list();
+        rounds.value = data.data;
+    } catch { /* round filter optional */ }
     await load(1);
 });
 </script>
@@ -112,22 +209,55 @@ onMounted(async () => {
             </RouterLink>
         </div>
 
-        <form class="flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
+        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6" @submit.prevent="load(1)">
+            <!-- Column 1: search (stays first) with the filter buttons beneath it. -->
             <input v-model="filters.search" type="search" :placeholder="$t('registration.searchPlaceholder')"
-                class="w-64 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <select v-model="filters.level_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
+
+            <!-- Column 2: Country / Region -->
+            <SearchSelect :model-value="filters.country_id" :options="countryOptions" dense
+                class="lg:col-start-2 lg:row-start-1" :placeholder="$t('registration.filterCountry')"
+                :search-placeholder="$t('registration.country')" @update:model-value="onCountry" />
+            <SearchSelect :model-value="filters.region_id" :options="regionOptions" dense :loading="regionLoading"
+                class="lg:col-start-2 lg:row-start-2" :disabled="filters.country_id === null"
+                :placeholder="$t('registration.filterRegion')" :search-placeholder="$t('reports.region')"
+                @update:model-value="onRegion" />
+
+            <!-- Column 3: Venue -->
+            <SearchSelect :model-value="filters.school_id" :options="schoolOptions" dense :loading="schoolLoading"
+                class="lg:col-start-3 lg:row-start-1" :disabled="filters.country_id === null"
+                :placeholder="$t('registration.filterVenue')" :search-placeholder="$t('registration.venue')"
+                @update:model-value="(v: number | null) => { filters.school_id = v; load(1); }" />
+
+            <!-- Column 4: Grade / Difficulty Category -->
+            <select v-model="filters.grade" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-1" @change="load(1)">
+                <option :value="null">{{ $t('registration.filterGrade') }}</option>
+                <option v-for="g in GRADES" :key="g" :value="g">{{ g }}</option>
+            </select>
+            <select v-model="filters.level_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-2" @change="load(1)">
                 <option :value="null">{{ $t('registration.filterLevel') }}</option>
                 <optgroup v-for="g in levelGroups" :key="g.label" :label="g.label">
                     <option v-for="l in g.levels" :key="l.id" :value="l.id">{{ l.level_short }}</option>
                 </optgroup>
             </select>
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
-                <option value="">{{ $t('registration.filterStatus') }}</option>
-                <option value="active">{{ $t('registration.statusActive') }}</option>
-                <option value="inactive">{{ $t('registration.statusInactive') }}</option>
+
+            <!-- Column 5: Round / Attendance -->
+            <select v-model="filters.exam_round_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-5 lg:row-start-1" @change="load(1)">
+                <option :value="null">{{ $t('registration.filterRound') }}</option>
+                <option v-for="r in rounds" :key="r.id" :value="r.id">{{ r.name }}</option>
             </select>
-            <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
-                {{ $t('common.search') }}
+            <select v-model="filters.attendance" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-5 lg:row-start-2" @change="load(1)">
+                <option value="">{{ $t('registration.filterAttendance') }}</option>
+                <option value="present">{{ $t('registration.attendancePresent') }}</option>
+                <option value="absent">{{ $t('registration.attendanceAbsent') }}</option>
+            </select>
+
+            <!-- Column 6: Filter above Reset, matched widths -->
+            <button type="submit" class="w-full rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover lg:col-start-6 lg:row-start-1">
+                {{ $t('common.filter') }}
+            </button>
+            <button type="button" class="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 lg:col-start-6 lg:row-start-2" @click="resetFilters">
+                {{ $t('registration.filterReset') }}
             </button>
         </form>
 
@@ -145,6 +275,7 @@ onMounted(async () => {
                         <th class="px-4 py-3">{{ $t('registration.venue') }}</th>
                         <th class="px-4 py-3">{{ $t('registration.level') }}</th>
                         <th class="px-4 py-3 text-center">{{ $t('registration.grade') }}</th>
+                        <th class="px-4 py-3 text-center">{{ $t('registration.attendance') }}</th>
                         <th class="px-4 py-3">{{ $t('registration.status') }}</th>
                         <th class="px-4 py-3 text-right">{{ $t('common.actions') }}</th>
                     </tr>
@@ -162,6 +293,13 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-600">{{ x.school?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ x.level?.level_short ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ x.grade ?? $t('common.dash') }}</td>
+                        <td class="px-4 py-3 text-center">
+                            <span :class="x.attendance === 'absent'
+                                ? 'inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700'
+                                : 'inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700'">
+                                {{ x.attendance === 'absent' ? $t('registration.attendanceAbsent') : $t('registration.attendancePresent') }}
+                            </span>
+                        </td>
                         <td class="px-4 py-3">
                             <Tooltip :text="$t('registration.toggleStatus')">
                                 <ToggleSwitch :model-value="x.status === 'active'" :disabled="!canEdit"
@@ -174,7 +312,7 @@ onMounted(async () => {
                         </td>
                     </tr>
                     <tr v-if="!loading && rows.length === 0">
-                        <td colspan="8" class="px-4 py-6 text-center text-gray-400">{{ $t('registration.empty') }}</td>
+                        <td colspan="9" class="px-4 py-6 text-center text-gray-400">{{ $t('registration.empty') }}</td>
                     </tr>
                 </tbody>
             </table>

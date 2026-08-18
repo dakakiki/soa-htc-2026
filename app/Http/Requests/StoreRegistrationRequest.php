@@ -26,6 +26,7 @@ class StoreRegistrationRequest extends FormRequest
             'date_of_birth' => ['nullable', 'date'],
             'grade' => ['required', 'integer', 'min:1', 'max:13'],
             'status' => ['sometimes', 'in:active,inactive'],
+            'attendance' => ['sometimes', 'in:present,absent'],
         ];
     }
 

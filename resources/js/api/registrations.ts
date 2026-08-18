@@ -9,15 +9,20 @@ export interface RegistrationPayload {
     date_of_birth?: string | null;
     grade: number;
     status?: string;
+    attendance?: string;
 }
 
 export interface RegistrationListParams {
     page?: number;
     search?: string;
-    school_id?: number;
     country_id?: number;
+    region_id?: number;
+    school_id?: number;
     level_id?: number;
+    grade?: number;
+    exam_round_id?: number;
     status?: string;
+    attendance?: string;
     per_page?: number;
 }
 
