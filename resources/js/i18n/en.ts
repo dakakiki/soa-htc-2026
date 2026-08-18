@@ -332,6 +332,7 @@ export default {
         filterStatus: 'Status…',
         filterLevel: 'Coordinator level…',
         filterVenue: 'Venue…',
+        filterReset: 'Reset filters',
         search: 'Name, Email, City',
         id: 'ID',
         venue: 'Venue',

@@ -149,6 +149,19 @@ async function onCountryFilterSelected(value: number | null): Promise<void> {
     await onCountryFilterChange();
 }
 
+async function resetFilters(): Promise<void> {
+    filters.search = '';
+    filters.country_id = null;
+    filters.region_id = null;
+    filters.role_id = null;
+    filters.school_id = null;
+    filters.status = '';
+    regions.value = [];
+    schools.value = [];
+    schoolTotal.value = 0;
+    await load(1);
+}
+
 async function onToggleStatus(c: Coordinator, value: boolean): Promise<void> {
     const previous = c.status;
     c.status = value ? 'active' : 'inactive';
@@ -202,65 +215,48 @@ onMounted(async () => {
             >{{ $t('coordinator.add') }}</RouterLink>
         </div>
 
-        <form class="flex flex-wrap items-start gap-3" @submit.prevent="load(1)">
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5" @submit.prevent="load(1)">
+            <!-- Column 1: search -->
             <input v-model="filters.search" type="search" :placeholder="$t('coordinator.search')"
-                class="w-48 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <!-- Country over Regions -->
-            <div class="flex w-44 flex-col gap-2">
-                <SearchSelect
-                    :model-value="filters.country_id"
-                    :options="countryOptions"
-                    dense
-                    :placeholder="$t('coordinator.filterCountry')"
-                    :search-placeholder="$t('coordinator.country')"
-                    @update:model-value="onCountryFilterSelected"
-                />
-                <SearchSelect
-                    v-model="filters.region_id"
-                    :options="regionOptions"
-                    dense
-                    :disabled="regions.length === 0"
-                    :loading="cascadeLoading"
-                    :placeholder="$t('coordinator.filterRegion')"
-                    :search-placeholder="$t('coordinator.region')"
-                />
-            </div>
-            <!-- Venue -->
-            <div class="w-44">
-                <SearchSelect
-                    v-model="filters.school_id"
-                    :options="venueOptions"
-                    dense
-                    remote
-                    :searching="schoolSearching"
-                    :total="schoolTotal"
-                    :disabled="!filters.country_id"
-                    :loading="cascadeLoading"
-                    :placeholder="$t('coordinator.filterVenue')"
-                    :search-placeholder="$t('coordinator.venuesLabel')"
-                    @search="onSchoolSearch"
-                />
-            </div>
-            <!-- Coordinator level over Status -->
-            <div class="flex flex-col gap-2">
-                <select v-model="filters.role_id" class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm">
-                    <option :value="null">{{ $t('coordinator.filterLevel') }}</option>
-                    <option v-for="r in coordinatorRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
-                </select>
-                <select v-model="filters.status" class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm">
-                    <option value="">{{ $t('coordinator.filterStatus') }}</option>
-                    <option value="active">{{ $t('coordinator.statusActive') }}</option>
-                    <option value="inactive">{{ $t('coordinator.statusInactive') }}</option>
-                </select>
-            </div>
-            <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
-                {{ $t('common.search') }}
+                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
+
+            <!-- Column 2: Country / Region -->
+            <SearchSelect :model-value="filters.country_id" :options="countryOptions" dense
+                class="lg:col-start-2 lg:row-start-1" :placeholder="$t('coordinator.filterCountry')"
+                :search-placeholder="$t('coordinator.country')" @update:model-value="onCountryFilterSelected" />
+            <SearchSelect v-model="filters.region_id" :options="regionOptions" dense :loading="cascadeLoading"
+                class="lg:col-start-2 lg:row-start-2" :disabled="regions.length === 0"
+                :placeholder="$t('coordinator.filterRegion')" :search-placeholder="$t('coordinator.region')" />
+
+            <!-- Column 3: Venue (server-side search) -->
+            <SearchSelect v-model="filters.school_id" :options="venueOptions" dense remote
+                :searching="schoolSearching" :total="schoolTotal" :disabled="!filters.country_id" :loading="cascadeLoading"
+                class="lg:col-start-3 lg:row-start-1" :placeholder="$t('coordinator.filterVenue')"
+                :search-placeholder="$t('coordinator.venuesLabel')" @search="onSchoolSearch" />
+
+            <!-- Column 4: Coordinator level / Status -->
+            <select v-model="filters.role_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-1">
+                <option :value="null">{{ $t('coordinator.filterLevel') }}</option>
+                <option v-for="r in coordinatorRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
+            </select>
+            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-2">
+                <option value="">{{ $t('coordinator.filterStatus') }}</option>
+                <option value="active">{{ $t('coordinator.statusActive') }}</option>
+                <option value="inactive">{{ $t('coordinator.statusInactive') }}</option>
+            </select>
+
+            <!-- Column 5: Filter above Reset, matched widths -->
+            <button type="submit" class="w-full rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover lg:col-start-5 lg:row-start-1">
+                {{ $t('common.filter') }}
+            </button>
+            <button type="button" class="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 lg:col-start-5 lg:row-start-2" @click="resetFilters">
+                {{ $t('coordinator.filterReset') }}
             </button>
         </form>
+        </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-
-        <p class="text-sm text-gray-500">{{ $t('common.results', { count: total }) }}</p>
 
         <div class="relative min-h-[8rem] overflow-x-auto rounded-lg border border-gray-200 bg-white">
             <LoadingOverlay v-if="loading" />
@@ -332,16 +328,16 @@ onMounted(async () => {
         </div>
 
         <!-- Schools modal: the coordinator's scoped schools with their details. -->
-        <div v-if="modalCoordinator" class="fixed inset-0 z-40 flex items-start justify-center bg-black/40 p-4 pt-20"
+        <div v-if="modalCoordinator" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
             @click.self="modalCoordinator = null">
-            <div class="w-full max-w-4xl rounded-lg bg-white shadow-xl">
-                <div class="flex items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
+            <div class="flex max-h-[80vh] w-full max-w-6xl flex-col rounded-lg bg-white shadow-xl">
+                <div class="flex shrink-0 items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
                     <h2 class="text-lg font-semibold">{{ $t('coordinator.schoolsModalTitle') }}</h2>
                     <button type="button" class="text-white/80 hover:text-white" @click="modalCoordinator = null">✕</button>
                 </div>
-                <div class="overflow-x-auto p-4">
+                <div class="flex-1 overflow-auto p-4">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                        <thead class="sticky top-0 z-10 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                             <tr>
                                 <th class="px-3 py-2">{{ $t('coordinator.id') }}</th>
                                 <th class="px-3 py-2">{{ $t('coordinator.venue') }}</th>
