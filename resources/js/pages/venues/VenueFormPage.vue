@@ -150,6 +150,8 @@ onMounted(async () => {
 });
 
 const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
+const fileBtn =
+    'mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-400 hover:bg-brand-primary-soft';
 </script>
 
 <template>
@@ -244,9 +246,15 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 
                         <div class="sm:col-span-2">
                             <label class="block text-sm font-medium text-gray-700">{{ $t('venue.file') }}</label>
-                            <input type="file" accept="image/*,application/pdf" class="mt-2 text-sm" @change="onFileChange" />
-                            <a v-if="currentImageUrl" :href="currentImageUrl" target="_blank"
-                                class="ml-3 text-sm text-brand-link hover:underline">{{ $t('venue.currentFile') }}</a>
+                            <label :class="fileBtn">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
+                                </svg>
+                                <span class="truncate">{{ imageFile?.name || $t('venue.chooseFile') }}</span>
+                                <input type="file" accept="image/*,application/pdf" class="hidden" @change="onFileChange" />
+                            </label>
+                            <a v-if="currentImageUrl && !imageFile" :href="currentImageUrl" target="_blank"
+                                class="mt-1 inline-block text-xs text-brand-link hover:underline">{{ $t('venue.currentFile') }}</a>
                         </div>
                     </div>
                 </div>
