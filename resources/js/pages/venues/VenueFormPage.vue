@@ -164,84 +164,90 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 
         <form class="relative rounded-lg border border-gray-200 bg-white p-6" @submit.prevent="submit">
             <LoadingOverlay v-if="saving" :message="$t('common.saving')" />
-            <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-4">
-                <div class="sm:col-span-4">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.name') }} *</label>
-                    <input v-model="form.name" type="text" required :class="field" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.country') }} *</label>
-                    <SearchSelect
-                        :model-value="form.country_id"
-                        :options="countryOptions"
-                        :clearable="false"
-                        :placeholder="$t('venue.countryPlaceholder')"
-                        :search-placeholder="$t('venue.country')"
-                        @update:model-value="onCountrySelected"
-                    />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.region') }}</label>
-                    <SearchSelect
-                        v-model="form.region_id"
-                        :options="regionOptions"
-                        :disabled="!form.country_id"
-                        :loading="cascadeLoading"
-                        :placeholder="form.country_id ? $t('venue.regionOptional') : $t('venue.regionFirst')"
-                        :search-placeholder="$t('venue.region')"
-                    />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.city') }}</label>
-                    <input v-model="form.city" type="text" :class="field" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.address') }}</label>
-                    <input v-model="form.address" type="text" :class="field" />
-                </div>
-
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.phone') }}</label>
-                    <input v-model="form.phone" type="text" :class="field" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.email') }}</label>
-                    <input v-model="form.email" type="email" :class="field" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.hoursEng') }}</label>
-                    <input v-model="form.hours" type="number" min="0" :class="field" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.schoolType') }}</label>
-                    <div class="mt-2 flex flex-wrap gap-4">
-                        <label v-for="opt in schoolTypes" :key="opt.value" class="flex items-center gap-2 text-sm">
-                            <input v-model="form.school_type" type="radio" :value="opt.value" />
-                            <span>{{ opt.label }}</span>
-                        </label>
+            <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                <!-- Right column: configuration + status -->
+                <div class="space-y-5 lg:order-2 lg:col-span-4 lg:border-l lg:border-gray-200 lg:pl-8">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('venue.hoursEng') }}</label>
+                        <input v-model="form.hours" type="number" min="0" :class="field" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('venue.schoolType') }}</label>
+                        <div class="mt-2 flex flex-col gap-2">
+                            <label v-for="opt in schoolTypes" :key="opt.value" class="flex items-center gap-2 text-sm">
+                                <input v-model="form.school_type" type="radio" :value="opt.value" />
+                                <span>{{ opt.label }}</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('venue.invigilators') }}</label>
+                        <select v-model="form.invigilators_count" :class="field">
+                            <option :value="null">{{ $t('venue.choose') }}</option>
+                            <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('venue.status') }}</label>
+                        <div class="mt-2">
+                            <ButtonGroup v-model="form.status" :options="statusOptions" />
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.invigilators') }}</label>
-                    <select v-model="form.invigilators_count" :class="field">
-                        <option :value="null">{{ $t('venue.choose') }}</option>
-                        <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
-                    </select>
-                </div>
 
-                <div class="sm:col-span-4">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.file') }}</label>
-                    <input type="file" accept="image/*,application/pdf" class="mt-2 text-sm" @change="onFileChange" />
-                    <a v-if="currentImageUrl" :href="currentImageUrl" target="_blank"
-                        class="ml-3 text-sm text-brand-link hover:underline">{{ $t('venue.currentFile') }}</a>
-                </div>
+                <!-- Left column: identity + contact -->
+                <div class="lg:col-span-8">
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('venue.name') }} *</label>
+                            <input v-model="form.name" type="text" required :class="field" />
+                        </div>
 
-                <div class="sm:col-span-4">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('venue.status') }}</label>
-                    <div class="mt-2">
-                        <ButtonGroup v-model="form.status" :options="statusOptions" />
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('venue.country') }} *</label>
+                            <SearchSelect
+                                :model-value="form.country_id"
+                                :options="countryOptions"
+                                :clearable="false"
+                                :placeholder="$t('venue.countryPlaceholder')"
+                                :search-placeholder="$t('venue.country')"
+                                @update:model-value="onCountrySelected"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('venue.region') }}</label>
+                            <SearchSelect
+                                v-model="form.region_id"
+                                :options="regionOptions"
+                                :disabled="!form.country_id"
+                                :loading="cascadeLoading"
+                                :placeholder="form.country_id ? $t('venue.regionOptional') : $t('venue.regionFirst')"
+                                :search-placeholder="$t('venue.region')"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('venue.city') }}</label>
+                            <input v-model="form.city" type="text" :class="field" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('venue.address') }}</label>
+                            <input v-model="form.address" type="text" :class="field" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('venue.phone') }}</label>
+                            <input v-model="form.phone" type="text" :class="field" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('venue.email') }}</label>
+                            <input v-model="form.email" type="email" :class="field" />
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('venue.file') }}</label>
+                            <input type="file" accept="image/*,application/pdf" class="mt-2 text-sm" @change="onFileChange" />
+                            <a v-if="currentImageUrl" :href="currentImageUrl" target="_blank"
+                                class="ml-3 text-sm text-brand-link hover:underline">{{ $t('venue.currentFile') }}</a>
+                        </div>
                     </div>
                 </div>
             </div>
