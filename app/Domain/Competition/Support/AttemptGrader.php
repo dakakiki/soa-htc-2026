@@ -75,11 +75,11 @@ final class AttemptGrader
             ]);
         }
 
-        $attempt->update([
+        $attempt->update(self::withSamplePublication($attempt, [
             'score' => $score,
             'max_score' => $spec['max_score'],
             'grading_status' => $hasEssay ? GradingStatus::PendingGrading : GradingStatus::AutoGraded,
-        ]);
+        ], final: ! $hasEssay));
     }
 
     /**
@@ -100,10 +100,43 @@ final class AttemptGrader
             fn ($id) => optional($answers->firstWhere('question_id', $id))->graded_at !== null,
         );
 
-        $attempt->update([
+        $attempt->update(self::withSamplePublication($attempt, [
             'score' => $score,
             'grading_status' => $allEssaysGraded ? GradingStatus::Graded : GradingStatus::PendingGrading,
-        ]);
+        ], final: $allEssaysGraded));
+    }
+
+    /**
+     * Sample (practice) results are revealed the instant their scoring is final —
+     * there is no admin publish step for them (ADR-0027). For a Sample-round attempt
+     * whose grading has just become final, stamp `published_at` (once) so the
+     * competitor sees the score immediately; every other round stays hidden until an
+     * admin publishes it. Keyed on the Sample round — the same boundary the results
+     * layer uses to keep practice out of the grid/import/export — so a Sample-round
+     * result is always both auto-revealed and excluded from the official layer.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private static function withSamplePublication(Attempt $attempt, array $attributes, bool $final): array
+    {
+        if ($final && $attempt->published_at === null && self::inSampleRound($attempt)) {
+            $attributes['published_at'] = now();
+        }
+
+        return $attributes;
+    }
+
+    /** Whether the attempt's test sits in the Sample round of an active exam. */
+    private static function inSampleRound(Attempt $attempt): bool
+    {
+        return DB::table('exam_test')
+            ->join('exams', 'exams.id', '=', 'exam_test.exam_id')
+            ->join('exam_rounds', 'exam_rounds.id', '=', 'exams.exam_round_id')
+            ->where('exam_test.test_id', $attempt->test_id)
+            ->where('exams.status', 'active')
+            ->where('exam_rounds.name', 'Sample')
+            ->exists();
     }
 
     /**

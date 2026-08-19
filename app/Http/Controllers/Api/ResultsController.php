@@ -12,6 +12,7 @@ use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\AttemptReset;
 use App\Domain\Competition\Models\PublicationBatch;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\ResultLedger;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -124,32 +125,41 @@ class ResultsController extends Controller
             ? Exam::query()->whereKey($validated['id'])->firstOrFail()->tests()->pluck('tests.id')->all()
             : [$validated['id']];
 
-        $query = Attempt::query()
-            ->whereIn('test_id', $testIds)
-            ->where('status', AttemptStatus::Completed)
-            ->whereIn('registration_id', $this->populationRegistrationIds($validated));
+        // The attempts update, the Layer B sync and the audit row are one unit: the
+        // results table must never drift from the attempts' published state.
+        $count = DB::transaction(function () use ($validated, $unpublish, $testIds, $request) {
+            $query = Attempt::query()
+                ->whereIn('test_id', $testIds)
+                ->where('status', AttemptStatus::Completed)
+                ->whereIn('registration_id', $this->populationRegistrationIds($validated));
 
-        if ($unpublish) {
-            $count = $query->whereNotNull('published_at')->update(['published_at' => null, 'published_by' => null]);
-        } else {
-            // Only publish attempts whose scoring is final — never one still
-            // awaiting essay grading (pending_grading) or the auto-grade job (queued).
-            $count = $query
-                ->whereNull('published_at')
-                ->whereIn('grading_status', ['auto_graded', 'graded'])
-                ->update(['published_at' => now(), 'published_by' => $request->user()?->id]);
-        }
+            if ($unpublish) {
+                $count = $query->whereNotNull('published_at')->update(['published_at' => null, 'published_by' => null]);
+            } else {
+                // Only publish attempts whose scoring is final — never one still
+                // awaiting essay grading (pending_grading) or the auto-grade job (queued).
+                $count = $query
+                    ->whereNull('published_at')
+                    ->whereIn('grading_status', ['auto_graded', 'graded'])
+                    ->update(['published_at' => now(), 'published_by' => $request->user()?->id]);
+            }
 
-        PublicationBatch::create([
-            'scope_type' => $validated['scope'],
-            'scope_id' => $validated['id'],
-            // Record the population the action was scoped to (null = whole season).
-            'country_id' => $validated['country_id'] ?? null,
-            'school_id' => $validated['school_id'] ?? null,
-            'action' => $unpublish ? 'unpublish' : 'publish',
-            'attempts_count' => $count,
-            'published_by' => $request->user()?->id,
-        ]);
+            // Mirror the new published state into the results layer (ADR-0027).
+            ResultLedger::reconcile($this->populationRegistrationIds($validated), $testIds);
+
+            PublicationBatch::create([
+                'scope_type' => $validated['scope'],
+                'scope_id' => $validated['id'],
+                // Record the population the action was scoped to (null = whole season).
+                'country_id' => $validated['country_id'] ?? null,
+                'school_id' => $validated['school_id'] ?? null,
+                'action' => $unpublish ? 'unpublish' : 'publish',
+                'attempts_count' => $count,
+                'published_by' => $request->user()?->id,
+            ]);
+
+            return $count;
+        });
 
         return response()->json(['action' => $unpublish ? 'unpublish' : 'publish', 'attempts_count' => $count]);
     }
@@ -174,7 +184,11 @@ class ResultsController extends Controller
             return response()->json(['message' => __('This attempt has already been reset.')], 422);
         }
 
-        DB::transaction(fn () => $this->voidAttempt($attempt, $validated['reason'], $request->user()?->id));
+        DB::transaction(function () use ($attempt, $validated, $request) {
+            $this->voidAttempt($attempt, $validated['reason'], $request->user()?->id);
+            // A voided attempt is no longer published — drop its Layer B row (ADR-0027).
+            ResultLedger::reconcile([(int) $attempt->registration_id], [(int) $attempt->test_id]);
+        });
 
         return response()->json(['status' => AttemptStatus::Void->value]);
     }
@@ -281,10 +295,16 @@ class ResultsController extends Controller
         $reason = $validated['reason'];
         $userId = $request->user()?->id;
 
-        [$voided, $students] = DB::transaction(function () use ($validated, $reason, $userId) {
-            $predicate = $this->scopedAttempts($validated, void: false, allMatching: (bool) ($validated['all_matching'] ?? false));
+        $allMatching = (bool) ($validated['all_matching'] ?? false);
+
+        [$voided, $students] = DB::transaction(function () use ($validated, $reason, $userId, $allMatching) {
+            $predicate = $this->scopedAttempts($validated, void: false, allMatching: $allMatching);
 
             $students = (int) (clone $predicate)->distinct()->count('attempts.registration_id');
+
+            // The tests whose results this reset touches — captured before the void
+            // so the Layer B sync knows which (registration × test) rows to drop.
+            $testIds = (clone $predicate)->distinct()->pluck('attempts.test_id')->map(fn ($id) => (int) $id)->all();
 
             // Snapshot each attempt's pre-void state, then void the whole set.
             DB::table('attempt_resets')->insertUsing(
@@ -300,6 +320,12 @@ class ResultsController extends Controller
                 'published_at' => null,
                 'published_by' => null,
             ]);
+
+            // Voided attempts are no longer published — mirror the removal to Layer B.
+            $registrations = $allMatching
+                ? $this->populationRegistrationIds($validated)
+                : array_map('intval', $validated['registration_ids'] ?? []);
+            ResultLedger::reconcile($registrations, $testIds);
 
             return [$voided, $students];
         });

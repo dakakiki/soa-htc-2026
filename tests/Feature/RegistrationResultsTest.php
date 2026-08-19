@@ -10,7 +10,9 @@ use App\Domain\Assessment\Models\Test;
 use App\Domain\Assessment\Models\TestType;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\AttemptGrader;
 use App\Domain\Competition\Support\RegistrationResults;
+use App\Domain\Competition\Support\ResultLedger;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\School;
@@ -96,7 +98,7 @@ class RegistrationResultsTest extends TestCase
     /** A completed attempt for a registration, optionally published. */
     private function attempt(Registration $r, array $content, ?float $score, bool $published): Attempt
     {
-        return Attempt::create([
+        $attempt = Attempt::create([
             'registration_id' => $r->id,
             'quiz_id' => $content['quiz']->id,
             'test_id' => $content['test']->id,
@@ -108,6 +110,14 @@ class RegistrationResultsTest extends TestCase
             'published_at' => $published ? now() : null,
             'channel' => 'web',
         ]);
+
+        // Publishing an attempt syncs it into the results layer (Layer B); the grid
+        // reads Layer B, so mirror that sync here for the published fixtures.
+        if ($published) {
+            ResultLedger::reconcile([$r->id], [$content['test']->id]);
+        }
+
+        return $attempt;
     }
 
     // ---- columns() / result-columns route ----
@@ -227,5 +237,130 @@ class RegistrationResultsTest extends TestCase
         $assignment->schools()->attach($mine->id);
 
         $this->actingAs($coordinator)->getJson("/api/registrations/{$reg->id}/results")->assertForbidden();
+    }
+
+    // ---- results layer (Layer B) sync on publish / unpublish / reset ----
+
+    /** A minimal completed, auto-graded, unpublished attempt (ready to publish). */
+    private function gradedAttempt(Registration $r, array $content, float $score): Attempt
+    {
+        return Attempt::create([
+            'registration_id' => $r->id,
+            'quiz_id' => $content['quiz']->id,
+            'test_id' => $content['test']->id,
+            'status' => 'completed',
+            'score' => $score, 'max_score' => 10,
+            'grading_status' => 'auto_graded',
+            'started_at' => now(), 'expires_at' => now()->addMinutes(30),
+            'submitted_at' => now(), 'channel' => 'web',
+        ]);
+    }
+
+    public function test_publishing_an_attempt_records_it_in_the_results_layer(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+        $this->gradedAttempt($reg, $c, 7.0);
+
+        // Nothing in the results layer until the attempt is published.
+        $this->assertDatabaseCount('registration_results', 0);
+
+        $this->actingAs($this->admin())
+            ->postJson('/api/results/publish', ['scope' => 'test', 'id' => $c['test']->id])
+            ->assertOk()->assertJsonPath('attempts_count', 1);
+
+        $roundId = (int) ExamRound::where('name', 'Preliminary round')->value('id');
+        $typeId = (int) TestType::where('name', 'Reading')->value('id');
+
+        // The denormalized row lands with its round/type/quiz/season resolved.
+        $this->assertDatabaseHas('registration_results', [
+            'registration_id' => $reg->id,
+            'test_id' => $c['test']->id,
+            'exam_round_id' => $roundId,
+            'test_type_id' => $typeId,
+            'quiz_id' => $c['quiz']->id,
+            'season_id' => $this->seasonId,
+            'source' => 'attempt',
+        ]);
+
+        // And the grid — now reading Layer B — reflects the score.
+        $grid = RegistrationResults::forRegistrations([$reg->id]);
+        $this->assertEqualsWithDelta(7.0, $grid[$reg->id][$roundId]['types'][$typeId], 0.001);
+    }
+
+    public function test_unpublishing_an_attempt_removes_it_from_the_results_layer(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+        $this->attempt($reg, $c, 7.0, published: true); // helper syncs Layer B
+
+        $this->assertDatabaseCount('registration_results', 1);
+
+        $this->actingAs($this->admin())
+            ->postJson('/api/results/publish', ['scope' => 'test', 'id' => $c['test']->id, 'unpublish' => true])
+            ->assertOk()->assertJsonPath('attempts_count', 1);
+
+        $this->assertDatabaseCount('registration_results', 0);
+        $this->assertArrayNotHasKey($reg->id, RegistrationResults::forRegistrations([$reg->id]));
+    }
+
+    public function test_resetting_a_published_attempt_removes_it_from_the_results_layer(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+        $attempt = $this->attempt($reg, $c, 7.0, published: true);
+
+        $this->assertDatabaseCount('registration_results', 1);
+
+        $this->actingAs($this->admin())
+            ->postJson("/api/results/attempts/{$attempt->id}/reset", ['reason' => 'Published in error'])
+            ->assertOk();
+
+        $this->assertDatabaseCount('registration_results', 0);
+    }
+
+    // ---- sample auto-publish (stays out of the results layer) ----
+
+    public function test_sample_round_attempts_auto_publish_but_stay_out_of_the_results_layer(): void
+    {
+        $c = $this->content('Sample', 'Reading');
+        $reg = $this->registration();
+        $attempt = Attempt::create([
+            'registration_id' => $reg->id,
+            'quiz_id' => $c['quiz']->id,
+            'test_id' => $c['test']->id,
+            'status' => 'completed',
+            'grading_status' => 'queued',
+            'started_at' => now(), 'expires_at' => now()->addMinutes(30),
+            'submitted_at' => now(), 'channel' => 'web',
+        ]);
+
+        AttemptGrader::grade($attempt);
+
+        // A practice result is revealed the moment it is graded...
+        $this->assertNotNull($attempt->refresh()->published_at);
+        // ...but never enters the official results layer or the grid.
+        $this->assertDatabaseCount('registration_results', 0);
+        $this->assertSame([], RegistrationResults::forRegistrations([$reg->id]));
+    }
+
+    public function test_non_sample_attempts_are_not_auto_published_on_grading(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+        $attempt = Attempt::create([
+            'registration_id' => $reg->id,
+            'quiz_id' => $c['quiz']->id,
+            'test_id' => $c['test']->id,
+            'status' => 'completed',
+            'grading_status' => 'queued',
+            'started_at' => now(), 'expires_at' => now()->addMinutes(30),
+            'submitted_at' => now(), 'channel' => 'web',
+        ]);
+
+        AttemptGrader::grade($attempt);
+
+        // Competition rounds stay hidden until an admin publishes them.
+        $this->assertNull($attempt->refresh()->published_at);
     }
 }

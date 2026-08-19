@@ -9,9 +9,12 @@ use Illuminate\Support\Facades\DB;
 /**
  * Builds the competition-results grid shown on the Students list: for each
  * exam round (Sample excluded — it is a practice round), the score a competitor
- * scored per test type, plus the round total. Scores come only from published
- * attempts. Rounds with no tests yet (Regional Qualifiers, World final) still
- * get a column so the grid mirrors the full competition path.
+ * scored per test type, plus the round total. Scores are read from the results
+ * layer (`registration_results`, Layer B — ADR-0027), which already holds one
+ * denormalized row per published (registration, test) and never carries the
+ * Sample round, so the grid needs no live join to `attempts`. Rounds with no
+ * tests yet (Regional Qualifiers, World final) still get a column so the grid
+ * mirrors the full competition path.
  */
 final class RegistrationResults
 {
@@ -62,7 +65,9 @@ final class RegistrationResults
 
     /**
      * Per-registration published scores keyed by round then test-type id, with a
-     * round total. Only the given registrations are queried (one page at a time).
+     * round total. Reads straight from the results layer (Layer B); only the given
+     * registrations are queried (one page at a time). Several tests of the same
+     * type in a round sum into that type's cell, matching the round total.
      *
      * @param  list<int>  $registrationIds
      * @return array<int, array<int, array{types: array<int, float>, sum: float}>>
@@ -73,34 +78,19 @@ final class RegistrationResults
             return [];
         }
 
-        // A test maps to at most one (round) via this distinct pair, so an attempt
-        // is never counted twice when a test happens to sit in several exams.
-        $testRound = DB::table('exam_test')
-            ->join('exams', 'exams.id', '=', 'exam_test.exam_id')
-            ->where('exams.status', 'active')
-            ->distinct()
-            ->select('exam_test.test_id', 'exams.exam_round_id');
-
-        $rows = DB::table('attempts')
-            ->joinSub($testRound, 'tr', 'tr.test_id', '=', 'attempts.test_id')
-            ->join('exam_rounds', 'exam_rounds.id', '=', 'tr.exam_round_id')
-            ->join('tests', 'tests.id', '=', 'attempts.test_id')
-            ->whereIn('attempts.registration_id', $registrationIds)
-            ->whereNotNull('attempts.published_at')
-            ->where('exam_rounds.name', '!=', self::EXCLUDED_ROUND)
-            ->groupBy('attempts.registration_id', 'exam_rounds.id', 'tests.test_type_id')
-            ->get([
-                'attempts.registration_id as reg_id',
-                'exam_rounds.id as round_id',
-                'tests.test_type_id as tt_id',
-                DB::raw('SUM(attempts.score) as score'),
-            ]);
+        $rows = DB::table('registration_results')
+            ->whereIn('registration_id', $registrationIds)
+            ->get(['registration_id', 'exam_round_id', 'test_type_id', 'score']);
 
         $out = [];
         foreach ($rows as $r) {
             $score = (float) $r->score;
-            $out[(int) $r->reg_id][(int) $r->round_id]['types'][(int) $r->tt_id] = $score;
-            $out[(int) $r->reg_id][(int) $r->round_id]['sum'] = ($out[(int) $r->reg_id][(int) $r->round_id]['sum'] ?? 0.0) + $score;
+            $regId = (int) $r->registration_id;
+            $roundId = (int) $r->exam_round_id;
+            $ttId = (int) $r->test_type_id;
+
+            $out[$regId][$roundId]['types'][$ttId] = ($out[$regId][$roundId]['types'][$ttId] ?? 0.0) + $score;
+            $out[$regId][$roundId]['sum'] = ($out[$regId][$roundId]['sum'] ?? 0.0) + $score;
         }
 
         return $out;
@@ -114,30 +104,21 @@ final class RegistrationResults
      */
     public static function detail(int $registrationId): array
     {
-        $testRound = DB::table('exam_test')
-            ->join('exams', 'exams.id', '=', 'exam_test.exam_id')
-            ->where('exams.status', 'active')
-            ->distinct()
-            ->select('exam_test.test_id', 'exams.exam_round_id');
-
-        $rows = DB::table('attempts')
-            ->joinSub($testRound, 'tr', 'tr.test_id', '=', 'attempts.test_id')
-            ->join('exam_rounds', 'exam_rounds.id', '=', 'tr.exam_round_id')
-            ->join('tests', 'tests.id', '=', 'attempts.test_id')
-            ->join('test_types', 'test_types.id', '=', 'tests.test_type_id')
-            ->where('attempts.registration_id', $registrationId)
-            ->whereNotNull('attempts.published_at')
-            ->where('exam_rounds.name', '!=', self::EXCLUDED_ROUND)
+        $rows = DB::table('registration_results')
+            ->join('exam_rounds', 'exam_rounds.id', '=', 'registration_results.exam_round_id')
+            ->join('tests', 'tests.id', '=', 'registration_results.test_id')
+            ->leftJoin('test_types', 'test_types.id', '=', 'registration_results.test_type_id')
+            ->where('registration_results.registration_id', $registrationId)
             // Latest round first — World final (if any) down to Preliminary.
             ->orderByDesc('exam_rounds.id')
-            ->orderBy('test_types.id')
+            ->orderBy('registration_results.test_type_id')
             ->get([
                 'exam_rounds.id as round_id',
                 'exam_rounds.name as round',
                 'tests.title as test',
                 'test_types.name as type',
-                'attempts.score',
-                'attempts.max_score',
+                'registration_results.score',
+                'registration_results.max_score',
             ]);
 
         $byRound = [];

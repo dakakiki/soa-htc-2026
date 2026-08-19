@@ -43,6 +43,8 @@ class ResetSeasonData extends Command
         'attempt_resets',
         'attempt_answers',
         'attempts',
+        'registration_qualifications',
+        'registration_results',
         'student_session_quiz',
         'student_sessions',
         'publication_batches',
