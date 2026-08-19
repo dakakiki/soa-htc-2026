@@ -563,6 +563,23 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0027 — Results sloj: denormalizovani `registration_results` (Layer B) za import/export/grid/reports/arhivu
+
+- **Status:** Prihvaćeno (2026-08-19); vlasnik proizvoda. Razrešava **follow-up #3** (kvalifikaciona logika NF/Q/WF).
+- **Kontekst:** Legacy ima **„Import Results"** (xlsx `Student ID | Result | Qualification`) i dva **„Export"** (Results / Results with Answers). Legacy import (`TestDataImportResultsController`) piše u `quiz_results` (`test_result`=score, `active=1`=objavljeno) + denormalizuje `el_student` (skorovi po rundi/tipu + `q_semi/q_quali/q_final`); lookup po vidljivom `student_id` (=naš competitor_number) → interni `entry_id`. Legacy export (`TestResultsExportController`): „Results" iz `quiz_results` (wide per-student, **hardkodovano samo Preliminary+National**), „with Answers" iz `test_results` (po pitanju, jedan test). Sadašnji app grid (`RegistrationResults`) i reports (`ReportSummary`) računaju **uživo** iz `attempts`. Competition rezultati stižu i offline (import), treba export, i na novu sezonu → arhiva.
+- **Odluka:**
+  - **Layer A ostaje `attempts`/`attempt_answers`** (in-app granularno: odgovori, tajming, grading).
+  - Uvodi se **denormalizovani `registration_results` (Layer B)**, red po **(registration_id, test_id)**: denormalizovani `exam_round_id`/`test_type_id`/`quiz_id`, `score`/`max_score`, **`source` enum(attempt|import)**, `published_at`/`published_by`, `season_id`; `unique(registration_id, test_id)`.
+  - **`registration_qualifications`** per (registration_id, exam_round_id): `code` **S/Q/F** = napredovanje (legacy `q_semi`/`q_quali`/`q_final`): **S→National**, **Q→Regional Qualifiers**, **F→World final**. Popunjava RQ/WF kolone na gridu.
+  - **Upis:** Publish attempt-a → **upsert** u Layer B. **Import** → **direktno** u Layer B (`source='import'`, `published_at=now`) + qualifications; **bez** sintetičkih `attempts`/`quiz_started` (import nema odgovore/tajming). Lookup po **`competitor_number`** (batch), upsert po (reg,test).
+  - **Čitanje:** Grid + Reports + **„Export Results (all)"** čitaju **Layer B** (brzo, bez live JOIN-ova; **dinamičke kolone** iz `RegistrationResults::columns()` — ne hardkodovati Preliminary+National kao legacy). **„Export with Answers"** čita **Layer A** (samo in-app; importovani nemaju odgovore).
+  - **Competition-scoped:** sample quizzes **nemaju** import/export/arhivu; sample = **auto-published**, prikazuje se odmah, živi samo u `attempts`, van grida (`RegistrationResults` već isključuje `Sample` rundu). Import/export dropdown = **samo competition** (legacy `quizzesActiveCompetition()`).
+  - **Arhiva (Layer C):** `season:reset` proširen — pre wipe-a **snapshot Layer B (+qualifications)** u `archive_*` tagovano `round_number`/`season_id`, pa wipe.
+  - **Za sada 1 competition quiz** → grid grupiše **po rundi** (spajanje prihvaćeno); razdvajanje po quiz-u = kasnija dorada ako zatreba.
+- **Posledica:** nove tabele `registration_results` + `registration_qualifications`; publish upsert; grid/reports read-switch na Layer B (+ testovi); nove strane **Results→Import** i **Results→Export** (all + with-answers, reuse `XlsxWriter` + `reportFilters`); `season:reset` dobija Layer C snapshot; sample auto-publish (mala izmena). **Cena:** score na 2 mesta (`attempts.score` + `registration_results.score`) → sync na publish/unpublish/reset. **Redosled:** (1) migracije, (2) publish→Layer B + grid/reports read-switch + testovi, (3) Import, (4) Export, (5) arhiva. Legacy referenca: `context for the project/legacy-app` (`TestDataImportResultsController`, `TestResultsExportController`). Plan u [[results-import-export-plan]].
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
