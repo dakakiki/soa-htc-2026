@@ -103,6 +103,10 @@ function roundSum(x: Registration, roundId: number): string {
     const v = x.results?.[String(roundId)]?.sum;
     return v === undefined ? '' : String(v);
 }
+/** Advancement code (S/Q/F) filling a test-less round column (Regional Qualifiers, World final). */
+function cellQual(x: Registration, roundId: number): string {
+    return x.results?.[String(roundId)]?.qual ?? '·';
+}
 function fmtDob(s: string | null): string {
     if (!s) {
         return t('common.dash');
@@ -406,7 +410,10 @@ onMounted(async () => {
                                 <td v-for="ty in col.types" :key="ty.id" class="bg-amber-50 px-2 py-3 text-center text-gray-700">{{ cellScore(x, col.round_id, ty.id) }}</td>
                                 <td class="bg-amber-100 px-2 py-3 text-center font-semibold text-gray-900">{{ roundSum(x, col.round_id) }}</td>
                             </template>
-                            <td v-else class="bg-slate-100 px-2 py-3 text-center text-gray-300">·</td>
+                            <td v-else class="bg-slate-100 px-2 py-3 text-center"
+                                :class="cellQual(x, col.round_id) === '·' ? 'text-gray-300' : 'font-semibold text-slate-700'">
+                                {{ cellQual(x, col.round_id) }}
+                            </td>
                         </template>
                         <td class="bg-sky-100 px-3 py-3 text-center">
                             <button type="button" class="text-brand-primary hover:text-brand-primary-hover" :title="$t('registration.results.view')" @click="selected = x">

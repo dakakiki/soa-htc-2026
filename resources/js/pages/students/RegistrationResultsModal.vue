@@ -55,8 +55,11 @@ const fmt = (v: number | null): string => (v === null ? '—' : String(v));
 
                 <div class="mt-6 space-y-4">
                     <div v-for="r in rounds" :key="r.round_id" class="overflow-hidden rounded-lg border border-gray-200">
-                        <div class="bg-brand-primary px-4 py-2 text-sm font-semibold text-brand-on-primary">{{ r.round }}</div>
-                        <div class="flex divide-x divide-gray-200">
+                        <div class="flex items-center justify-between bg-brand-primary px-4 py-2 text-sm font-semibold text-brand-on-primary">
+                            <span>{{ r.round }}</span>
+                            <span v-if="r.qual" class="rounded bg-white/20 px-2 py-0.5 text-xs">{{ $t('registration.results.qualified', { code: r.qual }) }}</span>
+                        </div>
+                        <div v-if="r.tests.length" class="flex divide-x divide-gray-200">
                             <div v-for="(t, i) in r.tests" :key="i" class="flex-1 p-3 text-center">
                                 <div class="text-sm font-medium text-gray-900">{{ t.type }}</div>
                                 <div class="mt-0.5 text-xs text-gray-500">{{ t.test }}</div>
@@ -64,6 +67,9 @@ const fmt = (v: number | null): string => (v === null ? '—' : String(v));
                                     {{ fmt(t.score) }}<span class="text-xs font-normal text-gray-400"> / {{ fmt(t.max_score) }}</span>
                                 </div>
                             </div>
+                        </div>
+                        <div v-else class="p-3 text-center text-sm text-gray-500">
+                            {{ $t('registration.results.advancement', { code: r.qual }) }}
                         </div>
                     </div>
                 </div>

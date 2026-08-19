@@ -320,16 +320,21 @@ export interface ResultColumn {
     types: ResultTypeCol[];
 }
 
-/** A competitor's summed published scores for one round: per test-type + total. */
+/**
+ * A competitor's results for one round: per test-type scores + total (for rounds
+ * with tests), and/or an advancement code S/Q/F (fills the test-less RQ/WF columns).
+ */
 export interface RegistrationResultCell {
-    types: Record<string, number>;
-    sum: number;
+    types?: Record<string, number>;
+    sum?: number;
+    qual?: string;
 }
 
 /** One round's detailed breakdown for the results modal. */
 export interface ResultDetailRound {
     round_id: number;
     round: string;
+    qual?: string;
     tests: { test: string; type: string; score: number | null; max_score: number | null }[];
 }
 

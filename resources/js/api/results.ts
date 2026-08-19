@@ -93,3 +93,43 @@ export function bulkReset(payload: ResetTarget & { reason: string }) {
 export function exportReset(payload: ResetTarget) {
     return http.post('/api/results/reset-export', cleanParams(payload), { responseType: 'blob' });
 }
+
+// --- Results import (offline results → Layer B, ADR-0027) ---
+
+/** The import cascade: competition quizzes, a chosen quiz's exams, and its tests. */
+export interface ImportOptions {
+    quizzes: { id: number; title: string }[];
+    exams: { id: number; title: string }[];
+    tests: { id: number; title: string }[];
+}
+
+/** Per-outcome counts returned after an import run. */
+export interface ImportSummary {
+    imported: number;
+    updated: number;
+    skipped_conflict: number;
+    not_found: number;
+    invalid: number;
+    qualifications: number;
+    not_found_numbers: string[];
+}
+
+export function importOptions(scope: { quiz_id?: number | null; exam_id?: number | null }) {
+    return http.get<ImportOptions>('/api/results/import/options', { params: cleanParams(scope) });
+}
+
+/** Upload offline results for one test (competition quiz → exam → test). */
+export function importResults(payload: { quiz_id: number; exam_id: number; test_id: number; file: File }) {
+    const fd = new FormData();
+    fd.append('quiz_id', String(payload.quiz_id));
+    fd.append('exam_id', String(payload.exam_id));
+    fd.append('test_id', String(payload.test_id));
+    fd.append('file', payload.file);
+
+    return http.post<ImportSummary>('/api/results/import', fd);
+}
+
+/** Download the blank import template (.xlsx). */
+export function importTemplate() {
+    return http.get('/api/results/import/template', { responseType: 'blob' });
+}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\Exam;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
@@ -12,16 +13,20 @@ use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\AttemptReset;
 use App\Domain\Competition\Models\PublicationBatch;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\ResultImporter;
 use App\Domain\Competition\Support\ResultLedger;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\XlsxReader;
 use App\Support\XlsxWriter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Result publication (Faza 5 Slice 5c, CC-10 / ADR-0020). An admin publishes or
@@ -388,6 +393,148 @@ class ResultsController extends Controller
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
+    }
+
+    /**
+     * The import scope cascade: competition quizzes, then a chosen quiz's exams, then
+     * its tests (narrowed to one exam when picked). Sample quizzes are excluded —
+     * they have no offline import (ADR-0027).
+     */
+    public function importOptions(Request $request): JsonResponse
+    {
+        $this->authorize('results.manage');
+
+        $quizId = $request->integer('quiz_id') ?: null;
+        $examId = $request->integer('exam_id') ?: null;
+
+        $quiz = $quizId
+            ? Quiz::query()
+                ->where('quiz_type', QuizType::Competition->value)
+                ->with([
+                    'exams' => fn ($q) => $q->where('exams.status', 'active'),
+                    'exams.tests' => fn ($q) => $q->where('tests.status', 'active'),
+                ])->find($quizId)
+            : null;
+
+        $exams = $quiz
+            ? $quiz->exams->map(fn (Exam $e) => ['id' => $e->id, 'title' => $e->title])->sortBy('title')->values()
+            : [];
+
+        // With an exam chosen, tests cascade to just that exam's tests; otherwise the
+        // union of every test in the quiz.
+        $testSource = $quiz && $examId
+            ? ($quiz->exams->firstWhere('id', $examId)?->tests ?? collect())
+            : ($quiz?->exams->flatMap(fn (Exam $e) => $e->tests) ?? collect());
+
+        $tests = $quiz
+            ? $testSource->unique('id')->map(fn (Test $t) => ['id' => $t->id, 'title' => $t->title])->sortBy('title')->values()
+            : [];
+
+        return response()->json([
+            'quizzes' => Quiz::query()
+                ->where('quiz_type', QuizType::Competition->value)
+                ->where('status', 'active')
+                ->orderBy('title')
+                ->get(['id', 'title']),
+            'exams' => $exams,
+            'tests' => $tests,
+        ]);
+    }
+
+    /** The blank import template: an .xlsx with the Student ID | Result | Qualification header. */
+    public function importTemplate(): Response
+    {
+        $this->authorize('results.manage');
+
+        $xlsx = XlsxWriter::toString(['Student ID', 'Result', 'Qualification'], [], 'Results');
+
+        return response($xlsx, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="results-import-template.xlsx"',
+        ]);
+    }
+
+    /**
+     * Import offline results for one test from an .xlsx/.csv upload (ADR-0027). The
+     * quiz/exam/test scope is validated (competition, non-Sample) and its round /
+     * test type resolved server-side, then each row is written straight into the
+     * results layer via {@see ResultImporter}. Returns per-outcome counts.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        $this->authorize('results.manage');
+
+        $validated = $request->validate([
+            'quiz_id' => ['required', 'integer'],
+            'exam_id' => ['required', 'integer'],
+            'test_id' => ['required', 'integer'],
+            'file' => ['required', 'file', 'max:10240'],
+        ]);
+
+        // The quiz must be a competition quiz; the exam must belong to it and carry a
+        // real (non-Sample) round; the test must belong to that exam.
+        $quiz = Quiz::query()->where('quiz_type', QuizType::Competition->value)->find($validated['quiz_id']);
+        $exam = $quiz?->exams()->where('exams.id', $validated['exam_id'])->with('round')->first();
+        $test = $exam?->tests()->where('tests.id', $validated['test_id'])->first();
+
+        if ($quiz === null || $exam === null || $test === null) {
+            throw ValidationException::withMessages(['test_id' => __('Choose a competition quiz, exam and test.')]);
+        }
+        if ($exam->exam_round_id === null || $exam->round?->name === 'Sample') {
+            throw ValidationException::withMessages(['exam_id' => __('This exam has no competition round to import into.')]);
+        }
+
+        $rows = $this->readUpload($validated['file']);
+        array_shift($rows); // the header row
+
+        $summary = ResultImporter::import(
+            $rows,
+            (int) $quiz->id,
+            (int) $exam->exam_round_id,
+            (int) $test->id,
+            $test->test_type_id !== null ? (int) $test->test_type_id : null,
+            $request->user()?->id,
+        );
+
+        return response()->json($summary);
+    }
+
+    /**
+     * Read an uploaded results file into raw rows. .xlsx is parsed by the
+     * dependency-free reader; .csv/.txt by fgetcsv (comma or semicolon sniffed).
+     *
+     * @return list<list<string>>
+     */
+    private function readUpload(UploadedFile $file): array
+    {
+        $path = (string) $file->getRealPath();
+
+        return match (strtolower($file->getClientOriginalExtension())) {
+            'xlsx' => XlsxReader::read($path),
+            'csv', 'txt' => $this->readCsv($path),
+            default => throw ValidationException::withMessages(['file' => __('Upload an .xlsx or .csv file.')]),
+        };
+    }
+
+    /**
+     * @return list<list<string>>
+     */
+    private function readCsv(string $path): array
+    {
+        // Sniff the delimiter from the header line (European exports use ';').
+        $firstLine = strtok((string) file_get_contents($path), "\r\n") ?: '';
+        $delimiter = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
+
+        $rows = [];
+        $handle = fopen($path, 'r');
+        if ($handle !== false) {
+            while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
+                $rows[] = array_map(fn ($cell) => (string) ($cell ?? ''), $data);
+            }
+            fclose($handle);
+        }
+
+        return $rows;
     }
 
     /**

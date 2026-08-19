@@ -21,6 +21,7 @@ import {
     IconClipboardCheck,
     IconChecklist,
     IconSend,
+    IconFileImport,
     IconChartBar,
     IconRotate,
     IconHelpCircle,
@@ -102,6 +103,7 @@ const nav: NavNode[] = [
         children: [
             { label: t('nav.grading'), icon: IconChecklist, to: 'grading', prefix: 'grading', perm: 'results.manage' },
             { label: t('nav.publishing'), icon: IconSend, to: 'publishing', prefix: 'publishing', perm: 'results.manage' },
+            { label: t('nav.import'), icon: IconFileImport, to: 'results.import', prefix: 'results.import', perm: 'results.manage' },
             { label: t('nav.reports'), icon: IconChartBar, to: 'reports', prefix: 'reports', perm: 'reports.view' },
             { label: t('nav.reset'), icon: IconRotate, to: 'reset', prefix: 'reset', perm: 'results.manage' },
         ],

@@ -65,12 +65,15 @@ final class RegistrationResults
 
     /**
      * Per-registration published scores keyed by round then test-type id, with a
-     * round total. Reads straight from the results layer (Layer B); only the given
-     * registrations are queried (one page at a time). Several tests of the same
-     * type in a round sum into that type's cell, matching the round total.
+     * round total, plus the advancement code (S/Q/F) for that round. Reads straight
+     * from the results layer (Layer B); only the given registrations are queried
+     * (one page at a time). Several tests of the same type in a round sum into that
+     * type's cell, matching the round total. Rounds with no tests (Regional
+     * Qualifiers, World final) carry only a `qual` code — the value that fills those
+     * grid columns.
      *
      * @param  list<int>  $registrationIds
-     * @return array<int, array<int, array{types: array<int, float>, sum: float}>>
+     * @return array<int, array<int, array{types?: array<int, float>, sum?: float, qual?: string}>>
      */
     public static function forRegistrations(array $registrationIds): array
     {
@@ -78,11 +81,12 @@ final class RegistrationResults
             return [];
         }
 
+        $out = [];
+
         $rows = DB::table('registration_results')
             ->whereIn('registration_id', $registrationIds)
             ->get(['registration_id', 'exam_round_id', 'test_type_id', 'score']);
 
-        $out = [];
         foreach ($rows as $r) {
             $score = (float) $r->score;
             $regId = (int) $r->registration_id;
@@ -91,6 +95,16 @@ final class RegistrationResults
 
             $out[$regId][$roundId]['types'][$ttId] = ($out[$regId][$roundId]['types'][$ttId] ?? 0.0) + $score;
             $out[$regId][$roundId]['sum'] = ($out[$regId][$roundId]['sum'] ?? 0.0) + $score;
+        }
+
+        // Advancement codes fill the Regional Qualifiers / World final columns (and
+        // sit alongside the National scores).
+        $quals = DB::table('registration_qualifications')
+            ->whereIn('registration_id', $registrationIds)
+            ->get(['registration_id', 'exam_round_id', 'code']);
+
+        foreach ($quals as $q) {
+            $out[(int) $q->registration_id][(int) $q->exam_round_id]['qual'] = (string) $q->code;
         }
 
         return $out;
@@ -123,15 +137,34 @@ final class RegistrationResults
 
         $byRound = [];
         foreach ($rows as $r) {
-            $byRound[$r->round_id]['round'] = self::roundLabel($r->round);
-            $byRound[$r->round_id]['round_id'] = (int) $r->round_id;
-            $byRound[$r->round_id]['tests'][] = [
+            $roundId = (int) $r->round_id;
+            $byRound[$roundId]['round'] = self::roundLabel($r->round);
+            $byRound[$roundId]['round_id'] = $roundId;
+            $byRound[$roundId]['tests'][] = [
                 'test' => $r->test,
                 'type' => $r->type,
                 'score' => $r->score === null ? null : (float) $r->score,
                 'max_score' => $r->max_score === null ? null : (float) $r->max_score,
             ];
         }
+
+        // Merge advancement codes; a qualified round with no tests (Regional
+        // Qualifiers, World final) still appears, carrying just its code.
+        $quals = DB::table('registration_qualifications')
+            ->join('exam_rounds', 'exam_rounds.id', '=', 'registration_qualifications.exam_round_id')
+            ->where('registration_qualifications.registration_id', $registrationId)
+            ->get(['exam_rounds.id as round_id', 'exam_rounds.name as round', 'registration_qualifications.code']);
+
+        foreach ($quals as $q) {
+            $roundId = (int) $q->round_id;
+            $byRound[$roundId]['round'] = self::roundLabel($q->round);
+            $byRound[$roundId]['round_id'] = $roundId;
+            $byRound[$roundId]['qual'] = (string) $q->code;
+            $byRound[$roundId]['tests'] ??= [];
+        }
+
+        // Latest round first — World final (if any) down to Preliminary.
+        krsort($byRound);
 
         return array_values($byRound);
     }
