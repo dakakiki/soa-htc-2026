@@ -163,6 +163,15 @@ Uslov završetka:
 - performance SLO je ispunjen sa sigurnosnom marginom;
 - rollback/cutover postupak je proban na staging okruženju.
 
+**Implementacioni status (2026-08-20):**
+
+- **Urađeno:** master-data ETL (`docs/04` §12), 50k sintetičkih registracija; **lokalni load-test** (k6, ~500 konkurentnih VU čisto — READ COMMITTED izolacija + deadlock-retry + odloženo grading kroz queue; detalji u `docs/05`); **istorijska arhiva rundi 9–13** (`docs/04` §13). Aplikacija je funkcionalno kompletna (Faze 2–5 + results/publishing/reporting + arhiva).
+- **Sledeći koraci (pred-produkcija):**
+  1. **Security review + QA prolaz** — *[urađeno 2026-08-20]* pregled 5 dimenzija (autorizacija/scope, studentski pristup i sesija, injection/upload, izloženost podataka/config, QA nad kritičnim admin tokovima). Jezgro čisto (objektna autorizacija, studentski tokovi, grading, SQL sloj, migracija). **Popravljeno:** coordinator `file_upload` + theme logo ograničeni na raster/pdf (stored-XSS); `ResultLedger::reconcile` više ne obara publish/reset (500) kad za isti test postoje i uvezeni i in-app rezultat (published attempt supersede-uje import); results/reports populacija stegnuta na scope pozivaoca + guard na single-attempt reset (bezbedna delegacija `results.manage`, ADR-0024); per-`competitor_number` throttle na `identify` (pristup testu = provera podataka, nije nalog). Suite **263** zelen. **Odloženo (backlog):** `ResultLedger` multi-round dedup, mrtva `can_reset_test_results` permisija, admin-ekvivalencija `users.manage`/`roles.manage`, scope-clamp i za reports/archive *reads*, blank imena u `season:reset` arhivi, prod-hardening (`.env.example` `APP_DEBUG`, `SESSION_SECURE_COOKIE`, security headeri, `LIBXML_NONET`).
+  2. **Validacija arhive vs stari legacy app** — uporediti r9–r13 (registered/participated po zemlji) sa brojevima iz starog sistema. *[planirano]*
+  3. **Pravi 10k load na prod-like infra** — Linux + php-fpm/nginx + LB. **Moguće tek nakon preseljenja aplikacije na server** (WAMP/Windows dev čisto ~500 VU); vezano za OD-2 (šta je „10k") i hosting odluku. *[čeka produkciono okruženje]*
+  4. *(sitno)* level-mapping cleanup za uvezene runde (~49–51% NULL — vidi `docs/04` §13).
+
 ### Faza 7 — Sertifikati i import/export
 
 - potvrda pravila generisanja i dostupnosti sertifikata;

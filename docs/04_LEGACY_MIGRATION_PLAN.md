@@ -244,3 +244,30 @@ Predloženi postupak:
 
 **SLEDEĆI KORAK (sutra):** load harness (k6) — identify → start → submit, do 10k paralelno, radi validacije upisa pod kontencijom (attempt start pod lock-om, race-safe `competitor_number`, unique aktivni attempt). ⚠️ Sintetički studenti su round-robin preko svih 24 nivoa (uklj. „…7" varijante bez sadržaja) — za test-taking pod opterećenjem vezati ih za nivoe koji imaju quiz/exam/test, inače `availability` vraća prazno. Zatim: uneti rezultate → dizajn arhive (Layer C) iz realnih podataka.
 
+## 13. Status — istorijska arhiva (2026-08-20)
+
+Layer C arhiva (ADR-0027) je kompletna i merge-ovana: denormalizovane `archive_registrations` + `archive_registration_results` + `archive_registration_qualifications` (self-contained, bez join-a na config, bez PII), read-only pregled na **Results → Archive**, i komanda **`legacy:archive-round {tabela} --round=N`** koja arhivira 1 legacy sezonu (ceo roster + rezultati + S/Q/F).
+
+**Uneseno (po rundi):**
+
+| Runda | Legacy tabela | Roster | Participated | Napomena |
+|---|---|--:|--:|---|
+| 13 (2025) | `el_student_bekap2025` | 93.260 | 42.307 | |
+| 11 (2023) | `el_student_bekap2023` | 83.343 | 75.026 | |
+| 10 (2022) | `el_student_bekap2022` | 67.882 | 58.554 | 130.944 result-redova |
+| 9 (2021) | `el_student_bekap2021` | 48.125 | 31.024 | 64.824 result-redova |
+
+**Nije uneto (provereno, svesna odluka vlasnika 2026-08-20 „stop"):**
+
+- **r8** (`bekap2020`, `bekap2020_new`): **nema rezultata** (sve mark-kolone 0; `archive_test_results` fallback pokriva samo r11/r13). Pravilo: **pre svake starije godine — prvo proveriti postoje li rezultati** (mark > 0 ili r-N u `archive_test_results`).
+- **r4–r7** (`bekap2016`=r4 / `2017`=r5 / `2018`=r6 / `2019`=r7): **imaju rezultate** (read+listen ~10–21k/god), ali starija šema traži doradu komande: (a) **guard na school-join** (nemaju `school_id` → crash; venue/region bi ionako bili NULL), (b) mapiranje `listen_mark`→Listening (imaju read+listen, ne read+use). Odloženo.
+- `bekap2024` (r12) **ne postoji** u dump-u; soa2024 `el_student` = r14 (aktuelna sezona, nije istorijska arhiva).
+
+**Round-mapiranje:** runda = **vodeće cifre** `student_id`-a (bekap2020→`80011`=r8, 2021→`900001`=r9, 2022→`1000002`=r10, 2023→`11000001`=r11), = `godina−2012`. Uvek prosleđivati **`--round=N` eksplicitno** (auto `substr(id,0,2)` radi samo za dvocifrene runde ≥10).
+
+**Data-quality caveat-i (uneti r9–r13):** (1) **level ~49–51% NULL** — stari backup-i mešaju id-jeve i short-kodove (`L1`,`S10`,`Little`,`level=1`); komanda join-uje samo `dl.id=e.level`. Popravka = join i na `level_short`+TRIM + odluka za `level=1`/`Little`. (2) **region/venue NULL** za redove koji koriste `school_external` umesto `school_id` (npr. r9 ~65–75%). „Registered vs participated po zemlji" (primarni cilj, OD-9) radi u potpunosti; country skoro pun.
+
+**Perf:** initial summary optimizovan kompozitnim `(round_number, <grupna kolona>)` indeksima (covering za `count(distinct competitor_number)`) — DB vreme ~5.0s → ~1.7s (round 13). Migracija `2026_08_20_120000_add_archive_summary_indexes`.
+
+**Staging:** sve `el_student_bekap*` tabele su učitane u `soahtc_legacy` (dev-local).
+

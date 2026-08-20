@@ -235,6 +235,37 @@ class ResultImportTest extends TestCase
         ]);
     }
 
+    public function test_publishing_an_attempt_supersedes_a_pre_existing_import_row(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+
+        // An offline result was imported first (Layer B source=import).
+        $this->import($c, $this->xlsxUpload([[$reg->competitor_number, 9, '']]))->assertOk()->assertJsonPath('imported', 1);
+
+        // The same competitor also sits the test in-app; the attempt is graded but not yet published.
+        Attempt::create([
+            'registration_id' => $reg->id, 'quiz_id' => $c['quiz']->id, 'test_id' => $c['test']->id,
+            'status' => 'completed', 'score' => 4.0, 'max_score' => 10, 'grading_status' => 'auto_graded',
+            'started_at' => now(), 'expires_at' => now()->addMinutes(30), 'submitted_at' => now(),
+            'channel' => 'web',
+        ]);
+
+        // Publishing must not collide with the pre-existing import row: the published
+        // attempt is authoritative and supersedes it (regression — this used to 500
+        // the whole cohort on the unique(registration_id, test_id) constraint).
+        $this->actingAs($this->admin())->postJson('/api/results/publish', [
+            'scope' => 'test', 'id' => $c['test']->id,
+        ])->assertOk()->assertJsonPath('attempts_count', 1);
+
+        // Exactly one Layer B row remains for (registration, test), sourced from the attempt.
+        $rows = DB::table('registration_results')
+            ->where('registration_id', $reg->id)->where('test_id', $c['test']->id)->get();
+        $this->assertCount(1, $rows);
+        $this->assertSame('attempt', $rows[0]->source);
+        $this->assertEqualsWithDelta(4.0, (float) $rows[0]->score, 0.001);
+    }
+
     public function test_reimport_updates_a_previously_imported_result(): void
     {
         $c = $this->content();

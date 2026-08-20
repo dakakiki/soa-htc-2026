@@ -22,8 +22,10 @@ class UpdateThemeRequest extends FormRequest
         $hex = ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'];
 
         $rules = [
-            'logo' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg', 'max:2048'],
-            'logo_icon' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg', 'max:2048'],
+            // No SVG: it is served from the public disk and an SVG can carry inline
+            // <script>, i.e. same-origin stored XSS. Raster formats only.
+            'logo' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+            'logo_icon' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
         ];
 
         foreach (Setting::COLOR_KEYS as $key) {

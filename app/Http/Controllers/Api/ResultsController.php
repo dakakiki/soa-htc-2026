@@ -190,6 +190,13 @@ class ResultsController extends Controller
             return response()->json(['message' => __('This attempt has already been reset.')], 422);
         }
 
+        // Unlike the population-scoped bulk paths, a single reset takes an attempt by
+        // id — so a non-global caller must be confined to their own schools here too.
+        $callerSchoolIds = $request->user()?->allowedSchoolIds();
+        if ($callerSchoolIds !== null && ! $callerSchoolIds->contains($attempt->registration()->value('school_id'))) {
+            abort(403);
+        }
+
         DB::transaction(function () use ($attempt, $validated, $request) {
             $this->voidAttempt($attempt, $validated['reason'], $request->user()?->id);
             // A voided attempt is no longer published — drop its Layer B row (ADR-0027).
@@ -764,6 +771,15 @@ class ResultsController extends Controller
             if ($schoolIds !== null) {
                 $query->whereIn('school_id', $schoolIds->all());
             }
+        }
+
+        // Authorization boundary: a non-global caller only ever acts on their own
+        // schools, whatever country_id/school_id the request carried (ADR-0024). This
+        // is what makes delegating `results.manage`/`reports.view` to a coordinator
+        // safe; global admins (schools.view.all) stay unrestricted.
+        $callerSchoolIds = auth()->user()?->allowedSchoolIds();
+        if ($callerSchoolIds !== null) {
+            $query->whereIn('school_id', $callerSchoolIds->all());
         }
 
         $search = trim((string) ($f['search'] ?? ''));

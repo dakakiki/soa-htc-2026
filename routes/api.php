@@ -66,7 +66,7 @@ Route::prefix('auth')->group(function () {
  * date of birth. Identification is rate-limited against guessing.
  */
 Route::prefix('student')->group(function () {
-    Route::post('identify', [StudentAuthController::class, 'identify'])->middleware('throttle:8,1');
+    Route::post('identify', [StudentAuthController::class, 'identify'])->middleware('throttle:student-identify');
     Route::get('countries', [StudentAuthController::class, 'countries']);
     Route::middleware('student.session')->group(function () {
         Route::get('me', [StudentAuthController::class, 'me']);
