@@ -216,12 +216,46 @@ class SeasonResetTest extends TestCase
         ]);
     }
 
+    public function test_reset_archives_the_full_roster_including_non_participants(): void
+    {
+        $participant = $this->seedPublishedResult(); // registered + a Layer B result
+        // A registered competitor with no results at all (registered but did not sit).
+        $school = School::firstOrFail();
+        $this->seq++;
+        $noResult = Registration::create([
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'competitor_number' => '14'.str_pad((string) $this->seq, 6, '0', STR_PAD_LEFT), 'sequence' => $this->seq,
+            'school_id' => $school->id, 'country_id' => $school->country_id,
+            'difficulty_level_id' => DifficultyLevel::where('level_short', 'H2')->value('id'),
+            'name' => 'No Result Student', 'date_of_birth' => '2010-05-01', 'grade' => 6,
+            'status' => 'active', 'attendance' => 'absent',
+        ]);
+
+        $this->artisan('season:reset', ['--force' => true])->assertExitCode(0);
+
+        // The whole roster is archived — participant and non-participant alike.
+        $this->assertSame(2, DB::table('archive_registrations')->count());
+        $this->assertDatabaseHas('archive_registrations', [
+            'competitor_number' => $noResult->competitor_number, 'round_number' => 14,
+            'name' => 'No Result Student', 'attendance' => 'absent',
+        ]);
+
+        // But only the participant has a result archived (registered vs. participated).
+        $this->assertSame(1, DB::table('archive_registration_results')->count());
+        $this->assertDatabaseHas('archive_registrations', ['competitor_number' => $participant->competitor_number]);
+        $this->assertDatabaseMissing('archive_registration_results', ['competitor_number' => $noResult->competitor_number]);
+
+        // The live roster is wiped.
+        $this->assertSame(0, Registration::count());
+    }
+
     public function test_dry_run_does_not_archive(): void
     {
         $this->seedPublishedResult();
 
         $this->artisan('season:reset', ['--dry-run' => true])->assertExitCode(0);
 
+        $this->assertSame(0, DB::table('archive_registrations')->count());
         $this->assertSame(0, DB::table('archive_registration_results')->count());
         $this->assertSame(0, DB::table('archive_registration_qualifications')->count());
         $this->assertSame(1, DB::table('registration_results')->count());
