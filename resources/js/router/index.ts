@@ -306,6 +306,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'reports.view' },
     },
     {
+        path: '/results/archive',
+        name: 'results.archive',
+        component: () => import('@/pages/results/ArchivePage.vue'),
+        meta: { requiresAuth: true, permission: 'reports.view' },
+    },
+    {
         path: '/reset',
         name: 'reset',
         component: () => import('@/pages/results/ResetPage.vue'),

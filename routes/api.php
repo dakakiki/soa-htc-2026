@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AttemptController;
 use App\Http\Controllers\Api\AuthController;
@@ -162,6 +163,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Results export (all from Layer B, with-answers from Layer A). Gated by results.manage.
     Route::get('results/export', [ResultsController::class, 'exportResults']);
     Route::get('results/export-answers', [ResultsController::class, 'exportResultsWithAnswers']);
+
+    // Results archive (Layer C, ADR-0027). Read-only, gated by reports.view.
+    Route::get('archive/rounds', [ArchiveController::class, 'rounds']);
+    Route::get('archive/summary', [ArchiveController::class, 'summary']);
 
     // Reports (5f, CC-12). Gated by reports.view.
     Route::get('reports/filters', [ReportController::class, 'filters']);
