@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import ArchiveBreakdownTable from '@/pages/results/ArchiveBreakdownTable.vue';
 import { archiveRounds, archiveSummary, type ArchiveRound, type ArchiveSummary } from '@/api/archive';
 
@@ -37,6 +38,28 @@ function match(name: string, term: string): boolean {
 }
 const breakdownRows = computed(() => (summary.value?.breakdown.rows ?? []).filter((r) => match(r.name, breakdownSearch.value)));
 const schoolRows = computed(() => (summary.value?.by_school.rows ?? []).filter((r) => match(r.name, schoolSearch.value)));
+
+// Geo filter selects. The archive is self-contained (ADR-0027) so its country /
+// region / venue are denormalized names, not config ids — the summary bundles the
+// name lists and we drive SearchSelect off them, using each name's position in the
+// list as its (stable-within-a-list) option id. Country → region → school cascade,
+// mirroring the registrations filter.
+const countryList = computed(() => summary.value?.filters.countries ?? []);
+const regionList = computed(() => summary.value?.filters.regions ?? []);
+const schoolList = computed(() => summary.value?.filters.schools ?? []);
+
+const toOptions = (names: string[]): SearchSelectOption[] => names.map((name, i) => ({ id: i, label: name }));
+const countryOptions = computed(() => toOptions(countryList.value));
+const regionOptions = computed(() => toOptions(regionList.value));
+const schoolOptions = computed(() => toOptions(schoolList.value));
+
+const idFor = (names: string[], value: string): number | null => {
+    const i = names.indexOf(value);
+    return i >= 0 ? i : null;
+};
+const countryId = computed(() => (country.value ? idFor(countryList.value, country.value) : null));
+const regionId = computed(() => (region.value ? idFor(regionList.value, region.value) : null));
+const schoolId = computed(() => (school.value ? idFor(schoolList.value, school.value) : null));
 
 async function loadRounds(): Promise<void> {
     loadingRounds.value = true;
@@ -74,12 +97,18 @@ function onRound(): void {
     country.value = region.value = school.value = '';
     loadSummary();
 }
-function onCountry(): void {
+function onCountry(id: number | null): void {
+    country.value = id === null ? '' : (countryList.value[id] ?? '');
     region.value = school.value = '';
     loadSummary();
 }
-function onRegion(): void {
+function onRegion(id: number | null): void {
+    region.value = id === null ? '' : (regionList.value[id] ?? '');
     school.value = '';
+    loadSummary();
+}
+function onSchool(id: number | null): void {
+    school.value = id === null ? '' : (schoolList.value[id] ?? '');
     loadSummary();
 }
 
@@ -101,39 +130,52 @@ onMounted(async () => {
         </p>
 
         <template v-else>
-            <!-- Filters: Season · Country · Region · School · Difficulty -->
+            <!-- Filters. Row 1: Season · Country · Venue · Diff. Categories; Region sits
+                 alone on row 2, under Country. Country/Region/Venue are searchable
+                 SearchSelects; picking a country shows a preloader on Region and Venue
+                 while their lists load. -->
             <div class="relative rounded-lg border border-gray-200 bg-white p-4">
-                <LoadingOverlay v-if="loadingRounds" />
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <label class="block">
+                <!-- Keep the preloader up through the first summary fetch as well: the
+                     country/region/venue options all come from it, so until it lands the
+                     filters would otherwise sit empty with no spinner. -->
+                <LoadingOverlay v-if="loadingRounds || (loading && !summary)" />
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <!-- Column 1: Season -->
+                    <label class="block lg:col-start-1 lg:row-start-1">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.season') }}</span>
                         <select v-model.number="round" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="onRound">
                             <option v-for="r in rounds" :key="r.round" :value="r.round">{{ roundLabel(r) }}</option>
                         </select>
                     </label>
-                    <label class="block">
+
+                    <!-- Column 2: Country / Region. SearchSelect is not wrapped in a
+                         <label>: its trigger is a <button>, and a label forwards option
+                         clicks back to that button — reopening the dropdown after a pick. -->
+                    <div class="lg:col-start-2 lg:row-start-1">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.country') }}</span>
-                        <select v-model="country" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="onCountry">
-                            <option value="">{{ $t('archive.allCountries') }}</option>
-                            <option v-for="c in summary?.filters.countries ?? []" :key="c" :value="c">{{ c }}</option>
-                        </select>
-                    </label>
-                    <label class="block">
+                        <SearchSelect :model-value="countryId" :options="countryOptions" dense
+                            :placeholder="$t('archive.allCountries')" :search-placeholder="$t('archive.country')"
+                            @update:model-value="onCountry" />
+                    </div>
+                    <div class="lg:col-start-2 lg:row-start-2">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.region') }}</span>
-                        <select v-model="region" :disabled="!country || (summary?.filters.regions.length ?? 0) === 0"
-                            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" @change="onRegion">
-                            <option value="">{{ country ? $t('archive.allRegions') : $t('archive.pickCountryFirst') }}</option>
-                            <option v-for="rg in summary?.filters.regions ?? []" :key="rg" :value="rg">{{ rg }}</option>
-                        </select>
-                    </label>
-                    <label class="block">
+                        <SearchSelect :model-value="regionId" :options="regionOptions" dense
+                            :disabled="!country" :loading="loading && !!country"
+                            :placeholder="country ? $t('archive.allRegions') : $t('archive.pickCountryFirst')"
+                            :search-placeholder="$t('archive.region')" @update:model-value="onRegion" />
+                    </div>
+
+                    <!-- Column 3: Venue -->
+                    <div class="lg:col-start-3 lg:row-start-1">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.school') }}</span>
-                        <select v-model="school" :disabled="!country" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" @change="loadSummary">
-                            <option value="">{{ country ? $t('archive.allSchools') : $t('archive.pickCountryFirst') }}</option>
-                            <option v-for="s in summary?.filters.schools ?? []" :key="s" :value="s">{{ s }}</option>
-                        </select>
-                    </label>
-                    <label class="block">
+                        <SearchSelect :model-value="schoolId" :options="schoolOptions" dense
+                            :disabled="!country" :loading="loading && !!country"
+                            :placeholder="country ? $t('archive.allSchools') : $t('archive.pickCountryFirst')"
+                            :search-placeholder="$t('archive.school')" @update:model-value="onSchool" />
+                    </div>
+
+                    <!-- Column 4: Difficulty categories -->
+                    <label class="block lg:col-start-4 lg:row-start-1">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.level') }}</span>
                         <select v-model="level" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="loadSummary">
                             <option value="">{{ $t('archive.allLevels') }}</option>
@@ -198,7 +240,7 @@ onMounted(async () => {
                     </div>
                 </div>
 
-                <!-- By school -->
+                <!-- By venue -->
                 <ArchiveBreakdownTable :title="$t('archive.bySchool')" :label="$t('archive.school')" :rows="schoolRows"
                     :truncated="summary.by_school.truncated" :hint="!country ? $t('archive.schoolCountryHint') : ''"
                     v-model:search="schoolSearch" header-class="bg-slate-600" />

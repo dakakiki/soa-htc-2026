@@ -134,23 +134,23 @@ onMounted(loadOptions);
 
             <!-- Competition quiz → exam → test -->
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <label class="block">
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('import.quiz') }} *</span>
                     <SearchSelect dense clearable :options="quizOptions" :model-value="scope.quiz_id"
                         :placeholder="$t('import.choose')" @update:model-value="onQuizChange" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('import.exam') }} *</span>
                     <SearchSelect dense clearable :options="examOptions" :model-value="scope.exam_id"
                         :disabled="!scope.quiz_id" :loading="optionsLoading" :placeholder="$t('import.choose')"
                         @update:model-value="onExamChange" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('import.test') }} *</span>
                     <SearchSelect dense clearable :options="testOptions" :model-value="scope.test_id"
                         :disabled="!scope.exam_id" :loading="optionsLoading" :placeholder="$t('import.choose')"
                         @update:model-value="(v: number | null) => (scope.test_id = v)" />
-                </label>
+                </div>
             </div>
 
             <!-- File -->

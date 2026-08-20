@@ -135,37 +135,37 @@ onMounted(loadOptions);
             <div class="space-y-3">
                 <!-- Row 1: population scope (country → venue). -->
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label class="block">
+                    <div class="block">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('publishing.country') }}</span>
                         <SearchSelect dense clearable :options="countryOptions" :model-value="q.country_id ?? null"
                             :placeholder="$t('publishing.anyOption')" @update:model-value="onCountryChange" />
-                    </label>
-                    <label class="block">
+                    </div>
+                    <div class="block">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('publishing.venue') }}</span>
                         <SearchSelect dense clearable :options="venueOptions" :model-value="q.school_id ?? null"
                             :disabled="!q.country_id" :loading="optionsLoading" :placeholder="$t('publishing.anyOption')"
                             @update:model-value="(v: number | null) => { q.school_id = v; loadOverview(); }" />
-                    </label>
+                    </div>
                 </div>
                 <!-- Row 2: content scope (quiz → exam / test). -->
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <label class="block">
+                    <div class="block">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('publishing.quiz') }} *</span>
                         <SearchSelect dense clearable :options="quizOptions" :model-value="q.quiz_id ?? null"
                             :placeholder="$t('publishing.anyOption')" @update:model-value="onQuizChange" />
-                    </label>
-                    <label class="block">
+                    </div>
+                    <div class="block">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('publishing.exam') }}</span>
                         <SearchSelect dense clearable :options="examOptions" :model-value="q.exam_id ?? null"
                             :disabled="!q.quiz_id" :loading="optionsLoading" :placeholder="$t('publishing.anyOption')"
                             @update:model-value="onExamChange" />
-                    </label>
-                    <label class="block">
+                    </div>
+                    <div class="block">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('publishing.test') }}</span>
                         <SearchSelect dense clearable :options="testOptions" :model-value="q.test_id ?? null"
                             :disabled="!q.quiz_id" :loading="optionsLoading" :placeholder="$t('publishing.anyOption')"
                             @update:model-value="(v: number | null) => { q.test_id = v; loadOverview(); }" />
-                    </label>
+                    </div>
                 </div>
             </div>
 

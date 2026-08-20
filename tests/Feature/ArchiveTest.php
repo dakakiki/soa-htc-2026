@@ -107,6 +107,60 @@ class ArchiveTest extends TestCase
             ->assertJsonPath('totals.participated', 1);
     }
 
+    /**
+     * Two Serbian regions (Vojvodina/School A, Belgrade/School C), both participating.
+     * Picking a region collapses the by-region breakdown to that region; picking a
+     * school collapses the by-school breakdown (and the region breakdown) to it.
+     */
+    public function test_region_and_school_filters_collapse_their_breakdowns(): void
+    {
+        $now = now();
+        DB::table('archive_registrations')->insert([
+            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000001', 'name' => '', 'country' => 'Serbia', 'region' => 'Vojvodina', 'venue' => 'School A', 'school_external' => null, 'level' => 'H2', 'grade' => 6, 'attendance' => null, 'archived_at' => $now],
+            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000003', 'name' => '', 'country' => 'Serbia', 'region' => 'Belgrade', 'venue' => 'School C', 'school_external' => null, 'level' => 'H2', 'grade' => 6, 'attendance' => null, 'archived_at' => $now],
+        ]);
+        DB::table('archive_registration_results')->insert([
+            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000001', 'student_name' => '', 'country' => 'Serbia', 'region' => 'Vojvodina', 'venue' => 'School A', 'school_external' => null, 'level' => 'H2', 'exam_round' => 'Preliminary round', 'test_type' => 'Reading', 'quiz' => null, 'test' => null, 'score' => 8, 'max_score' => null, 'source' => 'legacy', 'published_at' => null, 'archived_at' => $now],
+            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000003', 'student_name' => '', 'country' => 'Serbia', 'region' => 'Belgrade', 'venue' => 'School C', 'school_external' => null, 'level' => 'H2', 'exam_round' => 'Preliminary round', 'test_type' => 'Reading', 'quiz' => null, 'test' => null, 'score' => 9, 'max_score' => null, 'source' => 'legacy', 'published_at' => null, 'archived_at' => $now],
+        ]);
+
+        // Country only: both regions and both schools show.
+        $all = $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13&country=Serbia')->assertOk();
+        $this->assertCount(2, $all->json('breakdown.rows'));
+        $this->assertCount(2, $all->json('by_school.rows'));
+
+        // Region picked: the by-region breakdown collapses to that one region, and
+        // by-school narrows to the schools within it.
+        $byRegion = $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13&country=Serbia&region=Vojvodina')->assertOk();
+        $this->assertCount(1, $byRegion->json('breakdown.rows'));
+        $this->assertSame('Vojvodina', $byRegion->json('breakdown.rows.0.name'));
+        $this->assertCount(1, $byRegion->json('by_school.rows'));
+        $this->assertSame('School A', $byRegion->json('by_school.rows.0.name'));
+
+        // School picked: by-school shows only that school, and the region breakdown
+        // collapses to the school's region.
+        $bySchool = $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13&country=Serbia&school=School C')->assertOk();
+        $this->assertCount(1, $bySchool->json('by_school.rows'));
+        $this->assertSame('School C', $bySchool->json('by_school.rows.0.name'));
+        $this->assertCount(1, $bySchool->json('breakdown.rows'));
+        $this->assertSame('Belgrade', $bySchool->json('breakdown.rows.0.name'));
+    }
+
+    /** Picking a difficulty level collapses the level distribution to just that level. */
+    public function test_level_filter_narrows_the_level_distribution(): void
+    {
+        $this->seedArchive();
+
+        // No level chosen: the spread shows every level present (H2 + H3).
+        $all = $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13')->assertOk();
+        $this->assertCount(2, $all->json('by_level'));
+
+        // Level chosen: by_level agrees with the rest of the page — only H2.
+        $h2 = $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13&level=H2')->assertOk();
+        $this->assertCount(1, $h2->json('by_level'));
+        $this->assertSame('H2', $h2->json('by_level.0.label'));
+    }
+
     public function test_archive_requires_the_reports_permission(): void
     {
         $this->getJson('/api/archive/rounds')->assertUnauthorized();

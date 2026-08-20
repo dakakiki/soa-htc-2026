@@ -73,21 +73,21 @@ class ArchiveController extends Controller
         $school = $filters['school'] ?? null;
         $level = $filters['level'] ?? null;
 
-        // Full scope (all filters) for the headline; geography-only (no level) for
-        // the level distribution, so it still shows the spread.
+        // Every section is narrowed by all active filters, so the numbers below always
+        // agree with the chosen Season / Country / Region / Venue / Difficulty — a
+        // selected level collapses the level distribution to that one level, just as a
+        // selected venue collapses the by-venue table.
         $scoped = fn (string $table) => DB::table($table)->where('round_number', $round)
             ->when($country, fn ($q, $v) => $q->where('country', $v))
             ->when($region, fn ($q, $v) => $q->where('region', $v))
             ->when($school, fn ($q, $v) => $q->where('venue', $v))
             ->when($level, fn ($q, $v) => $q->where('level', $v));
-        $geoScoped = fn (string $table) => DB::table($table)->where('round_number', $round)
-            ->when($country, fn ($q, $v) => $q->where('country', $v))
-            ->when($region, fn ($q, $v) => $q->where('region', $v))
-            ->when($school, fn ($q, $v) => $q->where('venue', $v));
 
         // Primary breakdown: countries overall, or the chosen country's regions.
+        // Every active filter narrows it — picking a region collapses this to that
+        // one region, mirroring how school collapses the by-school table below.
         $hasCountry = $country !== null;
-        $breakdown = $this->byDimension($round, $hasCountry ? 'region' : 'country', $hasCountry ? $country : null, null, $level);
+        $breakdown = $this->byDimension($round, $hasCountry ? 'region' : 'country', $hasCountry ? $country : null, $region, $level, null, $school);
         $breakdown['dimension'] = $hasCountry ? 'region' : 'country';
 
         return response()->json([
@@ -98,8 +98,8 @@ class ArchiveController extends Controller
                 'qualifications' => $this->qualificationsCount($round, $country, $region, $school, $level),
             ],
             'breakdown' => $breakdown,
-            'by_school' => $this->byDimension($round, 'venue', $country, $region, $level, 100),
-            'by_level' => $this->distribution($geoScoped('archive_registrations'), 'level'),
+            'by_school' => $this->byDimension($round, 'venue', $country, $region, $level, 100, $school),
+            'by_level' => $this->distribution($scoped('archive_registrations'), 'level'),
             'by_grade' => $this->distribution($scoped('archive_registrations'), 'grade'),
             'filters' => [
                 'countries' => DB::table('archive_registrations')->where('round_number', $round)
@@ -122,17 +122,18 @@ class ArchiveController extends Controller
 
     /**
      * Registered vs participated grouped by one denormalized column (country /
-     * region / venue), within the country/region/level scope, biggest first and
-     * optionally capped (there can be hundreds of schools).
+     * region / venue), within the country/region/school/level scope, biggest first
+     * and optionally capped (there can be hundreds of schools).
      *
      * @return array{rows: list<array{name: string, registered: int, participated: int}>, truncated: bool}
      */
-    private function byDimension(int $round, string $column, ?string $country, ?string $region, ?string $level, ?int $cap = null): array
+    private function byDimension(int $round, string $column, ?string $country, ?string $region, ?string $level, ?int $cap = null, ?string $school = null): array
     {
         $base = fn (string $table) => DB::table($table)->where('round_number', $round)
             ->whereNotNull($column)->where($column, '!=', '')
             ->when($country, fn ($q, $v) => $q->where('country', $v))
             ->when($region, fn ($q, $v) => $q->where('region', $v))
+            ->when($school, fn ($q, $v) => $q->where('venue', $v))
             ->when($level, fn ($q, $v) => $q->where('level', $v));
 
         $registered = $base('archive_registrations')

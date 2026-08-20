@@ -100,49 +100,49 @@ onMounted(loadOptions);
 
             <!-- Population -->
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <label class="block">
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.country') }}</span>
                     <SearchSelect dense clearable :options="countryOptions" :model-value="q.country_id ?? null"
                         :placeholder="$t('export.any')" @update:model-value="onCountryChange" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.region') }}</span>
                     <SearchSelect dense clearable :options="regionOptions" :model-value="q.region_id ?? null"
                         :disabled="!q.country_id" :loading="optionsLoading" :placeholder="$t('export.any')"
                         @update:model-value="(v: number | null) => (q.region_id = v)" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.venue') }}</span>
                     <SearchSelect dense clearable :options="venueOptions" :model-value="q.school_id ?? null"
                         :disabled="!q.country_id" :loading="optionsLoading" :placeholder="$t('export.any')"
                         @update:model-value="(v: number | null) => (q.school_id = v)" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.level') }}</span>
                     <SearchSelect dense clearable :options="levelOptions" :model-value="q.difficulty_level_id ?? null"
                         :placeholder="$t('export.any')" @update:model-value="(v: number | null) => (q.difficulty_level_id = v)" />
-                </label>
+                </div>
             </div>
 
             <!-- Content -->
             <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <label class="block">
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.quiz') }}</span>
                     <SearchSelect dense clearable :options="quizOptions" :model-value="q.quiz_id ?? null"
                         :placeholder="$t('export.any')" @update:model-value="onQuizChange" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.exam') }}</span>
                     <SearchSelect dense clearable :options="examOptions" :model-value="q.exam_id ?? null"
                         :disabled="!q.quiz_id" :loading="optionsLoading" :placeholder="$t('export.any')"
                         @update:model-value="onExamChange" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.test') }}</span>
                     <SearchSelect dense clearable :options="testOptions" :model-value="q.test_id ?? null"
                         :disabled="!q.quiz_id" :loading="optionsLoading" :placeholder="$t('export.any')"
                         @update:model-value="(v: number | null) => (q.test_id = v)" />
-                </label>
+                </div>
             </div>
         </div>
 
