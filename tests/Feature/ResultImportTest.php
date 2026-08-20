@@ -263,6 +263,44 @@ class ResultImportTest extends TestCase
         $this->assertEqualsWithDelta(7.5, (float) DB::table('registration_results')->where('registration_id', $reg->id)->value('score'), 0.001);
     }
 
+    // ---- upload hardening ----
+
+    public function test_a_malformed_file_is_rejected_with_422(): void
+    {
+        $bad = UploadedFile::fake()->createWithContent('results.xlsx', 'this is not a zip archive');
+
+        $this->import($this->content(), $bad)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('file');
+    }
+
+    public function test_an_oversized_worksheet_entry_is_rejected(): void
+    {
+        // A worksheet whose uncompressed size trips the guard — written to disk in
+        // 1 MB chunks and streamed into the archive, so the test never holds it all
+        // in memory (and the reader rejects it before decompressing).
+        $big = tempnam(sys_get_temp_dir(), 'big');
+        $handle = fopen($big, 'w');
+        $chunk = str_repeat('A', 1024 * 1024);
+        for ($i = 0; $i < 51; $i++) {
+            fwrite($handle, $chunk);
+        }
+        fclose($handle);
+
+        $path = tempnam(sys_get_temp_dir(), 'bomb').'.xlsx';
+        $zip = new \ZipArchive;
+        $zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $zip->addFile($big, 'xl/worksheets/sheet1.xml');
+        $zip->close();
+        @unlink($big);
+
+        $this->import($this->content(), new UploadedFile($path, 'results.xlsx', null, null, true))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('file');
+
+        @unlink($path);
+    }
+
     // ---- options + auth ----
 
     public function test_import_options_list_only_competition_quizzes(): void

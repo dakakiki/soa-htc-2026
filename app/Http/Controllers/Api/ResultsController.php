@@ -485,7 +485,12 @@ class ResultsController extends Controller
             throw ValidationException::withMessages(['exam_id' => __('This exam has no competition round to import into.')]);
         }
 
-        $rows = $this->readUpload($validated['file']);
+        // A corrupt/oversized spreadsheet is a bad request, not a server error.
+        try {
+            $rows = $this->readUpload($validated['file']);
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['file' => __('The results file could not be read. Upload a valid .xlsx or .csv.')]);
+        }
         array_shift($rows); // the header row
 
         $summary = ResultImporter::import(

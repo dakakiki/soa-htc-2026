@@ -20,6 +20,13 @@ final class XlsxReader
     private const MAIN_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 
     /**
+     * Cap on a single entry's *uncompressed* size, checked before decompressing —
+     * a guard against zip bombs (a small archive that expands to gigabytes).
+     * Generous for a results sheet; far below what would exhaust memory.
+     */
+    private const MAX_ENTRY_BYTES = 50 * 1024 * 1024;
+
+    /**
      * Read the workbook's first worksheet as rows of cell strings. Gaps between
      * cells are filled with empty strings so a value always sits at its column
      * index (Student ID at 0, Result at 1, Qualification at 2).
@@ -35,7 +42,7 @@ final class XlsxReader
 
         try {
             $shared = self::sharedStrings($zip);
-            $sheetXml = $zip->getFromName(self::firstSheetName($zip));
+            $sheetXml = self::entryContents($zip, self::firstSheetName($zip));
             if ($sheetXml === false) {
                 throw new RuntimeException('The spreadsheet has no readable worksheet.');
             }
@@ -47,6 +54,24 @@ final class XlsxReader
     }
 
     /**
+     * Read one zip entry, refusing to decompress it if its uncompressed size
+     * exceeds {@see MAX_ENTRY_BYTES} (zip-bomb guard). Returns false when the entry
+     * is absent, mirroring ZipArchive::getFromName.
+     */
+    private static function entryContents(ZipArchive $zip, string $name): string|false
+    {
+        $stat = $zip->statName($name);
+        if ($stat === false) {
+            return false;
+        }
+        if (($stat['size'] ?? 0) > self::MAX_ENTRY_BYTES) {
+            throw new RuntimeException('The spreadsheet is too large to process.');
+        }
+
+        return $zip->getFromName($name);
+    }
+
+    /**
      * The shared string table (`xl/sharedStrings.xml`), if present. Each entry may
      * be a single run or several `<r><t>` runs, which are concatenated.
      *
@@ -54,7 +79,7 @@ final class XlsxReader
      */
     private static function sharedStrings(ZipArchive $zip): array
     {
-        $xml = $zip->getFromName('xl/sharedStrings.xml');
+        $xml = self::entryContents($zip, 'xl/sharedStrings.xml');
         if ($xml === false) {
             return [];
         }
