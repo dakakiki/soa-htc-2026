@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
  * It clears the season-transactional data and normalizes accounts/venues back to
  * a clean baseline, while leaving everything that persists across seasons intact.
  *
+ * ARCHIVE (snapshot)      the results layer (registration_results + _qualifications) → archive_* (Layer C), tagged by round
  * WIPE (delete rows)      registrations + the whole attempt/result/session/publication chain,
  *                         plus the audit_logs trail (a new season starts on a fresh log)
  * DELETE (accounts)       users who are SCHOOL coordinators in the active season
@@ -26,8 +27,9 @@ use Illuminate\Support\Facades\DB;
  *
  * Real schools and coordinators arrive via the legacy import; this command never
  * deletes a school (venues are persistent config — they are only deactivated) and
- * never touches an admin account. Archiving prior results before the wipe and
- * bumping the season round belong to a later phase and are out of scope here.
+ * never touches an admin account. The results layer (Layer B) is snapshotted into
+ * the archive (Layer C, ADR-0027) before it is wiped; bumping the season round
+ * still belongs to a later phase.
  */
 class ResetSeasonData extends Command
 {
@@ -75,6 +77,8 @@ class ResetSeasonData extends Command
 
         // --- Build the plan (counts only, no writes) ---
         $plan = [];
+        $plan[] = ['ARCHIVE', 'registration_results', (string) DB::table('registration_results')->count()];
+        $plan[] = ['ARCHIVE', 'registration_qualifications', (string) DB::table('registration_qualifications')->count()];
         foreach (self::WIPE_TABLES as $table) {
             $plan[] = ['WIPE', $table, (string) DB::table($table)->count()];
         }
@@ -101,6 +105,9 @@ class ResetSeasonData extends Command
         $result = [];
 
         DB::transaction(function () use ($schoolCoordUserIds, $deactivateUserQuery, $now, &$result): void {
+            // Snapshot the results layer into the archive before anything is wiped.
+            [$result['archived_results'], $result['archived_qualifications']] = $this->archiveResults($now);
+
             foreach (self::WIPE_TABLES as $table) {
                 $result[$table] = DB::table($table)->delete();
             }
@@ -125,6 +132,8 @@ class ResetSeasonData extends Command
         $this->newLine();
         $this->info('Done. Applied:');
         $rows = [];
+        $rows[] = ['archived', 'registration_results', (string) $result['archived_results']];
+        $rows[] = ['archived', 'registration_qualifications', (string) $result['archived_qualifications']];
         foreach (self::WIPE_TABLES as $table) {
             $rows[] = ['deleted', $table, (string) $result[$table]];
         }
@@ -134,6 +143,54 @@ class ResetSeasonData extends Command
         $this->table(['Action', 'Target', 'Rows'], $rows);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Snapshot the results layer (Layer B) into the archive (Layer C, ADR-0027)
+     * before it is wiped: one denormalized, self-contained row per published result
+     * and per advancement code, tagged with the season and its round_number. Runs
+     * while the registrations still exist (set-based INSERT…SELECT).
+     *
+     * @return array{0: int, 1: int} [results archived, qualifications archived]
+     */
+    private function archiveResults(string $now): array
+    {
+        $resultsCount = DB::table('registration_results')->count();
+        $qualificationsCount = DB::table('registration_qualifications')->count();
+
+        if ($resultsCount > 0) {
+            DB::table('archive_registration_results')->insertUsing(
+                ['season_id', 'round_number', 'competitor_number', 'student_name', 'country', 'region', 'venue', 'school_external', 'level', 'exam_round', 'test_type', 'quiz', 'test', 'score', 'max_score', 'source', 'published_at', 'archived_at'],
+                DB::table('registration_results as rr')
+                    ->join('registrations as r', 'r.id', '=', 'rr.registration_id')
+                    ->join('seasons as sea', 'sea.id', '=', 'rr.season_id')
+                    ->leftJoin('countries as c', 'c.id', '=', 'r.country_id')
+                    ->leftJoin('schools as s', 's.id', '=', 'r.school_id')
+                    ->leftJoin('regions as rg', 'rg.id', '=', 's.region_id')
+                    ->leftJoin('difficulty_levels as dl', 'dl.id', '=', 'r.difficulty_level_id')
+                    ->join('exam_rounds as er', 'er.id', '=', 'rr.exam_round_id')
+                    ->leftJoin('test_types as tt', 'tt.id', '=', 'rr.test_type_id')
+                    ->leftJoin('quizzes as qz', 'qz.id', '=', 'rr.quiz_id')
+                    ->leftJoin('tests as t', 't.id', '=', 'rr.test_id')
+                    ->selectRaw(
+                        'rr.season_id, sea.round_number, r.competitor_number, r.name, c.name, rg.name, s.name, r.school_external, dl.level_short, er.name, tt.name, qz.title, t.title, rr.score, rr.max_score, rr.source, rr.published_at, ?',
+                        [$now],
+                    ),
+            );
+        }
+
+        if ($qualificationsCount > 0) {
+            DB::table('archive_registration_qualifications')->insertUsing(
+                ['season_id', 'round_number', 'competitor_number', 'student_name', 'exam_round', 'code', 'published_at', 'archived_at'],
+                DB::table('registration_qualifications as rq')
+                    ->join('registrations as r', 'r.id', '=', 'rq.registration_id')
+                    ->join('seasons as sea', 'sea.id', '=', 'rq.season_id')
+                    ->join('exam_rounds as er', 'er.id', '=', 'rq.exam_round_id')
+                    ->selectRaw('rq.season_id, sea.round_number, r.competitor_number, r.name, er.name, rq.code, rq.published_at, ?', [$now]),
+            );
+        }
+
+        return [$resultsCount, $qualificationsCount];
     }
 
     /** User ids holding the given role key in the active season (all seasons if none active). */

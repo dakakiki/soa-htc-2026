@@ -4,11 +4,15 @@ namespace Tests\Feature;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
+use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\QuestionAnswer;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
+use App\Domain\Assessment\Models\TestType;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Models\RegistrationQualification;
+use App\Domain\Competition\Models\RegistrationResult;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\School;
@@ -149,6 +153,78 @@ class SeasonResetTest extends TestCase
         $this->assertGreaterThan(0, Test::count());
         $this->assertSame(0, School::where('status', 'active')->count());
         $this->assertSame($activeSchoolsBefore, School::where('status', 'inactive')->count());
+    }
+
+    /**
+     * A registration with a published Layer B result and an advancement code
+     * (competition Preliminary Reading + a Regional Qualifiers qualification).
+     */
+    private function seedPublishedResult(): Registration
+    {
+        $level = DifficultyLevel::where('level_short', 'H2')->firstOrFail();
+        $quiz = Quiz::create(['title' => 'CQ', 'quiz_type' => 'competition', 'status' => 'active']);
+        $exam = Exam::create(['title' => 'E', 'exam_round_id' => ExamRound::where('name', 'Preliminary round')->value('id'), 'status' => 'active']);
+        $quiz->exams()->attach($exam->id, ['position' => 1]);
+        $test = Test::create(['title' => 'Reading 1', 'test_type_id' => TestType::where('name', 'Reading')->value('id'), 'duration' => 30, 'status' => 'active']);
+        $exam->tests()->attach($test->id, ['position' => 1]);
+
+        $school = School::firstOrFail();
+        $this->seq++;
+        $reg = Registration::create([
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'competitor_number' => '14'.str_pad((string) $this->seq, 6, '0', STR_PAD_LEFT), 'sequence' => $this->seq,
+            'school_id' => $school->id, 'country_id' => $school->country_id,
+            'difficulty_level_id' => $level->id, 'name' => 'Archived Student',
+            'date_of_birth' => '2010-05-01', 'grade' => 6, 'status' => 'active',
+        ]);
+        RegistrationResult::create([
+            'registration_id' => $reg->id, 'test_id' => $test->id,
+            'exam_round_id' => $exam->exam_round_id, 'test_type_id' => $test->test_type_id,
+            'quiz_id' => $quiz->id, 'season_id' => $reg->season_id,
+            'score' => 7.5, 'max_score' => 10, 'source' => 'import', 'published_at' => now(),
+        ]);
+        RegistrationQualification::create([
+            'registration_id' => $reg->id,
+            'exam_round_id' => ExamRound::where('name', 'Regional Qualifiers')->value('id'),
+            'season_id' => $reg->season_id, 'code' => 'Q', 'source' => 'import', 'published_at' => now(),
+        ]);
+
+        return $reg;
+    }
+
+    public function test_reset_archives_the_results_layer_before_wiping_it(): void
+    {
+        $reg = $this->seedPublishedResult();
+
+        $this->artisan('season:reset', ['--force' => true])->assertExitCode(0);
+
+        // Layer B and the registrations are wiped...
+        $this->assertSame(0, DB::table('registration_results')->count());
+        $this->assertSame(0, DB::table('registration_qualifications')->count());
+        $this->assertSame(0, Registration::count());
+
+        // ...but a denormalized, self-contained snapshot survives in the archive,
+        // tagged with the season round and carrying the labels (no config joins).
+        $this->assertDatabaseHas('archive_registration_results', [
+            'round_number' => 14, 'competitor_number' => $reg->competitor_number, 'student_name' => 'Archived Student',
+            'exam_round' => 'Preliminary round', 'test_type' => 'Reading', 'quiz' => 'CQ', 'test' => 'Reading 1',
+            'score' => 7.50, 'source' => 'import',
+        ]);
+        $this->assertDatabaseHas('archive_registration_qualifications', [
+            'round_number' => 14, 'competitor_number' => $reg->competitor_number,
+            'exam_round' => 'Regional Qualifiers', 'code' => 'Q',
+        ]);
+    }
+
+    public function test_dry_run_does_not_archive(): void
+    {
+        $this->seedPublishedResult();
+
+        $this->artisan('season:reset', ['--dry-run' => true])->assertExitCode(0);
+
+        $this->assertSame(0, DB::table('archive_registration_results')->count());
+        $this->assertSame(0, DB::table('archive_registration_qualifications')->count());
+        $this->assertSame(1, DB::table('registration_results')->count());
     }
 
     public function test_dry_run_changes_nothing(): void
