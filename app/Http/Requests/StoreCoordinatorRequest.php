@@ -36,7 +36,9 @@ class StoreCoordinatorRequest extends FormRequest
             'address' => ['nullable', 'string', 'max:500'],
             'phone' => ['nullable', 'string', 'max:100'],
             'image' => ['nullable', 'file', 'image', 'max:5120'],
-            'file_upload' => ['nullable', 'file', 'max:10240'],
+            // Restrict to documents/images — an unrestricted upload on the public disk
+            // lets an .html/.svg become same-origin stored XSS.
+            'file_upload' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'can_student_insert' => ['sometimes', 'boolean'],
             'can_student_edit' => ['sometimes', 'boolean'],
             'can_student_delete' => ['sometimes', 'boolean'],

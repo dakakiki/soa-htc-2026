@@ -22,7 +22,10 @@ use App\Policies\SchoolPolicy;
 use App\Policies\SeasonUserAssignmentPolicy;
 use App\Policies\SettingPolicy;
 use App\Policies\UserPolicy;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -61,5 +64,13 @@ class AppServiceProvider extends ServiceProvider
 
         // Competition reports (5f) — a distinct read permission from results.manage.
         Gate::define('reports.view', fn (User $user): bool => $user->hasPermission('reports.view'));
+
+        // Web identify is guessable down to the competitor's date of birth, so cap
+        // attempts per competitor_number (which IP rotation can't dodge) alongside
+        // the per-IP cap — otherwise a targeted DOB brute force could take a session.
+        RateLimiter::for('student-identify', fn (Request $request): array => [
+            Limit::perMinute(8)->by('ip:'.$request->ip()),
+            Limit::perMinutes(60, 10)->by('num:'.(string) $request->input('competitor_number')),
+        ]);
     }
 }
