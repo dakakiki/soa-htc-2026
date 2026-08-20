@@ -133,3 +133,26 @@ export function importResults(payload: { quiz_id: number; exam_id: number; test_
 export function importTemplate() {
     return http.get('/api/results/import/template', { responseType: 'blob' });
 }
+
+// --- Results export (all from Layer B, with-answers from Layer A) ---
+
+export interface ExportScope {
+    country_id?: number | null;
+    region_id?: number | null;
+    school_id?: number | null;
+    difficulty_level_id?: number | null;
+    coordinator_user_id?: number | null;
+    quiz_id?: number | null;
+    exam_id?: number | null;
+    test_id?: number | null;
+}
+
+/** Download the wide results sheet (.xlsx) for the filtered population. */
+export function exportResults(scope: ExportScope) {
+    return http.get('/api/results/export', { params: cleanParams(scope), responseType: 'blob' });
+}
+
+/** Download the per-question answers sheet (.xlsx) for one test (quiz+exam+test required). */
+export function exportResultsWithAnswers(scope: ExportScope) {
+    return http.get('/api/results/export-answers', { params: cleanParams(scope), responseType: 'blob' });
+}

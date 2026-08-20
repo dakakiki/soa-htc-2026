@@ -159,6 +159,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('results/import/options', [ResultsController::class, 'importOptions']);
     Route::get('results/import/template', [ResultsController::class, 'importTemplate']);
     Route::post('results/import', [ResultsController::class, 'import']);
+    // Results export (all from Layer B, with-answers from Layer A). Gated by results.manage.
+    Route::get('results/export', [ResultsController::class, 'exportResults']);
+    Route::get('results/export-answers', [ResultsController::class, 'exportResultsWithAnswers']);
 
     // Reports (5f, CC-12). Gated by reports.view.
     Route::get('reports/filters', [ReportController::class, 'filters']);

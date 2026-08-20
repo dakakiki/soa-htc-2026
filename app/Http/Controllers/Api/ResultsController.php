@@ -13,6 +13,7 @@ use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\AttemptReset;
 use App\Domain\Competition\Models\PublicationBatch;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\ResultExporter;
 use App\Domain\Competition\Support\ResultImporter;
 use App\Domain\Competition\Support\ResultLedger;
 use App\Domain\Organization\Support\SeasonContext;
@@ -535,6 +536,93 @@ class ResultsController extends Controller
         }
 
         return $rows;
+    }
+
+    /**
+     * The wide results export (ADR-0027, Faza 4): one row per competitor in the
+     * filtered population who has a published result, with dynamic per-round /
+     * per-type score columns and the S/Q/F advancement codes. Reads Layer B.
+     */
+    public function exportResults(Request $request): Response
+    {
+        $this->authorize('results.manage');
+
+        $filters = $request->validate($this->candidateRules());
+
+        [$headers, $rows] = ResultExporter::all($this->resultRegistrationIds($filters));
+
+        return $this->xlsxDownload($headers, $rows, 'Results', 'results-'.now()->format('Y-m-d_His').'.xlsx');
+    }
+
+    /**
+     * The per-question answers export for one test (ADR-0027, Faza 4): identity
+     * plus each question's response and a correctness marker, from Layer A. In-app
+     * only — imported results have no answers.
+     */
+    public function exportResultsWithAnswers(Request $request): Response
+    {
+        $this->authorize('results.manage');
+
+        $filters = $request->validate(array_merge($this->candidateRules(), [
+            'quiz_id' => ['required', 'integer'],
+            'exam_id' => ['required', 'integer'],
+            'test_id' => ['required', 'integer'],
+        ]));
+
+        $testId = (int) $filters['test_id'];
+        [$headers, $rows] = ResultExporter::withAnswers($testId, $this->answerRegistrationIds($filters, $testId));
+
+        return $this->xlsxDownload($headers, $rows, 'Answers', 'results-answers-'.now()->format('Y-m-d_His').'.xlsx');
+    }
+
+    /**
+     * Population registrations that carry at least one published Layer B row (a
+     * result or an advancement code), optionally scoped to a quiz.
+     *
+     * @param  array<string, mixed>  $f
+     * @return list<int>
+     */
+    private function resultRegistrationIds(array $f): array
+    {
+        $quizId = $f['quiz_id'] ?? null;
+
+        return $this->populationRegistrationIds($f)
+            ->where(function ($q) use ($quizId) {
+                $q->whereExists(fn ($sub) => $sub->from('registration_results')
+                    ->whereColumn('registration_results.registration_id', 'registrations.id')
+                    ->when($quizId, fn ($s, $v) => $s->where('registration_results.quiz_id', $v)))
+                    ->orWhereExists(fn ($sub) => $sub->from('registration_qualifications')
+                        ->whereColumn('registration_qualifications.registration_id', 'registrations.id'));
+            })
+            ->pluck('registrations.id')->all();
+    }
+
+    /**
+     * Population registrations with a completed attempt at the given test.
+     *
+     * @param  array<string, mixed>  $f
+     * @return list<int>
+     */
+    private function answerRegistrationIds(array $f, int $testId): array
+    {
+        return $this->populationRegistrationIds($f)
+            ->whereExists(fn ($sub) => $sub->from('attempts')
+                ->whereColumn('attempts.registration_id', 'registrations.id')
+                ->where('attempts.test_id', $testId)
+                ->where('attempts.status', AttemptStatus::Completed->value))
+            ->pluck('registrations.id')->all();
+    }
+
+    /**
+     * @param  list<string>  $headers
+     * @param  list<list<string|int|float|null>>  $rows
+     */
+    private function xlsxDownload(array $headers, array $rows, string $sheet, string $filename): Response
+    {
+        return response(XlsxWriter::toString($headers, $rows, $sheet), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     /**

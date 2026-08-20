@@ -294,6 +294,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'results.manage' },
     },
     {
+        path: '/results/export',
+        name: 'results.export',
+        component: () => import('@/pages/results/ExportPage.vue'),
+        meta: { requiresAuth: true, permission: 'results.manage' },
+    },
+    {
         path: '/reports',
         name: 'reports',
         component: () => import('@/pages/results/ReportsPage.vue'),
