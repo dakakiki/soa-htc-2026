@@ -227,52 +227,52 @@ onMounted(async () => {
             </div>
 
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <label class="block">
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.country') }}</span>
                     <SearchSelect dense clearable :options="countryOptions" :model-value="q.country_id ?? null"
                         :placeholder="$t('reports.anyOption')" @update:model-value="onCountryChange" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.region') }}</span>
                     <SearchSelect dense clearable :options="regionOptions" :model-value="q.region_id ?? null"
                         :disabled="!q.country_id" :loading="optionsLoading" :placeholder="$t('reports.anyOption')"
                         @update:model-value="(v: number | null) => { q.region_id = v; loadCandidates(); }" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.school') }}</span>
                     <SearchSelect dense clearable :options="schoolOptions" :model-value="q.school_id ?? null"
                         :disabled="!q.country_id" :loading="optionsLoading" :placeholder="$t('reports.anyOption')"
                         @update:model-value="(v: number | null) => { q.school_id = v; loadCandidates(); }" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.coordinator') }}</span>
                     <SearchSelect dense clearable :options="coordinatorOptions" :model-value="q.coordinator_user_id ?? null"
                         :placeholder="$t('reports.anyOption')"
                         @update:model-value="(v: number | null) => { q.coordinator_user_id = v; loadCandidates(); }" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.quiz') }} *</span>
                     <SearchSelect dense clearable :options="quizOptions" :model-value="q.quiz_id ?? null"
                         :placeholder="$t('reports.anyOption')" @update:model-value="onQuizChange" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.exam') }}</span>
                     <SearchSelect dense clearable :options="examOptions" :model-value="q.exam_id ?? null"
                         :disabled="!q.quiz_id" :loading="optionsLoading" :placeholder="$t('reports.anyOption')"
                         @update:model-value="onExamChange" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.test') }}</span>
                     <SearchSelect dense clearable :options="testOptions" :model-value="q.test_id ?? null"
                         :disabled="!q.quiz_id" :loading="optionsLoading" :placeholder="$t('reports.anyOption')"
                         @update:model-value="(v: number | null) => { q.test_id = v; loadCandidates(); }" />
-                </label>
-                <label class="block">
+                </div>
+                <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.level') }}</span>
                     <SearchSelect dense clearable :options="levelOptions" :model-value="q.difficulty_level_id ?? null"
                         :placeholder="$t('reports.anyOption')"
                         @update:model-value="(v: number | null) => { q.difficulty_level_id = v; loadCandidates(); }" />
-                </label>
+                </div>
                 <label class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reset.studentId') }}</span>
                     <SearchInput
