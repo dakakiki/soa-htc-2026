@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import ArchiveBreakdownTable from '@/pages/results/ArchiveBreakdownTable.vue';
 import { archiveRounds, archiveSummary, type ArchiveRound, type ArchiveSummary } from '@/api/archive';
 
 const { t } = useI18n();
@@ -10,10 +11,14 @@ const rounds = ref<ArchiveRound[]>([]);
 const summary = ref<ArchiveSummary | null>(null);
 const round = ref<number | null>(null);
 const country = ref<string>('');
-const level = ref<string>('');
+const region = ref<string>('');
 const school = ref<string>('');
+const level = ref<string>('');
 const loading = ref(false);
 const loadingRounds = ref(false);
+
+const breakdownSearch = ref('');
+const schoolSearch = ref('');
 
 const pct = (part: number, whole: number): string => (whole > 0 ? Math.round((100 * part) / whole) + '%' : '—');
 
@@ -22,6 +27,16 @@ const roundLabel = (r: ArchiveRound): string =>
 
 const maxLevel = computed(() => Math.max(1, ...(summary.value?.by_level ?? []).map((d) => d.count)));
 const maxGrade = computed(() => Math.max(1, ...(summary.value?.by_grade ?? []).map((d) => d.count)));
+
+const isRegion = computed(() => summary.value?.breakdown.dimension === 'region');
+const breakdownTitle = computed(() => (isRegion.value ? t('archive.byRegion') : t('archive.byCountry')));
+const breakdownLabel = computed(() => (isRegion.value ? t('archive.region') : t('archive.country')));
+
+function match(name: string, term: string): boolean {
+    return name.toLowerCase().includes(term.trim().toLowerCase());
+}
+const breakdownRows = computed(() => (summary.value?.breakdown.rows ?? []).filter((r) => match(r.name, breakdownSearch.value)));
+const schoolRows = computed(() => (summary.value?.by_school.rows ?? []).filter((r) => match(r.name, schoolSearch.value)));
 
 async function loadRounds(): Promise<void> {
     loadingRounds.value = true;
@@ -42,27 +57,31 @@ async function loadSummary(): Promise<void> {
         return;
     }
     loading.value = true;
+    breakdownSearch.value = '';
+    schoolSearch.value = '';
     try {
-        const { data } = await archiveSummary({ round: round.value, country: country.value, level: level.value, school: school.value });
+        const { data } = await archiveSummary({
+            round: round.value, country: country.value, region: region.value, school: school.value, level: level.value,
+        });
         summary.value = data;
     } finally {
         loading.value = false;
     }
 }
 
-// Changing the round clears the narrower filters (their options are per-round).
-watch(round, () => {
-    country.value = '';
-    level.value = '';
+// Each level down clears the narrower ones (their options are scoped to it).
+function onRound(): void {
+    country.value = region.value = school.value = '';
+    loadSummary();
+}
+function onCountry(): void {
+    region.value = school.value = '';
+    loadSummary();
+}
+function onRegion(): void {
     school.value = '';
     loadSummary();
-});
-// School options depend on the chosen country, so a country change clears it.
-watch(country, () => {
-    school.value = '';
-    loadSummary();
-});
-watch([level, school], loadSummary);
+}
 
 onMounted(async () => {
     await loadRounds();
@@ -82,35 +101,43 @@ onMounted(async () => {
         </p>
 
         <template v-else>
-            <!-- Filters -->
+            <!-- Filters: Season · Country · Region · School · Difficulty -->
             <div class="relative rounded-lg border border-gray-200 bg-white p-4">
                 <LoadingOverlay v-if="loadingRounds" />
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                     <label class="block">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.season') }}</span>
-                        <select v-model.number="round" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                        <select v-model.number="round" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="onRound">
                             <option v-for="r in rounds" :key="r.round" :value="r.round">{{ roundLabel(r) }}</option>
                         </select>
                     </label>
                     <label class="block">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.country') }}</span>
-                        <select v-model="country" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                        <select v-model="country" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="onCountry">
                             <option value="">{{ $t('archive.allCountries') }}</option>
                             <option v-for="c in summary?.filters.countries ?? []" :key="c" :value="c">{{ c }}</option>
                         </select>
                     </label>
                     <label class="block">
-                        <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.level') }}</span>
-                        <select v-model="level" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm">
-                            <option value="">{{ $t('archive.allLevels') }}</option>
-                            <option v-for="l in summary?.filters.levels ?? []" :key="l" :value="l">{{ l }}</option>
+                        <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.region') }}</span>
+                        <select v-model="region" :disabled="!country || (summary?.filters.regions.length ?? 0) === 0"
+                            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" @change="onRegion">
+                            <option value="">{{ country ? $t('archive.allRegions') : $t('archive.pickCountryFirst') }}</option>
+                            <option v-for="rg in summary?.filters.regions ?? []" :key="rg" :value="rg">{{ rg }}</option>
                         </select>
                     </label>
                     <label class="block">
                         <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.school') }}</span>
-                        <select v-model="school" :disabled="!country" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400">
+                        <select v-model="school" :disabled="!country" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" @change="loadSummary">
                             <option value="">{{ country ? $t('archive.allSchools') : $t('archive.pickCountryFirst') }}</option>
                             <option v-for="s in summary?.filters.schools ?? []" :key="s" :value="s">{{ s }}</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('archive.level') }}</span>
+                        <select v-model="level" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" @change="loadSummary">
+                            <option value="">{{ $t('archive.allLevels') }}</option>
+                            <option v-for="l in summary?.filters.levels ?? []" :key="l" :value="l">{{ l }}</option>
                         </select>
                     </label>
                 </div>
@@ -140,33 +167,10 @@ onMounted(async () => {
                 </dl>
 
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <!-- Per-country -->
+                    <!-- Primary breakdown (country, or the chosen country's regions) -->
                     <div class="lg:col-span-2">
-                        <h2 class="mb-2 text-sm font-semibold text-gray-700">{{ $t('archive.byCountry') }}</h2>
-                        <div class="overflow-hidden rounded-lg border border-gray-200">
-                            <div class="max-h-[28rem] overflow-auto">
-                                <table class="w-full text-sm">
-                                    <thead class="sticky top-0 bg-brand-primary text-left text-xs uppercase tracking-wide text-brand-on-primary">
-                                        <tr>
-                                            <th class="px-4 py-2">{{ $t('archive.country') }}</th>
-                                            <th class="px-4 py-2 text-right">{{ $t('archive.registered') }}</th>
-                                            <th class="px-4 py-2 text-right">{{ $t('archive.participated') }}</th>
-                                            <th class="px-4 py-2 text-right">%</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="row in summary.per_country" :key="row.country ?? '—'" class="odd:bg-white even:bg-gray-50 hover:bg-brand-primary-soft">
-                                            <td class="px-4 py-2 text-gray-800">{{ row.country || $t('common.dash') }}</td>
-                                            <td class="px-4 py-2 text-right tabular-nums text-gray-600">{{ row.registered.toLocaleString() }}</td>
-                                            <td class="px-4 py-2 text-right tabular-nums text-gray-600">{{ row.participated.toLocaleString() }}</td>
-                                            <td class="px-4 py-2 text-right tabular-nums font-medium" :class="row.participated === 0 ? 'text-amber-600' : 'text-gray-900'">
-                                                {{ pct(row.participated, row.registered) }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        <ArchiveBreakdownTable :title="breakdownTitle" :label="breakdownLabel" :rows="breakdownRows"
+                            :truncated="summary.breakdown.truncated" v-model:search="breakdownSearch" />
                     </div>
 
                     <!-- Distributions -->
@@ -195,40 +199,9 @@ onMounted(async () => {
                 </div>
 
                 <!-- By school -->
-                <div>
-                    <div class="mb-2 flex items-center gap-2">
-                        <h2 class="text-sm font-semibold text-gray-700">{{ $t('archive.bySchool') }}</h2>
-                        <span v-if="summary.by_school.truncated" class="text-xs text-gray-400">{{ $t('archive.topSchools') }}</span>
-                        <span v-if="!country" class="text-xs text-gray-400">{{ $t('archive.schoolCountryHint') }}</span>
-                    </div>
-                    <div class="overflow-hidden rounded-lg border border-gray-200">
-                        <div class="max-h-[28rem] overflow-auto">
-                            <table class="w-full text-sm">
-                                <thead class="sticky top-0 bg-slate-600 text-left text-xs uppercase tracking-wide text-white">
-                                    <tr>
-                                        <th class="px-4 py-2">{{ $t('archive.school') }}</th>
-                                        <th class="px-4 py-2 text-right">{{ $t('archive.registered') }}</th>
-                                        <th class="px-4 py-2 text-right">{{ $t('archive.participated') }}</th>
-                                        <th class="px-4 py-2 text-right">%</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-if="summary.by_school.rows.length === 0">
-                                        <td colspan="4" class="px-4 py-6 text-center text-gray-400">{{ $t('archive.noSchools') }}</td>
-                                    </tr>
-                                    <tr v-for="row in summary.by_school.rows" :key="row.school" class="odd:bg-white even:bg-gray-50 hover:bg-brand-primary-soft">
-                                        <td class="px-4 py-2 text-gray-800">{{ row.school }}</td>
-                                        <td class="px-4 py-2 text-right tabular-nums text-gray-600">{{ row.registered.toLocaleString() }}</td>
-                                        <td class="px-4 py-2 text-right tabular-nums text-gray-600">{{ row.participated.toLocaleString() }}</td>
-                                        <td class="px-4 py-2 text-right tabular-nums font-medium" :class="row.participated === 0 ? 'text-amber-600' : 'text-gray-900'">
-                                            {{ pct(row.participated, row.registered) }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <ArchiveBreakdownTable :title="$t('archive.bySchool')" :label="$t('archive.school')" :rows="schoolRows"
+                    :truncated="summary.by_school.truncated" :hint="!country ? $t('archive.schoolCountryHint') : ''"
+                    v-model:search="schoolSearch" header-class="bg-slate-600" />
             </div>
         </template>
     </section>

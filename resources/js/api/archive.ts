@@ -8,16 +8,16 @@ export interface ArchiveRound {
     participated: number;
 }
 
-export interface ArchiveCountryRow {
-    country: string | null;
+/** One row in a registered-vs-participated breakdown (country / region / school). */
+export interface ArchiveBreakdownRow {
+    name: string;
     registered: number;
     participated: number;
 }
 
-export interface ArchiveSchoolRow {
-    school: string;
-    registered: number;
-    participated: number;
+export interface ArchiveTable {
+    rows: ArchiveBreakdownRow[];
+    truncated: boolean;
 }
 
 export interface ArchiveDistribution {
@@ -28,11 +28,11 @@ export interface ArchiveDistribution {
 export interface ArchiveSummary {
     round: number;
     totals: { registered: number; participated: number; qualifications: number };
-    per_country: ArchiveCountryRow[];
-    by_school: { rows: ArchiveSchoolRow[]; truncated: boolean };
+    breakdown: ArchiveTable & { dimension: 'country' | 'region' };
+    by_school: ArchiveTable;
     by_level: ArchiveDistribution[];
     by_grade: ArchiveDistribution[];
-    filters: { countries: string[]; levels: string[]; schools: string[] };
+    filters: { countries: string[]; regions: string[]; schools: string[]; levels: string[] };
 }
 
 /** The archived rounds available to browse (newest first). */
@@ -40,8 +40,8 @@ export function archiveRounds() {
     return http.get<{ rounds: ArchiveRound[] }>('/api/archive/rounds');
 }
 
-/** One round's archive summary, optionally narrowed by country/level/school. */
-export function archiveSummary(params: { round: number; country?: string | null; level?: string | null; school?: string | null }) {
+/** One round's archive summary, optionally narrowed by country → region → school and level. */
+export function archiveSummary(params: { round: number; country?: string | null; region?: string | null; school?: string | null; level?: string | null }) {
     const clean = Object.fromEntries(
         Object.entries(params).filter(([, v]) => v !== null && v !== undefined && v !== '')
     );
