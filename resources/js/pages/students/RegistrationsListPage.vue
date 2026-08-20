@@ -2,18 +2,21 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IconListCheck } from '@tabler/icons-vue';
+import { IconListCheck, IconFileText } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
-import { listRegistrations, deleteRegistration, resultColumns } from '@/api/registrations';
+import { listRegistrations, exportRegistrations, deleteRegistration, resultColumns } from '@/api/registrations';
 import { listCountries, listRegions, listLevelOptions } from '@/api/reference';
 import { listSchools, getSchool } from '@/api/schools';
 import { examRoundsApi, type Lookup } from '@/api/content';
 import { apiErrorMessage } from '@/api/http';
+import ExportButton from '@/components/ExportButton.vue';
 import RowActions from '@/components/RowActions.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import RegistrationResultsModal from '@/pages/students/RegistrationResultsModal.vue';
+import AttendanceReportModal from '@/pages/students/AttendanceReportModal.vue';
+import { saveBlob } from '@/utils/download';
 import type { Country, LevelOption, Region, Registration, ResultColumn, School } from '@/types/models';
 
 const { t } = useI18n();
@@ -40,6 +43,8 @@ const page = ref(1);
 const lastPage = ref(1);
 const total = ref(0);
 const loading = ref(false);
+const exporting = ref(false);
+const attendanceOpen = ref(false);
 // The list only appears once the user has filtered — nobody pages the full roster.
 const searched = ref(false);
 const regionLoading = ref(false);
@@ -179,23 +184,27 @@ async function onRegion(v: number | null): Promise<void> {
     await load(1);
 }
 
-async function resetFilters(): Promise<void> {
-    filters.search = '';
-    filters.country_id = null;
-    filters.region_id = null;
-    filters.school_id = null;
-    filters.grade = null;
-    filters.level_id = null;
-    filters.exam_round_id = null;
-    filters.attendance = '';
-    selectedSchoolFilter.value = null;
-    regions.value = [];
-    schools.value = [];
-    // Back to the empty prompt — a cleared filter shows nothing, not the whole roster.
-    rows.value = [];
-    total.value = 0;
-    searched.value = false;
-    router.replace({ query: {} });
+// Export the currently filtered set (same filters as the list) to .xlsx.
+async function exportList(): Promise<void> {
+    exporting.value = true;
+    error.value = null;
+    try {
+        const { data } = await exportRegistrations({
+            search: filters.search || undefined,
+            country_id: filters.country_id ?? undefined,
+            region_id: filters.region_id ?? undefined,
+            school_id: filters.school_id ?? undefined,
+            grade: filters.grade ?? undefined,
+            level_id: filters.level_id ?? undefined,
+            exam_round_id: filters.exam_round_id ?? undefined,
+            attendance: filters.attendance || undefined,
+        });
+        saveBlob(data as Blob, `${new Date().toISOString().slice(0, 10)}_Students_Export.xlsx`);
+    } catch (e) {
+        error.value = apiErrorMessage(e, t('registration.exportFailed'));
+    } finally {
+        exporting.value = false;
+    }
 }
 
 // Mirror the active filters into the URL so returning from add/edit (router.back)
@@ -304,8 +313,16 @@ onMounted(async () => {
         </div>
 
         <div class="rounded-lg border border-gray-200 bg-white p-4">
-        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6" @submit.prevent="load(1)">
-            <!-- Column 1: search (stays first) with the filter buttons beneath it. -->
+        <!-- Actions row (above the filters, same card). Export first; more may follow. -->
+        <div class="mb-3 flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
+            <ExportButton :loading="exporting" :disabled="!searched"
+                :tooltip="searched ? $t('registration.exportTooltip') : $t('registration.exportHint')"
+                @click="exportList" />
+            <ExportButton :icon="IconFileText" :label="$t('registration.attendanceReport.title')"
+                :tooltip="$t('registration.attendanceReport.tooltip')" @click="attendanceOpen = true" />
+        </div>
+        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5" @submit.prevent="load(1)">
+            <!-- Column 1: search (stays first). Press Enter to apply. -->
             <input v-model="filters.search" type="search" :placeholder="$t('registration.searchPlaceholder')"
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
 
@@ -347,14 +364,6 @@ onMounted(async () => {
                 <option value="present">{{ $t('registration.attendancePresent') }}</option>
                 <option value="absent">{{ $t('registration.attendanceAbsent') }}</option>
             </select>
-
-            <!-- Column 6: Filter above Reset, matched widths -->
-            <button type="submit" class="w-full rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover lg:col-start-6 lg:row-start-1">
-                {{ $t('common.filter') }}
-            </button>
-            <button type="button" class="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 lg:col-start-6 lg:row-start-2" @click="resetFilters">
-                {{ $t('registration.filterReset') }}
-            </button>
         </form>
         </div>
 
@@ -447,5 +456,9 @@ onMounted(async () => {
         </div>
 
         <RegistrationResultsModal :registration="selected" @close="selected = null" />
+
+        <AttendanceReportModal :open="attendanceOpen"
+            :default-country-id="filters.country_id" :default-school-id="filters.school_id"
+            :default-school-option="selectedSchoolFilter" @close="attendanceOpen = false" />
     </section>
 </template>

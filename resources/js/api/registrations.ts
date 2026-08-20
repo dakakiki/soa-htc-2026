@@ -30,6 +30,16 @@ export function listRegistrations(params: RegistrationListParams = {}) {
     return http.get<Paginated<Registration>>('/api/registrations', { params });
 }
 
+/** Download the currently filtered students roster as .xlsx (same filters as the list). */
+export function exportRegistrations(params: RegistrationListParams = {}) {
+    return http.get('/api/registrations/export', { params, responseType: 'blob' });
+}
+
+/** Download the printable attendance register (PDF) for one venue + difficulty levels. */
+export function attendanceReport(params: { school_id: number; level_id: number[] }) {
+    return http.get('/api/registrations/attendance-report', { params, responseType: 'blob' });
+}
+
 export function getRegistration(id: number) {
     return http.get<{ data: Registration }>(`/api/registrations/${id}`);
 }

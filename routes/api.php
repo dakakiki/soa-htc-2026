@@ -129,6 +129,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('schools', SchoolController::class);
+    // Filtered students roster export (.xlsx) + printable attendance register (PDF).
+    // Declared before the resource so the static paths aren't caught by {registration}.
+    Route::get('registrations/export', [RegistrationController::class, 'export']);
+    Route::get('registrations/attendance-report', [RegistrationController::class, 'attendanceReport']);
     // Results grid: column definition + one competitor's per-round breakdown.
     // Declared before the resource so the static path isn't caught by {registration}.
     Route::get('registrations/result-columns', [RegistrationController::class, 'resultColumns']);

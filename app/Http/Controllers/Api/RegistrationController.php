@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\AttendanceReport;
+use App\Domain\Competition\Support\RegistrationExporter;
 use App\Domain\Competition\Support\RegistrationResults;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Support\SeasonContext;
@@ -12,6 +14,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRegistrationRequest;
 use App\Http\Requests\UpdateRegistrationRequest;
 use App\Http\Resources\RegistrationResource;
+use App\Support\PdfWriter;
+use App\Support\XlsxWriter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -25,7 +30,90 @@ class RegistrationController extends Controller
         $this->authorize('viewAny', Registration::class);
 
         $query = Registration::query()->with(['school', 'country', 'level'])->latest('id');
+        $this->applyFilters($query, $request);
 
+        $perPage = min(max($request->integer('per_page', 20), 1), 200);
+        $paginated = $query->paginate($perPage);
+
+        // Attach each competitor's published per-round scores for the results grid.
+        $results = RegistrationResults::forRegistrations($paginated->pluck('id')->all());
+        $paginated->getCollection()->each(function (Registration $reg) use ($results): void {
+            $reg->results_grid = $results[$reg->id] ?? [];
+        });
+
+        return RegistrationResource::collection($paginated);
+    }
+
+    /**
+     * Export the currently filtered students roster to .xlsx (legacy "Students
+     * Export" layout). Same filters and coordinator scope as {@see index()}, but
+     * the whole matching set rather than one page — so the file mirrors exactly
+     * what the admin filtered to.
+     */
+    public function export(Request $request): Response
+    {
+        $this->authorize('viewAny', Registration::class);
+
+        $query = Registration::query();
+        $this->applyFilters($query, $request);
+        $ids = $query->pluck('registrations.id')->all();
+
+        [$headers, $rows] = RegistrationExporter::export($ids);
+
+        $filename = now()->format('Y-m-d').'_Students_Export.xlsx';
+
+        return response(XlsxWriter::toString($headers, $rows, 'Students'), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * The printable attendance register (invigilation sheet) for one venue, as a
+     * PDF (ADR: {@see AttendanceReport}). Scoped by venue + one or more difficulty
+     * levels — no exam round. A coordinator may only print their own venues.
+     * Returns 422 when the venue/levels hold no students (nothing to print).
+     */
+    public function attendanceReport(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $this->authorize('viewAny', Registration::class);
+
+        $validated = $request->validate([
+            'school_id' => ['required', 'integer', 'exists:schools,id'],
+            'level_id' => ['required', 'array', 'min:1'],
+            'level_id.*' => ['integer', 'exists:difficulty_levels,id'],
+        ]);
+
+        $schoolId = (int) $validated['school_id'];
+
+        // A non-global coordinator may only print registers for their own venues.
+        $allowed = $request->user()->allowedSchoolIds();
+        if ($allowed !== null && ! $allowed->contains($schoolId)) {
+            abort(403);
+        }
+
+        $html = AttendanceReport::html($schoolId, $validated['level_id']);
+        if ($html === '') {
+            return response()->json(['message' => __('No students match the selected venue and levels.')], 422);
+        }
+
+        $filename = 'Attendance_Report_'.now()->format('Y-m-d').'.pdf';
+
+        return response(PdfWriter::toString($html, 'Attendance register', 'P'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * Apply the list filters + row-level coordinator scope shared by {@see index()}
+     * and {@see export()}: free-text search, geography, grade/level, status,
+     * attendance, and round participation.
+     *
+     * @param  Builder<Registration>  $query
+     */
+    private function applyFilters(Builder $query, Request $request): void
+    {
         // Row-level scope: coordinators only see registrations for their schools.
         $allowed = $request->user()->allowedSchoolIds();
         if ($allowed !== null) {
@@ -74,17 +162,6 @@ class RegistrationController extends Controller
                     ->where('exams.exam_round_id', $round);
             });
         }
-
-        $perPage = min(max($request->integer('per_page', 20), 1), 200);
-        $paginated = $query->paginate($perPage);
-
-        // Attach each competitor's published per-round scores for the results grid.
-        $results = RegistrationResults::forRegistrations($paginated->pluck('id')->all());
-        $paginated->getCollection()->each(function (Registration $reg) use ($results): void {
-            $reg->results_grid = $results[$reg->id] ?? [];
-        });
-
-        return RegistrationResource::collection($paginated);
     }
 
     /** The results-grid column definition (rounds and their test-type heads). */
