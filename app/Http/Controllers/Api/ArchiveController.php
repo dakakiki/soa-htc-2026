@@ -64,18 +64,22 @@ class ArchiveController extends Controller
             'round' => ['required', 'integer'],
             'country' => ['nullable', 'string', 'max:255'],
             'level' => ['nullable', 'string', 'max:50'],
+            'school' => ['nullable', 'string', 'max:255'],
         ]);
         $round = (int) $filters['round'];
         $country = $filters['country'] ?? null;
         $level = $filters['level'] ?? null;
+        $school = $filters['school'] ?? null;
 
         $registrations = fn () => DB::table('archive_registrations')->where('round_number', $round)
             ->when($country, fn ($q, $v) => $q->where('country', $v))
-            ->when($level, fn ($q, $v) => $q->where('level', $v));
+            ->when($level, fn ($q, $v) => $q->where('level', $v))
+            ->when($school, fn ($q, $v) => $q->where('venue', $v));
 
         $results = fn () => DB::table('archive_registration_results')->where('round_number', $round)
             ->when($country, fn ($q, $v) => $q->where('country', $v))
-            ->when($level, fn ($q, $v) => $q->where('level', $v));
+            ->when($level, fn ($q, $v) => $q->where('level', $v))
+            ->when($school, fn ($q, $v) => $q->where('venue', $v));
 
         // Per-country registered vs participated (level filter applies; country does not).
         $regByCountry = DB::table('archive_registrations')->where('round_number', $round)
@@ -100,9 +104,10 @@ class ArchiveController extends Controller
             'totals' => [
                 'registered' => $registrations()->count(),
                 'participated' => (int) $results()->distinct()->count('competitor_number'),
-                'qualifications' => $this->qualificationsCount($round, $country, $level),
+                'qualifications' => $this->qualificationsCount($round, $country, $level, $school),
             ],
             'per_country' => $perCountry,
+            'by_school' => $this->bySchool($round, $country, $level),
             'by_level' => $this->distribution($registrations(), 'level'),
             'by_grade' => $this->distribution($registrations(), 'grade'),
             'filters' => [
@@ -112,24 +117,68 @@ class ArchiveController extends Controller
                 'levels' => DB::table('archive_registrations')->where('round_number', $round)
                     ->whereNotNull('level')->where('level', '!=', '')
                     ->distinct()->pluck('level')->unique()->values(),
+                // Schools are only offered once a country is chosen (there are hundreds).
+                'schools' => $country === null ? [] : DB::table('archive_registrations')->where('round_number', $round)
+                    ->where('country', $country)->whereNotNull('venue')->where('venue', '!=', '')
+                    ->distinct()->orderBy('venue')->pluck('venue'),
             ],
         ]);
+    }
+
+    /**
+     * Per-school registered vs participated within the country/level scope, biggest
+     * first, capped (there can be hundreds of schools). Country scopes it to that
+     * country's schools; otherwise it's the top schools overall.
+     *
+     * @return array{rows: list<array{school: string, registered: int, participated: int}>, truncated: bool}
+     */
+    private function bySchool(int $round, ?string $country, ?string $level): array
+    {
+        $cap = 100;
+
+        $registered = DB::table('archive_registrations')->where('round_number', $round)
+            ->whereNotNull('venue')->where('venue', '!=', '')
+            ->when($country, fn ($q, $v) => $q->where('country', $v))
+            ->when($level, fn ($q, $v) => $q->where('level', $v))
+            ->groupBy('venue')->selectRaw('venue, count(*) as n')
+            ->orderByDesc('n')->limit($cap + 1)->pluck('n', 'venue');
+
+        $truncated = $registered->count() > $cap;
+        $venues = $registered->take($cap);
+
+        $participated = DB::table('archive_registration_results')->where('round_number', $round)
+            ->whereIn('venue', $venues->keys())
+            ->when($level, fn ($q, $v) => $q->where('level', $v))
+            ->groupBy('venue')->selectRaw('venue, count(distinct competitor_number) as n')
+            ->pluck('n', 'venue');
+
+        $rows = [];
+        foreach ($venues as $venue => $reg) {
+            $rows[] = [
+                'school' => (string) $venue,
+                'registered' => (int) $reg,
+                'participated' => (int) ($participated[$venue] ?? 0),
+            ];
+        }
+
+        return ['rows' => $rows, 'truncated' => $truncated];
     }
 
     /**
      * Count qualification (S/Q/F) rows for the round, narrowed to the country/level
      * scope via the roster (the qualifications table itself carries no geography).
      */
-    private function qualificationsCount(int $round, ?string $country, ?string $level): int
+    private function qualificationsCount(int $round, ?string $country, ?string $level, ?string $school): int
     {
         $query = DB::table('archive_registration_qualifications as q')->where('q.round_number', $round);
 
-        if ($country !== null || $level !== null) {
+        if ($country !== null || $level !== null || $school !== null) {
             $query->join('archive_registrations as r', function ($join) use ($round) {
                 $join->on('r.competitor_number', '=', 'q.competitor_number')->where('r.round_number', '=', $round);
             })
                 ->when($country, fn ($x, $v) => $x->where('r.country', $v))
-                ->when($level, fn ($x, $v) => $x->where('r.level', $v));
+                ->when($level, fn ($x, $v) => $x->where('r.level', $v))
+                ->when($school, fn ($x, $v) => $x->where('r.venue', $v));
         }
 
         return $query->count();

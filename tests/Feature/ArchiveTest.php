@@ -32,11 +32,11 @@ class ArchiveTest extends TestCase
     {
         $now = now();
         DB::table('archive_registrations')->insert([
-            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000001', 'name' => '', 'country' => 'Serbia', 'region' => null, 'venue' => null, 'school_external' => null, 'level' => 'H2', 'grade' => 6, 'attendance' => null, 'archived_at' => $now],
-            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000002', 'name' => '', 'country' => 'Croatia', 'region' => null, 'venue' => null, 'school_external' => null, 'level' => 'H3', 'grade' => 7, 'attendance' => null, 'archived_at' => $now],
+            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000001', 'name' => '', 'country' => 'Serbia', 'region' => null, 'venue' => 'School A', 'school_external' => null, 'level' => 'H2', 'grade' => 6, 'attendance' => null, 'archived_at' => $now],
+            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000002', 'name' => '', 'country' => 'Croatia', 'region' => null, 'venue' => 'School B', 'school_external' => null, 'level' => 'H3', 'grade' => 7, 'attendance' => null, 'archived_at' => $now],
         ]);
         DB::table('archive_registration_results')->insert([
-            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000001', 'student_name' => '', 'country' => 'Serbia', 'region' => null, 'venue' => null, 'school_external' => null, 'level' => 'H2', 'exam_round' => 'Preliminary round', 'test_type' => 'Reading', 'quiz' => null, 'test' => null, 'score' => 8, 'max_score' => null, 'source' => 'legacy', 'published_at' => null, 'archived_at' => $now],
+            ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000001', 'student_name' => '', 'country' => 'Serbia', 'region' => null, 'venue' => 'School A', 'school_external' => null, 'level' => 'H2', 'exam_round' => 'Preliminary round', 'test_type' => 'Reading', 'quiz' => null, 'test' => null, 'score' => 8, 'max_score' => null, 'source' => 'legacy', 'published_at' => null, 'archived_at' => $now],
         ]);
         DB::table('archive_registration_qualifications')->insert([
             ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '13000001', 'student_name' => '', 'exam_round' => 'Regional Qualifiers', 'code' => 'Q', 'published_at' => null, 'archived_at' => $now],
@@ -79,6 +79,33 @@ class ArchiveTest extends TestCase
             ->assertJsonPath('totals.registered', 1)
             ->assertJsonPath('totals.participated', 1)
             ->assertJsonPath('totals.qualifications', 1);
+    }
+
+    public function test_summary_breaks_down_by_school_and_offers_schools_per_country(): void
+    {
+        $this->seedArchive();
+
+        $response = $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13')->assertOk();
+
+        $bySchool = collect($response->json('by_school.rows'))->keyBy('school');
+        $this->assertSame(1, $bySchool['School A']['participated']);
+        $this->assertSame(0, $bySchool['School B']['participated']);
+
+        // Schools are offered only once a country is chosen.
+        $this->assertSame([], $response->json('filters.schools'));
+        $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13&country=Serbia')
+            ->assertOk()
+            ->assertJsonPath('filters.schools.0', 'School A');
+    }
+
+    public function test_summary_narrows_by_school(): void
+    {
+        $this->seedArchive();
+
+        $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13&country=Serbia&school=School A')
+            ->assertOk()
+            ->assertJsonPath('totals.registered', 1)
+            ->assertJsonPath('totals.participated', 1);
     }
 
     public function test_archive_requires_the_reports_permission(): void
