@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Registration;
@@ -14,7 +15,9 @@ use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
 use App\Support\XlsxReader;
+use App\Support\XlsxWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -473,6 +476,28 @@ class RegistrationApiTest extends TestCase
             ->assertJsonPath('data.status', 'inactive');
     }
 
+    public function test_attendance_toggle(): void
+    {
+        $school = School::firstOrFail();
+        $registration = Registration::create([
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'competitor_number' => '14077777', 'sequence' => 77777,
+            'school_id' => $school->id, 'country_id' => $school->country_id,
+            'difficulty_level_id' => $this->level()->id, 'name' => 'Att', 'status' => 'active', 'attendance' => 'present',
+        ]);
+
+        $this->actingAs($this->admin())
+            ->putJson("/api/registrations/{$registration->id}", ['attendance' => 'absent'])
+            ->assertOk()
+            ->assertJsonPath('data.attendance', 'absent');
+
+        // A coordinator without edit rights cannot change attendance.
+        $noEdit = $this->scopedCoordinator([$school->id], ['can_student_edit' => false]);
+        $this->actingAs($noEdit)
+            ->putJson("/api/registrations/{$registration->id}", ['attendance' => 'present'])
+            ->assertForbidden();
+    }
+
     public function test_delete_requires_delete_right(): void
     {
         $school = School::firstOrFail();
@@ -493,5 +518,218 @@ class RegistrationApiTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)->getJson('/api/registrations')->assertForbidden();
+    }
+
+    /** A regular category applicable to all countries, plus one of its level shorts. */
+    private function importSet(): array
+    {
+        $category = DifficultyCategory::where('type', 'regular')->where('countries_all', true)->firstOrFail();
+        $level = DifficultyLevel::where('difficulty_category_id', $category->id)->firstOrFail();
+
+        return [$category, $level];
+    }
+
+    /** Build a fake .xlsx upload matching the import template (header + hint + data). */
+    private function importFile(array $dataRows): UploadedFile
+    {
+        $header = ['Name', 'Date Of Birth', 'School (if different from venue)', 'Grade', 'Category'];
+        $hint = ['use just standard Latin letters', 'dd.mm.yyyy', '', 'school grade', 'Please enter ...'];
+        $bytes = XlsxWriter::toString($header, array_merge([$hint], $dataRows), 'Students');
+
+        return UploadedFile::fake()->createWithContent('students.xlsx', $bytes);
+    }
+
+    public function test_students_import_template_downloads_as_xlsx(): void
+    {
+        $response = $this->actingAs($this->admin())->get('/api/registrations/import/template')->assertOk();
+
+        $this->assertStringContainsString('spreadsheetml', (string) $response->headers->get('content-type'));
+        $this->assertStringContainsString('students-import-template.xlsx', (string) $response->headers->get('content-disposition'));
+    }
+
+    public function test_import_category_sets_lists_applicable_regular_categories(): void
+    {
+        [$category] = $this->importSet();
+        $school = School::firstOrFail();
+
+        $response = $this->actingAs($this->admin())
+            ->getJson('/api/registrations/import/category-sets?country_id='.$school->country_id)
+            ->assertOk();
+
+        $this->assertTrue(collect($response->json('data'))->pluck('id')->contains($category->id));
+    }
+
+    public function test_students_import_creates_registrations(): void
+    {
+        [$category, $level] = $this->importSet();
+        $school = School::firstOrFail();
+
+        $this->actingAs($this->admin())
+            ->post('/api/registrations/import', [
+                'school_id' => $school->id,
+                'category_id' => $category->id,
+                'file' => $this->importFile([
+                    ['Ana Anic', '01.02.2015', '', '3', $level->level_short],
+                    ['Marko Maric', '', 'Home School', '6', $level->level_short],
+                ]),
+            ])
+            ->assertOk()
+            ->assertJsonPath('created', 2)
+            ->assertJsonPath('error_count', 0);
+
+        $this->assertDatabaseHas('registrations', [
+            'name' => 'Ana Anic', 'school_id' => $school->id,
+            'difficulty_level_id' => $level->id, 'attendance' => 'present',
+        ]);
+        $this->assertDatabaseHas('registrations', ['name' => 'Marko Maric', 'school_external' => 'Home School']);
+
+        // The dd.mm.yyyy cell is parsed to a real date (storage format aside).
+        $ana = Registration::where('name', 'Ana Anic')->firstOrFail();
+        $this->assertSame('2015-02-01', $ana->date_of_birth?->format('Y-m-d'));
+    }
+
+    public function test_students_import_rejects_the_whole_file_on_any_invalid_row(): void
+    {
+        [$category, $level] = $this->importSet();
+        $school = School::firstOrFail();
+
+        $this->actingAs($this->admin())
+            ->post('/api/registrations/import', [
+                'school_id' => $school->id,
+                'category_id' => $category->id,
+                'file' => $this->importFile([
+                    ['Good Row', '01.02.2015', '', '3', $level->level_short],
+                    ['Bad Grade', '', '', '99', $level->level_short],   // grade out of range
+                    ['Bad Category', '', '', '4', 'ZZ'],                 // unknown short
+                ]),
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('created', 0)
+            ->assertJsonPath('error_count', 2);
+
+        // Nothing is written when any row is invalid.
+        $this->assertDatabaseMissing('registrations', ['name' => 'Good Row']);
+    }
+
+    public function test_students_import_error_report_annotates_the_file(): void
+    {
+        [$category, $level] = $this->importSet();
+        $school = School::firstOrFail();
+
+        $response = $this->actingAs($this->admin())
+            ->post('/api/registrations/import/errors', [
+                'school_id' => $school->id,
+                'category_id' => $category->id,
+                'file' => $this->importFile([
+                    ['Good', '01.02.2015', '', '3', $level->level_short],
+                    ['Bad Grade', '', '', '99', $level->level_short],
+                ]),
+            ])
+            ->assertOk();
+
+        $this->assertStringContainsString('spreadsheetml', (string) $response->headers->get('content-type'));
+
+        // The returned sheet gains an "Error" column with the message on the bad row.
+        $tmp = tempnam(sys_get_temp_dir(), 'err').'.xlsx';
+        file_put_contents($tmp, $response->getContent());
+        $rows = XlsxReader::read($tmp);
+        @unlink($tmp);
+
+        $flat = collect($rows)->map(fn ($r) => implode('|', $r))->implode("\n");
+        $this->assertStringContainsString('Error', implode('|', $rows[0]));
+        $this->assertStringContainsString('Grade must be', $flat);
+    }
+
+    public function test_students_import_requires_student_insert_scope(): void
+    {
+        [$category, $level] = $this->importSet();
+        $schools = School::query()->take(2)->get();
+        $coordinator = $this->scopedCoordinator([$schools[0]->id]);
+
+        // A coordinator cannot import into a venue outside their scope.
+        $this->actingAs($coordinator)
+            ->post('/api/registrations/import', [
+                'school_id' => $schools[1]->id,
+                'category_id' => $category->id,
+                'file' => $this->importFile([['X', '', '', '3', $level->level_short]]),
+            ])
+            ->assertForbidden();
+    }
+
+    /** Build a fake attendance-update .xlsx (Candidate no | Absent) with the hint row. */
+    private function attendanceFile(array $rows): UploadedFile
+    {
+        $bytes = XlsxWriter::toString(['Candidate no', 'Absent'], array_merge([['10000000', '0/1']], $rows), 'Attendance');
+
+        return UploadedFile::fake()->createWithContent('attendance.xlsx', $bytes);
+    }
+
+    private function newStudent(int $schoolId, string $name = 'Att Student'): array
+    {
+        return $this->actingAs($this->admin())
+            ->postJson('/api/registrations', [
+                'school_id' => $schoolId, 'difficulty_level_id' => $this->level()->id, 'name' => $name, 'grade' => 5,
+            ])->json('data');
+    }
+
+    public function test_attendance_import_template_downloads(): void
+    {
+        $this->actingAs($this->admin())
+            ->get('/api/registrations/attendance-import/template')
+            ->assertOk()
+            ->assertHeader('content-disposition', 'attachment; filename="attendance-update-template.xlsx"');
+    }
+
+    public function test_attendance_import_updates_by_candidate_number(): void
+    {
+        $school = School::firstOrFail();
+        $a = $this->newStudent($school->id, 'Absentee');
+        $b = $this->newStudent($school->id, 'Present One');
+
+        $this->actingAs($this->admin())
+            ->post('/api/registrations/attendance-import', [
+                'file' => $this->attendanceFile([
+                    [$a['competitor_number'], '1'],   // absent
+                    [$b['competitor_number'], '0'],   // present
+                    ['99999999', '1'],                // not found
+                    ['', 'nope'],                     // invalid
+                ]),
+            ])
+            ->assertOk()
+            ->assertJsonPath('updated', 2)
+            ->assertJsonPath('not_found', 1)
+            ->assertJsonPath('invalid', 1)
+            ->assertJsonPath('not_found_numbers', ['99999999']);
+
+        $this->assertDatabaseHas('registrations', ['id' => $a['id'], 'attendance' => 'absent']);
+        $this->assertDatabaseHas('registrations', ['id' => $b['id'], 'attendance' => 'present']);
+    }
+
+    public function test_attendance_import_is_scoped_to_the_coordinators_venues(): void
+    {
+        $schools = School::query()->take(2)->get();
+        $outsider = $this->newStudent($schools[1]->id, 'Outsider');
+        $coordinator = $this->scopedCoordinator([$schools[0]->id]);
+
+        // A student outside the coordinator's venues is simply not found (untouched).
+        $this->actingAs($coordinator)
+            ->post('/api/registrations/attendance-import', [
+                'file' => $this->attendanceFile([[$outsider['competitor_number'], '1']]),
+            ])
+            ->assertOk()
+            ->assertJsonPath('updated', 0)
+            ->assertJsonPath('not_found', 1);
+    }
+
+    public function test_attendance_import_requires_edit_right(): void
+    {
+        $school = School::firstOrFail();
+        $noEdit = $this->scopedCoordinator([$school->id], ['can_student_edit' => false]);
+
+        $this->actingAs($noEdit)
+            ->post('/api/registrations/attendance-import', [
+                'file' => $this->attendanceFile([['14000001', '1']]),
+            ])
+            ->assertForbidden();
     }
 }

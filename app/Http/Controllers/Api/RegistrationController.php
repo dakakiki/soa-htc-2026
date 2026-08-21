@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\AttendanceImporter;
 use App\Domain\Competition\Support\AttendanceReport;
 use App\Domain\Competition\Support\RegistrationExporter;
+use App\Domain\Competition\Support\RegistrationImporter;
 use App\Domain\Competition\Support\RegistrationResults;
 use App\Domain\Competition\Support\SoaCertificate;
 use App\Domain\Organization\Models\School;
@@ -16,6 +19,7 @@ use App\Http\Requests\StoreRegistrationRequest;
 use App\Http\Requests\UpdateRegistrationRequest;
 use App\Http\Resources\RegistrationResource;
 use App\Support\PdfWriter;
+use App\Support\XlsxReader;
 use App\Support\XlsxWriter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +28,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class RegistrationController extends Controller
 {
@@ -193,6 +198,152 @@ class RegistrationController extends Controller
     private function certChunkSize(): int
     {
         return max(1, (int) (config('cert.chunk') ?: 50));
+    }
+
+    /**
+     * The "Upload Students" import template (.xlsx): the column headers plus the
+     * instructions row, matching the legacy file. Downloaded from the import modal.
+     */
+    public function importTemplate(): Response
+    {
+        $this->authorize('create', Registration::class);
+
+        $headers = ['Name', 'Date Of Birth', 'School (if different from venue)', 'Grade', 'Category'];
+        $hint = [
+            'use just standard Latin letters without country specific',
+            'dd.mm.yyyy',
+            '',
+            'school grade',
+            'Please enter in this format: for Baby Hippo enter BH, Little Hippo enter LH, for Hippo 1 enter H1, for Hippo 2 enter H2, … for Hippo S1 enter S1, etc.',
+        ];
+
+        return response(XlsxWriter::toString($headers, [$hint], 'Students'), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="students-import-template.xlsx"',
+        ]);
+    }
+
+    /**
+     * The difficulty-category sets a competitor at this country can be imported
+     * into: every regular category that applies (all-countries, or linked to the
+     * country). The chosen set fixes how a category short (BH, S1, …) resolves.
+     */
+    public function importCategorySets(Request $request): JsonResponse
+    {
+        $this->authorize('create', Registration::class);
+
+        $validated = $request->validate([
+            'country_id' => ['required', 'integer', 'exists:countries,id'],
+        ]);
+        $countryId = (int) $validated['country_id'];
+
+        $sets = DifficultyCategory::query()
+            ->where('type', 'regular')
+            ->where('status', 'active')
+            ->where(fn ($q) => $q->where('countries_all', true)
+                ->orWhereHas('countries', fn ($c) => $c->whereKey($countryId)))
+            ->orderByDesc('countries_all')
+            ->orderBy('id')
+            ->get(['id', 'name'])
+            ->map(fn ($c) => ['id' => (int) $c->id, 'label' => (string) $c->name]);
+
+        return response()->json(['data' => $sets]);
+    }
+
+    /**
+     * Bulk-create students for one venue from an uploaded .xlsx (the "Upload
+     * Students" flow, {@see RegistrationImporter}). The category set fixes how the
+     * short codes resolve. Returns {created} on success, or {created:0, errors[]}
+     * (HTTP 422) listing the offending rows when the file has any invalid row.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        $this->authorize('create', Registration::class);
+
+        $validated = $request->validate([
+            'school_id' => ['required', 'integer', 'exists:schools,id'],
+            'category_id' => ['required', 'integer', 'exists:difficulty_categories,id'],
+            'file' => ['required', 'file', 'max:10240'],
+        ]);
+
+        $schoolId = (int) $validated['school_id'];
+        $this->assertVenueInScope($request, $schoolId);
+
+        try {
+            $rows = XlsxReader::read((string) $validated['file']->getRealPath());
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['file' => __('The file could not be read. Upload a valid .xlsx.')]);
+        }
+
+        $summary = RegistrationImporter::import($schoolId, (int) $validated['category_id'], $rows);
+
+        return response()->json($summary, $summary['error_count'] === 0 ? 200 : 422);
+    }
+
+    /**
+     * The uploaded student file returned with an "Error" column filled in per invalid
+     * row ({@see RegistrationImporter::errorReport()}) — the user fixes it and
+     * re-uploads. Same venue scope + validation as {@see import()}.
+     */
+    public function importErrors(Request $request): Response
+    {
+        $this->authorize('create', Registration::class);
+
+        $validated = $request->validate([
+            'school_id' => ['required', 'integer', 'exists:schools,id'],
+            'category_id' => ['required', 'integer', 'exists:difficulty_categories,id'],
+            'file' => ['required', 'file', 'max:10240'],
+        ]);
+
+        $this->assertVenueInScope($request, (int) $validated['school_id']);
+
+        try {
+            $rows = XlsxReader::read((string) $validated['file']->getRealPath());
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['file' => __('The file could not be read. Upload a valid .xlsx.')]);
+        }
+
+        $xlsx = RegistrationImporter::errorReport((int) $validated['school_id'], (int) $validated['category_id'], $rows);
+
+        return response($xlsx, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="students-import-errors.xlsx"',
+        ]);
+    }
+
+    /** The attendance-update template (.xlsx): Candidate no | Absent (0/1). */
+    public function attendanceImportTemplate(): Response
+    {
+        $this->authorize('viewAny', Registration::class);
+
+        return response(XlsxWriter::toString(['Candidate no', 'Absent'], [['10000000', '0/1']], 'Attendance'), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="attendance-update-template.xlsx"',
+        ]);
+    }
+
+    /**
+     * Bulk-update attendance from an uploaded .xlsx (Candidate no | Absent) — the
+     * separate "update students" flow ({@see AttendanceImporter}). A non-global
+     * coordinator only affects their own venues. Returns per-outcome counts.
+     */
+    public function attendanceImport(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can_student_edit ?? false, 403);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
+        ]);
+
+        try {
+            $rows = XlsxReader::read((string) $validated['file']->getRealPath());
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['file' => __('The file could not be read. Upload a valid .xlsx.')]);
+        }
+
+        $summary = AttendanceImporter::import($rows, $request->user()->allowedSchoolIds());
+
+        return response()->json($summary);
     }
 
     /** A non-global coordinator may only act on their own venues. */

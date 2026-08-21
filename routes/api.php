@@ -133,6 +133,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Declared before the resource so the static paths aren't caught by {registration}.
     Route::get('registrations/export', [RegistrationController::class, 'export']);
     Route::get('registrations/attendance-report', [RegistrationController::class, 'attendanceReport']);
+    // Bulk student import (.xlsx) — "Upload Students": template, per-country category
+    // sets, and the create-import itself.
+    Route::get('registrations/import/template', [RegistrationController::class, 'importTemplate']);
+    Route::get('registrations/import/category-sets', [RegistrationController::class, 'importCategorySets']);
+    Route::post('registrations/import', [RegistrationController::class, 'import']);
+    Route::post('registrations/import/errors', [RegistrationController::class, 'importErrors']);
+    // Bulk attendance update (.xlsx) — the separate "update students" flow.
+    Route::get('registrations/attendance-import/template', [RegistrationController::class, 'attendanceImportTemplate']);
+    Route::post('registrations/attendance-import', [RegistrationController::class, 'attendanceImport']);
     Route::get('registrations/soa-certificate/plan', [RegistrationController::class, 'soaCertificatePlan']);
     Route::get('registrations/soa-certificate', [RegistrationController::class, 'soaCertificate']);
     // Results grid: column definition + one competitor's per-round breakdown.

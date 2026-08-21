@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IconListCheck, IconFileText, IconCertificate } from '@tabler/icons-vue';
+import { IconListCheck, IconFileText, IconCertificate, IconUpload, IconClipboardCheck, IconPlus } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
 import { listRegistrations, exportRegistrations, deleteRegistration, resultColumns } from '@/api/registrations';
@@ -17,6 +17,8 @@ import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect
 import RegistrationResultsModal from '@/pages/students/RegistrationResultsModal.vue';
 import AttendanceReportModal from '@/pages/students/AttendanceReportModal.vue';
 import SoaCertificateModal from '@/pages/students/SoaCertificateModal.vue';
+import RegistrationImportModal from '@/pages/students/RegistrationImportModal.vue';
+import AttendanceImportModal from '@/pages/students/AttendanceImportModal.vue';
 import { saveBlob } from '@/utils/download';
 import type { Country, LevelOption, Region, Registration, ResultColumn, School } from '@/types/models';
 
@@ -47,6 +49,17 @@ const loading = ref(false);
 const exporting = ref(false);
 const attendanceOpen = ref(false);
 const soaCertOpen = ref(false);
+const importOpen = ref(false);
+const attendanceImportOpen = ref(false);
+
+// Refresh the list after an import / attendance update so the change shows (when
+// a filtered list is on screen).
+function onImported(): void {
+    if (searched.value) {
+        void load(page.value);
+    }
+}
+
 // The list only appears once the user has filtered — nobody pages the full roster.
 const searched = ref(false);
 const regionLoading = ref(false);
@@ -277,8 +290,9 @@ onMounted(async () => {
     } catch { /* filters/columns optional */ }
     try {
         // Exam rounds populate the Round filter; needs content access, so degrade quietly.
+        // The Sample round is practice-only and never a search dimension — drop it.
         const { data } = await examRoundsApi.list();
-        rounds.value = data.data;
+        rounds.value = data.data.filter((r) => r.name !== 'Sample');
     } catch { /* round filter optional */ }
 
     // No initial list — the roster is huge; results appear once the user filters.
@@ -308,21 +322,28 @@ onMounted(async () => {
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('registration.title') }}</h1>
                 <p v-if="searched" class="mt-1 text-sm text-gray-500">{{ $t('common.total', { count: total }) }}</p>
             </div>
-            <RouterLink v-if="canInsert" :to="{ name: 'registrations.new' }"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
-                {{ $t('registration.add') }}
-            </RouterLink>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <RouterLink v-if="canInsert" :to="{ name: 'registrations.new' }"
+                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
+                    <IconPlus :size="16" />
+                    {{ $t('registration.add') }}
+                </RouterLink>
+                <ExportButton v-if="canInsert" :icon="IconUpload" :label="$t('registration.import.title')"
+                    :tooltip="$t('registration.import.tooltip')" @click="importOpen = true" />
+                <ExportButton v-if="canEdit" :icon="IconClipboardCheck" :label="$t('registration.attendanceUpdate.title')"
+                    :tooltip="$t('registration.attendanceUpdate.tooltip')" @click="attendanceImportOpen = true" />
+            </div>
         </div>
 
         <div class="rounded-lg border border-gray-200 bg-white p-4">
         <!-- Actions row (above the filters, same card). Export first; more may follow. -->
         <div class="mb-3 flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
-            <ExportButton :loading="exporting" :disabled="!searched"
+            <ExportButton small :loading="exporting" :disabled="!searched"
                 :tooltip="searched ? $t('registration.exportTooltip') : $t('registration.exportHint')"
                 @click="exportList" />
-            <ExportButton :icon="IconFileText" :label="$t('registration.attendanceReport.title')"
+            <ExportButton small :icon="IconFileText" :label="$t('registration.attendanceReport.title')"
                 :tooltip="$t('registration.attendanceReport.tooltip')" @click="attendanceOpen = true" />
-            <ExportButton :icon="IconCertificate" :label="$t('registration.soaCert.title')"
+            <ExportButton small :icon="IconCertificate" :label="$t('registration.soaCert.title')"
                 :tooltip="$t('registration.soaCert.tooltip')" @click="soaCertOpen = true" />
         </div>
         <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5" @submit.prevent="load(1)">
@@ -468,5 +489,11 @@ onMounted(async () => {
         <SoaCertificateModal :open="soaCertOpen"
             :default-country-id="filters.country_id" :default-school-id="filters.school_id"
             :default-school-option="selectedSchoolFilter" @close="soaCertOpen = false" />
+
+        <RegistrationImportModal :open="importOpen"
+            :default-country-id="filters.country_id" :default-school-id="filters.school_id"
+            :default-school-option="selectedSchoolFilter" @imported="onImported" @close="importOpen = false" />
+
+        <AttendanceImportModal :open="attendanceImportOpen" @updated="onImported" @close="attendanceImportOpen = false" />
     </section>
 </template>

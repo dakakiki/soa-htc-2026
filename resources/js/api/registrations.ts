@@ -56,6 +56,60 @@ export function soaCertificate(params: { round: string; school_id: number; level
     return http.get('/api/registrations/soa-certificate', { params, responseType: 'blob' });
 }
 
+/** The difficulty-category sets a competitor at this country can be imported into. */
+export function importCategorySets(countryId: number) {
+    return http.get<{ data: { id: number; label: string }[] }>(
+        '/api/registrations/import/category-sets', { params: { country_id: countryId } },
+    );
+}
+
+/** Download the "Upload Students" .xlsx template. */
+export function importTemplate() {
+    return http.get('/api/registrations/import/template', { responseType: 'blob' });
+}
+
+export interface StudentImportSummary {
+    created: number;
+    error_count: number;
+}
+
+/** Bulk-create students for one venue from an .xlsx upload. Rejects the whole file on any bad row. */
+export function importStudents(payload: { school_id: number; category_id: number; file: File }) {
+    const fd = new FormData();
+    fd.append('school_id', String(payload.school_id));
+    fd.append('category_id', String(payload.category_id));
+    fd.append('file', payload.file);
+    return http.post<StudentImportSummary>('/api/registrations/import', fd);
+}
+
+/** Download the uploaded file back with an "Error" column filled in per invalid row. */
+export function importStudentErrors(payload: { school_id: number; category_id: number; file: File }) {
+    const fd = new FormData();
+    fd.append('school_id', String(payload.school_id));
+    fd.append('category_id', String(payload.category_id));
+    fd.append('file', payload.file);
+    return http.post('/api/registrations/import/errors', fd, { responseType: 'blob' });
+}
+
+/** Download the attendance-update .xlsx template (Candidate no | Absent). */
+export function attendanceImportTemplate() {
+    return http.get('/api/registrations/attendance-import/template', { responseType: 'blob' });
+}
+
+export interface AttendanceImportSummary {
+    updated: number;
+    not_found: number;
+    invalid: number;
+    not_found_numbers: string[];
+}
+
+/** Bulk-update attendance from an .xlsx upload (Candidate no | Absent), keyed by competitor number. */
+export function importAttendance(file: File) {
+    const fd = new FormData();
+    fd.append('file', file);
+    return http.post<AttendanceImportSummary>('/api/registrations/attendance-import', fd);
+}
+
 export function getRegistration(id: number) {
     return http.get<{ data: Registration }>(`/api/registrations/${id}`);
 }
