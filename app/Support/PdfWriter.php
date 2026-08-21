@@ -24,6 +24,53 @@ final class PdfWriter
      */
     public static function toString(string $bodyHtml, string $title = '', string $orientation = 'P'): string
     {
+        $mpdf = self::make($orientation);
+        $mpdf->SetHTMLHeader(self::header($title));
+        $mpdf->SetHTMLFooter(self::footer());
+        $mpdf->WriteHTML($bodyHtml);
+
+        return $mpdf->Output('', 'S');
+    }
+
+    /**
+     * Build a document from many page fragments, written one at a time (each on
+     * its own page). For large runs — thousands of one-page certificates in a
+     * single PDF — this keeps peak memory far below parsing one giant HTML string,
+     * and lifts the request's memory/time limits so the whole venue renders at once
+     * (no chunking).
+     *
+     * @param  iterable<string>  $pages
+     */
+    public static function fromPages(iterable $pages, string $title = '', string $orientation = 'P', string $styleHead = '', bool $plain = false): string
+    {
+        self::liftLimits();
+
+        $mpdf = self::make($orientation, $plain);
+        // "plain" pages (e.g. certificates) own the whole page, so skip the running
+        // brand header + page-number footer and use small uniform margins.
+        if (! $plain) {
+            $mpdf->SetHTMLHeader(self::header($title));
+            $mpdf->SetHTMLFooter(self::footer());
+        }
+
+        // One WriteHTML for the whole run: mPDF re-merges the stylesheet on every
+        // WriteHTML call, so writing page-by-page is quadratic and unusably slow for
+        // thousands of pages. A single call with an optional shared <style> head (so
+        // per-page markup carries no repeated inline CSS to re-parse) stays linear.
+        $html = $styleHead;
+        $first = true;
+        foreach ($pages as $page) {
+            $html .= ($first ? '' : '<pagebreak />').(string) $page;
+            $first = false;
+        }
+
+        $mpdf->WriteHTML($html);
+
+        return $mpdf->Output('', 'S');
+    }
+
+    private static function make(string $orientation, bool $plain = false): Mpdf
+    {
         // mPDF caches fonts to a temp dir; keep it under storage (always writable,
         // unlike a CI-deployed read-only vendor/).
         $tmp = storage_path('app/mpdf');
@@ -31,11 +78,11 @@ final class PdfWriter
             mkdir($tmp, 0775, true);
         }
 
-        $mpdf = new Mpdf([
+        return new Mpdf([
             'mode' => 'utf-8',
             'format' => $orientation === 'L' ? 'A4-L' : 'A4',
-            'margin_top' => 34,
-            'margin_bottom' => 18,
+            'margin_top' => $plain ? 12 : 34,
+            'margin_bottom' => $plain ? 12 : 18,
             'margin_left' => 12,
             'margin_right' => 12,
             // DejaVu ships with mPDF and covers Cyrillic + Latin diacritics (ČĆŽŠĐ).
@@ -43,12 +90,37 @@ final class PdfWriter
             'default_font_size' => 9,
             'tempDir' => $tmp,
         ]);
+    }
 
-        $mpdf->SetHTMLHeader(self::header($title));
-        $mpdf->SetHTMLFooter(self::footer());
-        $mpdf->WriteHTML($bodyHtml);
+    /** Give a large render room to finish: a generous time cap and at least 1 GB of memory. */
+    private static function liftLimits(): void
+    {
+        @set_time_limit(300);
 
-        return $mpdf->Output('', 'S');
+        $limit = trim((string) ini_get('memory_limit'));
+        if ($limit === '-1') {
+            return; // already unlimited
+        }
+        $bytes = self::toBytes($limit);
+        if ($bytes > 0 && $bytes < 1024 * 1024 * 1024) {
+            @ini_set('memory_limit', '1024M');
+        }
+    }
+
+    private static function toBytes(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 0;
+        }
+        $number = (int) $value;
+
+        return match (strtolower($value[strlen($value) - 1])) {
+            'g' => $number * 1024 * 1024 * 1024,
+            'm' => $number * 1024 * 1024,
+            'k' => $number * 1024,
+            default => (int) $value,
+        };
     }
 
     /** Brand header: logo (when set) + "SOA HTC" name on the left, title on the right. */

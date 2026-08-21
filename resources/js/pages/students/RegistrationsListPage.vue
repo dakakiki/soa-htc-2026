@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IconListCheck, IconFileText } from '@tabler/icons-vue';
+import { IconListCheck, IconFileText, IconCertificate } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
 import { listRegistrations, exportRegistrations, deleteRegistration, resultColumns } from '@/api/registrations';
@@ -16,6 +16,7 @@ import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import RegistrationResultsModal from '@/pages/students/RegistrationResultsModal.vue';
 import AttendanceReportModal from '@/pages/students/AttendanceReportModal.vue';
+import SoaCertificateModal from '@/pages/students/SoaCertificateModal.vue';
 import { saveBlob } from '@/utils/download';
 import type { Country, LevelOption, Region, Registration, ResultColumn, School } from '@/types/models';
 
@@ -45,6 +46,7 @@ const total = ref(0);
 const loading = ref(false);
 const exporting = ref(false);
 const attendanceOpen = ref(false);
+const soaCertOpen = ref(false);
 // The list only appears once the user has filtered — nobody pages the full roster.
 const searched = ref(false);
 const regionLoading = ref(false);
@@ -320,6 +322,8 @@ onMounted(async () => {
                 @click="exportList" />
             <ExportButton :icon="IconFileText" :label="$t('registration.attendanceReport.title')"
                 :tooltip="$t('registration.attendanceReport.tooltip')" @click="attendanceOpen = true" />
+            <ExportButton :icon="IconCertificate" :label="$t('registration.soaCert.title')"
+                :tooltip="$t('registration.soaCert.tooltip')" @click="soaCertOpen = true" />
         </div>
         <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5" @submit.prevent="load(1)">
             <!-- Column 1: search (stays first). Press Enter to apply. -->
@@ -460,5 +464,9 @@ onMounted(async () => {
         <AttendanceReportModal :open="attendanceOpen"
             :default-country-id="filters.country_id" :default-school-id="filters.school_id"
             :default-school-option="selectedSchoolFilter" @close="attendanceOpen = false" />
+
+        <SoaCertificateModal :open="soaCertOpen"
+            :default-country-id="filters.country_id" :default-school-id="filters.school_id"
+            :default-school-option="selectedSchoolFilter" @close="soaCertOpen = false" />
     </section>
 </template>

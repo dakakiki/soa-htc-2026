@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Support\AttendanceReport;
+use App\Domain\Competition\Support\SoaCertificate;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\School;
@@ -308,6 +310,151 @@ class RegistrationApiTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)->get('/api/registrations/attendance-report')->assertForbidden();
+    }
+
+    public function test_soa_certificate_html_has_a_page_per_student_with_marks(): void
+    {
+        $school = School::firstOrFail();
+        $level = $this->level();
+
+        $withMark = $this->actingAs($this->admin())->postJson('/api/registrations', [
+            'school_id' => $school->id, 'difficulty_level_id' => $level->id, 'name' => 'Marko Marks', 'grade' => 6,
+        ])->assertCreated();
+        $this->actingAs($this->admin())->postJson('/api/registrations', [
+            'school_id' => $school->id, 'difficulty_level_id' => $level->id, 'name' => 'Nula Nomark', 'grade' => 6,
+        ])->assertCreated();
+
+        // A published Reading result in the Preliminary round for the first student.
+        $readingTypeId = DB::table('test_types')->where('name', 'Reading')->value('id');
+        $readingTest = Test::create(['title' => 'Reading T', 'test_type_id' => $readingTypeId, 'duration' => 30, 'status' => 'active']);
+        DB::table('registration_results')->insert([
+            'registration_id' => $withMark->json('data.id'),
+            'test_id' => $readingTest->id,
+            'exam_round_id' => DB::table('exam_rounds')->where('name', 'Preliminary round')->value('id'),
+            'test_type_id' => $readingTypeId,
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'score' => 25,
+            'source' => 'import',
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $html = SoaCertificate::html($school->id, [$level->id], 'preliminary');
+
+        $this->assertStringContainsString('Preliminary round', $html);
+        $this->assertStringContainsString('Marko Marks', $html);
+        $this->assertStringContainsString('Nula Nomark', $html);        // both students get a page
+        $this->assertStringContainsString('Reading', $html);
+        $this->assertStringContainsString('Use of English', $html);     // Preliminary marks pair
+        $this->assertStringContainsString('25.00', $html);              // the published Reading score
+        $this->assertStringContainsString('in category', $html);
+
+        // A level with no students yields nothing to print.
+        $other = DifficultyLevel::where('id', '!=', $level->id)->firstOrFail();
+        $this->assertSame('', SoaCertificate::html($school->id, [$other->id], 'preliminary'));
+    }
+
+    public function test_soa_certificate_returns_pdf(): void
+    {
+        $school = School::firstOrFail();
+        $level = $this->level();
+
+        $this->actingAs($this->admin())->postJson('/api/registrations', [
+            'school_id' => $school->id, 'difficulty_level_id' => $level->id, 'name' => 'Cert Guy', 'grade' => 6,
+        ])->assertCreated();
+
+        $response = $this->actingAs($this->admin())
+            ->get('/api/registrations/soa-certificate?round=preliminary&school_id='.$school->id.'&level_id[]='.$level->id)
+            ->assertOk();
+
+        $this->assertSame('application/pdf', $response->headers->get('content-type'));
+        $this->assertStringContainsString('SOA_Cert_Preliminary', (string) $response->headers->get('content-disposition'));
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_soa_certificate_plan_reports_parts(): void
+    {
+        config(['cert.chunk' => 2]); // tiny chunk so a few students span several parts
+
+        $school = School::firstOrFail();
+        $level = $this->level();
+        foreach (['A', 'B', 'C'] as $n) {
+            $this->actingAs($this->admin())->postJson('/api/registrations', [
+                'school_id' => $school->id, 'difficulty_level_id' => $level->id, 'name' => 'Bulk '.$n, 'grade' => 6,
+            ])->assertCreated();
+        }
+
+        $this->actingAs($this->admin())
+            ->getJson('/api/registrations/soa-certificate/plan?round=preliminary&school_id='.$school->id.'&level_id[]='.$level->id)
+            ->assertOk()
+            ->assertJson(['total' => 3, 'chunk_size' => 2, 'chunks' => 2]); // 3 students / 2 per part → 2 parts
+    }
+
+    public function test_soa_certificate_renders_a_part_and_422_past_the_end(): void
+    {
+        config(['cert.chunk' => 2]);
+
+        $school = School::firstOrFail();
+        $level = $this->level();
+        foreach (['A', 'B', 'C'] as $n) {
+            $this->actingAs($this->admin())->postJson('/api/registrations', [
+                'school_id' => $school->id, 'difficulty_level_id' => $level->id, 'name' => 'Bulk '.$n, 'grade' => 6,
+            ])->assertCreated();
+        }
+
+        // Part 1 (chunk 0) renders as a PDF.
+        $response = $this->actingAs($this->admin())
+            ->get('/api/registrations/soa-certificate?round=preliminary&school_id='.$school->id.'&level_id[]='.$level->id.'&chunk=0')
+            ->assertOk();
+        $this->assertSame('application/pdf', $response->headers->get('content-type'));
+        $this->assertStringContainsString('part01', (string) $response->headers->get('content-disposition'));
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+
+        // A part past the last student has nothing to render → 422.
+        $this->actingAs($this->admin())
+            ->get('/api/registrations/soa-certificate?round=preliminary&school_id='.$school->id.'&level_id[]='.$level->id.'&chunk=5')
+            ->assertStatus(422);
+    }
+
+    public function test_soa_certificate_returns_422_when_no_students(): void
+    {
+        $school = School::firstOrFail();
+        $level = $this->level();
+
+        $this->actingAs($this->admin())->postJson('/api/registrations', [
+            'school_id' => $school->id, 'difficulty_level_id' => $level->id, 'name' => 'Only H2', 'grade' => 6,
+        ])->assertCreated();
+        $other = DifficultyLevel::where('id', '!=', $level->id)->firstOrFail();
+
+        $this->actingAs($this->admin())
+            ->get('/api/registrations/soa-certificate?round=national&school_id='.$school->id.'&level_id[]='.$other->id)
+            ->assertStatus(422);
+    }
+
+    public function test_soa_certificate_is_scoped_to_the_coordinators_schools(): void
+    {
+        $schools = School::query()->take(2)->get();
+        $coordinator = $this->scopedCoordinator([$schools[0]->id]);
+
+        $this->actingAs($coordinator)
+            ->get('/api/registrations/soa-certificate?round=preliminary&school_id='.$schools[1]->id.'&level_id[]='.$this->level()->id)
+            ->assertForbidden();
+    }
+
+    public function test_soa_certificate_requires_round_school_and_levels(): void
+    {
+        $this->actingAs($this->admin())
+            ->getJson('/api/registrations/soa-certificate')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['round', 'school_id', 'level_id']);
+    }
+
+    public function test_soa_certificate_forbidden_for_non_staff(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get('/api/registrations/soa-certificate')->assertForbidden();
     }
 
     public function test_status_toggle(): void

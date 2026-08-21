@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { onBeforeUnmount, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
+import { TextStyle, Color } from '@tiptap/extension-text-style';
 import {
     IconBold, IconItalic, IconUnderline, IconH2,
-    IconList, IconListNumbers, IconLink, IconClearFormatting,
+    IconList, IconListNumbers, IconLink, IconClearFormatting, IconPalette,
 } from '@tabler/icons-vue';
+import { useThemeStore } from '@/stores/theme';
 
 const props = withDefaults(defineProps<{ modelValue: string; placeholder?: string }>(), { placeholder: '' });
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>();
 
 const editor = useEditor({
     content: props.modelValue || '',
-    extensions: [StarterKit, Underline, Link.configure({ openOnClick: false })],
+    // TextStyle + Color let text carry a colour (rendered as inline <span style="color">,
+    // which mPDF also honours in the certificate PDF).
+    extensions: [StarterKit, Underline, Link.configure({ openOnClick: false }), TextStyle, Color],
     onUpdate: ({ editor }) => {
         const html = editor.getHTML();
         // Treat an empty document as an empty string, not "<p></p>".
@@ -53,6 +57,30 @@ function setLink(): void {
     }
     editor.value.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
 }
+
+// Text-colour palette, drawn from the active brand theme so colours stay on-brand
+// wherever this editor is used (and match the app's own colours in the PDF).
+const theme = useThemeStore();
+const colorSwatches = computed<{ label: string; value: string }[]>(() => {
+    const c = theme.theme?.colors;
+    return [
+        { label: 'Primary', value: c?.primary ?? '#2563eb' },
+        { label: 'Primary (dark)', value: c?.primary_hover ?? '#1d4ed8' },
+        { label: 'Accent', value: c?.accent ?? '#0d9488' },
+        { label: 'Accent (dark)', value: c?.accent_hover ?? '#0f766e' },
+        { label: 'Link', value: c?.link ?? '#2563eb' },
+    ];
+});
+
+const showColors = ref(false);
+function applyColor(value: string): void {
+    editor.value?.chain().focus().setColor(value).run();
+    showColors.value = false;
+}
+function clearColor(): void {
+    editor.value?.chain().focus().unsetColor().run();
+    showColors.value = false;
+}
 </script>
 
 <template>
@@ -66,6 +94,21 @@ function setLink(): void {
             <button type="button" :class="btn(editor.isActive('bulletList'))" title="Bullet list" @click="editor.chain().focus().toggleBulletList().run()"><IconList :size="16" /></button>
             <button type="button" :class="btn(editor.isActive('orderedList'))" title="Numbered list" @click="editor.chain().focus().toggleOrderedList().run()"><IconListNumbers :size="16" /></button>
             <button type="button" :class="btn(editor.isActive('link'))" title="Link" @click="setLink"><IconLink :size="16" /></button>
+            <div class="relative">
+                <button type="button" :class="btn(showColors)" title="Text colour" @click="showColors = !showColors"><IconPalette :size="16" /></button>
+                <div v-if="showColors" class="fixed inset-0 z-10" @click="showColors = false" />
+                <div v-if="showColors" class="absolute left-0 top-9 z-20 w-44 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+                    <div class="grid grid-cols-5 gap-1.5">
+                        <button v-for="s in colorSwatches" :key="s.value" type="button" :title="s.label"
+                            class="h-6 w-6 rounded border border-gray-200 transition hover:scale-110"
+                            :style="{ backgroundColor: s.value }" @click="applyColor(s.value)" />
+                    </div>
+                    <button type="button" class="mt-2 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs text-gray-600 hover:bg-gray-100" @click="clearColor">
+                        <span class="h-4 w-4 rounded border border-gray-300 bg-white" />
+                        Default colour
+                    </button>
+                </div>
+            </div>
             <span class="mx-1 h-5 w-px bg-gray-200" />
             <button type="button" :class="btn(false)" title="Clear formatting" @click="editor.chain().focus().unsetAllMarks().clearNodes().run()"><IconClearFormatting :size="16" /></button>
         </div>

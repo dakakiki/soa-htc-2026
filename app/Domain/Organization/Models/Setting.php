@@ -27,6 +27,13 @@ class Setting extends Model
     protected $fillable = [
         'logo_path',
         'logo_icon_path',
+        // Admin-editable certificate content + assets (see SoaCertificate).
+        'cert_header_title',
+        'cert_body',
+        'cert_signature_text',
+        'cert_logo_path',
+        'cert_signature_path',
+        'cert_qr_path',
         ...self::COLOR_KEYS,
     ];
 

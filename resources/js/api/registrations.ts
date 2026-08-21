@@ -40,6 +40,22 @@ export function attendanceReport(params: { school_id: number; level_id: number[]
     return http.get('/api/registrations/attendance-report', { params, responseType: 'blob' });
 }
 
+/** The chunk plan for a SOA Cert run: student count and how many part PDFs to download. */
+export interface SoaCertPlan {
+    total: number;
+    chunk_size: number;
+    chunks: number;
+}
+
+export function soaCertificatePlan(params: { round: string; school_id: number; level_id: number[] }) {
+    return http.get<SoaCertPlan>('/api/registrations/soa-certificate/plan', { params });
+}
+
+/** Download one part (zero-based `chunk`) of the SOA participation certificates (PDF). */
+export function soaCertificate(params: { round: string; school_id: number; level_id: number[]; chunk: number }) {
+    return http.get('/api/registrations/soa-certificate', { params, responseType: 'blob' });
+}
+
 export function getRegistration(id: number) {
     return http.get<{ data: Registration }>(`/api/registrations/${id}`);
 }

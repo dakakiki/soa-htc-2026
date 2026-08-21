@@ -8,6 +8,7 @@ use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Support\AttendanceReport;
 use App\Domain\Competition\Support\RegistrationExporter;
 use App\Domain\Competition\Support\RegistrationResults;
+use App\Domain\Competition\Support\SoaCertificate;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
@@ -22,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class RegistrationController extends Controller
 {
@@ -103,6 +105,103 @@ class RegistrationController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
+    }
+
+    /**
+     * The "SOA Cert" participation certificates for one venue as a single PDF —
+     * one page per student in the scope, with their points for the chosen round
+     * ({@see SoaCertificate}). Same venue + level scope and coordinator guard as
+     * the attendance register; the round (Preliminary / National) picks which two
+     * marks print. Returns 422 when the scope holds no students.
+     */
+    /**
+     * One chunk of the "SOA Cert" participation certificates for a venue as a PDF.
+     * mPDF renders every page (~0.3s), so a large venue is split into fixed-size
+     * chunks — exactly what the legacy app did (it used DomPDF, slower still). The
+     * client reads the plan ({@see soaCertificatePlan()}) then downloads each part
+     * in turn, keeping every request bounded. `chunk` is the zero-based part index
+     * (default 0). Same venue + level scope and coordinator guard as the attendance
+     * register; the round picks which two marks print.
+     */
+    public function soaCertificate(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $this->authorize('viewAny', Registration::class);
+
+        $validated = $request->validate($this->certRules() + [
+            'chunk' => ['sometimes', 'integer', 'min:0'],
+        ]);
+
+        $schoolId = (int) $validated['school_id'];
+        $this->assertVenueInScope($request, $schoolId);
+
+        $size = $this->certChunkSize();
+        $chunk = max(0, (int) ($validated['chunk'] ?? 0));
+
+        // Building every page is cheap string work; only this part is rendered by mPDF.
+        $slice = array_slice(
+            SoaCertificate::pages($schoolId, $validated['level_id'], $validated['round']),
+            $chunk * $size,
+            $size,
+        );
+        if ($slice === []) {
+            return response()->json(['message' => __('No students match the selected venue and levels.')], 422);
+        }
+
+        $part = str_pad((string) ($chunk + 1), 2, '0', STR_PAD_LEFT);
+        $filename = 'SOA_Cert_'.ucfirst($validated['round']).'_'.now()->format('Y-m-d').'_part'.$part.'.pdf';
+
+        return response(PdfWriter::fromPages($slice, '', 'P', SoaCertificate::styleHead(), plain: true), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * The chunk plan for a SOA Cert run: how many students match and how many parts
+     * the client must download (legacy chunking). The count is round-independent.
+     */
+    public function soaCertificatePlan(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Registration::class);
+
+        $validated = $request->validate($this->certRules());
+        $schoolId = (int) $validated['school_id'];
+        $this->assertVenueInScope($request, $schoolId);
+
+        $total = SoaCertificate::count($schoolId, $validated['level_id']);
+        $size = $this->certChunkSize();
+
+        return response()->json([
+            'total' => $total,
+            'chunk_size' => $size,
+            'chunks' => (int) ceil($total / $size),
+        ]);
+    }
+
+    /** Shared validation for the SOA Cert plan + chunk endpoints. */
+    private function certRules(): array
+    {
+        return [
+            'round' => ['required', 'string', Rule::in(SoaCertificate::rounds())],
+            'school_id' => ['required', 'integer', 'exists:schools,id'],
+            'level_id' => ['required', 'array', 'min:1'],
+            'level_id.*' => ['integer', 'exists:difficulty_levels,id'],
+        ];
+    }
+
+    /** Certificates per chunk (matches the legacy app's 50); keeps each render bounded. */
+    private function certChunkSize(): int
+    {
+        return max(1, (int) (config('cert.chunk') ?: 50));
+    }
+
+    /** A non-global coordinator may only act on their own venues. */
+    private function assertVenueInScope(Request $request, int $schoolId): void
+    {
+        $allowed = $request->user()->allowedSchoolIds();
+        if ($allowed !== null && ! $allowed->contains($schoolId)) {
+            abort(403);
+        }
     }
 
     /**

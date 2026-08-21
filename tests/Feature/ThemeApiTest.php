@@ -121,6 +121,97 @@ class ThemeApiTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_admin_reads_certificate_settings_with_default_body(): void
+    {
+        $res = $this->actingAs($this->admin())->getJson('/api/settings/certificate')->assertOk();
+
+        $this->assertStringContainsString('[name]', $res->json('body'));  // built-in default template
+        $res->assertJsonPath('placeholders.0.tag', '[name]')              // legend supplied by the backend
+            ->assertJsonPath('signature_text', null)
+            ->assertJsonPath('logo_url', null);
+    }
+
+    public function test_admin_updates_certificate_body_and_signature(): void
+    {
+        $this->actingAs($this->admin())
+            ->putJson('/api/settings/certificate', ['cert_body' => '<p>Hello [name]</p>', 'cert_signature_text' => 'Jane Doe'])
+            ->assertOk()
+            ->assertJsonPath('body', '<p>Hello [name]</p>')
+            ->assertJsonPath('signature_text', 'Jane Doe');
+
+        $this->assertDatabaseHas('settings', ['id' => 1, 'cert_body' => '<p>Hello [name]</p>', 'cert_signature_text' => 'Jane Doe']);
+    }
+
+    public function test_certificate_asset_upload_is_stored(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin())
+            ->put('/api/settings/certificate', [
+                'cert_body' => '<p>[name]</p>',
+                'cert_signature_text' => '',
+                'cert_logo' => UploadedFile::fake()->image('cert-logo.png'),
+                'cert_qr' => UploadedFile::fake()->image('qr.png'),
+            ])
+            ->assertOk()
+            ->assertJsonPath('logo_url', fn ($url) => is_string($url) && $url !== '')
+            ->assertJsonPath('qr_url', fn ($url) => is_string($url) && $url !== '');
+
+        $path = Setting::current()->cert_logo_path;
+        $this->assertNotNull($path);
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_certificate_asset_can_be_deleted(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin())
+            ->put('/api/settings/certificate', [
+                'cert_body' => '<p>[name]</p>',
+                'cert_signature_text' => '',
+                'cert_logo' => UploadedFile::fake()->image('cert-logo.png'),
+            ])
+            ->assertOk();
+
+        $path = Setting::current()->cert_logo_path;
+        $this->assertNotNull($path);
+
+        $this->actingAs($this->admin())
+            ->deleteJson('/api/settings/certificate/assets/logo')
+            ->assertOk()
+            ->assertJsonPath('logo_url', null);
+
+        $this->assertNull(Setting::current()->cert_logo_path);
+        Storage::disk('public')->assertMissing($path);
+
+        // An unknown asset key is a 404, not a silent no-op.
+        $this->actingAs($this->admin())
+            ->deleteJson('/api/settings/certificate/assets/nope')
+            ->assertNotFound();
+    }
+
+    public function test_certificate_non_image_upload_is_rejected(): void
+    {
+        $this->actingAs($this->admin())
+            ->put('/api/settings/certificate', [
+                'cert_body' => '<p>[name]</p>',
+                'cert_signature_text' => '',
+                'cert_logo' => UploadedFile::fake()->create('malware.exe', 10),
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('cert_logo');
+    }
+
+    public function test_non_manager_cannot_read_or_update_certificate(): void
+    {
+        $user = $this->nonManager();
+
+        $this->actingAs($user)->getJson('/api/settings/certificate')->assertForbidden();
+        $this->actingAs($user)->putJson('/api/settings/certificate', ['cert_body' => '<p>x</p>'])->assertForbidden();
+        $this->actingAs($user)->deleteJson('/api/settings/certificate/assets/logo')->assertForbidden();
+    }
+
     public function test_settings_row_is_a_singleton(): void
     {
         Setting::current();

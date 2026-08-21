@@ -246,6 +246,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'settings.manage' },
     },
     {
+        path: '/settings/certificate',
+        name: 'settings.certificate',
+        component: () => import('@/pages/settings/CertificateSettingsPage.vue'),
+        meta: { requiresAuth: true, permission: 'settings.manage' },
+    },
+    {
         path: '/roles',
         name: 'roles',
         component: () => import('@/pages/roles/RolesListPage.vue'),

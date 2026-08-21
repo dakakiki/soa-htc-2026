@@ -133,6 +133,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Declared before the resource so the static paths aren't caught by {registration}.
     Route::get('registrations/export', [RegistrationController::class, 'export']);
     Route::get('registrations/attendance-report', [RegistrationController::class, 'attendanceReport']);
+    Route::get('registrations/soa-certificate/plan', [RegistrationController::class, 'soaCertificatePlan']);
+    Route::get('registrations/soa-certificate', [RegistrationController::class, 'soaCertificate']);
     // Results grid: column definition + one competitor's per-round breakdown.
     // Declared before the resource so the static path isn't caught by {registration}.
     Route::get('registrations/result-columns', [RegistrationController::class, 'resultColumns']);
@@ -149,6 +151,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Branding/theme (read is public via /theme above; writing is gated).
     // PUT so the SPA can send multipart via POST + _method spoofing (like schools).
     Route::put('settings/theme', [SettingsController::class, 'updateTheme']);
+    // Certificate content admin (body template + logo/signature/QR uploads).
+    Route::get('settings/certificate', [SettingsController::class, 'certificate']);
+    Route::put('settings/certificate', [SettingsController::class, 'updateCertificate']);
+    Route::delete('settings/certificate/assets/{asset}', [SettingsController::class, 'deleteCertificateAsset']);
 
     // Results: essay grading (5b), publication (5c), attempt reset (5e). Gated by results.manage.
     Route::get('grading/attempts', [GradingController::class, 'index']);
