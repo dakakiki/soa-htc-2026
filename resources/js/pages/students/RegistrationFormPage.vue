@@ -255,7 +255,7 @@ onMounted(async () => {
                     </div>
                 </div>
 
-                <div class="mt-8 flex items-center justify-end gap-3 border-t border-gray-200 pt-4">
+                <div class="mt-8 flex items-center justify-between border-t border-gray-200 pt-4">
                     <button type="button" class="rounded-md border border-gray-300 bg-gray-100 px-5 py-2 text-sm text-gray-700 hover:bg-gray-200" @click="goBack">{{ $t('common.cancel') }}</button>
                     <button type="submit" :disabled="saving" class="rounded-md bg-brand-primary px-5 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                         {{ saving ? $t('common.saving') : $t('common.save') }}
