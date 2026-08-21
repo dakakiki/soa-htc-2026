@@ -585,6 +585,35 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0028 — SOA Cert (participation sertifikat): CMS-editabilan sadržaj + chunked PDF + legacy-identičan izgled
+
+- **Status:** Prihvaćeno (2026-08-21); vlasnik proizvoda. **IMPLEMENTIRAN** (`bf76632`, u `main`-u; suite zeleno).
+- **Kontekst:** Legacy „SOA Cert" = participation sertifikat po venue-u (DomPDF, blade `pdf_soa_cert_preliminary/semifinal`, chunk 50 strana). Vlasnik traži **izgled identičan legacy-ju** (font/bold/razmak „jako važni") + **editabilan sadržaj** (naslov, telo, potpis, logo, QR) bez deploy-a.
+- **Odluka:**
+  - `App\Domain\Competition\Support\SoaCertificate` gradi mPDF-friendly body HTML, **1 strana/student**, iz **results Layer B** (Prelim=Reading+UoE, National=Reading+Writing; 0 ako nema objavljenog skora).
+  - **Chunk kao legacy (default 50, `config('cert.chunk')`):** mPDF ~0.3s/strana → plan endpoint + chunk render (0-based part), `PdfWriter::fromPages(..., plain:true)` = **bez running header/footer** (sertifikat drži celu stranu).
+  - **CMS u Settings → SOA Certificate** (`settings.manage`): rich-text `cert_body` sa `[placeholders]` (`[name][category][round][edition][venue][school][city][country][points]`) + `cert_header_title` (HTML za two-tone) + `cert_signature_text` + upload logo/signature/qr. Prazno → built-in default + „SOA HTC" wordmark.
+  - **`[edition]`** = aktivna `Season::round_number` kao **superscript ordinal** (14th/21st…), sufiks (st/nd/rd/th) računat iz broja (11–13→th).
+  - **Dizajn identičan legacy-ju** (verifikovano pymupdf side-by-side): crn ram cela strana → header **logo-levo + two-tone „Global Hippo Association" desno** → unutrašnji ram → telo levo `line-height:2.2` **INLINE** (mPDF ignoriše LH iz CSS klase!) + razmak pasosa preko `<br>` → potpis+ime levo / QR desno na dnu.
+  - **Reusable `ImageThumb`** (slika + crveni X) = brisanje asset-a sa servera (delete endpoint po polju); obrazac za svako image/file polje (primenjen i na Coordinator image/file).
+  - **Editor boje (deljeni `RichTextEditor`, ide svuda):** `@tiptap/extension-text-style` (TextStyle+Color) + color-picker sa theme-swatch-evima; crta `<span style="color">` (mPDF poštuje). Header title kroz editor → PHP skida block tagove da inline header ostane.
+- **Posledica:** nove `settings.cert_*` kolone (2 migracije); `SettingsController` cert CRUD + `deleteCertificateAsset`; `RegistrationController` cert plan/chunk; front `CertificateSettingsPage`+`SoaCertificateModal`+`ImageThumb`. Zavisnost `@tiptap/extension-text-style@3.30.1` (pin na `@tiptap/core` 3.30.1). mPDF zamke dokumentovane (height samo `<td>`; `<p>` margine u `<td>` NE rade→`<br>`; **line-height radi SAMO inline**). Legacy ref: `context for the project/legacy-app` (`pdf_soa_cert_*.blade.php`).
+
+---
+
+## ADR-0029 — Bulk student import (create) + attendance update: dva odvojena fajl-toka
+
+- **Status:** Prihvaćeno (2026-08-21); vlasnik proizvoda. **IMPLEMENTIRAN** (`3f02b51`, u `main`-u; suite 298 zeleno).
+- **Kontekst:** Legacy „Upload Students" = dva fajl-toka: (1) **kreiranje** rostera (`Name | Date Of Birth | School if different | Grade | Category`), (2) **„update"** koji zapravo samo postavlja attendance (`Candidate no | Absent 0/1`). Vlasnik: treba oba; **in-app klik-po-redu za attendance ODBAČEN** („niko neće da klikne 1000 studenata"), mora odvojeno/preko fajla.
+- **Odluka:**
+  - **Import (create)** — `App\Domain\Competition\Support\RegistrationImporter`; forma **Country + Venue + Category set** + xlsx.
+    - **Category set (razrešavanje kategorije):** `difficulty_levels.level_short` (BH/LH/H1–H5, S1–S5) **NIJE jedinstven** — 24 nivoa, svaki short 2× (po varijanti). Varijanta je **country-determined**: `difficulty_categories.countries_all=1` = Default (sve zemlje), `=0` = specifične zemlje preko `difficulty_category_country` pivota. Forma nudi primenljive **regular** kategorije za izabranu zemlju; short (BH vs S1) bira Regular/Special, **upareni** po istoj primenljivosti. (Vlasnik: varijantu „7" zadržati, koristi se.)
+    - **Reject-whole-file:** svi redovi validirani pre upisa; jedan loš → **0 kreirano** + `error_count`. UI: opšta poruka + count + dugme koje skine **isti fajl sa dodatom „Error" kolonom** (`errorReport()`) po neispravnom redu → fix + re-upload (extra kolona ignorisana). DOB parsira `dd.mm.yyyy` (+ Excel serial). **Perf: chunked bulk INSERT** (chunk 500) — ~5k studenata ~4s (naspram ~38s sa Eloquent create() po redu); `set_time_limit(300)`.
+  - **Attendance update** — `App\Domain\Competition\Support\AttendanceImporter`; **odvojen** fajl `Candidate no | Absent (0/1)`. **Apply-and-report** (NE reject, za razliku od create-import-a): ažurira sve pronađene/validne redove, prijavi `{updated, not_found, invalid, not_found_numbers}` — jedan typo ne blokira markiranje 1000. Upis = **2 bulk UPDATE** (whereIn absent/present) po `competitor_number`. Coordinator **venue-scoped** (tuđi venue → not_found).
+- **Posledica:** `RegistrationImporter` (validate/import/errorReport) + `AttendanceImporter`; endpointi `registrations/import` (+ `/template`, `/category-sets`, `/errors`) i `registrations/attendance-import` (+ `/template`); front `RegistrationImportModal` + `AttendanceImportModal`, grupisani sa „Register student" u header-u. Gate `create`=can_student_insert / attendance `update`=can_student_edit. Legacy ref: priloženi `StudentsForImport(1).xlsx` / `StudentsForUpdate.xlsx`. Detalji — memorija `students-import-attendance`.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
