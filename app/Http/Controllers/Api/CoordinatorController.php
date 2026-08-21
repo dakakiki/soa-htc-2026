@@ -133,6 +133,28 @@ class CoordinatorController extends Controller
         return CoordinatorResource::make($this->loadCoordinator($coordinator));
     }
 
+    /**
+     * Remove one uploaded asset (profile image / attached file): delete the file from
+     * storage and clear its column, freeing the field for a new upload.
+     */
+    public function deleteAsset(User $coordinator, string $asset): CoordinatorResource
+    {
+        $this->authorize('update', $coordinator);
+
+        $column = match ($asset) {
+            'image' => 'image_path',
+            'file' => 'file_path',
+            default => abort(404),
+        };
+
+        if ($coordinator->{$column}) {
+            Storage::disk('public')->delete($coordinator->{$column});
+            $coordinator->update([$column => null]);
+        }
+
+        return CoordinatorResource::make($this->loadCoordinator($coordinator));
+    }
+
     public function destroy(Request $request, User $coordinator): Response
     {
         $this->authorize('delete', $coordinator);

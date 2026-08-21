@@ -8,6 +8,8 @@ use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\School;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CoordinatorApiTest extends TestCase
@@ -178,5 +180,43 @@ class CoordinatorApiTest extends TestCase
 
         $this->assertDatabaseMissing('users', ['id' => $created['id']]);
         $this->assertDatabaseMissing('season_user_assignments', ['id' => $created['assignment_id']]);
+    }
+
+    public function test_coordinator_asset_can_be_deleted(): void
+    {
+        Storage::fake('public');
+        $school = School::first();
+
+        $id = $this->actingAs($this->admin())
+            ->post('/api/coordinators', [
+                'name' => 'Asset Coord',
+                'email' => 'assetcoord@soahtc.test',
+                'password' => 'secret-password',
+                'country_id' => $school->country_id,
+                'role_id' => $this->roleId(SystemRole::SchoolCoordinator->value),
+                'school_ids' => [$school->id],
+                'image' => UploadedFile::fake()->image('avatar.png'),
+                'file_upload' => UploadedFile::fake()->create('doc.pdf', 20, 'application/pdf'),
+            ])
+            ->assertCreated()
+            ->json('data.id');
+
+        $imagePath = User::findOrFail($id)->image_path;
+        $this->assertNotNull($imagePath);
+
+        $this->actingAs($this->admin())
+            ->deleteJson("/api/coordinators/{$id}/assets/image")
+            ->assertOk()
+            ->assertJsonPath('data.image_url', null);
+
+        $this->assertNull(User::findOrFail($id)->image_path);
+        Storage::disk('public')->assertMissing($imagePath);
+        // The attached file is untouched by an image delete.
+        $this->assertNotNull(User::findOrFail($id)->file_path);
+
+        // Unknown asset key is a 404.
+        $this->actingAs($this->admin())
+            ->deleteJson("/api/coordinators/{$id}/assets/nope")
+            ->assertNotFound();
     }
 }

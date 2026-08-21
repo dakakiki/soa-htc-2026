@@ -2,15 +2,17 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { createCoordinator, getCoordinator, updateCoordinator, type CoordinatorPayload } from '@/api/coordinators';
+import { createCoordinator, getCoordinator, updateCoordinator, deleteCoordinatorAsset, type CoordinatorPayload } from '@/api/coordinators';
 import { listCountries, listRegions, listRoles } from '@/api/reference';
 import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
+import { IconX } from '@tabler/icons-vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
+import ImageThumb from '@/components/ImageThumb.vue';
 import type { Country, Region, Role, School } from '@/types/models';
 
 const SCHOOL_COORDINATOR_KEY = 'school_coordinator';
@@ -138,6 +140,19 @@ function onImageChange(event: Event): void {
 }
 function onFileChange(event: Event): void {
     uploadFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+}
+
+// Delete a stored asset (image / file) from the server, freeing the field for a new one.
+async function removeAsset(asset: 'image' | 'file'): Promise<void> {
+    if (id.value === null) return;
+    error.value = null;
+    try {
+        const { data } = await deleteCoordinatorAsset(id.value, asset);
+        currentImageUrl.value = data.data.image_url ?? null;
+        currentFileUrl.value = data.data.file_url ?? null;
+    } catch (e) {
+        error.value = apiErrorMessage(e, t('coordinator.saveFailed'));
+    }
 }
 
 function goBack(): void {
@@ -372,8 +387,9 @@ const fileBtn =
                                 <span class="truncate">{{ imageFile?.name || $t('coordinator.chooseImage') }}</span>
                                 <input type="file" accept="image/*" class="hidden" @change="onImageChange" />
                             </label>
-                            <a v-if="currentImageUrl && !imageFile" :href="currentImageUrl" target="_blank"
-                                class="mt-1 inline-block text-xs text-brand-link hover:underline">{{ $t('coordinator.currentImage') }}</a>
+                            <div v-if="currentImageUrl && !imageFile" class="mt-2">
+                                <ImageThumb :src="currentImageUrl" alt="image" @remove="removeAsset('image')" />
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.file') }}</label>
@@ -384,8 +400,14 @@ const fileBtn =
                                 <span class="truncate">{{ uploadFile?.name || $t('coordinator.chooseFile') }}</span>
                                 <input type="file" accept="image/*,application/pdf" class="hidden" @change="onFileChange" />
                             </label>
-                            <a v-if="currentFileUrl && !uploadFile" :href="currentFileUrl" target="_blank"
-                                class="mt-1 inline-block text-xs text-brand-link hover:underline">{{ $t('coordinator.currentFile') }}</a>
+                            <div v-if="currentFileUrl && !uploadFile" class="mt-2 flex items-center gap-3">
+                                <a :href="currentFileUrl" target="_blank" class="text-xs text-brand-link hover:underline">{{ $t('coordinator.currentFile') }}</a>
+                                <button type="button" :title="$t('common.remove')"
+                                    class="flex h-5 w-5 items-center justify-center rounded bg-red-600 text-white shadow hover:bg-red-700"
+                                    @click="removeAsset('file')">
+                                    <IconX :size="12" stroke-width="3" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

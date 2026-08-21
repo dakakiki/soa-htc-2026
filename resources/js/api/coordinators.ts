@@ -84,3 +84,8 @@ export function setCoordinatorStatus(id: number, status: string) {
 export function deleteCoordinator(id: number) {
     return http.delete(`/api/coordinators/${id}`);
 }
+
+/** Delete one uploaded asset (profile image / attached file) from the server. */
+export function deleteCoordinatorAsset(id: number, asset: 'image' | 'file') {
+    return http.delete<{ data: Coordinator }>(`/api/coordinators/${id}/assets/${asset}`);
+}
