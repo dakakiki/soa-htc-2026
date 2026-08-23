@@ -146,6 +146,8 @@ Izlazi:
 - administrator može završiti ručno ocenjivanje i objaviti rezultat;
 - istorijski rezultat čuva tadašnji reporting kontekst.
 
+**Dopuna (2026-08-23) — ADR-0039:** izveštajni sloj je dobio i **dashboard po nivou pristupa**. Sadržaj bira *scope*, ne rola: bez ograničenja → svetska karta (spajanje preko ISO 3166-1) + tabela zemalja; više od jednog venue-a → tabela venue-a; tačno jedan venue → sam spisak studenata. Uz KPI trake ide traka **„Waiting on you"** koja vraća samo ne-nulte stavke i samo one na koje korisnik sme da deluje, pa prazna traka znači da ništa ne čeka. Trend prijava po rundama crta **trake, ne liniju**, jer arhiva nema rundu 12.
+
 ### Faza 6 — Migracija, performanse i produkciona spremnost
 
 Glavne aktivnosti:
@@ -201,6 +203,11 @@ Uslov završetka:
 - pet theme tokena, logo i mapiranje na komponente;
 - tema važi odmah nakon čuvanja, bez istorije i rollback-a;
 - ista tema za public, student, admin/coordinator i mobile.
+
+**Stanje (2026-08-23) — Theme i navigacija su urađeni pre same faze:**
+
+- **Theme (ADR-0035):** ne pet nego **12 tokena** — 8 semantičkih plus **4 slobodna slota palete** za javni/CMS deo; slot 4 nosi pozadinu admin top bara. SVG logo se prihvata, ali se pri uploadu prepisuje kroz whitelist sanitizer (na disk ide samo očišćena verzija). Uz to rich-text **site title** pored logotipa, već u javnom `/api/theme` payload-u.
+- **Navigacija i autorizacija (ADR-0038):** legacy `user_level` 10/5/1 preslikan u permisije + row scope; matricu drži `PermissionMatrixTest`. Public deo se **ne dira** dok se ne otvori CMS (vlasnik, 2026-08-23) — trenutni logo je beo, pa bi na belim public zaglavljima bio nevidljiv.
 
 ### Faza 9 — Accounting compatibility
 

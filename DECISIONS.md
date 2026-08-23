@@ -755,6 +755,24 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0039 — Dashboard po nivou: sadržaj bira scope, ne rola; karta preko ISO koda
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda (predlog odobren, karta „odmah", karta gradova preskočena). **IMPLEMENTIRANO** (suite 362 zeleno).
+- **Kontekst:** Dashboard je bio tri brojača i tri prečice, iste za svakoga. Vlasnik je tražio predlog po nivou pristupa (KPI, tabela, pretraga, rezultati, po mogućstvu karta). Polazna postavka predloga: **dashboard odgovara na jedno pitanje po nivou** — „šta danas traži moju pažnju" — a sve što je samo zanimljivo za gledanje ostaje u Reports.
+- **Odluka:**
+  - **Šta se prikazuje bira `allowedSchoolIds()`, ne ime role.** Bez ograničenja → svetska karta + tabela zemalja; **više od jednog venue-a** → tabela venue-a; **tačno jedan venue** → sam spisak studenata. Isto pravilo koje zakucava polja u pickerima (ADR-0037/0038), pa country coordinator koji drži jedan venue prirodno dobija roster umesto tabele sa jednim redom, bez ijedne provere role u komponenti.
+  - **Payload nosi `null` umesto izostavljenog ključa** za ono što nivo ne dobija (`countries`, `venues_active`, `by_country`, `trend`) — UI grana na podatak, ne na permisiju.
+  - **„Waiting on you" vraća samo ne-nulte stavke, i samo one na koje korisnik sme da deluje.** Prazna traka time stvarno znači da ništa ne čeka. Stavke bez odgovarajućeg filtera na ciljnom ekranu (`missing_dob`, `no_coordinator`, `no_city`) prikazuju se **bez linka** — bolje nego bacanje korisnika na nefiltriranu listu od 50.000 redova.
+  - **Karta se spaja preko ISO 3166-1.** `countries.code` su olimpijski kodovi iz legacy-ja (`SRB`, `CRO`, `MON` = Crna Gora); dodate su `iso_alpha2` i `iso_numeric` (95/96 mapirano; `WRL/World` je kanta i ostaje van karte, Kosovo dobija user-assigned `XK` bez numeričkog). `world-atlas` geometrija ključuje feature po **numeričkom** kodu, pa nema nikakvog poklapanja po imenu. Geometrija se učitava lenjo (chunk 108 KB) i skidaju je samo nalozi čiji payload nosi zemlje.
+  - **Trend su trake, ne linija.** Arhiva nema rundu 12 (nema je u dump-u), a linija bi povukla pravu preko rupe i prikazala je kao rast. Runda u toku je druge boje jer je tekući zbir, ne rezultat.
+- **Dva odstupanja od predloga, oba zbog modela podataka:**
+  - **„Prisustvo nije uneto" ne postoji kao stanje** — `registrations.attendance` je `NOT NULL DEFAULT 'present'`, pa je svaki student od unosa prisutan. Planirana kartica je postala **„Odsutni"**. Treće stanje bi tražilo nullable kolonu + prilagođavanje attendance importa (ADR-0029).
+  - **„Poeni" su zbir objavljenih rezultata sezone** (`registration_results`), ne skor jednog testa: pojedinačan skor traži dimenziju runde/testa da bi značio nešto (isti argument kao za prosek u ADR-0023).
+- **⚡ Perf:** naivna verzija je brojala svaki KPI zasebno (**821 ms**) i mapu jednim join-om preko svih prijava (**1.096 ms**). Sada: svi brojevi nad `registrations` idu **jednim prolazom** (uslovne sume), mapa **tri uska grupisana upita**, plus indeks `(season_id, country_id)` koji je nedostajao → **admin 410 ms, koordinatori 12–22 ms**. `registrations.country_id` je denormalizovan i uvek jednak venue-ovoj državi (provereno: 0 neslaganja), pa grupisanje po državi ide bez join-a. Na punom rosteru (300k+) odgovor je keširana sumarna tabela, ne dalje doterivanje upita.
+- **Posledica:** migracije `add_iso_codes_to_countries_table` + `add_season_country_index_to_registrations`; nove zavisnosti `d3-geo`, `topojson-client`, `world-atlas`; `WorldChoropleth.vue` (🪤 boje se **ne** vezuju za `prefers-color-scheme` — admin je light-only, karta se na dark-mode mašini izvrne); Quick actions uklonjene sa dashboarda. **Nije rađeno:** globalna pretraga i karta gradova (traži `lat`/`lng` + geokodiranje 1.352 grada; vlasnik preskočio). **Predlog** je objavljen kao artifact: <https://claude.ai/code/artifact/46c085cb-e24f-40a8-9d10-94d4f8fdf4e9>
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
