@@ -88,6 +88,8 @@ Izlazi:
 - sistem ne dozvoljava objavu nekonzistentne konfiguracije;
 - API vraća samo sadržaj dozvoljen za level registracije.
 
+**Dopuna (2026-08-23) — ADR-0034:** numeracija se ne unosi u tekst. Broj pitanja dolazi iz njegovog mesta u testu, oznake odgovora (`a) b) c)` / `A) B) C)` / `1) 2) 3)`, ili nijedna) su podešavanje po pitanju, a uputstvo se piše u opisu testa umesto da se gura u prvo pitanje. Naslov pitanja je zato opcion i rich-text. **Zatečeni sadržaj se ispravlja na strani autora** — legacy unos je numeraciju držao u tekstu (1453 naslova su čist broj) i mestimično je vezivao za pogrešnu poziciju.
+
 ### Faza 3 — Registracije i studentski pristup
 
 Glavne aktivnosti:

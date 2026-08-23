@@ -655,6 +655,34 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0033 — Ikonične kontrole nose tooltip; bubble se renderuje van svog kontejnera
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda. **PRIMENJENO kroz ceo admin** (suite 324 zeleno).
+- **Kontekst:** Popis svih 69 komponenti našao je **26 kontrola bez ijednog tooltipa** (zatvaranje modala, strelice za redosled, brisanje čipa, „clear" u selektu) i još nekoliko koje su imale samo native `title` — vizuelno stran ostatku aplikacije. Uz to, vlasnik je prijavio da tooltip na Quizzes listi (katanac = kviz ima lozinku) nestaje iza zaglavlja tabele.
+- **Odluka:**
+  - **Svaka kontrola koja prikazuje samo ikonicu dobija `<Tooltip>`** + `aria-label` sa istim tekstom. Isto važi za prekidače u tabelama (nemaju vidljivu labelu). Kontrola koja **ima** vidljivu labelu (status toggle u formi, „Add exam") tooltip dobija samo ako donosi više od same labele — kod Export/Import to je pun opis radnje.
+  - **Native `title` se ne koristi** — izgleda drugačije i ne prevodi se. Sve ide kroz zajedničku komponentu.
+  - **Bubble se teleportuje u `<body>` i pozicionira fiksnim koordinatama**, umesto apsolutno unutar okidača. Razlog je konkretan: liste su u `overflow-x-auto` kontejnerima (**14 strana**), a `overflow` seče sve što izlazi iz njega — tačno tamo gde tooltip ide. Izlaskom iz kontejnera rešava se i slaganje slojeva prema top baru i sidebar-u. Gasi se na skrol, jer fiksne koordinate zastare čim se nešto pomeri.
+  - **Dug tekst se prelama** (`max-w-xs`, centriran) i **vraća se u ekran** ako bi prešao ivicu; kad nema mesta iznad, okreće se ispod. **Zamka:** bubble se mora izmeriti **sa leve ivice** pre pozicioniranja — element sa `position: fixed` dobija samo prostor desno od svoje pozicije, pa merenje na krajnjoj desnoj poziciji prelomi tekst na ~105px umesto dozvoljenih 320px.
+- **Posledica:** popravke su gde god je moguće u **deljenim komponentama** (`RowActions`, `OrderableList`, `ExportButton`, `MultiSelect`, `SearchSelect`, `ImageThumb`), pa jedan potez pokriva desetine poziva. Usput: `RichTextEditor` toolbar je imao hardkodiran engleski (`title="Bold"`) — prebačen u i18n. Nove ikonične kontrole prate ovo bez posebnog dogovora.
+
+---
+
+## ADR-0034 — Prikaz pitanja: broj iz redosleda, naslov opcion i rich-text, oznake odgovora kao podešavanje
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda. **IMPLEMENTIRAN** (suite 324 zeleno).
+- **Kontekst:** Legacy sadržaj je numeraciju kucao **u tekst**: **1453 od 1699** naslova pitanja su čist broj („60."), a **1388 od 4492** MC odgovora počinje sa `a)` ili `A)`. Time isti podatak živi na dva mesta — u tekstu i u `question_test.position` / redosledu opcija — pa preuređivanje ostavlja pogrešne oznake.
+- **Odluka:**
+  - **Broj pitanja dolazi iz `question_test.position`**, ne iz naslova. Redosled je oduvek bio ispravan (`Test::questions()` sortira po poziciji; naslov se nigde ne koristi za sortiranje) — pogrešan je bio samo *prikazani* broj.
+  - **Naslov postaje opcion i rich-text.** Opcion jer je za većinu pitanja bio samo broj, a bez toga se „60." ne bi ni mogao obrisati kroz formu (`required` + `NOT NULL`). Rich-text zbog formatiranja u samom pitanju. U admin listama i picker-u se prikazuje kao čist tekst (`toPlainText`), jer bi HTML razbio red tabele.
+  - **Oznake odgovora su podešavanje po pitanju** (`answer_numbering`: `lower_alpha` / `upper_alpha` / `numeric` / null), renderovano iz **pozicije opcije**. Null je ravnopravan izbor — mnoga pitanja se čitaju kao običan spisak. Gap-filling ga ne nudi (tamo su odgovori prihvaćene reči, ne označen spisak).
+  - **Uputstvo se piše na testu** (`tests.description`), koje se do sada slalo studentu ali se **nikad nije prikazivalo**. Zato **nema posebnog tipa stavke za uputstvo** — vlasnik: „imaju test description i tamo mogu da unesu uputstvo".
+  - **Postojeći podaci se NE čiste** (vlasnik: „nemoj da čistiš da ne komplikujemo"). Do ručne ispravke student vidi dupli broj — automatski i onaj iz naslova.
+- **Zašto se ne preskaču „blokovi sa uputstvom" pri numerisanju:** provera je pokazala da **580 od 1446** brojčanih naslova ne odgovara poziciji, jer su autori uputstvo gurali kao pseudo-pitanje (test #59: pozicije 1, 11, 21 nose „1) Put the verbs…", a 2–10, 12–20, 22–30 se savršeno poklapaju), a legacy brojevi se ponegde i preklapaju između testova istog exama (2–34 i 32–50). Zaključak vlasnika: **unos se ispravlja na njihovoj strani**, pa pozicija i broj postaju isti sami od sebe. Zato nema heuristike koja pogađa šta je uputstvo.
+- **Posledica:** migracije `make_question_title_optional` + `add_answer_numbering_to_questions`; enum `App\Domain\Assessment\Enums\AnswerNumbering` (+ `marker()` sa zaštitom preko 26. opcije); `resources/js/utils/answerNumbering.ts` i `richText.ts`; studentska strana renderuje broj iz redosleda, uputstvo testa i oznake opcija. Uz to: pregled pitanja i izmena u novom tabu iz forme testa (test je nesačuvan iza modala).
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
