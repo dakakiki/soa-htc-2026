@@ -699,6 +699,35 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0036 — Regioni imaju eksplicitan redosled po državi; drag & drop umesto kucanja brojeva
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda. **IMPLEMENTIRANO** (suite 340 zeleno).
+- **Kontekst:** Regioni su se svuda sortirali po imenu (`orderBy('name')`), a vlasnik ih u pickerima želi u redosledu koji sam odredi. Legacy podaci to već pokazuju: imena nose ručno kucane prefikse („1- Jawzjan", „2- Balkh") — isti obrazac kao brojevi u naslovima pitanja (ADR-0034), tj. redosled je živeo u tekstu jer nije imao gde drugde.
+- **Odluka:**
+  - **Nova kolona `regions.position`**, jedinstvena po državi u praksi (nema DB constraint-a — reorder je uvek pun prepis liste). Migracija je **popunjava po abecedi**, pa se na deploy-u ništa vidljivo ne pomera; ime ostaje tie-breaker (`scopeOrdered` = `position`, pa `name`) za redove koje uveze migracija bez pozicije.
+  - **Redosled se zadaje drag & drop-om** kroz `OrderableList` — istu komponentu koriste testovi i egzami, pa je pokret isti svuda. Komponenta je dobila `removable` prop: u modalu regiona brisanje je **guarded server delete**, a ne izbacivanje reda iz niza, pa ugrađenu kantu treba ugasiti.
+  - **Upis je odložen ~400 ms.** Drag emituje na **svaki red preko kog pokazivač pređe**, pa bi jedno prevlačenje poslalo 5–6 PUT-ova; zatvaranje modala flush-uje ono što je u čekanju, da redosled ne ostane neupisan.
+  - **`PUT /api/regions/reorder` prima `country_id` + `ids` u prikazanom redosledu**, i **odbija (422) id koji pripada drugoj državi** — pomešan payload ne sme da se primeni do pola. Ono što payload ne pomene zadržava poziciju, pa zastareo tab ne može da premeša ono što nije ni prikazao. Nov region ide na kraj (`max(position)+1`).
+  - **Ruta ide PRE `regions/{region}`**, inače `reorder` bude uhvaćen kao id (ista zamka kao kod `coordinators/export`, ADR-0030).
+- **Gde važi:** svi pickeri i filteri idu kroz `/api/regions` (Students, Users, Coordinators, Venues), plus opcije za Reports. **Izuzetak: Archive filteri ostaju abecedni** — tamo su regioni zamrznut tekst iz `archive_registrations` (bez FK), pa bi vezivanje po imenu na današnju konfiguraciju bilo krhko (preimenovani/obrisani regioni) i konceptualno pogrešno: arhiva je snimak godine, ne trenutna postavka.
+- **Posledica:** imena sa legacy prefiksima sada duplo prikazuju broj (pozicija + tekst). Kao i kod ADR-0034, **podaci se ne čiste automatski** — ispravka je na strani autora.
+
+---
+
+## ADR-0037 — Profil ulogovanog naloga: server objavljuje koja polja uloga sme da menja
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda. **IMPLEMENTIRANO** (suite 340 zeleno).
+- **Kontekst:** Do sada je nalog mogao da menja samo neko drugi, kroz Users/Coordinators ekrane. Trebalo je da svako uređuje svoje podatke, ali ne ista polja: admin sve, country coordinator uz sliku i fajl, school coordinator samo kontakt podatke.
+- **Odluka:**
+  - **`ProfileController::editableFields()` je jedini izvor istine.** Ista lista (a) ide u payload i forma renderuje po njoj, (b) pravi validaciona pravila u `UpdateProfileRequest`. Polje van liste **nije validirano**, pa ga Laravel i ne prosleđuje — school coordinator koji pošalje `country_id` dobija 200 i nepromenjenu državu. Alternativa (422 na neovlašćeno polje) je odbijena: klijent takvo polje nikad ne prikazuje, pa je greška znak napada, a ne korisničke zabune.
+  - **Odvojen kontroler, ne `UserController`.** Tamo je autorizacija „smem li da menjam **drugog**", ovde „koja **moja** polja". Mešanje bi značilo da jedan `UpdateUserRequest` nosi dva različita modela pristupa.
+  - **Role, status, permisije i sezonski scope NISU na profilu**, iako je vlasnik za admina rekao „sva polja". Razlog: to su stvari koje se **dodeljuju**, a admin koji sebi postavi `status=inactive` ili obriše svoju rolu zaključava sam sebe bez povratka. Kod već ima istu zaštitu za brisanje sopstvenog naloga (`messages.user.self_delete`).
+  - **Promena lozinke traži trenutnu lozinku** (`current_password` rule). `SESSION_LIFETIME` je 30 dana, pa bi bez toga otvorena sesija na tuđoj mašini bila dovoljna za trajno preuzimanje naloga.
+  - Ruta je **`requiresAuth` bez permisije** — svako ima profil; uloga odlučuje samo o poljima.
+- **Posledica:** `GET/PUT /api/profile` + `DELETE /api/profile/assets/{image|file}` (brisanje odbija asset koji uloga i nema — 403); `session.refresh()` posle snimanja, jer top bar prikazuje e-mail. Top bar: e-mail + ikonica su jedno dugme ka `/profile`.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
