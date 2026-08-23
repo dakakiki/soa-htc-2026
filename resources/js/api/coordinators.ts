@@ -89,3 +89,32 @@ export function deleteCoordinator(id: number) {
 export function deleteCoordinatorAsset(id: number, asset: 'image' | 'file') {
     return http.delete<{ data: Coordinator }>(`/api/coordinators/${id}/assets/${asset}`);
 }
+
+/** Export the currently filtered coordinators as an .xlsx (same layout as the template). */
+export function exportCoordinators(params: CoordinatorListParams = {}) {
+    return http.get('/api/coordinators/export', { params, responseType: 'blob' });
+}
+
+/** Download the coordinators import .xlsx template. */
+export function coordinatorImportTemplate() {
+    return http.get('/api/coordinators/import/template', { responseType: 'blob' });
+}
+
+export interface CoordinatorImportSummary {
+    created: number;
+    error_count: number;
+}
+
+/** Bulk-create country coordinators from a filled-in .xlsx. */
+export function importCoordinators(file: File) {
+    const fd = new FormData();
+    fd.append('file', file);
+    return http.post<CoordinatorImportSummary>('/api/coordinators/import', fd);
+}
+
+/** The same file back with an "Error" column marking each invalid row. */
+export function importCoordinatorErrors(file: File) {
+    const fd = new FormData();
+    fd.append('file', file);
+    return http.post('/api/coordinators/import/errors', fd, { responseType: 'blob' });
+}

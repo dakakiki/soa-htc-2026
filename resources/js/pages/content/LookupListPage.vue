@@ -8,7 +8,7 @@ import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import Tooltip from '@/components/Tooltip.vue';
-import { IconPencil, IconTrash } from '@tabler/icons-vue';
+import { IconPencil, IconTrash, IconPlus } from '@tabler/icons-vue';
 
 const props = defineProps<{ kind: 'testType' | 'examRound' | 'tag' }>();
 
@@ -106,8 +106,8 @@ onMounted(load);
                 <p class="mt-1 text-sm text-gray-500">{{ $t('common.results', { count: items.length }) }}</p>
             </div>
             <button v-if="canManage" type="button"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-                @click="openAdd">{{ $t(cfg.add) }}</button>
+                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
+                @click="openAdd"><IconPlus :size="16" />{{ $t(cfg.add) }}</button>
         </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>

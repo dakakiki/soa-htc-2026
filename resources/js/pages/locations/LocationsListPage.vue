@@ -15,7 +15,7 @@ import {
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
-import { IconPencil, IconTrash, IconMap } from '@tabler/icons-vue';
+import { IconPencil, IconTrash, IconMap, IconPlus } from '@tabler/icons-vue';
 import type { Country, Region } from '@/types/models';
 
 const { t } = useI18n();
@@ -222,9 +222,9 @@ onMounted(load);
             <button
                 v-if="canManage"
                 type="button"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
+                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                 @click="openAddCountry"
-            >{{ $t('location.addCountry') }}</button>
+            ><IconPlus :size="16" />{{ $t('location.addCountry') }}</button>
         </div>
 
         <form class="flex flex-wrap items-center gap-3" @submit.prevent>

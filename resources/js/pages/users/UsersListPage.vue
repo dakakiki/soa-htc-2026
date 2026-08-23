@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { IconPlus } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
@@ -146,8 +147,8 @@ onMounted(async () => {
             <RouterLink
                 v-if="canManage"
                 :to="{ name: 'users.new' }"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-            >{{ $t('user.add') }}</RouterLink>
+                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
+            ><IconPlus :size="16" />{{ $t('user.add') }}</RouterLink>
         </div>
 
         <form class="mt-2 flex flex-wrap items-center gap-2" @submit.prevent="load(1)">

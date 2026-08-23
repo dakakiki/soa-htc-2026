@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\SeasonUserAssignment;
+use App\Domain\Organization\Support\CoordinatorExporter;
+use App\Domain\Organization\Support\CoordinatorImporter;
 use App\Domain\Organization\Support\CoordinatorScope;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
@@ -13,6 +15,9 @@ use App\Http\Requests\StoreCoordinatorRequest;
 use App\Http\Requests\UpdateCoordinatorRequest;
 use App\Http\Resources\CoordinatorResource;
 use App\Models\User;
+use App\Support\XlsxReader;
+use App\Support\XlsxWriter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -31,20 +36,126 @@ class CoordinatorController extends Controller
         $roleIds = $this->coordinatorRoleIds();
         $seasonId = SeasonContext::active()?->id;
 
+        $users = $this->filteredCoordinators($request, $roleIds, $seasonId)
+            ->with([
+                'country',
+                'region',
+                'seasonAssignments' => function ($query) use ($roleIds, $seasonId): void {
+                    $query->whereIn('role_id', $roleIds)
+                        ->when($seasonId, fn ($q) => $q->where('season_id', $seasonId))
+                        ->with(['role', 'schools.country']);
+                },
+            ])
+            ->orderBy('name')
+            ->paginate(min(max($request->integer('per_page', 20), 1), 200))
+            ->withQueryString();
+
+        return CoordinatorResource::collection($users);
+    }
+
+    /**
+     * Export the currently filtered coordinators to .xlsx (same layout as the
+     * import template, so a file can round-trip). Same filters and scope as
+     * {@see index()}, but the whole matching set rather than one page.
+     */
+    public function export(Request $request): Response
+    {
+        $this->authorize('viewAny', User::class);
+
+        $roleIds = $this->coordinatorRoleIds();
+        $seasonId = SeasonContext::active()?->id;
+
+        $ids = $this->filteredCoordinators($request, $roleIds, $seasonId)->pluck('id')->all();
+
+        [$headers, $rows] = CoordinatorExporter::export($ids, $roleIds, $seasonId);
+
+        $filename = now()->format('Y-m-d').'_Coordinators_Export.xlsx';
+
+        return response(XlsxWriter::toString($headers, $rows, 'Coordinators'), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * The coordinators import template (.xlsx): the column headers plus one
+     * instructions row (skipped on import). Downloaded from the import modal.
+     */
+    public function importTemplate(): Response
+    {
+        $this->authorize('create', User::class);
+
+        $hint = [
+            'e.g. John Smith', 'name@example.com', 'Serbia', 'Vojvodina (optional)',
+            'Venue A, Venue B (optional)', 'Belgrade (optional)', '(optional)', '(optional)',
+            'active or inactive', 'Yes/No', 'Yes/No', 'Yes/No', 'Yes/No',
+        ];
+
+        return response(XlsxWriter::toString(CoordinatorExporter::HEADERS, [$hint], 'Coordinators'), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="coordinators-import-template.xlsx"',
+        ]);
+    }
+
+    /**
+     * Bulk-create country coordinators from an uploaded .xlsx ({@see CoordinatorImporter}).
+     * Returns {created} on success, or {created:0, error_count} (HTTP 422) when the
+     * file has any invalid row — the annotated file comes from {@see importErrors()}.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        $this->authorize('create', User::class);
+
+        $validated = $request->validate(['file' => ['required', 'file', 'max:10240']]);
+
+        try {
+            $rows = XlsxReader::read((string) $validated['file']->getRealPath());
+        } catch (\RuntimeException) {
+            throw ValidationException::withMessages(['file' => __('The file could not be read. Upload a valid .xlsx.')]);
+        }
+
+        $summary = CoordinatorImporter::import($rows);
+
+        return response()->json($summary, $summary['error_count'] === 0 ? 200 : 422);
+    }
+
+    /**
+     * The uploaded coordinator file returned with an "Error" column filled in per
+     * invalid row ({@see CoordinatorImporter::errorReport()}) — the user fixes it
+     * and re-uploads.
+     */
+    public function importErrors(Request $request): Response
+    {
+        $this->authorize('create', User::class);
+
+        $validated = $request->validate(['file' => ['required', 'file', 'max:10240']]);
+
+        try {
+            $rows = XlsxReader::read((string) $validated['file']->getRealPath());
+        } catch (\RuntimeException) {
+            throw ValidationException::withMessages(['file' => __('The file could not be read. Upload a valid .xlsx.')]);
+        }
+
+        return response(CoordinatorImporter::errorReport($rows), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="coordinators-import-errors.xlsx"',
+        ]);
+    }
+
+    /**
+     * The base coordinator query with all list filters + the coordinator-role /
+     * active-season scope applied — shared by {@see index()} and {@see export()}.
+     *
+     * @param  Collection<int, int>  $roleIds
+     */
+    private function filteredCoordinators(Request $request, Collection $roleIds, ?int $seasonId): Builder
+    {
         $scoped = function ($query) use ($roleIds, $seasonId): void {
             $query->whereIn('role_id', $roleIds)
                 ->when($seasonId, fn ($q) => $q->where('season_id', $seasonId));
         };
 
-        $users = User::query()
-            ->with([
-                'country',
-                'region',
-                'seasonAssignments' => function ($query) use ($scoped): void {
-                    $scoped($query);
-                    $query->with(['role', 'schools.country']);
-                },
-            ])
+        return User::query()
             ->whereHas('seasonAssignments', $scoped)
             ->when($request->filled('search'), function ($query) use ($request): void {
                 $term = '%'.$request->string('search').'%';
@@ -67,12 +178,7 @@ class CoordinatorController extends Controller
                         ->when($seasonId, fn ($qq) => $qq->where('season_id', $seasonId))
                         ->whereHas('schools', fn ($s) => $s->where('schools.id', $request->integer('school_id')));
                 });
-            })
-            ->orderBy('name')
-            ->paginate(min(max($request->integer('per_page', 20), 1), 200))
-            ->withQueryString();
-
-        return CoordinatorResource::collection($users);
+            });
     }
 
     public function show(User $coordinator): CoordinatorResource

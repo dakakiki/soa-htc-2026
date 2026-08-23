@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
-import { deleteCoordinator, listCoordinators, setCoordinatorStatus } from '@/api/coordinators';
+import { deleteCoordinator, listCoordinators, setCoordinatorStatus, exportCoordinators } from '@/api/coordinators';
 import { listCountries, listRegions, listRoles, listLevelColumns } from '@/api/reference';
 import { listSchools, getSchool } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
@@ -13,7 +13,10 @@ import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
-import { IconBuilding } from '@tabler/icons-vue';
+import ExportButton from '@/components/ExportButton.vue';
+import CoordinatorImportModal from './CoordinatorImportModal.vue';
+import { saveBlob } from '@/utils/download';
+import { IconBuilding, IconPlus, IconUpload } from '@tabler/icons-vue';
 import type { Coordinator, Country, Region, Role, School } from '@/types/models';
 
 const COORDINATOR_ROLE_KEYS = ['country_coordinator', 'school_coordinator'];
@@ -37,6 +40,8 @@ const cascadeLoading = ref(false);
 const schoolSearching = ref(false);
 const schoolTotal = ref(0);
 const error = ref<string | null>(null);
+const exporting = ref(false);
+const importOpen = ref(false);
 
 const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
@@ -99,6 +104,30 @@ async function load(target = page.value): Promise<void> {
     }
 }
 
+async function exportList(): Promise<void> {
+    exporting.value = true;
+    try {
+        const { data } = await exportCoordinators({
+            search: filters.search || undefined,
+            country_id: filters.country_id ?? undefined,
+            region_id: filters.region_id ?? undefined,
+            role_id: filters.role_id ?? undefined,
+            school_id: filters.school_id ?? undefined,
+            status: filters.status || undefined,
+        });
+        saveBlob(data as Blob, `${new Date().toISOString().slice(0, 10)}_Coordinators_Export.xlsx`);
+    } catch (e) {
+        error.value = apiErrorMessage(e, t('coordinator.exportFailed'));
+    } finally {
+        exporting.value = false;
+    }
+}
+
+async function onImported(): Promise<void> {
+    importOpen.value = false;
+    await load(1);
+}
+
 // Load the region + venue options for the current country without touching the
 // selected filter values — used both on country change and on URL restore.
 async function loadCascade(): Promise<void> {
@@ -158,19 +187,6 @@ function onSchoolSearch(term: string): void {
 async function onCountryFilterSelected(value: number | null): Promise<void> {
     filters.country_id = value;
     await onCountryFilterChange();
-}
-
-async function resetFilters(): Promise<void> {
-    filters.search = '';
-    filters.country_id = null;
-    filters.region_id = null;
-    filters.role_id = null;
-    filters.school_id = null;
-    filters.status = '';
-    selectedSchoolFilter.value = null;
-    regions.value = [];
-    schools.value = [];
-    schoolTotal.value = 0;
     await load(1);
 }
 
@@ -228,15 +244,19 @@ onMounted(async () => {
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('coordinator.title') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ $t('coordinator.count', { count: total }) }}</p>
             </div>
-            <RouterLink
-                v-if="canManage"
-                :to="{ name: 'coordinators.new' }"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-            >{{ $t('coordinator.add') }}</RouterLink>
+            <div v-if="canManage" class="flex flex-wrap items-center justify-end gap-2">
+                <RouterLink
+                    :to="{ name: 'coordinators.new' }"
+                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
+                ><IconPlus :size="16" />{{ $t('coordinator.add') }}</RouterLink>
+                <ExportButton :icon="IconUpload" :label="$t('coordinator.import.title')"
+                    :tooltip="$t('coordinator.import.tooltip')" @click="importOpen = true" />
+                <ExportButton :loading="exporting" :tooltip="$t('coordinator.exportTooltip')" @click="exportList" />
+            </div>
         </div>
 
         <div class="rounded-lg border border-gray-200 bg-white p-4">
-        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5" @submit.prevent="load(1)">
+        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="load(1)">
             <!-- Column 1: search -->
             <input v-model="filters.search" type="search" :placeholder="$t('coordinator.search')"
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
@@ -245,35 +265,30 @@ onMounted(async () => {
             <SearchSelect :model-value="filters.country_id" :options="countryOptions" dense
                 class="lg:col-start-2 lg:row-start-1" :placeholder="$t('coordinator.filterCountry')"
                 :search-placeholder="$t('coordinator.country')" @update:model-value="onCountryFilterSelected" />
-            <SearchSelect v-model="filters.region_id" :options="regionOptions" dense :loading="cascadeLoading"
+            <SearchSelect :model-value="filters.region_id" :options="regionOptions" dense :loading="cascadeLoading"
                 class="lg:col-start-2 lg:row-start-2" :disabled="regions.length === 0"
-                :placeholder="$t('coordinator.filterRegion')" :search-placeholder="$t('coordinator.region')" />
+                :placeholder="$t('coordinator.filterRegion')" :search-placeholder="$t('coordinator.region')"
+                @update:model-value="(v: number | null) => { filters.region_id = v; load(1); }" />
 
             <!-- Column 3: Venue (server-side search) -->
-            <SearchSelect v-model="filters.school_id" :options="venueOptions" dense remote
+            <SearchSelect :model-value="filters.school_id" :options="venueOptions" dense remote
                 :searching="schoolSearching" :total="schoolTotal" :selected-option="selectedSchoolFilter"
                 :disabled="!filters.country_id" :loading="cascadeLoading"
                 class="lg:col-start-3 lg:row-start-1" :placeholder="$t('coordinator.filterVenue')"
-                :search-placeholder="$t('coordinator.venuesLabel')" @search="onSchoolSearch" />
+                :search-placeholder="$t('coordinator.venuesLabel')" @search="onSchoolSearch"
+                @update:model-value="(v: number | null) => { filters.school_id = v; load(1); }" />
 
             <!-- Column 4: Coordinator level / Status -->
-            <select v-model="filters.role_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-1">
+            <select v-model="filters.role_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-1" @change="load(1)">
                 <option :value="null">{{ $t('coordinator.filterLevel') }}</option>
                 <option v-for="r in coordinatorRoles" :key="r.id" :value="r.id">{{ r.name }}</option>
             </select>
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-2">
+            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-2" @change="load(1)">
                 <option value="">{{ $t('coordinator.filterStatus') }}</option>
                 <option value="active">{{ $t('coordinator.statusActive') }}</option>
                 <option value="inactive">{{ $t('coordinator.statusInactive') }}</option>
             </select>
 
-            <!-- Column 5: Filter above Reset, matched widths -->
-            <button type="submit" class="w-full rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover lg:col-start-5 lg:row-start-1">
-                {{ $t('common.filter') }}
-            </button>
-            <button type="button" class="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 lg:col-start-5 lg:row-start-2" @click="resetFilters">
-                {{ $t('coordinator.filterReset') }}
-            </button>
         </form>
         </div>
 
@@ -386,5 +401,7 @@ onMounted(async () => {
                 </div>
             </div>
         </div>
+
+        <CoordinatorImportModal :open="importOpen" @close="importOpen = false" @imported="onImported" />
     </section>
 </template>

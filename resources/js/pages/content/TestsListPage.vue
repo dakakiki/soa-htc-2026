@@ -13,7 +13,7 @@ import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
 import TestPreviewModal from '@/components/TestPreviewModal.vue';
-import { IconEye } from '@tabler/icons-vue';
+import { IconEye, IconPlus } from '@tabler/icons-vue';
 import type { Lookup } from '@/api/content';
 import type { LevelOption, Test } from '@/types/models';
 
@@ -115,7 +115,8 @@ onMounted(async () => {
                 <p class="mt-1 text-sm text-gray-500">{{ $t('common.total', { count: total }) }}</p>
             </div>
             <RouterLink v-if="canManage" :to="{ name: 'tests.new' }"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
+                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
+                <IconPlus :size="16" />
                 {{ $t('test.add') }}
             </RouterLink>
         </div>

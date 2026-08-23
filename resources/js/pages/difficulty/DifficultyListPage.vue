@@ -14,7 +14,7 @@ import Tooltip from '@/components/Tooltip.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
-import { IconPencil, IconTrash, IconStairs } from '@tabler/icons-vue';
+import { IconPencil, IconTrash, IconStairs, IconPlus } from '@tabler/icons-vue';
 import type { Country, DifficultyCategory, DifficultyLevel } from '@/types/models';
 
 const { t } = useI18n();
@@ -25,9 +25,14 @@ const canManage = computed(() => session.can('difficulty.manage'));
 const chip = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200';
 const GRADE_OPTIONS: MultiSelectOption[] = Array.from({ length: 13 }, (_, i) => ({ id: i + 1, label: String(i + 1) }));
 const typeOptions = [
-    { value: 'regular', label: 'Regular' },
-    { value: 'special', label: 'Special' },
+    { value: 'regular', label: 'Regular', activeClass: 'bg-green-500 text-white' },
+    { value: 'special', label: 'Special', activeClass: 'bg-green-500 text-white' },
 ];
+
+const statusOptions = computed(() => [
+    { value: 'active', label: t('difficulty.statusActive'), activeClass: 'bg-green-500 text-white' },
+    { value: 'inactive', label: t('difficulty.statusInactive'), activeClass: 'bg-gray-400 text-white' },
+]);
 
 const categories = ref<DifficultyCategory[]>([]);
 const countries = ref<Country[]>([]);
@@ -213,8 +218,8 @@ onMounted(async () => {
                 <p class="mt-1 text-sm text-gray-500">{{ $t('difficulty.count', { count: categories.length }) }}</p>
             </div>
             <button v-if="canManage" type="button"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-                @click="openAddCategory">{{ $t('difficulty.addCategory') }}</button>
+                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
+                @click="openAddCategory"><IconPlus :size="16" />{{ $t('difficulty.addCategory') }}</button>
         </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
@@ -305,10 +310,9 @@ onMounted(async () => {
                                 :placeholder="$t('difficulty.selectCountries')" :summary="(n: number) => $t('difficulty.countriesSelected', { count: n })" />
                         </div>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <ToggleSwitch :model-value="cat.status === 'active'" :aria-label="$t('difficulty.status')"
-                            @update:model-value="(v: boolean) => (cat.status = v ? 'active' : 'inactive')" />
-                        <span class="text-sm text-gray-700">{{ $t('difficulty.status') }}: {{ cat.status === 'active' ? $t('difficulty.statusActive') : $t('difficulty.statusInactive') }}</span>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">{{ $t('difficulty.status') }}</label>
+                        <ButtonGroup v-model="cat.status" :options="statusOptions" />
                     </div>
                     <p v-if="cat.error" class="text-sm text-red-600">{{ cat.error }}</p>
                     <div class="flex items-center justify-between border-t border-gray-200 pt-4">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import { IconPlus } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
 import { deleteRole } from '@/api/roles';
 import { listRoles } from '@/api/reference';
@@ -58,8 +59,8 @@ onMounted(load);
             </div>
             <RouterLink
                 :to="{ name: 'roles.new' }"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-            >{{ $t('role.add') }}</RouterLink>
+                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
+            ><IconPlus :size="16" />{{ $t('role.add') }}</RouterLink>
         </div>
 
         <div class="flex justify-end">

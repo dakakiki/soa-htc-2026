@@ -152,6 +152,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Staff users and their season role/scope assignments.
     Route::apiResource('users', UserController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    // Coordinators export (.xlsx) + bulk import (.xlsx) — registered before the
+    // apiResource so "coordinators/export" isn't captured as a {coordinator} show.
+    Route::get('coordinators/export', [CoordinatorController::class, 'export']);
+    Route::get('coordinators/import/template', [CoordinatorController::class, 'importTemplate']);
+    Route::post('coordinators/import', [CoordinatorController::class, 'import']);
+    Route::post('coordinators/import/errors', [CoordinatorController::class, 'importErrors']);
+
     Route::apiResource('coordinators', CoordinatorController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::delete('coordinators/{coordinator}/assets/{asset}', [CoordinatorController::class, 'deleteAsset']);
     Route::post('users/{user}/assignments', [AssignmentController::class, 'store']);

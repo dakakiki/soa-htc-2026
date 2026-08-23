@@ -8,13 +8,17 @@ import { listLevelOptions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
-import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import OrderableList from '@/components/OrderableList.vue';
 import type { LevelOption, QuizExamRef, Exam } from '@/types/models';
 
 const { t } = useI18n();
+
+const statusOptions = computed(() => [
+    { value: 'active', label: t('quiz.statusActive'), activeClass: 'bg-green-500 text-white' },
+    { value: 'inactive', label: t('quiz.statusInactive'), activeClass: 'bg-gray-400 text-white' },
+]);
 const route = useRoute();
 const router = useRouter();
 
@@ -212,10 +216,9 @@ onMounted(async () => {
                             {{ $t('quiz.passwordRemove') }}
                         </label>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <ToggleSwitch :model-value="form.status === 'active'" :aria-label="$t('quiz.status')"
-                            @update:model-value="(v: boolean) => (form.status = v ? 'active' : 'inactive')" />
-                        <span class="text-sm text-gray-700">{{ $t('quiz.status') }}: {{ form.status === 'active' ? $t('quiz.statusActive') : $t('quiz.statusInactive') }}</span>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">{{ $t('quiz.status') }}</label>
+                        <ButtonGroup v-model="form.status" :options="statusOptions" />
                     </div>
                 </div>
 

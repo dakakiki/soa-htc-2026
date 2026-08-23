@@ -11,7 +11,7 @@ import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
-import { IconLock } from '@tabler/icons-vue';
+import { IconLock, IconPlus } from '@tabler/icons-vue';
 import type { LevelOption, Quiz } from '@/types/models';
 
 const { t } = useI18n();
@@ -113,7 +113,8 @@ onMounted(async () => {
                 <p class="mt-1 text-sm text-gray-500">{{ $t('common.total', { count: total }) }}</p>
             </div>
             <RouterLink v-if="canManage" :to="{ name: 'quizzes.new' }"
-                class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
+                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
+                <IconPlus :size="16" />
                 {{ $t('quiz.add') }}
             </RouterLink>
         </div>

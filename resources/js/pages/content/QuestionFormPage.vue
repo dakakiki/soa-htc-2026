@@ -17,6 +17,11 @@ import type { Lookup } from '@/api/content';
 import type { LevelOption, QuestionAnswer } from '@/types/models';
 
 const { t } = useI18n();
+
+const statusOptions = computed(() => [
+    { value: 'active', label: t('question.statusActive'), activeClass: 'bg-green-500 text-white' },
+    { value: 'inactive', label: t('question.statusInactive'), activeClass: 'bg-gray-400 text-white' },
+]);
 const route = useRoute();
 const router = useRouter();
 
@@ -202,10 +207,9 @@ onMounted(async () => {
                             <a v-if="currentAudio && !audioFile" :href="currentAudio" target="_blank" class="mt-1 inline-block text-xs text-brand-link hover:underline">{{ $t('question.current') }}</a>
                         </div>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <ToggleSwitch :model-value="form.status === 'active'" :aria-label="$t('question.status')"
-                            @update:model-value="(v: boolean) => (form.status = v ? 'active' : 'inactive')" />
-                        <span class="text-sm text-gray-700">{{ $t('question.status') }}: {{ form.status === 'active' ? $t('question.statusActive') : $t('question.statusInactive') }}</span>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">{{ $t('question.status') }}</label>
+                        <ButtonGroup v-model="form.status" :options="statusOptions" />
                     </div>
                 </div>
 
