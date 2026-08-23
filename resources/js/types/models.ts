@@ -427,11 +427,22 @@ export interface Coordinator {
     schools: CoordinatorSchool[];
 }
 
+/** One country on the dashboard map, keyed by ISO 3166-1 numeric. */
+export interface CountryMapRow {
+    iso: number;
+    name: string;
+    students: number;
+    venues: number;
+    submitted: number;
+}
+
 export interface DashboardData {
     season: { name: string; round_number: number; status: string; ends_at: string | null } | null;
     venues: { count: number; scoped: boolean };
     users: { count: number } | null;
     coordinators: { count: number } | null;
+    /** Present only for accounts that see beyond one country (the map audience). */
+    by_country: CountryMapRow[] | null;
 }
 
 export interface Paginated<T> {

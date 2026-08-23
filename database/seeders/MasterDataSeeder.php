@@ -35,11 +35,14 @@ class MasterDataSeeder extends Seeder
         Setting::current();
 
         $countries = collect([
-            ['code' => 'RS', 'name' => 'Serbia'],
-            ['code' => 'MK', 'name' => 'North Macedonia'],
-            ['code' => 'EG', 'name' => 'Egypt'],
+            ['code' => 'RS', 'name' => 'Serbia', 'iso_alpha2' => 'RS', 'iso_numeric' => 688],
+            ['code' => 'MK', 'name' => 'North Macedonia', 'iso_alpha2' => 'MK', 'iso_numeric' => 807],
+            ['code' => 'EG', 'name' => 'Egypt', 'iso_alpha2' => 'EG', 'iso_numeric' => 818],
         ])->mapWithKeys(fn (array $c) => [
-            $c['code'] => Country::query()->firstOrCreate(['code' => $c['code']], ['name' => $c['name']]),
+            $c['code'] => Country::query()->firstOrCreate(
+                ['code' => $c['code']],
+                ['name' => $c['name'], 'iso_alpha2' => $c['iso_alpha2'], 'iso_numeric' => $c['iso_numeric']],
+            ),
         ]);
 
         // One country has many regions.

@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { defineAsyncComponent, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useSessionStore } from '@/stores/session';
 import { getDashboard } from '@/api/dashboard';
 import { apiErrorMessage } from '@/api/http';
 import type { DashboardData } from '@/types/models';
+
+// The map pulls in the world geometry and a projection, so it loads only for
+// the accounts whose payload actually carries country rows.
+const WorldChoropleth = defineAsyncComponent(() => import('@/components/WorldChoropleth.vue'));
 
 const session = useSessionStore();
 const data = ref<DashboardData | null>(null);
@@ -51,6 +55,18 @@ onMounted(async () => {
             <div v-if="data.coordinators" class="rounded-lg bg-gray-50 p-4">
                 <div class="text-xs text-gray-500">{{ $t('dashboard.coordinators') }}</div>
                 <div class="mt-1 text-2xl font-medium text-gray-900">{{ data.coordinators.count }}</div>
+            </div>
+        </div>
+
+        <div v-if="data?.by_country?.length" class="rounded-lg border border-gray-200 bg-white">
+            <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+                <h2 class="text-sm font-semibold text-gray-900">{{ $t('dashboard.map.title') }}</h2>
+                <span class="ml-auto text-xs text-gray-500">
+                    {{ $t('dashboard.map.countries', { count: data.by_country.length }) }}
+                </span>
+            </div>
+            <div class="p-4">
+                <WorldChoropleth :rows="data.by_country" />
             </div>
         </div>
 

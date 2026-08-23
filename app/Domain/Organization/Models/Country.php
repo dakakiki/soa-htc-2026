@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Country extends Model
 {
-    protected $fillable = ['code', 'name', 'legacy_id'];
+    protected $fillable = ['code', 'iso_alpha2', 'iso_numeric', 'name', 'legacy_id'];
 
     protected function casts(): array
     {
-        return ['legacy_id' => 'integer'];
+        return ['iso_numeric' => 'integer', 'legacy_id' => 'integer'];
     }
 
     /** @return HasMany<Region, $this> */

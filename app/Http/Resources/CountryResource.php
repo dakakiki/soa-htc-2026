@@ -20,6 +20,9 @@ class CountryResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
+            // ISO 3166-1: alpha-2 for labels and SVG maps, numeric for TopoJSON.
+            'iso_alpha2' => $this->iso_alpha2,
+            'iso_numeric' => $this->iso_numeric,
             'regions_count' => $this->whenCounted('regions'),
             'schools_count' => $this->whenCounted('schools'),
         ];
