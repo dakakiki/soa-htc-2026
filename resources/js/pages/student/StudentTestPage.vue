@@ -46,6 +46,19 @@ function renderedDescription(description: string | null): string {
     return description.replaceAll(GAP_MARKER, () => `<strong>[${++n}]</strong>`);
 }
 
+/**
+ * The test's own instructions. Legacy imports copied the title into this field,
+ * which would print the same line twice, so only genuinely new text is shown.
+ */
+const testIntro = computed(() => {
+    const description = session.value?.test.description ?? '';
+    const asText = (html: string) => new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? '';
+
+    return asText(description) !== '' && asText(description) !== (session.value?.test.title ?? '').trim()
+        ? description
+        : '';
+});
+
 const clock = computed(() => {
     const s = Math.max(0, remaining.value);
     const m = Math.floor(s / 60);
@@ -170,6 +183,12 @@ onUnmounted(stopTicker);
                     <IconClock :size="24" />{{ clock }}
                 </p>
             </header>
+
+            <!-- How to answer this test: authored on the test itself, so it is stated
+                 once rather than repeated into the first question. Kept out of the
+                 sticky header, where a long instruction would eat the screen. -->
+            <div v-if="testIntro" class="prose prose-sm max-w-none rounded-lg border border-gray-200 bg-white p-5 text-base text-gray-700"
+                v-html="testIntro"></div>
 
             <ol class="space-y-5">
                 <li v-for="(q, qi) in session.questions" :key="q.id" class="rounded-lg border border-gray-200 bg-white p-5">
