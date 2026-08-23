@@ -34,6 +34,11 @@ export const useSessionStore = defineStore('session', () => {
         }
     }
 
+    /** Re-read the identity after the user edits their own profile. */
+    async function refresh(): Promise<void> {
+        user.value = await authApi.fetchUser();
+    }
+
     async function login(email: string, password: string, remember = false): Promise<void> {
         user.value = await authApi.login(email, password, remember);
         ready.value = true;
@@ -53,5 +58,5 @@ export const useSessionStore = defineStore('session', () => {
         user.value = null;
     }
 
-    return { user, ready, isAuthenticated, can, ensureLoaded, login, logout, forceLogout };
+    return { user, ready, isAuthenticated, can, ensureLoaded, refresh, login, logout, forceLogout };
 });

@@ -39,3 +39,8 @@ export function updateRegion(id: number, payload: { name: string }) {
 export function deleteRegion(id: number) {
     return http.delete(`/api/regions/${id}`);
 }
+
+/** Persist the drag & drop order; `ids` are in display order. Returns the country's regions. */
+export function reorderRegions(countryId: number, ids: number[]) {
+    return http.put<{ data: Region[] }>('/api/regions/reorder', { country_id: countryId, ids });
+}

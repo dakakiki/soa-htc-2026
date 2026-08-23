@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IconLogout } from '@tabler/icons-vue';
+import { IconLogout, IconUserCircle } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
 import AppSidebar from '@/components/AppSidebar.vue';
@@ -34,8 +34,14 @@ async function logout(): Promise<void> {
                 <span v-if="themeStore.theme?.site_title" class="text-[1.35rem] leading-none [&_p]:m-0" v-html="themeStore.theme.site_title" />
                 <span v-else-if="!themeStore.theme?.logo_url" class="text-[1.35rem] leading-none">{{ $t('app.name') }}</span>
             </RouterLink>
-            <div class="ml-auto flex items-center gap-4 text-sm">
-                <span class="text-white">{{ session.user?.email }}</span>
+            <div class="ml-auto flex items-center gap-3 text-sm">
+                <Tooltip :text="t('profile.title')" position="bottom">
+                    <RouterLink :to="{ name: 'profile' }"
+                        class="inline-flex items-center gap-2 rounded-md border border-white/25 bg-white/10 px-3 py-1.5 text-white hover:bg-white/20">
+                        <IconUserCircle :size="18" />
+                        <span>{{ session.user?.email }}</span>
+                    </RouterLink>
+                </Tooltip>
                 <Tooltip :text="t('nav.logout')" position="bottom">
                     <button
                         :aria-label="t('nav.logout')"

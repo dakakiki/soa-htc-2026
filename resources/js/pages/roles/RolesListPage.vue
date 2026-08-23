@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { IconPlus } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
@@ -24,6 +24,21 @@ const filtered = computed(() => {
         return roles.value;
     }
     return roles.value.filter((r) => r.name.toLowerCase().includes(q) || r.key.toLowerCase().includes(q));
+});
+
+/*
+ * Paged in the browser: `/api/roles` is the shared reference endpoint the user and
+ * coordinator forms read, so it stays unpaginated and the page size lives here.
+ */
+const PER_PAGE = 10;
+const page = ref(1);
+const lastPage = computed(() => Math.max(1, Math.ceil(filtered.value.length / PER_PAGE)));
+const paged = computed<Role[]>(() => filtered.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE));
+
+watch(filtered, () => {
+    if (page.value > lastPage.value) {
+        page.value = 1;
+    }
 });
 
 async function load(): Promise<void> {
@@ -66,9 +81,11 @@ onMounted(load);
             </Tooltip>
         </div>
 
-        <div class="flex justify-end">
-            <input v-model="search" type="search" :placeholder="$t('role.searchPlaceholder')"
-                class="w-full max-w-xs rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+            <form class="grid grid-cols-1 gap-2 sm:grid-cols-2" @submit.prevent>
+                <input v-model="search" type="search" :placeholder="$t('role.searchPlaceholder')"
+                    class="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+            </form>
         </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
@@ -84,7 +101,7 @@ onMounted(load);
                 </thead>
                 <tbody>
                     <tr
-                        v-for="role in filtered"
+                        v-for="role in paged"
                         :key="role.id"
                         class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft"
                     >
@@ -111,6 +128,16 @@ onMounted(load);
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <div v-if="lastPage > 1" class="flex items-center gap-3 text-sm">
+            <button :disabled="page <= 1" class="rounded-md border border-gray-300 px-3 py-1 disabled:opacity-40" @click="page--">
+                {{ $t('common.previous') }}
+            </button>
+            <span class="text-gray-500">{{ $t('common.pageOf', { current: page, last: lastPage }) }}</span>
+            <button :disabled="page >= lastPage" class="rounded-md border border-gray-300 px-3 py-1 disabled:opacity-40" @click="page++">
+                {{ $t('common.next') }}
+            </button>
         </div>
     </section>
 </template>

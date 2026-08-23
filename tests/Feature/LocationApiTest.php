@@ -127,6 +127,66 @@ class LocationApiTest extends TestCase
             ->assertJsonPath('data.name', 'Skopje Region');
     }
 
+    public function test_new_region_lands_last_and_drag_order_is_persisted(): void
+    {
+        $country = Country::where('code', 'MK')->firstOrFail();
+
+        $ids = [];
+        foreach (['Bitola', 'Ohrid', 'Tetovo'] as $name) {
+            $ids[$name] = $this->actingAs($this->admin())
+                ->postJson('/api/regions', ['country_id' => $country->id, 'name' => $name])
+                ->assertCreated()
+                ->json('data.id');
+        }
+
+        // Creation order, not alphabetical: each new region goes to the end.
+        $this->actingAs($this->admin())
+            ->getJson("/api/regions?country_id={$country->id}")
+            ->assertOk()
+            ->assertJsonPath('data.0.name', 'Bitola')
+            ->assertJsonPath('data.2.name', 'Tetovo');
+
+        $this->actingAs($this->admin())
+            ->putJson('/api/regions/reorder', [
+                'country_id' => $country->id,
+                'ids' => [$ids['Tetovo'], $ids['Bitola'], $ids['Ohrid']],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.0.name', 'Tetovo')
+            ->assertJsonPath('data.1.name', 'Bitola');
+
+        // The pickers read the same endpoint, so the order follows them everywhere.
+        $this->actingAs($this->admin())
+            ->getJson("/api/regions?country_id={$country->id}")
+            ->assertJsonPath('data.0.name', 'Tetovo');
+
+        $this->assertSame(1, Region::find($ids['Tetovo'])->position);
+    }
+
+    public function test_reorder_rejects_a_region_from_another_country(): void
+    {
+        $mk = Country::where('code', 'MK')->firstOrFail();
+        $rs = Country::where('code', 'RS')->firstOrFail();
+
+        $foreign = Region::create(['country_id' => $rs->id, 'name' => 'Vojvodina']);
+        $own = Region::create(['country_id' => $mk->id, 'name' => 'Ohrid']);
+
+        $this->actingAs($this->admin())
+            ->putJson('/api/regions/reorder', ['country_id' => $mk->id, 'ids' => [$foreign->id, $own->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('ids.0');
+    }
+
+    public function test_non_manager_cannot_reorder_regions(): void
+    {
+        $country = Country::where('code', 'RS')->firstOrFail();
+        $region = Region::create(['country_id' => $country->id, 'name' => 'Vojvodina']);
+
+        $this->actingAs($this->nonManager())
+            ->putJson('/api/regions/reorder', ['country_id' => $country->id, 'ids' => [$region->id]])
+            ->assertForbidden();
+    }
+
     public function test_region_name_unique_within_country(): void
     {
         $country = Country::where('code', 'RS')->firstOrFail();

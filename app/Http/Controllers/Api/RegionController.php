@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Organization\Models\Region;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RegionIndexRequest;
+use App\Http\Requests\ReorderRegionsRequest;
 use App\Http\Requests\StoreRegionRequest;
 use App\Http\Requests\UpdateRegionRequest;
 use App\Http\Resources\RegionResource;
@@ -14,6 +15,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class RegionController extends Controller
 {
@@ -29,7 +31,7 @@ class RegionController extends Controller
                 $request->integer('country_id'),
                 fn ($query, int $countryId) => $query->where('country_id', $countryId)
             )
-            ->orderBy('name')
+            ->ordered()
             ->get();
 
         return RegionResource::collection($regions);
@@ -37,7 +39,11 @@ class RegionController extends Controller
 
     public function store(StoreRegionRequest $request): JsonResponse
     {
-        $region = Region::create($request->validated());
+        $data = $request->validated();
+        // A new region lands at the end of its country's order.
+        $data['position'] = (int) Region::query()->where('country_id', $data['country_id'])->max('position') + 1;
+
+        $region = Region::create($data);
 
         return RegionResource::make($region->loadCount('schools'))
             ->response()
@@ -49,6 +55,29 @@ class RegionController extends Controller
         $region->update($request->validated());
 
         return RegionResource::make($region->loadCount('schools'));
+    }
+
+    /**
+     * Persist the drag & drop order for one country. Ids arrive in display order;
+     * anything the payload omits keeps its position, so a stale tab cannot silently
+     * reshuffle regions it never showed.
+     */
+    public function reorder(ReorderRegionsRequest $request): AnonymousResourceCollection
+    {
+        $countryId = $request->integer('country_id');
+
+        DB::transaction(function () use ($request, $countryId): void {
+            foreach ($request->collect('ids') as $index => $id) {
+                Region::query()
+                    ->where('id', (int) $id)
+                    ->where('country_id', $countryId)
+                    ->update(['position' => $index + 1]);
+            }
+        });
+
+        return RegionResource::collection(
+            Region::query()->withCount('schools')->where('country_id', $countryId)->ordered()->get()
+        );
     }
 
     /**

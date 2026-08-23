@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
@@ -11,9 +11,11 @@ import {
     createRegion,
     updateRegion,
     deleteRegion,
+    reorderRegions,
 } from '@/api/locations';
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import OrderableList from '@/components/OrderableList.vue';
 import Tooltip from '@/components/Tooltip.vue';
 import { IconPencil, IconTrash, IconMap, IconPlus } from '@tabler/icons-vue';
 import type { Country, Region } from '@/types/models';
@@ -36,6 +38,22 @@ const filtered = computed<Country[]>(() => {
     return countries.value.filter(
         (c) => c.name.toLowerCase().includes(term) || c.code.toLowerCase().includes(term)
     );
+});
+
+/*
+ * Paged in the browser: `/api/countries` is the shared, deliberately unpaginated
+ * reference endpoint every picker depends on, so the page size lives here.
+ */
+const PER_PAGE = 10;
+const page = ref(1);
+const lastPage = computed(() => Math.max(1, Math.ceil(filtered.value.length / PER_PAGE)));
+const paged = computed<Country[]>(() => filtered.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE));
+
+// A narrowed result set can leave the current page past the end.
+watch(filtered, () => {
+    if (page.value > lastPage.value) {
+        page.value = 1;
+    }
 });
 
 const chip = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200';
@@ -144,6 +162,8 @@ async function openRegions(c: Country): Promise<void> {
 }
 
 function closeRegions(): void {
+    clearTimeout(orderTimer);
+    void persistOrder();
     regionsModal.country = null;
 }
 
@@ -170,6 +190,45 @@ async function reloadRegions(): Promise<void> {
     const row = countries.value.find((c) => c.id === countryId);
     if (row) {
         row.regions_count = regionsModal.regions.length;
+    }
+}
+
+/*
+ * Drag & drop order. Every move emits, so the write is coalesced behind a short
+ * timer instead of firing per row the pointer crosses; closing the modal flushes
+ * whatever is still pending so an order is never lost mid-drag.
+ */
+const savingOrder = ref(false);
+let orderTimer: ReturnType<typeof setTimeout> | undefined;
+let orderPending = false;
+
+function onReorder(list: Region[]): void {
+    regionsModal.regions = list;
+    if (!canManage.value) {
+        return;
+    }
+    orderPending = true;
+    clearTimeout(orderTimer);
+    orderTimer = setTimeout(() => void persistOrder(), 400);
+}
+
+async function persistOrder(): Promise<void> {
+    const country = regionsModal.country;
+    if (!country || !orderPending) {
+        return;
+    }
+    orderPending = false;
+    savingOrder.value = true;
+    regionsModal.error = null;
+    try {
+        const { data } = await reorderRegions(country.id, regionsModal.regions.map((r) => r.id));
+        regionsModal.regions = data.data;
+    } catch (e) {
+        regionsModal.error = apiErrorMessage(e, t('location.saveFailed'));
+        // Show what the server actually holds rather than the rejected arrangement.
+        await reloadRegions();
+    } finally {
+        savingOrder.value = false;
     }
 }
 
@@ -217,7 +276,7 @@ onMounted(load);
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('location.title') }}</h1>
-                <p class="mt-1 text-sm text-gray-500">{{ $t('location.count', { count: countries.length }) }}</p>
+                <p class="mt-1 text-sm text-gray-500">{{ $t('location.count', { count: filtered.length }) }}</p>
             </div>
             <Tooltip v-if="canManage" :text="$t('location.addCountry')">
                 <button
@@ -228,25 +287,20 @@ onMounted(load);
             </Tooltip>
         </div>
 
-        <form class="flex flex-wrap items-center gap-3" @submit.prevent>
-            <input v-model="search" type="search" :placeholder="$t('location.search')"
-                class="w-56 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <button type="submit"
-                class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
-                {{ $t('common.search') }}
-            </button>
-        </form>
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+            <form class="grid grid-cols-1 gap-2 sm:grid-cols-2" @submit.prevent>
+                <input v-model="search" type="search" :placeholder="$t('location.search')"
+                    class="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+            </form>
+        </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-
-        <p class="text-sm text-gray-500">{{ $t('common.results', { count: filtered.length }) }}</p>
 
         <div class="relative min-h-[8rem] overflow-x-auto rounded-lg border border-gray-200 bg-white">
             <LoadingOverlay v-if="loading" />
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                     <tr>
-                        <th class="px-4 py-3">{{ $t('location.id') }}</th>
                         <th class="px-4 py-3">{{ $t('location.code') }}</th>
                         <th class="px-4 py-3">{{ $t('location.name') }}</th>
                         <th class="px-4 py-3 text-center">{{ $t('location.regions') }}</th>
@@ -255,8 +309,7 @@ onMounted(load);
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="c in filtered" :key="c.id" class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft">
-                        <td class="px-4 py-3 text-gray-500">{{ c.id }}</td>
+                    <tr v-for="c in paged" :key="c.id" class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft">
                         <td class="px-4 py-3 font-mono font-medium text-gray-900">{{ c.code }}</td>
                         <td class="px-4 py-3 text-gray-800">{{ c.name }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ c.regions_count ?? 0 }}</td>
@@ -285,10 +338,20 @@ onMounted(load);
                         </td>
                     </tr>
                     <tr v-if="!loading && filtered.length === 0">
-                        <td colspan="6" class="px-4 py-6 text-center text-gray-400">{{ $t('location.empty') }}</td>
+                        <td colspan="5" class="px-4 py-6 text-center text-gray-400">{{ $t('location.empty') }}</td>
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <div v-if="lastPage > 1" class="flex items-center gap-3 text-sm">
+            <button :disabled="page <= 1" class="rounded-md border border-gray-300 px-3 py-1 disabled:opacity-40" @click="page--">
+                {{ $t('common.previous') }}
+            </button>
+            <span class="text-gray-500">{{ $t('common.pageOf', { current: page, last: lastPage }) }}</span>
+            <button :disabled="page >= lastPage" class="rounded-md border border-gray-300 px-3 py-1 disabled:opacity-40" @click="page++">
+                {{ $t('common.next') }}
+            </button>
         </div>
 
         <!-- Country add/edit modal -->
@@ -333,57 +396,50 @@ onMounted(load);
         <!-- Regions modal -->
         <div v-if="regionsModal.country" class="fixed inset-0 z-40 flex items-start justify-center bg-black/40 p-4 pt-20"
             @click.self="closeRegions">
-            <div class="w-full max-w-2xl rounded-lg bg-white shadow-xl">
-                <div class="flex items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
+            <div class="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
+                <div class="flex shrink-0 items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
                     <h2 class="text-lg font-semibold">{{ $t('location.regionsModalTitle', { country: regionsModal.country.name }) }}</h2>
                     <Tooltip :text="$t('common.close')" position="bottom">
                         <button type="button" class="text-white/80 hover:text-white"
                             :aria-label="$t('common.close')" @click="closeRegions">✕</button>
                     </Tooltip>
                 </div>
-                <div class="relative min-h-[6rem] p-4">
-                    <LoadingOverlay v-if="regionsModal.loading" />
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                            <tr>
-                                <th class="px-3 py-2">{{ $t('location.id') }}</th>
-                                <th class="px-3 py-2">{{ $t('location.name') }}</th>
-                                <th class="px-3 py-2 text-center">{{ $t('location.venues') }}</th>
-                                <th v-if="canManage" class="px-3 py-2 text-right">{{ $t('common.actions') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="r in regionsModal.regions" :key="r.id" class="odd:bg-white even:bg-gray-50">
-                                <td class="px-3 py-2 text-gray-500">{{ r.id }}</td>
-                                <td class="px-3 py-2 font-medium text-gray-900">{{ r.name }}</td>
-                                <td class="px-3 py-2 text-center text-gray-600">{{ r.schools_count ?? 0 }}</td>
-                                <td v-if="canManage" class="px-3 py-2">
-                                    <div class="flex items-center justify-end gap-1.5">
-                                        <Tooltip :text="$t('common.edit')">
-                                            <button type="button" :aria-label="$t('common.edit')"
-                                                :class="[chip, 'text-green-600']" @click="startEditRegion(r)">
-                                                <IconPencil :size="16" />
-                                            </button>
-                                        </Tooltip>
-                                        <Tooltip :text="$t('common.remove')">
-                                            <button type="button" :aria-label="$t('common.remove')"
-                                                :class="[chip, 'text-red-600']" @click="removeRegion(r)">
-                                                <IconTrash :size="16" />
-                                            </button>
-                                        </Tooltip>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr v-if="!regionsModal.loading && regionsModal.regions.length === 0">
-                                <td :colspan="canManage ? 4 : 3" class="px-3 py-4 text-center text-gray-400">{{ $t('location.noRegions') }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
 
-                    <p v-if="regionsModal.error" class="mt-3 text-sm text-red-600">{{ regionsModal.error }}</p>
+                <!-- The list scrolls; the add/edit row below stays put. -->
+                <div class="relative min-h-[6rem] flex-1 overflow-auto p-4">
+                    <LoadingOverlay v-if="regionsModal.loading" />
+                    <div class="mb-3 flex items-center justify-between">
+                        <p class="text-xs text-gray-400">{{ $t('location.orderHint') }}</p>
+                        <span v-if="savingOrder" class="text-xs text-gray-400">{{ $t('common.saving') }}</span>
+                    </div>
+                    <OrderableList :model-value="regionsModal.regions" :empty-text="$t('location.noRegions')"
+                        :removable="false" @update:model-value="onReorder">
+                        <template #item="{ item }">
+                            <span class="min-w-0 flex-1 truncate font-medium text-gray-900">{{ item.name }}</span>
+                            <span class="shrink-0 text-xs text-gray-500">{{ $t('location.venues') }}: {{ item.schools_count ?? 0 }}</span>
+                        </template>
+                        <template v-if="canManage" #actions="{ item }">
+                            <Tooltip :text="$t('common.edit')">
+                                <button type="button" :aria-label="$t('common.edit')"
+                                    class="text-green-600 hover:text-green-700" @click="startEditRegion(item)">
+                                    <IconPencil :size="16" />
+                                </button>
+                            </Tooltip>
+                            <Tooltip :text="$t('common.remove')">
+                                <button type="button" :aria-label="$t('common.remove')"
+                                    class="text-red-600 hover:text-red-700" @click="removeRegion(item)">
+                                    <IconTrash :size="16" />
+                                </button>
+                            </Tooltip>
+                        </template>
+                    </OrderableList>
+                </div>
+
+                <div class="shrink-0 border-t border-gray-200 p-4">
+                    <p v-if="regionsModal.error" class="mb-3 text-sm text-red-600">{{ regionsModal.error }}</p>
 
                     <!-- Add / edit region row -->
-                    <form v-if="canManage" class="mt-4 flex items-center gap-2 border-t border-gray-200 pt-4" @submit.prevent="saveRegion">
+                    <form v-if="canManage" class="flex items-center gap-2" @submit.prevent="saveRegion">
                         <input v-model="regionsModal.name" type="text" required
                             class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
                             :placeholder="regionsModal.editingId ? $t('location.editRegion') : $t('location.addRegionPlaceholder')" />

@@ -60,6 +60,7 @@ async function load(target = page.value): Promise<void> {
     try {
         const { data } = await listUsers({
             page: target,
+            per_page: 10,
             search: filters.search || undefined,
             country_id: filters.country_id ?? undefined,
             region_id: filters.region_id ?? undefined,
@@ -93,6 +94,12 @@ async function onCountryFilterChange(): Promise<void> {
 async function onCountryFilterSelected(value: number | null): Promise<void> {
     filters.country_id = value;
     await onCountryFilterChange();
+    await load(1);
+}
+
+async function onRegionFilterSelected(value: number | null): Promise<void> {
+    filters.region_id = value;
+    await load(1);
 }
 
 async function onToggleStatus(user: AdminUser, value: boolean): Promise<void> {
@@ -152,10 +159,10 @@ onMounted(async () => {
             </Tooltip>
         </div>
 
-        <form class="mt-2 flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
-            <input v-model="filters.search" type="search" :placeholder="$t('user.searchNameEmail')"
-                class="w-44 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <div class="w-44">
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+            <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="load(1)">
+                <input v-model="filters.search" type="search" :placeholder="$t('user.searchNameEmail')"
+                    class="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
                 <SearchSelect
                     :model-value="filters.country_id"
                     :options="countryOptions"
@@ -164,31 +171,26 @@ onMounted(async () => {
                     :search-placeholder="$t('user.country')"
                     @update:model-value="onCountryFilterSelected"
                 />
-            </div>
-            <div class="w-44">
                 <SearchSelect
-                    v-model="filters.region_id"
+                    :model-value="filters.region_id"
                     :options="regionOptions"
                     dense
                     :disabled="!filters.country_id"
                     :loading="cascadeLoading"
                     :placeholder="$t('user.region')"
                     :search-placeholder="$t('user.region')"
+                    @update:model-value="onRegionFilterSelected"
                 />
-            </div>
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
-                <option value="">{{ $t('user.filterStatus') }}</option>
-                <option value="active">{{ $t('user.statusActive') }}</option>
-                <option value="inactive">{{ $t('user.statusInactive') }}</option>
-            </select>
-            <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
-                {{ $t('common.search') }}
-            </button>
-        </form>
+                <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                    @change="load(1)">
+                    <option value="">{{ $t('user.filterStatus') }}</option>
+                    <option value="active">{{ $t('user.statusActive') }}</option>
+                    <option value="inactive">{{ $t('user.statusInactive') }}</option>
+                </select>
+            </form>
+        </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-
-        <p class="text-sm text-gray-500">{{ $t('common.results', { count: total }) }}</p>
 
         <div class="relative min-h-[8rem] overflow-x-auto rounded-lg border border-gray-200 bg-white">
             <LoadingOverlay v-if="loading" />

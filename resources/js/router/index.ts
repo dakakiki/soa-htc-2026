@@ -99,6 +99,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'schools.manage' },
     },
     {
+        path: '/profile',
+        name: 'profile',
+        component: () => import('@/pages/profile/ProfileFormPage.vue'),
+        meta: { requiresAuth: true },
+    },
+    {
         path: '/users',
         name: 'users',
         component: () => import('@/pages/users/UsersListPage.vue'),

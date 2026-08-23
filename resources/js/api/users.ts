@@ -20,6 +20,7 @@ export interface UserPayload {
 
 export interface UserListParams {
     page?: number;
+    per_page?: number;
     search?: string;
     country_id?: number;
     region_id?: number;

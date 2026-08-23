@@ -4,10 +4,16 @@ import { useI18n } from 'vue-i18n';
 import { IconGripVertical, IconArrowUp, IconArrowDown, IconTrash, IconPlus } from '@tabler/icons-vue';
 import Tooltip from '@/components/Tooltip.vue';
 
-const props = defineProps<{
-    modelValue: T[];
-    emptyText: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        modelValue: T[];
+        emptyText: string;
+        /** Off when removing a row means more than dropping it from the list (e.g. a
+         *  guarded server delete) — the caller then supplies its own action. */
+        removable?: boolean;
+    }>(),
+    { removable: true },
+);
 const emit = defineEmits<{ 'update:modelValue': [T[]] }>();
 
 const { t } = useI18n();
@@ -79,7 +85,7 @@ function onDragEnd(): void {
             <div class="flex shrink-0 items-center gap-2 border-l border-gray-200 pl-3">
                 <!-- Caller's actions (view, edit, …); remove stays last, as everywhere else. -->
                 <slot name="actions" :item="item" :index="i" />
-                <Tooltip :text="t('common.remove')">
+                <Tooltip v-if="removable" :text="t('common.remove')">
                     <button type="button" class="text-red-600 hover:text-red-700"
                         :aria-label="t('common.remove')" @click="removeAt(i)"><IconTrash :size="16" /></button>
                 </Tooltip>

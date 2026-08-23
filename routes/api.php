@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ExamRoundController;
 use App\Http\Controllers\Api\GradingController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\QuestionTagController;
 use App\Http\Controllers\Api\QuizController;
@@ -91,12 +92,21 @@ Route::prefix('student')->group(function () {
  */
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'show']);
+
+    // Self-service profile of the signed-in account (no permission gate: the
+    // role decides which fields are editable, see ProfileController).
+    Route::get('profile', [ProfileController::class, 'show']);
+    Route::put('profile', [ProfileController::class, 'update']);
+    Route::delete('profile/assets/{asset}', [ProfileController::class, 'deleteAsset']);
+
     Route::get('countries', [CountryController::class, 'index']);
     Route::post('countries', [CountryController::class, 'store']);
     Route::put('countries/{country}', [CountryController::class, 'update']);
     Route::delete('countries/{country}', [CountryController::class, 'destroy']);
     Route::get('regions', [RegionController::class, 'index']);
     Route::post('regions', [RegionController::class, 'store']);
+    // Before `regions/{region}`: otherwise "reorder" is parsed as a region id.
+    Route::put('regions/reorder', [RegionController::class, 'reorder']);
     Route::put('regions/{region}', [RegionController::class, 'update']);
     Route::delete('regions/{region}', [RegionController::class, 'destroy']);
     // Difficulty configuration (admin-only; categories + their grade→level maps).

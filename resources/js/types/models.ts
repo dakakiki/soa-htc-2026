@@ -153,6 +153,8 @@ export interface Region {
     id: number;
     name: string;
     country_id: number;
+    /** Display order within the country, set by drag & drop in the locations admin. */
+    position?: number;
     schools_count?: number;
 }
 

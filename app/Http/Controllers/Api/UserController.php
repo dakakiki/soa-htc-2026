@@ -58,7 +58,7 @@ class UserController extends Controller
             ->when($request->filled('region_id'), fn ($q) => $q->where('region_id', $request->integer('region_id')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->orderBy('name')
-            ->paginate(20);
+            ->paginate(min(max($request->integer('per_page', 20), 1), 200));
 
         return AdminUserResource::collection($users);
     }

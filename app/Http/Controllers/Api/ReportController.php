@@ -477,7 +477,7 @@ class ReportController extends Controller
         return response()->json([
             'countries' => Country::query()->orderBy('name')->get(['id', 'name']),
             'regions' => $countryId
-                ? Region::query()->where('country_id', $countryId)->orderBy('name')->get(['id', 'name'])
+                ? Region::query()->where('country_id', $countryId)->ordered()->get(['id', 'name'])
                 : [],
             'schools' => $countryId
                 ? School::query()->where('country_id', $countryId)->orderBy('name')->get(['id', 'name'])
