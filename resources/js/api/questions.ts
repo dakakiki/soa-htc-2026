@@ -2,7 +2,8 @@ import { http } from '@/api/http';
 import type { Paginated, Question, QuestionAnswer } from '@/types/models';
 
 export interface QuestionPayload {
-    title: string;
+    // Optional rich text: the question's number comes from its place in the test.
+    title?: string | null;
     description?: string | null;
     question_type: string;
     points: number;

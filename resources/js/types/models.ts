@@ -195,7 +195,9 @@ export interface QuestionAnswer {
 
 export interface Question {
     id: number;
-    title: string;
+    // Rich text, and optional: a question's number comes from its position in the
+    // test, so most carry no heading of their own.
+    title: string | null;
     description: string | null;
     question_type: string;
     question_type_label: string;
@@ -211,7 +213,7 @@ export interface Question {
 
 export interface TestQuestionRef {
     id: number;
-    title: string;
+    title: string | null;
     points: number;
     position: number;
 }

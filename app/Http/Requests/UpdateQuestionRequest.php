@@ -23,7 +23,7 @@ class UpdateQuestionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => ['sometimes', 'required', 'string', 'max:3000'],
+            'title' => ['sometimes', 'nullable', 'string', 'max:3000'],
             'description' => ['nullable', 'string'],
             'question_type' => ['sometimes', 'required', Rule::enum(QuestionType::class)],
             'points' => ['sometimes', 'required', 'numeric', 'min:0', 'max:999'],

@@ -172,11 +172,15 @@ onUnmounted(stopTicker);
             </header>
 
             <ol class="space-y-5">
-                <li v-for="q in session.questions" :key="q.id" class="rounded-lg border border-gray-200 bg-white p-5">
-                    <div class="mb-2 text-right">
+                <li v-for="(q, qi) in session.questions" :key="q.id" class="rounded-lg border border-gray-200 bg-white p-5">
+                    <div class="mb-2 flex items-center justify-between gap-3">
+                        <!-- The number comes from the question's place in the test, not from
+                             anything typed into its title. -->
+                        <span class="text-sm font-bold text-gray-400">{{ qi + 1 }}.</span>
                         <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500">{{ $t('student.test.points', { n: q.points }) }}</span>
                     </div>
-                    <h2 v-if="q.title" class="text-xl font-bold text-gray-900">{{ q.title }}</h2>
+                    <!-- Admin-authored rich text. -->
+                    <h2 v-if="q.title" class="prose prose-sm max-w-none text-xl font-bold text-gray-900" v-html="q.title"></h2>
                     <!-- Admin-authored content; [answer] markers shown as numbered blanks. -->
                     <div v-if="q.description" class="prose prose-sm mt-2 max-w-none text-base text-gray-600" v-html="renderedDescription(q.description)"></div>
 

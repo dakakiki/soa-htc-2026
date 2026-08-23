@@ -458,6 +458,7 @@ export default {
         id: 'ID',
         titleCol: 'Title',
         titlePlaceholder: 'Question title',
+        titleHint: 'Optional. Do not type the question number — it comes from the question’s place in the test.',
         description: 'Description',
         descriptionHint: 'Question text / instructions (HTML allowed)',
         type: 'Type',

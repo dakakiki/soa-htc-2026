@@ -8,6 +8,7 @@ import { useConfirmStore } from '@/stores/confirm';
 import { listQuestions, deleteQuestion, setQuestionStatus } from '@/api/questions';
 import { questionTagsApi } from '@/api/content';
 import { apiErrorMessage } from '@/api/http';
+import { toPlainText } from '@/utils/richText';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
@@ -157,7 +158,7 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-500">{{ q.id }}</td>
                         <td class="px-4 py-3 max-w-md truncate">
                             <RouterLink :to="{ name: 'questions.edit', params: { id: q.id } }" class="font-medium text-gray-900 hover:text-brand-primary">
-                                {{ q.title }}
+                                {{ toPlainText(q.title) || $t('common.dash') }}
                             </RouterLink>
                         </td>
                         <td class="px-4 py-3 text-gray-600">{{ q.question_type_label }}</td>

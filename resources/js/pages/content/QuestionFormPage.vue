@@ -74,7 +74,8 @@ async function save(): Promise<void> {
     saving.value = true;
     error.value = null;
     const payload = {
-        title: form.title.trim(),
+        // Both are rich text; the editor emits '' when empty, which we store as null.
+        title: form.title || null,
         description: form.description || null,
         question_type: form.question_type,
         points: form.points,
@@ -108,7 +109,7 @@ onMounted(async () => {
         if (isEdit.value) {
             const { data } = await getQuestion(id.value);
             const q = data.data;
-            form.title = q.title;
+            form.title = q.title ?? '';
             form.description = q.description ?? '';
             form.question_type = q.question_type;
             form.points = q.points;
@@ -139,8 +140,9 @@ onMounted(async () => {
                 <!-- Left: content -->
                 <div class="space-y-5 lg:col-span-2">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('question.titleCol') }}</label>
-                        <input v-model="form.title" type="text" required :class="field" :placeholder="$t('question.titlePlaceholder')" />
+                        <label class="mb-1 block text-sm font-medium text-gray-700">{{ $t('question.titleCol') }}</label>
+                        <RichTextEditor v-model="form.title" :placeholder="$t('question.titlePlaceholder')" />
+                        <p class="mt-1 text-xs text-gray-400">{{ $t('question.titleHint') }}</p>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">{{ $t('question.description') }}</label>

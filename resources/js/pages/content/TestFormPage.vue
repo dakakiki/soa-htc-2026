@@ -7,6 +7,7 @@ import { listQuestions } from '@/api/questions';
 import { testTypesApi } from '@/api/content';
 import { listLevelOptions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
+import { toPlainText } from '@/utils/richText';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
@@ -169,7 +170,7 @@ onMounted(async () => {
                                         :disabled="selectedIds.has(q.id)"
                                         class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-brand-primary-soft disabled:opacity-40"
                                         @click="add(q)">
-                                        <span class="truncate">{{ q.title }}</span>
+                                        <span class="truncate">{{ toPlainText(q.title) || $t('common.dash') }}</span>
                                         <span class="shrink-0 text-xs text-gray-400">
                                             {{ selectedIds.has(q.id) ? $t('test.alreadyAdded') : q.question_type_label }}
                                         </span>
@@ -181,7 +182,7 @@ onMounted(async () => {
 
                         <OrderableList v-model="selected" :empty-text="$t('test.noQuestions')" class="mt-3">
                             <template #item="{ item }">
-                                <span class="flex-1 truncate">{{ item.title }}</span>
+                                <span class="flex-1 truncate">{{ toPlainText(item.title) || $t('common.dash') }}</span>
                                 <span class="shrink-0 text-xs text-gray-400">{{ item.points }}</span>
                             </template>
                         </OrderableList>

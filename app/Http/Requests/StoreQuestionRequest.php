@@ -21,7 +21,7 @@ class StoreQuestionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:3000'],
+            'title' => ['nullable', 'string', 'max:3000'],
             'description' => ['nullable', 'string'],
             'question_type' => ['required', Rule::enum(QuestionType::class)],
             'points' => ['required', 'numeric', 'min:0', 'max:999'],
