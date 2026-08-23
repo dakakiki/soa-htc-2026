@@ -48,7 +48,10 @@ class MediaController extends Controller
 
         $validated = $request->validate([
             'files' => ['required', 'array', 'min:1', 'max:20'],
-            'files.*' => ['file', 'image', 'max:'.self::MAX_KILOBYTES],
+            // Raster only. SVG is executable markup, and this project accepts
+            // it in exactly one place — the Theme logo/icon, rewritten by
+            // SvgSanitizer on the way in (ADR-0035).
+            'files.*' => ['file', 'mimes:jpeg,jpg,png,webp,gif', 'max:'.self::MAX_KILOBYTES],
         ]);
 
         $created = collect($validated['files'])

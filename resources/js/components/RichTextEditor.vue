@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch, type Component } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -10,8 +10,9 @@ import { TableKit } from '@tiptap/extension-table/kit';
 import {
     IconBold, IconItalic, IconUnderline, IconH2, IconH3, IconH4,
     IconList, IconListNumbers, IconLink, IconClearFormatting, IconPalette,
-    IconPhoto, IconTable, IconTablePlus, IconTableMinus, IconTableOff,
-    IconColumnInsertRight, IconColumnRemove,
+    IconPhoto, IconTable, IconTablePlus, IconTableOff, IconHeading, IconPilcrow,
+    IconChevronDown, IconColumnInsertRight, IconColumnRemove,
+    IconRowInsertBottom, IconRowRemove,
 } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
 import Tooltip from '@/components/Tooltip.vue';
@@ -77,6 +78,17 @@ onBeforeUnmount(() => editor.value?.destroy());
 const btn = (active: boolean): string =>
     `inline-flex h-8 w-8 items-center justify-center rounded ${active ? 'bg-brand-primary-soft text-brand-primary' : 'text-gray-600 hover:bg-gray-100'}`;
 
+/** A toolbar button that opens a menu: wider, with room for the chevron. */
+const menuBtn = (active: boolean, open: boolean): string =>
+    `inline-flex h-8 items-center gap-0.5 rounded px-1.5 ${
+        active || open ? 'bg-brand-primary-soft text-brand-primary' : 'text-gray-600 hover:bg-gray-100'
+    }`;
+
+const menuItem = (active: boolean): string =>
+    `flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm ${
+        active ? 'bg-brand-primary-soft text-brand-primary' : 'text-gray-700 hover:bg-gray-100'
+    }`;
+
 function setLink(): void {
     if (!editor.value) return;
     const previous = editor.value.getAttributes('link').href as string | undefined;
@@ -108,7 +120,46 @@ const colorSwatches = computed<{ label: string; value: string }[]>(() => {
     ];
 });
 
+/** The levels the heading menu offers, and the icon that labels each one. */
+const HEADING_LEVELS = [2, 3, 4] as const;
+const HEADING_ICONS: Record<number, Component> = { 2: IconH2, 3: IconH3, 4: IconH4 };
+
 const showMedia = ref(false);
+const showHeadings = ref(false);
+const showTable = ref(false);
+
+/** Opening one toolbar menu closes the others, so two never overlap. */
+function openMenu(which: 'headings' | 'table' | 'colors'): void {
+    showHeadings.value = which === 'headings' ? !showHeadings.value : false;
+    showTable.value = which === 'table' ? !showTable.value : false;
+    showColors.value = which === 'colors' ? !showColors.value : false;
+}
+
+function applyHeading(level: number): void {
+    editor.value?.chain().focus().toggleHeading({ level: level as 2 | 3 | 4 }).run();
+    showHeadings.value = false;
+}
+
+function applyParagraph(): void {
+    editor.value?.chain().focus().setParagraph().run();
+    showHeadings.value = false;
+}
+
+function insertTable(): void {
+    editor.value?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    showTable.value = false;
+}
+
+type TableAction = 'addRowAfter' | 'deleteRow' | 'addColumnAfter' | 'deleteColumn' | 'deleteTable';
+
+function tableAction(action: TableAction): void {
+    const chain = editor.value?.chain().focus();
+    if (!chain) {
+        return;
+    }
+    chain[action]().run();
+    showTable.value = false;
+}
 
 /** Insert a library image at the cursor, with its alt text. */
 function insertImage(media: CmsMedia): void {
@@ -134,17 +185,35 @@ function clearColor(): void {
             <Tooltip :text="t('editor.italic')"><button type="button" :class="btn(editor.isActive('italic'))" :aria-label="t('editor.italic')" @click="editor.chain().focus().toggleItalic().run()"><IconItalic :size="16" /></button></Tooltip>
             <Tooltip :text="t('editor.underline')"><button type="button" :class="btn(editor.isActive('underline'))" :aria-label="t('editor.underline')" @click="editor.chain().focus().toggleUnderline().run()"><IconUnderline :size="16" /></button></Tooltip>
             <span class="mx-1 h-5 w-px bg-gray-200" />
-            <Tooltip :text="t('editor.heading')"><button type="button" :class="btn(editor.isActive('heading', { level: 2 }))" :aria-label="t('editor.heading')" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><IconH2 :size="16" /></button></Tooltip>
-            <!-- The smaller headings only matter in a long article. -->
-            <template v-if="rich">
-                <Tooltip :text="t('editor.heading3')"><button type="button" :class="btn(editor.isActive('heading', { level: 3 }))" :aria-label="t('editor.heading3')" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"><IconH3 :size="16" /></button></Tooltip>
-                <Tooltip :text="t('editor.heading4')"><button type="button" :class="btn(editor.isActive('heading', { level: 4 }))" :aria-label="t('editor.heading4')" @click="editor.chain().focus().toggleHeading({ level: 4 }).run()"><IconH4 :size="16" /></button></Tooltip>
-            </template>
+            <!-- One heading button with the levels behind it: three H buttons in a
+                 row read as three unrelated tools. The plain editor has a single
+                 level, so there it stays a plain button. -->
+            <div v-if="rich" class="relative">
+                <Tooltip :text="t('editor.heading')">
+                    <button type="button" :class="menuBtn(editor.isActive('heading'), showHeadings)" :aria-label="t('editor.heading')"
+                        @click="openMenu('headings')">
+                        <IconHeading :size="16" /><IconChevronDown :size="12" class="opacity-60" />
+                    </button>
+                </Tooltip>
+                <div v-if="showHeadings" class="fixed inset-0 z-10" @click="showHeadings = false" />
+                <div v-if="showHeadings" class="absolute left-0 top-9 z-20 w-44 rounded-md border border-gray-200 bg-white p-1 shadow-lg">
+                    <button v-for="level in HEADING_LEVELS" :key="level" type="button"
+                        :class="menuItem(editor.isActive('heading', { level }))" @click="applyHeading(level)">
+                        <component :is="HEADING_ICONS[level]" :size="16" />
+                        {{ t(`editor.heading${level}`) }}
+                    </button>
+                    <button type="button" :class="menuItem(editor.isActive('paragraph'))" @click="applyParagraph()">
+                        <IconPilcrow :size="16" />
+                        {{ t('editor.paragraph') }}
+                    </button>
+                </div>
+            </div>
+            <Tooltip v-else :text="t('editor.heading')"><button type="button" :class="btn(editor.isActive('heading', { level: 2 }))" :aria-label="t('editor.heading')" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><IconH2 :size="16" /></button></Tooltip>
             <Tooltip :text="t('editor.bulletList')"><button type="button" :class="btn(editor.isActive('bulletList'))" :aria-label="t('editor.bulletList')" @click="editor.chain().focus().toggleBulletList().run()"><IconList :size="16" /></button></Tooltip>
             <Tooltip :text="t('editor.numberedList')"><button type="button" :class="btn(editor.isActive('orderedList'))" :aria-label="t('editor.numberedList')" @click="editor.chain().focus().toggleOrderedList().run()"><IconListNumbers :size="16" /></button></Tooltip>
             <Tooltip :text="t('editor.link')"><button type="button" :class="btn(editor.isActive('link'))" :aria-label="t('editor.link')" @click="setLink"><IconLink :size="16" /></button></Tooltip>
             <div class="relative">
-                <Tooltip :text="t('editor.textColour')"><button type="button" :class="btn(showColors)" :aria-label="t('editor.textColour')" @click="showColors = !showColors"><IconPalette :size="16" /></button></Tooltip>
+                <Tooltip :text="t('editor.textColour')"><button type="button" :class="btn(showColors)" :aria-label="t('editor.textColour')" @click="openMenu('colors')"><IconPalette :size="16" /></button></Tooltip>
                 <div v-if="showColors" class="fixed inset-0 z-10" @click="showColors = false" />
                 <div v-if="showColors" class="absolute left-0 top-9 z-20 w-44 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
                     <div class="grid grid-cols-5 gap-1.5">
@@ -164,15 +233,43 @@ function clearColor(): void {
             <template v-if="rich">
                 <span class="mx-1 h-5 w-px bg-gray-200" />
                 <Tooltip :text="t('editor.image')"><button type="button" :class="btn(showMedia)" :aria-label="t('editor.image')" @click="showMedia = true"><IconPhoto :size="16" /></button></Tooltip>
-                <Tooltip :text="t('editor.table')"><button type="button" :class="btn(editor.isActive('table'))" :aria-label="t('editor.table')" @click="editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()"><IconTable :size="16" /></button></Tooltip>
-                <!-- Row and column controls only mean anything inside a table. -->
-                <template v-if="editor.isActive('table')">
-                    <Tooltip :text="t('editor.addRow')"><button type="button" :class="btn(false)" :aria-label="t('editor.addRow')" @click="editor.chain().focus().addRowAfter().run()"><IconTablePlus :size="16" /></button></Tooltip>
-                    <Tooltip :text="t('editor.deleteRow')"><button type="button" :class="btn(false)" :aria-label="t('editor.deleteRow')" @click="editor.chain().focus().deleteRow().run()"><IconTableMinus :size="16" /></button></Tooltip>
-                    <Tooltip :text="t('editor.addColumn')"><button type="button" :class="btn(false)" :aria-label="t('editor.addColumn')" @click="editor.chain().focus().addColumnAfter().run()"><IconColumnInsertRight :size="16" /></button></Tooltip>
-                    <Tooltip :text="t('editor.deleteColumn')"><button type="button" :class="btn(false)" :aria-label="t('editor.deleteColumn')" @click="editor.chain().focus().deleteColumn().run()"><IconColumnRemove :size="16" /></button></Tooltip>
-                    <Tooltip :text="t('editor.deleteTable')"><button type="button" :class="btn(false)" :aria-label="t('editor.deleteTable')" @click="editor.chain().focus().deleteTable().run()"><IconTableOff :size="16" /></button></Tooltip>
-                </template>
+
+                <!-- Insert plus the row/column actions in one menu: outside a table
+                     only "insert" applies, and six icons that appear and vanish as
+                     the caret moves are worse than one button that stays put. -->
+                <div class="relative">
+                    <Tooltip :text="t('editor.table')">
+                        <button type="button" :class="menuBtn(editor.isActive('table'), showTable)" :aria-label="t('editor.table')"
+                            @click="openMenu('table')">
+                            <IconTable :size="16" /><IconChevronDown :size="12" class="opacity-60" />
+                        </button>
+                    </Tooltip>
+                    <div v-if="showTable" class="fixed inset-0 z-10" @click="showTable = false" />
+                    <div v-if="showTable" class="absolute left-0 top-9 z-20 w-52 rounded-md border border-gray-200 bg-white p-1 shadow-lg">
+                        <button type="button" :class="menuItem(false)" @click="insertTable()">
+                            <IconTablePlus :size="16" />{{ t('editor.insertTable') }}
+                        </button>
+                        <template v-if="editor.isActive('table')">
+                            <span class="my-1 block h-px bg-gray-200" />
+                            <button type="button" :class="menuItem(false)" @click="tableAction('addRowAfter')">
+                                <IconRowInsertBottom :size="16" />{{ t('editor.addRow') }}
+                            </button>
+                            <button type="button" :class="menuItem(false)" @click="tableAction('deleteRow')">
+                                <IconRowRemove :size="16" />{{ t('editor.deleteRow') }}
+                            </button>
+                            <button type="button" :class="menuItem(false)" @click="tableAction('addColumnAfter')">
+                                <IconColumnInsertRight :size="16" />{{ t('editor.addColumn') }}
+                            </button>
+                            <button type="button" :class="menuItem(false)" @click="tableAction('deleteColumn')">
+                                <IconColumnRemove :size="16" />{{ t('editor.deleteColumn') }}
+                            </button>
+                            <span class="my-1 block h-px bg-gray-200" />
+                            <button type="button" :class="`${menuItem(false)} text-red-600`" @click="tableAction('deleteTable')">
+                                <IconTableOff :size="16" />{{ t('editor.deleteTable') }}
+                            </button>
+                        </template>
+                    </div>
+                </div>
             </template>
             <Tooltip :text="t('editor.clearFormatting')"><button type="button" :class="btn(false)" :aria-label="t('editor.clearFormatting')" @click="editor.chain().focus().unsetAllMarks().clearNodes().run()"><IconClearFormatting :size="16" /></button></Tooltip>
         </div>

@@ -26,7 +26,8 @@ class StoreCmsPostRequest extends FormRequest
             'slug' => CmsSlugRules::optional('cms_posts'),
             'excerpt' => ['nullable', 'string', 'max:2000'],
             'body' => ['nullable', 'string'],
-            'image' => ['nullable', 'image', 'max:5120'],
+            // Raster only, as in the media library (ADR-0035 keeps SVG to the theme).
+            'image' => ['nullable', 'mimes:jpeg,jpg,png,webp,gif', 'max:5120'],
             'status' => ['sometimes', Rule::enum(PublicationStatus::class)],
             // Blank on publish means "now"; a future date schedules the post.
             'published_at' => ['nullable', 'date'],
