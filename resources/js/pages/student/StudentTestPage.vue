@@ -99,6 +99,17 @@ function stopTicker(): void {
     }
 }
 
+/**
+ * Once the header is pinned it competes with the question for screen space, so
+ * the title shrinks out of the way as soon as reading starts. The countdown keeps
+ * its size — it is the one thing worth glancing up at.
+ */
+const scrolled = ref(false);
+
+function onScroll(): void {
+    scrolled.value = window.scrollY > 8;
+}
+
 function buildAnswers(): SubmitAnswer[] {
     if (session.value === null) {
         return [];
@@ -133,6 +144,9 @@ async function submit(auto = false): Promise<void> {
 }
 
 onMounted(async () => {
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll(); // a reload can restore the page mid-scroll
+
     try {
         const { data } = await startTest(student.token ?? '', testId);
         session.value = data;
@@ -152,7 +166,10 @@ onMounted(async () => {
     }
 });
 
-onUnmounted(stopTicker);
+onUnmounted(() => {
+    stopTicker();
+    window.removeEventListener('scroll', onScroll);
+});
 </script>
 
 <template>
@@ -174,11 +191,17 @@ onUnmounted(stopTicker);
         <p v-else-if="error" class="text-sm text-red-600">{{ error }}</p>
 
         <template v-else-if="session">
-            <header class="sticky top-0 z-10 -mx-6 border-b border-gray-200 bg-white/95 px-6 py-4 text-center backdrop-blur">
-                <h1 class="text-3xl font-extrabold tracking-tight text-gray-900">{{ session.test.title }}</h1>
+            <header
+                class="sticky top-0 z-10 -mx-6 border-b border-gray-200 bg-white/95 px-6 text-center backdrop-blur transition-[padding] duration-200"
+                :class="scrolled ? 'py-2' : 'py-4'"
+            >
+                <h1
+                    class="font-extrabold tracking-tight text-gray-900 transition-all duration-200"
+                    :class="scrolled ? 'text-base' : 'text-3xl'"
+                >{{ session.test.title }}</h1>
                 <p
-                    class="mt-4 inline-flex items-center gap-2 text-2xl font-extrabold tabular-nums text-red-600"
-                    :class="remaining <= 60 ? 'animate-pulse' : ''"
+                    class="inline-flex items-center gap-2 text-2xl font-extrabold tabular-nums text-red-600 transition-[margin] duration-200"
+                    :class="[remaining <= 60 ? 'animate-pulse' : '', scrolled ? 'mt-1' : 'mt-4']"
                 >
                     <IconClock :size="24" />{{ clock }}
                 </p>
