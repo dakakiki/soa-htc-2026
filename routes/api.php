@@ -5,6 +5,9 @@ use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AttemptController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Cms\CategoryController as CmsCategoryController;
+use App\Http\Controllers\Api\Cms\PageController as CmsPageController;
+use App\Http\Controllers\Api\Cms\PostController as CmsPostController;
 use App\Http\Controllers\Api\CoordinatorController;
 use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\DashboardController;
@@ -15,6 +18,7 @@ use App\Http\Controllers\Api\ExamRoundController;
 use App\Http\Controllers\Api\GradingController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PublicContentController;
 use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\QuestionTagController;
 use App\Http\Controllers\Api\QuizController;
@@ -52,6 +56,18 @@ Route::get('/ping', function () {
  * included), so it is intentionally unauthenticated. No business data.
  */
 Route::get('/theme', [SettingsController::class, 'theme']);
+
+/*
+ * The public website's own reads. Unauthenticated on purpose: every query is
+ * narrowed to published content in the controller, so there is nothing here an
+ * anonymous reader is not meant to see.
+ */
+Route::prefix('public')->group(function () {
+    Route::get('posts', [PublicContentController::class, 'posts']);
+    Route::get('posts/{slug}', [PublicContentController::class, 'post']);
+    Route::get('categories', [PublicContentController::class, 'categories']);
+    Route::get('pages/{slug}', [PublicContentController::class, 'page']);
+});
 
 /*
  * Admin / coordinator authentication (Sanctum cookie session for the SPA).
@@ -103,6 +119,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('profile', [ProfileController::class, 'show']);
     Route::put('profile', [ProfileController::class, 'update']);
     Route::delete('profile/assets/{asset}', [ProfileController::class, 'deleteAsset']);
+
+    /*
+     * The website's content (ADR-0042). One permission, `cms.manage`, gates the
+     * lot; the public reads go through /api/public above and never touch these.
+     */
+    Route::prefix('cms')->group(function () {
+        Route::apiResource('categories', CmsCategoryController::class)
+            ->parameters(['categories' => 'category'])->names('cms.categories');
+        Route::apiResource('posts', CmsPostController::class)
+            ->parameters(['posts' => 'post'])->names('cms.posts');
+        // Removing the cover image without touching the post itself (ImageThumb).
+        Route::delete('posts/{post}/image', [CmsPostController::class, 'deleteImage'])->whereNumber('post');
+        Route::apiResource('pages', CmsPageController::class)
+            ->parameters(['pages' => 'page'])->names('cms.pages');
+    });
 
     Route::get('countries', [CountryController::class, 'index']);
     Route::post('countries', [CountryController::class, 'store']);

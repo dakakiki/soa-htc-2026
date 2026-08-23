@@ -49,4 +49,8 @@ return [
     'content' => [
         'tag_in_use' => 'This tag is used by questions and cannot be deleted.',
     ],
+    'cms' => [
+        'slug_reserved' => 'This address is used by the application. Choose another slug.',
+        'category_in_use' => 'This category still has posts. Move or delete them first.',
+    ],
 ];

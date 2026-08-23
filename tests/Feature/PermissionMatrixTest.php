@@ -253,6 +253,9 @@ class PermissionMatrixTest extends TestCase
             '/api/grading/attempts',            // results
             '/api/reports/summary',
             '/api/settings/certificate',
+            '/api/cms/pages',                   // the public website
+            '/api/cms/posts',
+            '/api/cms/categories',
         ];
 
         foreach ([SystemRole::CountryCoordinator, SystemRole::SchoolCoordinator] as $role) {

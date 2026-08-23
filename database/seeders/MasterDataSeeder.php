@@ -4,6 +4,10 @@ namespace Database\Seeders;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Cms\Enums\PublicationStatus;
+use App\Domain\Cms\Models\Category;
+use App\Domain\Cms\Models\Page;
+use App\Domain\Cms\Models\Post;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Enums\SeasonStatus;
@@ -106,6 +110,54 @@ class MasterDataSeeder extends Seeder
             ['season_id' => $season->id, 'user_id' => $admin->id, 'role_id' => $adminRole->id],
             ['status' => 'active'],
         );
+
+        $this->seedWebsite($admin->id);
+    }
+
+    /**
+     * One page, one category and one post, so the public site has something to
+     * render in a fresh development database. Real content is entered through
+     * the admin.
+     *
+     * Local only, not testing: a test that counts published posts should start
+     * from an empty site, not from sample content.
+     */
+    private function seedWebsite(int $authorId): void
+    {
+        if (! app()->environment('local')) {
+            return;
+        }
+
+        Page::query()->firstOrCreate(
+            ['slug' => 'about'],
+            [
+                'title' => 'About the contest',
+                'body' => '<p>Hippo the Contest is an international English language competition for school students.</p>'
+                    .'<p>This page is development sample content — replace it from Website → Pages.</p>',
+                'status' => PublicationStatus::Published,
+                'published_at' => now(),
+            ],
+        );
+
+        $category = Category::query()->firstOrCreate(
+            ['slug' => 'announcements'],
+            ['name' => 'Announcements', 'status' => 'active'],
+        );
+
+        $post = Post::query()->firstOrCreate(
+            ['slug' => 'registration-is-open'],
+            [
+                'title' => 'Registration is open',
+                'excerpt' => 'Coordinators can now enter their students for the current round.',
+                'body' => '<p>Registration for the current round is open. Coordinators enter their students'
+                    .' through the admin, and each competitor receives a competitor number.</p>',
+                'author_id' => $authorId,
+                'status' => PublicationStatus::Published,
+                'published_at' => now(),
+            ],
+        );
+
+        $post->categories()->syncWithoutDetaching([$category->id]);
     }
 
     /**

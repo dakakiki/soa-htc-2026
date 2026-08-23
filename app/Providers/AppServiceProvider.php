@@ -59,6 +59,11 @@ class AppServiceProvider extends ServiceProvider
         // ability rather than a policy per lookup model.
         Gate::define('content.manage', fn (User $user): bool => $user->hasPermission('content.manage'));
 
+        // The public website (pages, posts, categories). Its own ability, not part
+        // of content.manage: the competition content and the site's content are
+        // different jobs, and the CMS never touches an attempt or a result.
+        Gate::define('cms.manage', fn (User $user): bool => $user->hasPermission('cms.manage'));
+
         // Bulk student file flows (import + attendance update). Separate from the
         // per-user student flags: legacy gave these to admins and country
         // coordinators only, never to a school coordinator.

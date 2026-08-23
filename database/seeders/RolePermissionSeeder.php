@@ -33,6 +33,7 @@ class RolePermissionSeeder extends Seeder
         'settings.manage' => 'Manage branding and theme settings',
         'difficulty.manage' => 'Manage difficulty categories and levels',
         'content.manage' => 'Manage quizzes, tests, questions and related content',
+        'cms.manage' => 'Manage the public website: pages, posts and categories',
         'results.manage' => 'Grade essays, publish and manage results',
         'reports.view' => 'View competition reports and statistics',
     ];
