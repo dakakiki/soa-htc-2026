@@ -5,6 +5,7 @@ import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { getQuestion } from '@/api/questions';
 import { apiErrorMessage } from '@/api/http';
+import Tooltip from '@/components/Tooltip.vue';
 import { answerMarker } from '@/utils/answerNumbering';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import type { Question } from '@/types/models';
@@ -54,9 +55,11 @@ watch(() => props.questionId, async (id) => {
         <div class="relative w-full max-w-2xl rounded-lg bg-white shadow-xl">
             <div class="flex items-center justify-between rounded-t-lg bg-brand-primary px-6 py-3 text-brand-on-primary">
                 <h2 class="text-sm font-semibold uppercase tracking-wide">{{ $t('question.preview.title') }}</h2>
-                <button type="button" class="rounded p-1 hover:bg-white/10" :aria-label="$t('common.close')" @click="emit('close')">
-                    <IconX :size="18" />
-                </button>
+                <Tooltip :text="$t('common.close')" position="bottom">
+                    <button type="button" class="rounded p-1 hover:bg-white/10" :aria-label="$t('common.close')" @click="emit('close')">
+                        <IconX :size="18" />
+                    </button>
+                </Tooltip>
             </div>
 
             <div class="relative min-h-[8rem] space-y-4 p-6">

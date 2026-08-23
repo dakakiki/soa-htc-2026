@@ -219,12 +219,13 @@ onMounted(load);
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('location.title') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ $t('location.count', { count: countries.length }) }}</p>
             </div>
-            <button
-                v-if="canManage"
+            <Tooltip v-if="canManage" :text="$t('location.addCountry')">
+                <button
                 type="button"
                 class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                 @click="openAddCountry"
-            ><IconPlus :size="16" />{{ $t('location.addCountry') }}</button>
+                ><IconPlus :size="16" />{{ $t('location.addCountry') }}</button>
+            </Tooltip>
         </div>
 
         <form class="flex flex-wrap items-center gap-3" @submit.prevent>
@@ -298,7 +299,10 @@ onMounted(load);
                     <h2 class="text-lg font-semibold">
                         {{ countryModal.editing ? $t('location.editCountry') : $t('location.addCountry') }}
                     </h2>
-                    <button type="button" class="text-white/80 hover:text-white" @click="closeCountryModal">✕</button>
+                    <Tooltip :text="$t('common.close')" position="bottom">
+                        <button type="button" class="text-white/80 hover:text-white"
+                            :aria-label="$t('common.close')" @click="closeCountryModal">✕</button>
+                    </Tooltip>
                 </div>
                 <form class="flex flex-col gap-4 p-5" @submit.prevent="saveCountry">
                     <div>
@@ -332,7 +336,10 @@ onMounted(load);
             <div class="w-full max-w-2xl rounded-lg bg-white shadow-xl">
                 <div class="flex items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
                     <h2 class="text-lg font-semibold">{{ $t('location.regionsModalTitle', { country: regionsModal.country.name }) }}</h2>
-                    <button type="button" class="text-white/80 hover:text-white" @click="closeRegions">✕</button>
+                    <Tooltip :text="$t('common.close')" position="bottom">
+                        <button type="button" class="text-white/80 hover:text-white"
+                            :aria-label="$t('common.close')" @click="closeRegions">✕</button>
+                    </Tooltip>
                 </div>
                 <div class="relative min-h-[6rem] p-4">
                     <LoadingOverlay v-if="regionsModal.loading" />

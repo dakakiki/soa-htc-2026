@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import Tooltip from '@/components/Tooltip.vue';
 
 export interface SearchSelectOption {
     id: number;
@@ -150,13 +151,14 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
                 <template v-else>
+                    <Tooltip v-if="clearable && selected && !disabled" :text="t('common.clear')">
                     <span
-                        v-if="clearable && selected && !disabled"
                         class="cursor-pointer text-gray-400 hover:text-gray-700"
                         role="button"
-                        aria-label="clear"
+                        :aria-label="t('common.clear')"
                         @click.stop="clear"
                     >✕</span>
+                    </Tooltip>
                     <svg class="h-4 w-4" :class="disabled ? 'text-gray-300' : 'text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>

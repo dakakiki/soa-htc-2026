@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import { getTestPreview } from '@/api/tests';
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import type { TestPreview } from '@/types/models';
 
 const props = defineProps<{ testId: number | null }>();
@@ -50,7 +51,10 @@ watch(
         <div class="relative flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
             <div class="flex items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
                 <h2 class="text-sm font-semibold uppercase tracking-widest">{{ $t('test.previewHeading') }}</h2>
-                <button type="button" class="text-white/80 hover:text-white" @click="emit('close')">✕</button>
+                <Tooltip :text="$t('common.close')" position="bottom">
+                    <button type="button" class="text-white/80 hover:text-white"
+                        :aria-label="$t('common.close')" @click="emit('close')">✕</button>
+                </Tooltip>
             </div>
 
             <div class="relative min-h-[10rem] overflow-y-auto px-6 py-5">

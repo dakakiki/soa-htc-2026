@@ -4,6 +4,7 @@ import { IconX, IconUpload, IconFileSpreadsheet } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
 import { importCoordinators, importCoordinatorErrors, coordinatorImportTemplate, type CoordinatorImportSummary } from '@/api/coordinators';
 import { apiErrorMessage } from '@/api/http';
+import Tooltip from '@/components/Tooltip.vue';
 import { saveBlob } from '@/utils/download';
 
 const props = defineProps<{ open: boolean }>();
@@ -90,9 +91,11 @@ async function downloadErrors(): Promise<void> {
         <div class="relative w-full max-w-lg rounded-lg bg-white shadow-xl">
             <div class="flex items-center justify-between rounded-t-lg bg-brand-primary px-6 py-3 text-brand-on-primary">
                 <h2 class="text-sm font-semibold uppercase tracking-wide">{{ $t('coordinator.import.title') }}</h2>
-                <button type="button" class="rounded p-1 hover:bg-white/10" :aria-label="$t('common.cancel')" @click="emit('close')">
-                    <IconX :size="18" />
-                </button>
+                <Tooltip :text="$t('common.close')" position="bottom">
+                    <button type="button" class="rounded p-1 hover:bg-white/10" :aria-label="$t('common.close')" @click="emit('close')">
+                        <IconX :size="18" />
+                    </button>
+                </Tooltip>
             </div>
 
             <div class="space-y-4 p-6">

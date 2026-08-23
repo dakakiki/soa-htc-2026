@@ -6,6 +6,7 @@ import { useSessionStore } from '@/stores/session';
 import { getSchool } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import type { School } from '@/types/models';
 
 const route = useRoute();
@@ -49,7 +50,9 @@ onMounted(async () => {
         <div v-if="venue" class="rounded-lg border border-gray-200 bg-white p-6">
             <div class="flex items-start justify-between">
                 <h1 class="text-2xl font-semibold tracking-tight">{{ venue.name }}</h1>
-                <ToggleSwitch :model-value="venue.status === 'active'" disabled :aria-label="$t('venue.toggleStatus')" />
+                <Tooltip :text="$t('venue.status')">
+                    <ToggleSwitch :model-value="venue.status === 'active'" disabled :aria-label="$t('venue.toggleStatus')" />
+                </Tooltip>
             </div>
 
             <dl class="mt-4 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">

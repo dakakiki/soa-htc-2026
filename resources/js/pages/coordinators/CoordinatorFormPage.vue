@@ -9,6 +9,7 @@ import { apiErrorMessage } from '@/api/http';
 import { IconX } from '@tabler/icons-vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
@@ -402,11 +403,13 @@ const fileBtn =
                             </label>
                             <div v-if="currentFileUrl && !uploadFile" class="mt-2 flex items-center gap-3">
                                 <a :href="currentFileUrl" target="_blank" class="text-xs text-brand-link hover:underline">{{ $t('coordinator.currentFile') }}</a>
-                                <button type="button" :title="$t('common.remove')"
-                                    class="flex h-5 w-5 items-center justify-center rounded bg-red-600 text-white shadow hover:bg-red-700"
-                                    @click="removeAsset('file')">
-                                    <IconX :size="12" stroke-width="3" />
-                                </button>
+                                <Tooltip :text="$t('common.remove')">
+                                    <button type="button" :aria-label="$t('common.remove')"
+                                        class="flex h-5 w-5 items-center justify-center rounded bg-red-600 text-white shadow hover:bg-red-700"
+                                        @click="removeAsset('file')">
+                                        <IconX :size="12" stroke-width="3" />
+                                    </button>
+                                </Tooltip>
                             </div>
                         </div>
                     </div>

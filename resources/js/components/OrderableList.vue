@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconGripVertical, IconArrowUp, IconArrowDown, IconTrash, IconPlus } from '@tabler/icons-vue';
+import Tooltip from '@/components/Tooltip.vue';
 
 const props = defineProps<{
     modelValue: T[];
@@ -54,9 +55,11 @@ function onDragEnd(): void {
             class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
             :class="{ 'opacity-50': dragIndex === i }"
             @dragstart="onDragStart(i)" @dragover.prevent="onDragOver(i)" @dragend="onDragEnd" @drop.prevent="onDragEnd">
-            <span class="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing" :aria-label="t('common.dragReorder')" :title="t('common.dragReorder')">
-                <IconGripVertical :size="16" />
-            </span>
+            <Tooltip :text="t('common.dragReorder')">
+                <span class="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing" :aria-label="t('common.dragReorder')">
+                    <IconGripVertical :size="16" />
+                </span>
+            </Tooltip>
             <span class="w-6 shrink-0 text-center text-xs font-medium text-gray-400">{{ i + 1 }}</span>
             <div class="flex min-w-0 flex-1 items-center gap-2">
                 <slot name="item" :item="item" :index="i" />
@@ -64,16 +67,22 @@ function onDragEnd(): void {
             <!-- Reordering and acting on a row are different jobs, so they sit in
                  separated groups rather than one undifferentiated strip of icons. -->
             <div class="flex shrink-0 items-center gap-1 border-l border-gray-200 pl-3">
-                <button type="button" class="text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === 0"
-                    :aria-label="t('common.moveUp')" @click="move(i, i - 1)"><IconArrowUp :size="16" /></button>
-                <button type="button" class="text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === modelValue.length - 1"
-                    :aria-label="t('common.moveDown')" @click="move(i, i + 1)"><IconArrowDown :size="16" /></button>
+                <Tooltip :text="t('common.moveUp')">
+                    <button type="button" class="text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === 0"
+                        :aria-label="t('common.moveUp')" @click="move(i, i - 1)"><IconArrowUp :size="16" /></button>
+                </Tooltip>
+                <Tooltip :text="t('common.moveDown')">
+                    <button type="button" class="text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === modelValue.length - 1"
+                        :aria-label="t('common.moveDown')" @click="move(i, i + 1)"><IconArrowDown :size="16" /></button>
+                </Tooltip>
             </div>
             <div class="flex shrink-0 items-center gap-2 border-l border-gray-200 pl-3">
                 <!-- Caller's actions (view, edit, …); remove stays last, as everywhere else. -->
                 <slot name="actions" :item="item" :index="i" />
-                <button type="button" class="text-red-600 hover:text-red-700"
-                    :aria-label="t('common.remove')" @click="removeAt(i)"><IconTrash :size="16" /></button>
+                <Tooltip :text="t('common.remove')">
+                    <button type="button" class="text-red-600 hover:text-red-700"
+                        :aria-label="t('common.remove')" @click="removeAt(i)"><IconTrash :size="16" /></button>
+                </Tooltip>
             </div>
         </li>
         <li v-if="modelValue.length === 0" class="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-400">

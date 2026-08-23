@@ -2,6 +2,7 @@
 import type { Component } from 'vue';
 import { IconTableExport } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
+import Tooltip from '@/components/Tooltip.vue';
 
 /**
  * The standard export button. One brand colour (`brand-accent`) for every export
@@ -19,15 +20,18 @@ const { t } = useI18n();
 </script>
 
 <template>
-    <button
-        type="button"
-        :disabled="disabled || loading"
-        :title="tooltip || undefined"
-        class="inline-flex items-center rounded-md bg-brand-accent font-medium text-brand-on-primary hover:bg-brand-accent-hover disabled:opacity-40"
-        :class="props.small ? 'gap-1 px-2.5 py-1 text-xs' : 'gap-1.5 px-3 py-1.5 text-sm'"
-        @click="$emit('click')"
-    >
-        <component :is="icon || IconTableExport" :size="props.small ? 14 : 16" />
-        {{ label || t('common.export') }}
-    </button>
+    <!-- The label already names the action, so the tooltip carries the longer
+         explanation callers pass; without one there is nothing to add. -->
+    <Tooltip :text="tooltip">
+        <button
+            type="button"
+            :disabled="disabled || loading"
+            class="inline-flex items-center rounded-md bg-brand-accent font-medium text-brand-on-primary hover:bg-brand-accent-hover disabled:opacity-40"
+            :class="props.small ? 'gap-1 px-2.5 py-1 text-xs' : 'gap-1.5 px-3 py-1.5 text-sm'"
+            @click="$emit('click')"
+        >
+            <component :is="icon || IconTableExport" :size="props.small ? 14 : 16" />
+            {{ label || t('common.export') }}
+        </button>
+    </Tooltip>
 </template>

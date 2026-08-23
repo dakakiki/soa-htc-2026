@@ -14,6 +14,7 @@ import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import { IconTrash, IconPlus } from '@tabler/icons-vue';
+import Tooltip from '@/components/Tooltip.vue';
 import type { Lookup } from '@/api/content';
 import type { LevelOption, QuestionAnswer } from '@/types/models';
 
@@ -188,9 +189,14 @@ onMounted(async () => {
                                 </span>
                                 <input v-model="a.text" type="text" :placeholder="isGap ? $t('question.gapPlaceholder') : $t('question.answerText')" class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
                                 <span v-if="!isGap" class="flex w-16 shrink-0 justify-center">
-                                    <ToggleSwitch v-model="a.is_correct" :aria-label="$t('question.correct')" />
+                                    <Tooltip :text="$t('question.correct')">
+                                        <ToggleSwitch v-model="a.is_correct" :aria-label="$t('question.correct')" />
+                                    </Tooltip>
                                 </span>
-                                <button type="button" class="w-4 shrink-0 text-red-600 hover:text-red-700" @click="removeAnswer(i)"><IconTrash :size="16" /></button>
+                                <Tooltip :text="isGap ? $t('question.removeGap') : $t('question.removeAnswer')">
+                                    <button type="button" class="w-4 shrink-0 text-red-600 hover:text-red-700"
+                                        :aria-label="isGap ? $t('question.removeGap') : $t('question.removeAnswer')" @click="removeAnswer(i)"><IconTrash :size="16" /></button>
+                                </Tooltip>
                             </div>
                         </div>
                     </div>

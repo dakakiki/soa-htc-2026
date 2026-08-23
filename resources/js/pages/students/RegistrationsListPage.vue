@@ -13,6 +13,7 @@ import { apiErrorMessage } from '@/api/http';
 import ExportButton from '@/components/ExportButton.vue';
 import RowActions from '@/components/RowActions.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import RegistrationResultsModal from '@/pages/students/RegistrationResultsModal.vue';
 import AttendanceReportModal from '@/pages/students/AttendanceReportModal.vue';
@@ -323,11 +324,13 @@ onMounted(async () => {
                 <p v-if="searched" class="mt-1 text-sm text-gray-500">{{ $t('common.total', { count: total }) }}</p>
             </div>
             <div class="flex flex-wrap items-center justify-end gap-2">
-                <RouterLink v-if="canInsert" :to="{ name: 'registrations.new' }"
+                <Tooltip v-if="canInsert" :text="$t('registration.add')">
+                    <RouterLink :to="{ name: 'registrations.new' }"
                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
                     <IconPlus :size="16" />
                     {{ $t('registration.add') }}
-                </RouterLink>
+                    </RouterLink>
+                </Tooltip>
                 <ExportButton v-if="canInsert" :icon="IconUpload" :label="$t('registration.import.title')"
                     :tooltip="$t('registration.import.tooltip')" @click="importOpen = true" />
                 <ExportButton v-if="canEdit" :icon="IconClipboardCheck" :label="$t('registration.attendanceUpdate.title')"
@@ -450,9 +453,12 @@ onMounted(async () => {
                             </td>
                         </template>
                         <td class="bg-sky-100 px-3 py-3 text-center">
-                            <button type="button" class="text-brand-primary hover:text-brand-primary-hover" :title="$t('registration.results.view')" @click="selected = x">
-                                <IconListCheck :size="18" />
-                            </button>
+                            <Tooltip :text="$t('registration.results.view')">
+                                <button type="button" class="text-brand-primary hover:text-brand-primary-hover"
+                                    :aria-label="$t('registration.results.view')" @click="selected = x">
+                                    <IconListCheck :size="18" />
+                                </button>
+                            </Tooltip>
                         </td>
                         <td class="px-4 py-3">
                             <RowActions :edit-to="canEdit ? { name: 'registrations.edit', params: { id: x.id } } : null"

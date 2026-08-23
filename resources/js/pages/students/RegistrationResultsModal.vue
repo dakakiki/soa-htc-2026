@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import { IconX } from '@tabler/icons-vue';
 import { registrationResults } from '@/api/registrations';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import type { Registration, ResultDetailRound } from '@/types/models';
 
 const props = defineProps<{ registration: Registration | null }>();
@@ -36,9 +37,11 @@ const fmt = (v: number | null): string => (v === null ? '—' : String(v));
         <div class="relative w-full max-w-4xl rounded-lg bg-white shadow-xl">
             <div class="flex items-center justify-between rounded-t-lg bg-brand-primary px-6 py-3 text-brand-on-primary">
                 <h2 class="text-sm font-semibold uppercase tracking-wide">{{ $t('registration.results.title') }}</h2>
-                <button type="button" class="rounded p-1 hover:bg-white/10" :aria-label="$t('common.cancel')" @click="emit('close')">
-                    <IconX :size="18" />
-                </button>
+                <Tooltip :text="$t('common.close')" position="bottom">
+                    <button type="button" class="rounded p-1 hover:bg-white/10" :aria-label="$t('common.close')" @click="emit('close')">
+                        <IconX :size="18" />
+                    </button>
+                </Tooltip>
             </div>
 
             <div class="relative p-6">

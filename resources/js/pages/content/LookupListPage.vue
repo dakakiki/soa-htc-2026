@@ -105,9 +105,11 @@ onMounted(load);
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t(cfg.title) }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ $t('common.results', { count: items.length }) }}</p>
             </div>
-            <button v-if="canManage" type="button"
+            <Tooltip v-if="canManage" :text="$t(cfg.add)">
+                <button type="button"
                 class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                 @click="openAdd"><IconPlus :size="16" />{{ $t(cfg.add) }}</button>
+            </Tooltip>
         </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
@@ -156,7 +158,10 @@ onMounted(load);
             <div class="w-full max-w-md rounded-lg bg-white shadow-xl">
                 <div class="flex items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
                     <h2 class="text-lg font-semibold">{{ modal.editing ? $t('content.edit') : $t(cfg.add) }}</h2>
-                    <button type="button" class="text-white/80 hover:text-white" @click="modal.open = false">✕</button>
+                    <Tooltip :text="$t('common.close')" position="bottom">
+                        <button type="button" class="text-white/80 hover:text-white"
+                            :aria-label="$t('common.close')" @click="modal.open = false">✕</button>
+                    </Tooltip>
                 </div>
                 <form class="flex flex-col gap-4 p-5" @submit.prevent="save">
                     <div>

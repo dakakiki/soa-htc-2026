@@ -6,6 +6,7 @@ import { soaCertificate, soaCertificatePlan, type SoaCertPlan } from '@/api/regi
 import { listCountries, listLevelOptions } from '@/api/reference';
 import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
+import Tooltip from '@/components/Tooltip.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import { saveBlob, filenameFromDisposition } from '@/utils/download';
@@ -163,9 +164,11 @@ async function downloadPart(part: number): Promise<void> {
         <div class="relative w-full max-w-lg rounded-lg bg-white shadow-xl">
             <div class="flex items-center justify-between rounded-t-lg bg-brand-primary px-6 py-3 text-brand-on-primary">
                 <h2 class="text-sm font-semibold uppercase tracking-wide">{{ $t('registration.soaCert.title') }}</h2>
-                <button type="button" class="rounded p-1 hover:bg-white/10" :aria-label="$t('common.cancel')" @click="emit('close')">
-                    <IconX :size="18" />
-                </button>
+                <Tooltip :text="$t('common.close')" position="bottom">
+                    <button type="button" class="rounded p-1 hover:bg-white/10" :aria-label="$t('common.close')" @click="emit('close')">
+                        <IconX :size="18" />
+                    </button>
+                </Tooltip>
             </div>
 
             <div class="space-y-4 p-6">

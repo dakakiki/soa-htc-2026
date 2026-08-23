@@ -245,10 +245,12 @@ onMounted(async () => {
                 <p class="mt-1 text-sm text-gray-500">{{ $t('coordinator.count', { count: total }) }}</p>
             </div>
             <div v-if="canManage" class="flex flex-wrap items-center justify-end gap-2">
-                <RouterLink
+                <Tooltip :text="$t('coordinator.add')">
+                    <RouterLink
                     :to="{ name: 'coordinators.new' }"
                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-                ><IconPlus :size="16" />{{ $t('coordinator.add') }}</RouterLink>
+                    ><IconPlus :size="16" />{{ $t('coordinator.add') }}</RouterLink>
+                </Tooltip>
                 <ExportButton :icon="IconUpload" :label="$t('coordinator.import.title')"
                     :tooltip="$t('coordinator.import.tooltip')" @click="importOpen = true" />
                 <ExportButton :loading="exporting" :tooltip="$t('coordinator.exportTooltip')" @click="exportList" />
@@ -322,10 +324,12 @@ onMounted(async () => {
                         <td class="px-4 py-3 text-gray-600">{{ c.role?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ c.venues_count }}</td>
                         <td class="px-4 py-3 text-center">
-                            <button v-if="c.schools.length" type="button" class="text-gray-500 hover:text-brand-link"
-                                :title="$t('coordinator.schools')" @click="modalCoordinator = c">
-                                <IconBuilding :size="20" />
-                            </button>
+                            <Tooltip v-if="c.schools.length" :text="$t('coordinator.schools')">
+                                <button type="button" class="text-gray-500 hover:text-brand-link"
+                                    :aria-label="$t('coordinator.schools')" @click="modalCoordinator = c">
+                                    <IconBuilding :size="20" />
+                                </button>
+                            </Tooltip>
                             <span v-else class="text-gray-300">{{ $t('common.dash') }}</span>
                         </td>
                         <td class="px-4 py-3">
@@ -369,7 +373,10 @@ onMounted(async () => {
             <div class="flex max-h-[80vh] w-full max-w-6xl flex-col rounded-lg bg-white shadow-xl">
                 <div class="flex shrink-0 items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
                     <h2 class="text-lg font-semibold">{{ $t('coordinator.schoolsModalTitle') }}</h2>
-                    <button type="button" class="text-white/80 hover:text-white" @click="modalCoordinator = null">✕</button>
+                    <Tooltip :text="$t('common.close')" position="bottom">
+                        <button type="button" class="text-white/80 hover:text-white"
+                            :aria-label="$t('common.close')" @click="modalCoordinator = null">✕</button>
+                    </Tooltip>
                 </div>
                 <div class="flex-1 overflow-auto p-4">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -393,7 +400,9 @@ onMounted(async () => {
                                 <td v-for="col in levelColumns" :key="col" class="px-2 py-2 text-center text-gray-500">{{ s.level_counts?.[col] ?? 0 }}</td>
                                 <td class="px-2 py-2 text-center font-semibold text-gray-800">{{ s.total_competitors ?? 0 }}</td>
                                 <td class="px-3 py-2">
-                                    <ToggleSwitch :model-value="s.status === 'active'" disabled :aria-label="$t('coordinator.toggleStatus')" />
+                                    <Tooltip :text="$t('coordinator.toggleStatus')">
+                                        <ToggleSwitch :model-value="s.status === 'active'" disabled :aria-label="$t('coordinator.toggleStatus')" />
+                                    </Tooltip>
                                 </td>
                             </tr>
                         </tbody>

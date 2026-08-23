@@ -144,11 +144,12 @@ onMounted(async () => {
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('user.title') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ $t('common.total', { count: total }) }}</p>
             </div>
-            <RouterLink
-                v-if="canManage"
+            <Tooltip v-if="canManage" :text="$t('user.add')">
+                <RouterLink
                 :to="{ name: 'users.new' }"
                 class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-            ><IconPlus :size="16" />{{ $t('user.add') }}</RouterLink>
+                ><IconPlus :size="16" />{{ $t('user.add') }}</RouterLink>
+            </Tooltip>
         </div>
 
         <form class="mt-2 flex flex-wrap items-center gap-2" @submit.prevent="load(1)">

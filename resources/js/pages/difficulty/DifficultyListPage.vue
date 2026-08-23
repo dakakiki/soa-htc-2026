@@ -217,9 +217,11 @@ onMounted(async () => {
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('difficulty.title') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ $t('difficulty.count', { count: categories.length }) }}</p>
             </div>
-            <button v-if="canManage" type="button"
+            <Tooltip v-if="canManage" :text="$t('difficulty.addCategory')">
+                <button type="button"
                 class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                 @click="openAddCategory"><IconPlus :size="16" />{{ $t('difficulty.addCategory') }}</button>
+            </Tooltip>
         </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
@@ -289,7 +291,10 @@ onMounted(async () => {
             <div class="w-full max-w-lg rounded-lg bg-white shadow-xl">
                 <div class="flex items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
                     <h2 class="text-lg font-semibold">{{ cat.editing ? $t('difficulty.editCategory') : $t('difficulty.addCategory') }}</h2>
-                    <button type="button" class="text-white/80 hover:text-white" @click="cat.open = false">✕</button>
+                    <Tooltip :text="$t('common.close')" position="bottom">
+                        <button type="button" class="text-white/80 hover:text-white"
+                            :aria-label="$t('common.close')" @click="cat.open = false">✕</button>
+                    </Tooltip>
                 </div>
                 <form class="flex flex-col gap-4 p-5" @submit.prevent="saveCategory">
                     <div>
@@ -330,7 +335,10 @@ onMounted(async () => {
             <div class="w-full max-w-3xl rounded-lg bg-white shadow-xl">
                 <div class="flex items-center justify-between rounded-t-lg bg-slate-800 px-5 py-3 text-white">
                     <h2 class="text-lg font-semibold">{{ $t('difficulty.levelsModalTitle', { name: lv.category.name }) }}</h2>
-                    <button type="button" class="text-white/80 hover:text-white" @click="lv.category = null">✕</button>
+                    <Tooltip :text="$t('common.close')" position="bottom">
+                        <button type="button" class="text-white/80 hover:text-white"
+                            :aria-label="$t('common.close')" @click="lv.category = null">✕</button>
+                    </Tooltip>
                 </div>
                 <div class="relative min-h-[6rem] p-4">
                     <LoadingOverlay v-if="lv.loading" />
@@ -352,8 +360,10 @@ onMounted(async () => {
                                 <td class="px-3 py-2 text-gray-800">{{ l.name }}</td>
                                 <td class="px-3 py-2 text-gray-600">{{ l.grades.join(', ') || $t('common.dash') }}</td>
                                 <td class="px-3 py-2">
-                                    <ToggleSwitch :model-value="l.status === 'active'" :disabled="!canManage"
-                                        :aria-label="$t('difficulty.toggleStatus')" @update:model-value="(v: boolean) => onToggleLevel(l, v)" />
+                                    <Tooltip :text="$t('difficulty.toggleStatus')">
+                                        <ToggleSwitch :model-value="l.status === 'active'" :disabled="!canManage"
+                                            :aria-label="$t('difficulty.toggleStatus')" @update:model-value="(v: boolean) => onToggleLevel(l, v)" />
+                                    </Tooltip>
                                 </td>
                                 <td v-if="canManage" class="px-3 py-2">
                                     <div class="flex items-center justify-end gap-1.5">
@@ -382,7 +392,10 @@ onMounted(async () => {
                             <button type="submit" :disabled="lv.saving" class="flex-1 rounded-md bg-brand-primary px-3 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                                 {{ lv.editingId ? $t('common.save') : $t('difficulty.addLevel') }}
                             </button>
-                            <button v-if="lv.editingId" type="button" class="rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-200" @click="resetLevelForm">✕</button>
+                            <Tooltip v-if="lv.editingId" :text="$t('common.cancel')">
+                                <button type="button" class="rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-200"
+                                    :aria-label="$t('common.cancel')" @click="resetLevelForm">✕</button>
+                            </Tooltip>
                         </div>
                     </form>
                 </div>

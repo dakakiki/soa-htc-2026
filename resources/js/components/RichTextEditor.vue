@@ -9,7 +9,11 @@ import {
     IconBold, IconItalic, IconUnderline, IconH2,
     IconList, IconListNumbers, IconLink, IconClearFormatting, IconPalette,
 } from '@tabler/icons-vue';
+import { useI18n } from 'vue-i18n';
+import Tooltip from '@/components/Tooltip.vue';
 import { useThemeStore } from '@/stores/theme';
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<{ modelValue: string; placeholder?: string }>(), { placeholder: '' });
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>();
@@ -64,11 +68,11 @@ const theme = useThemeStore();
 const colorSwatches = computed<{ label: string; value: string }[]>(() => {
     const c = theme.theme?.colors;
     return [
-        { label: 'Primary', value: c?.primary ?? '#2563eb' },
-        { label: 'Primary (dark)', value: c?.primary_hover ?? '#1d4ed8' },
-        { label: 'Accent', value: c?.accent ?? '#0d9488' },
-        { label: 'Accent (dark)', value: c?.accent_hover ?? '#0f766e' },
-        { label: 'Link', value: c?.link ?? '#2563eb' },
+        { label: t('editor.colorPrimary'), value: c?.primary ?? '#2563eb' },
+        { label: t('editor.colorPrimaryDark'), value: c?.primary_hover ?? '#1d4ed8' },
+        { label: t('editor.colorAccent'), value: c?.accent ?? '#0d9488' },
+        { label: t('editor.colorAccentDark'), value: c?.accent_hover ?? '#0f766e' },
+        { label: t('editor.colorLink'), value: c?.link ?? '#2563eb' },
     ];
 });
 
@@ -86,31 +90,31 @@ function clearColor(): void {
 <template>
     <div class="rounded-md border border-gray-300 focus-within:border-brand-primary">
         <div v-if="editor" class="flex flex-wrap items-center gap-0.5 border-b border-gray-200 p-1">
-            <button type="button" :class="btn(editor.isActive('bold'))" title="Bold" @click="editor.chain().focus().toggleBold().run()"><IconBold :size="16" /></button>
-            <button type="button" :class="btn(editor.isActive('italic'))" title="Italic" @click="editor.chain().focus().toggleItalic().run()"><IconItalic :size="16" /></button>
-            <button type="button" :class="btn(editor.isActive('underline'))" title="Underline" @click="editor.chain().focus().toggleUnderline().run()"><IconUnderline :size="16" /></button>
+            <Tooltip :text="t('editor.bold')"><button type="button" :class="btn(editor.isActive('bold'))" :aria-label="t('editor.bold')" @click="editor.chain().focus().toggleBold().run()"><IconBold :size="16" /></button></Tooltip>
+            <Tooltip :text="t('editor.italic')"><button type="button" :class="btn(editor.isActive('italic'))" :aria-label="t('editor.italic')" @click="editor.chain().focus().toggleItalic().run()"><IconItalic :size="16" /></button></Tooltip>
+            <Tooltip :text="t('editor.underline')"><button type="button" :class="btn(editor.isActive('underline'))" :aria-label="t('editor.underline')" @click="editor.chain().focus().toggleUnderline().run()"><IconUnderline :size="16" /></button></Tooltip>
             <span class="mx-1 h-5 w-px bg-gray-200" />
-            <button type="button" :class="btn(editor.isActive('heading', { level: 2 }))" title="Heading" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><IconH2 :size="16" /></button>
-            <button type="button" :class="btn(editor.isActive('bulletList'))" title="Bullet list" @click="editor.chain().focus().toggleBulletList().run()"><IconList :size="16" /></button>
-            <button type="button" :class="btn(editor.isActive('orderedList'))" title="Numbered list" @click="editor.chain().focus().toggleOrderedList().run()"><IconListNumbers :size="16" /></button>
-            <button type="button" :class="btn(editor.isActive('link'))" title="Link" @click="setLink"><IconLink :size="16" /></button>
+            <Tooltip :text="t('editor.heading')"><button type="button" :class="btn(editor.isActive('heading', { level: 2 }))" :aria-label="t('editor.heading')" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><IconH2 :size="16" /></button></Tooltip>
+            <Tooltip :text="t('editor.bulletList')"><button type="button" :class="btn(editor.isActive('bulletList'))" :aria-label="t('editor.bulletList')" @click="editor.chain().focus().toggleBulletList().run()"><IconList :size="16" /></button></Tooltip>
+            <Tooltip :text="t('editor.numberedList')"><button type="button" :class="btn(editor.isActive('orderedList'))" :aria-label="t('editor.numberedList')" @click="editor.chain().focus().toggleOrderedList().run()"><IconListNumbers :size="16" /></button></Tooltip>
+            <Tooltip :text="t('editor.link')"><button type="button" :class="btn(editor.isActive('link'))" :aria-label="t('editor.link')" @click="setLink"><IconLink :size="16" /></button></Tooltip>
             <div class="relative">
-                <button type="button" :class="btn(showColors)" title="Text colour" @click="showColors = !showColors"><IconPalette :size="16" /></button>
+                <Tooltip :text="t('editor.textColour')"><button type="button" :class="btn(showColors)" :aria-label="t('editor.textColour')" @click="showColors = !showColors"><IconPalette :size="16" /></button></Tooltip>
                 <div v-if="showColors" class="fixed inset-0 z-10" @click="showColors = false" />
                 <div v-if="showColors" class="absolute left-0 top-9 z-20 w-44 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
                     <div class="grid grid-cols-5 gap-1.5">
-                        <button v-for="s in colorSwatches" :key="s.value" type="button" :title="s.label"
+                        <button v-for="s in colorSwatches" :key="s.value" type="button" :aria-label="s.label" :title="s.label"
                             class="h-6 w-6 rounded border border-gray-200 transition hover:scale-110"
                             :style="{ backgroundColor: s.value }" @click="applyColor(s.value)" />
                     </div>
                     <button type="button" class="mt-2 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs text-gray-600 hover:bg-gray-100" @click="clearColor">
                         <span class="h-4 w-4 rounded border border-gray-300 bg-white" />
-                        Default colour
+                        {{ t('editor.defaultColour') }}
                     </button>
                 </div>
             </div>
             <span class="mx-1 h-5 w-px bg-gray-200" />
-            <button type="button" :class="btn(false)" title="Clear formatting" @click="editor.chain().focus().unsetAllMarks().clearNodes().run()"><IconClearFormatting :size="16" /></button>
+            <Tooltip :text="t('editor.clearFormatting')"><button type="button" :class="btn(false)" :aria-label="t('editor.clearFormatting')" @click="editor.chain().focus().unsetAllMarks().clearNodes().run()"><IconClearFormatting :size="16" /></button></Tooltip>
         </div>
         <EditorContent :editor="editor" />
     </div>

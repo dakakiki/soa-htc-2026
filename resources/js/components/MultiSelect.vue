@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import Tooltip from '@/components/Tooltip.vue';
 
 export interface MultiSelectOption {
     id: number;
@@ -170,13 +171,14 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
                         class="inline-flex items-center gap-1 rounded bg-brand-primary-soft px-2 py-0.5 text-xs text-brand-primary"
                     >
                         {{ opt.label }}
+                        <Tooltip v-if="!disabled" :text="t('common.remove')">
                         <span
-                            v-if="!disabled"
                             class="cursor-pointer text-blue-400 hover:text-brand-primary"
                             role="button"
-                            :aria-label="`remove ${opt.label}`"
+                            :aria-label="t('common.remove')"
                             @click.stop="remove(opt.id)"
                         >✕</span>
+                        </Tooltip>
                     </span>
                 </template>
                 <span v-else :class="disabled ? 'text-gray-400' : 'text-gray-700'">{{ loading ? t('common.loading') : placeholder }}</span>
