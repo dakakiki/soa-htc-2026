@@ -614,6 +614,32 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0030 — Coordinator bulk import/export: razrešavanje po imenu, bez lozinke u fajlu
+
+- **Status:** Prihvaćeno (2026-08-21); vlasnik proizvoda. **IMPLEMENTIRAN** (suite 305 zeleno).
+- **Kontekst:** Coordinators strana imala samo ručni add/edit; vlasnik tražio import/export sa template-om, „kao što je u legacy-ju". Legacy aplikacijski kod NIJE u repou — nalaz izveden iz legacy **modela podataka** (baza `soahtc_legacy`): koordinatori žive u `users` razdvojeni `user_level` (**10**=admin 12, **5**=country coord 115, **1**=school coord 2367 — sezonski, ne migriraju se), opseg venue-a u `user_schools`, polja `name/email/password/country_id/region_id/active/city/address/phone/can_student_*/can_reset_test_results`.
+- **Odluka:**
+  - **Obim = samo country coordinators.** Bez „Level" kolone — svaki red dobija `country_coordinator` ulogu (admin se ne uvozi masovno; school-coord je sezonski, kao ni u legacy migraciji).
+  - **BEZ „Password" kolone.** Provera legacy baze pokazala da svih 115 country-koordinatora IMA bcrypt hash, ali lozinke u čistom tekstu u `.xlsx` su bezbednosni rizik (vlasnik: „ako toga nema u legacy, nemoj ni da kreiraš"). Import kreira nalog sa `Str::random(40)` (hashed cast bcrypt-uje → neupotrebljiva) — **admin postavi lozinku u edit formi** (polje već postoji, prazno = bez promene). Napomena o tome stoji u modalu. Posledica: uvezeni koordinator ne može odmah da se prijavi. Alternativa (auto-generisana + reset link mejlom) odložena — traži podešen SMTP.
+  - **Razrešavanje po IMENU, ne po id-u** (admin ne vidi interne id-jeve): Country po imenu; **Region i Venues scoped na državu tog reda** (isto ime u drugoj zemlji ne prolazi); Venues = **imena razdvojena zarezom** (= scope opseg, `assignment->schools()->sync()`); lookup case/whitespace-insensitive.
+  - **Reject-whole-file + anotirani fajl** — isti ugovor kao ADR-0029 create-import: svi redovi validirani pre upisa, jedan loš → **0 kreirano** + `error_count`, dugme skine isti fajl sa dodatom **„Error"** kolonom. Detektuje i **duplikat email-a unutar fajla** (ne samo postojeći u bazi). Bez bulk INSERT-a (obimi su mali — koordinator po venue-vlasniku, ne hiljade), pa red-po-red u jednoj transakciji.
+  - **Export = isti layout kao template** (bez lozinke) → fajl round-trip-uje: exportuj, doradi, re-importuj. Poštuje **iste filtere kao lista** (deljeni `filteredCoordinators()`), ceo skup a ne jedna strana.
+- **Posledica:** `App\Domain\Organization\Support\CoordinatorExporter` (`HEADERS` + `export()`) + `CoordinatorImporter` (`import()`/`errorReport()`); endpointi `coordinators/export`, `coordinators/import` (+ `/template`, `/errors`) — registrovani **pre** `apiResource` da `export` ne bude uhvaćen kao `{coordinator}`; front `CoordinatorImportModal` + Import/Export dugmiće u header-u. Kolone: `Name·Email·Country·Region·Venues·City·Address·Phone·Status·Can add·Can edit·Can delete·Can reset`. Gated `create`/`viewAny` na `User` (`users.manage`). Testovi `CoordinatorImportExportTest` (7). Detalji — memorija `coordinator-import-export`.
+
+---
+
+## ADR-0031 — Admin UI konzistentnost: header akcije, status kontrola, filteri bez dugmadi
+
+- **Status:** Prihvaćeno (2026-08-21); vlasnik proizvoda. **PRIMENJENO kroz ceo admin** (suite 305 zeleno).
+- **Kontekst:** Strane su nastajale kroz više faza pa su se razišle: „add" dugmiće u header-u imali dve veličine (`px-4 py-2` bez ikonice vs `px-3 py-1.5` + ikonica), status se na nekim formama unosio `ToggleSwitch`-em a na drugima `ButtonGroup`-om, a filter kartice su negde imale Filter/Reset dugmiće a negde auto-primenu. Vlasnik tražio jedinstven izgled („isto kao Students").
+- **Odluka — tri pravila, Students strana je referenca:**
+  1. **Header akcije.** Primarna akcija pored naslova = `inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium` + **ikonica 16px** (`IconPlus` za „add"). Sekundarne akcije (Import/Export/report) = `ExportButton` (brand-accent, `icon` prop) u istom redu, desno. *Ne* važi za dugmiće u dnu formi/modala (Save/Cancel/Edit/Back) — oni ostaju `px-4 py-2` i usklađeni su međusobno.
+  2. **Status kontrola zavisi od konteksta.** U **add/edit formama i modalima** status je **`ButtonGroup`** (zeleno aktivno / sivo neaktivno) — vidljiv je i trenutni i alternativni izbor, što je jasnije za polje koje se snima. U **tabelama** ostaje `ToggleSwitch` (inline prekidač = brza izmena jednog reda, uz lak PUT). Ostali boolean-i (attendance, `is_correct`, „All countries") ostaju toggle jer nisu status. Segmentovane kontrole u istom modalu dele istu aktivnu boju (zelena) da ne izgledaju kao dva različita mehanizma.
+  3. **Filteri bez dugmadi.** Filter kartica nema Filter/Reset dugmiće: selecti i `SearchSelect` primenjuju se **odmah** (`load(1)`), tekstualna pretraga na **Enter** (`@submit.prevent`). Stanje filtera se sinhronizuje u URL i restauriše na mount-u; **nikad se ne čisti automatski** posle prikaza/exporta (korisnik ih briše ručno).
+- **Posledica:** primenjeno na 11 list-strana (Exams/Questions/Quizzes/Tests/Lookup/Coordinators/Difficulty/Locations/Roles/Users/Venues), na content forme (Exam/Question/Quiz/Test) i Difficulty modal, te na Coordinators filter. Nove strane prate ova pravila bez posebnog dogovora. Reusable: `ButtonGroup` (`activeClass` po opciji), `ToggleSwitch`, `ExportButton`.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

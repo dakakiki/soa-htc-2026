@@ -180,6 +180,15 @@ Uslov završetka:
 - validacija, dry-run, error report i audit izvoza;
 - queue obrada velikih dokumenata.
 
+**Implementacioni status (2026-08-21):** najveći deo faze je isporučen kroz tri ADR-a.
+
+- **Sertifikati:** SOA Cert (participation) — CMS-editabilan sadržaj + chunked PDF, legacy-identičan izgled (**ADR-0028**). Attendance register (PDF) uz njega.
+- **Import/export ugovori (.xlsx):** ustaljen zajednički obrazac — **template** (header + hint red) · **reject-whole-file** validacija · **anotirani „Error" fajl** koji korisnik popravi i ponovo pošalje · **export istog layout-a** (round-trip). Nosi ga dependency-free `App\Support\XlsxWriter`/`XlsxReader`.
+  - **Rezultati** — import/export + arhiva (**ADR-0027**).
+  - **Studenti** — bulk create + odvojen attendance update (apply-and-report umesto reject) (**ADR-0029**).
+  - **Koordinatori** — bulk create + export; razrešavanje po *imenu* (country/region/venue), bez lozinke u fajlu (**ADR-0030**).
+- **Ostaje:** verzionisanje template-a i audit izvoza; queue obrada velikih dokumenata (za sada sinhrono uz chunking — SOA Cert deli PDF na delove, student import ide chunked bulk INSERT); dry-run kao korisnička opcija (postoji samo interno kroz „Error" fajl).
+
 ### Faza 8 — CMS, navigacija i Theme Settings
 
 - PageLayout, Page, Category i Post;
