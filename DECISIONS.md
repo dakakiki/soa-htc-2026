@@ -640,6 +640,21 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0032 — Venues import/export: id-vođen upsert, mapiranje po zaglavlju, duplikat-guard na (country, name, city)
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda. **IMPLEMENTIRAN** (suite 318 zeleno).
+- **Kontekst:** Venues strana imala samo ručni add/edit. Vlasnik dostavio legacy „Venues Export" (`23.08.2026_Venues_Export.xlsx`, 3906 redova) kao specifikaciju izgleda, ali **legacy nema import** — ni template ni kod (legacy app nije u repou). Format je zato izveden iz legacy `schools` tabele + tog export-a. Nalaz: legacy kolone `c_name/c_phone/c_email` = **school koordinator (level 1)** vezan preko `user_schools` — potvrđeno na podacima (venue sa samo country-koordinatorom ima te ćelije prazne). Kod nas je taj nivo nemigriran (ADR-0025), pa su kolone prazne dok se ne dodaju.
+- **Odluka:**
+  - **„Venue ID" vodi operaciju:** prazan → kreira, popunjen → ažurira baš taj venue (nepostojeći id = greška). Poravnavanje po imenu se **ne nudi** — imena se ponavljaju, id je jedini pouzdan ključ. Time export → doradi → import postaje pravi round-trip za masovne ispravke.
+  - **Kolone se mapiraju po NAZIVU ZAGLAVLJA, ne po poziciji** (odstupanje od ADR-0029/0030, gde su pozicije fiksne). Razlog: exportovani fajl nosi i računate kolone (`Coordinator*`, BH…S5, Total); mapiranje po imenu ih jednostavno ignoriše, pa se export vraća **bez ikakve dorade**. Kolona koje nema u fajlu se ne dira pri izmeni; kolona koja postoji je merodavna (prazna ćelija briše vrednost).
+  - **Duplikat-guard samo za redove sa praznim id-em**, na otisku **(country, name, city)**. Prvobitno je bio (country, name) — vlasnik ispravio („u dva grada može postojati venue sa istim imenom"), i podaci to potvrđuju: **12 grupa / 24 venue-a** duplo po (name, country), a **0** po (name, country, city). Guard hvata i ponovljen red unutar istog fajla; poruka nosi postojeći Venue ID i uputstvo. Namerni blizanci se i dalje dodaju kroz formu.
+  - **Export = legacy layout + tri polja koja mu fale** (Hours of English, Venue type, Status) — bez njih bi round-trip tiho gubio podatke. Poštuje iste filtere kao lista (deljeni `filtered()`).
+  - **BH…S5 brojevi se stvarno računaju** iz rostera, sabrano **po `level_short`** (isti short postoji u dve varijante kategorija). Do sada su `SchoolResource` i `CoordinatorResource` vraćali fiksne nule, pa je lista prikazivala 0 iako venue ima takmičare; oba sada čitaju `VenueCompetitorCounts`, punjen po strani u kontroleru (jedan grupisan upit, ne po redu).
+- **Perf (mereno na dev bazi: 3878 venue-a, 50k registracija):** profilisanje je otkrilo tri uska grla i sva su uklonjena — coordinator export **6080 → 62 ms** (hidratacija 2225 School modela → ravan join), venue import 1000 redova **7658 → 519 ms** (`School::pluck()` je sam trošio 1878 ms → `DB::table`; upis red-po-red → chunked `insert`/`upsert`), fajl grešaka **2369 → 301 ms**. Pravilo koje iz ovoga sledi: **izveštajni/bulk kod ide ravnim query builder-om**, Eloquent hidratacija se plaća po redu. Ostaje poznato: `XlsxWriter` troši ~17µs/ćeliji (1836 ms od 2705 ms na punom exportu 3878 venue-a) — zajednički za sve export-e, optimizacija je backlog.
+- **Posledica:** `App\Domain\Organization\Support\SchoolExporter` / `SchoolImporter` / `VenueCompetitorCounts`; endpointi `schools/export`, `schools/import` (+ `/template`, `/errors`) — **pre** `apiResource` da `export` ne bude uhvaćen kao `{school}`; front `VenueImportModal` + Import/Export dugmiće. Template kolone: `Venue ID·Venue·Country·Region·City·Address·Phone·Email·No. Invigilators·Hours of English·Venue type·Status`. Gated `create`/`viewAny` na `School`. Testovi `VenueExportTest` (5) + `VenueImportTest` (13, uključujući „isto ime u drugom gradu MORA da prođe"). Detalji — memorija `venues-import-export`.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
