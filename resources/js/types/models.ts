@@ -1,3 +1,11 @@
+/** Row-level scope of the signed-in account (see UserResource::scope). */
+export interface AuthScope {
+    /** True for an admin: nothing is pinned and every venue is in reach. */
+    all_schools: boolean;
+    country: { id: number; name: string | null } | null;
+    schools: { id: number; name: string; region: { id: number; name: string | null } | null }[];
+}
+
 export interface AuthUser {
     id: number;
     name: string;
@@ -8,6 +16,7 @@ export interface AuthUser {
     can_student_delete: boolean;
     roles: string[];
     permissions: string[];
+    scope: AuthScope;
 }
 
 export interface Country {

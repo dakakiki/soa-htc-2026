@@ -12,6 +12,8 @@ import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import LockedField from '@/components/LockedField.vue';
+import { useScope } from '@/composables/useScope';
 import Tooltip from '@/components/Tooltip.vue';
 import ExportButton from '@/components/ExportButton.vue';
 import CoordinatorImportModal from './CoordinatorImportModal.vue';
@@ -28,6 +30,7 @@ const session = useSessionStore();
 const confirm = useConfirmStore();
 // A country coordinator manages the school coordinators under it; the import
 // creates country coordinators (ADR-0030), so that one stays with `users.manage`.
+const { countryLocked, country: scopeCountry } = useScope();
 const canManage = computed(() => session.can('coordinators.manage'));
 const canImport = computed(() => session.can('users.manage'));
 
@@ -225,6 +228,12 @@ onMounted(async () => {
     } catch {
         // filters are optional
     }
+    // A pinned country is the filter, so the region cascade has something to
+    // work from without the user picking what they cannot change.
+    if (countryLocked.value) {
+        filters.country_id = scopeCountry.value?.id ?? null;
+    }
+
     // Restore the cascade options for a filter carried in the URL (e.g. returning
     // from add/edit) without clearing the region/venue the user had chosen.
     if (filters.country_id) {
@@ -267,7 +276,9 @@ onMounted(async () => {
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
 
             <!-- Column 2: Country / Region -->
-            <SearchSelect :model-value="filters.country_id" :options="countryOptions" dense
+            <LockedField v-if="countryLocked" dense :value="scopeCountry?.name"
+                class="lg:col-start-2 lg:row-start-1" />
+            <SearchSelect v-else :model-value="filters.country_id" :options="countryOptions" dense
                 class="lg:col-start-2 lg:row-start-1" :placeholder="$t('coordinator.filterCountry')"
                 :search-placeholder="$t('coordinator.country')" @update:model-value="onCountryFilterSelected" />
             <SearchSelect :model-value="filters.region_id" :options="regionOptions" dense :loading="cascadeLoading"

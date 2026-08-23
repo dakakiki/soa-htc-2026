@@ -210,6 +210,33 @@ class PermissionMatrixTest extends TestCase
             ->get('/api/coordinators/import/template')->assertForbidden();
     }
 
+    // ------------------------------------------------------------------- scope
+
+    public function test_the_identity_payload_pins_the_scope_for_a_venue_coordinator(): void
+    {
+        $venue = $this->venue();
+        $user = $this->coordinator(SystemRole::SchoolCoordinator, $venue);
+
+        // The SPA renders country and venue as fixed fields from this, so the
+        // shape matters as much as the values.
+        $this->actingAs($user)
+            ->getJson('/api/auth/user')
+            ->assertOk()
+            ->assertJsonPath('data.scope.all_schools', false)
+            ->assertJsonPath('data.scope.country.id', $venue->country_id)
+            ->assertJsonCount(1, 'data.scope.schools')
+            ->assertJsonPath('data.scope.schools.0.id', $venue->id);
+    }
+
+    public function test_an_admin_has_nothing_pinned(): void
+    {
+        $this->actingAs($this->admin())
+            ->getJson('/api/auth/user')
+            ->assertOk()
+            ->assertJsonPath('data.scope.all_schools', true)
+            ->assertJsonPath('data.scope.schools', []);
+    }
+
     // ------------------------------------------------------------ admin-only areas
 
     public function test_admin_only_modules_are_closed_to_both_coordinator_roles(): void

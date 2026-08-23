@@ -11,6 +11,8 @@ import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
+import LockedField from '@/components/LockedField.vue';
+import { useScope } from '@/composables/useScope';
 import type { Country, LevelOption, School } from '@/types/models';
 
 const { t } = useI18n();
@@ -39,6 +41,7 @@ const selectedSchool = ref<SearchSelectOption | null>(null);
 const schoolSearching = ref(false);
 const schoolTotal = ref(0);
 
+const { countryLocked, country: scopeCountry, venueLocked, venue: scopeVenue } = useScope();
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const schoolOptions = computed<SearchSelectOption[]>(() => schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })));
 // Difficulty options are the levels whose grade range includes the chosen grade.
@@ -150,6 +153,16 @@ onMounted(async () => {
         const [{ data: countryData }, { data: levelData }] = await Promise.all([listCountries(), listLevelOptions()]);
         countries.value = countryData.data;
         levels.value = levelData.data;
+
+        // A pinned scope is the answer to these fields, so a new student starts
+        // with them filled rather than asking for a choice that does not exist.
+        if (countryLocked.value) {
+            form.country_id = scopeCountry.value?.id ?? null;
+        }
+        if (venueLocked.value) {
+            form.school_id = scopeVenue.value?.id ?? null;
+        }
+
         if (isEdit.value) {
             const { data } = await getRegistration(id.value);
             const x = data.data;
@@ -205,12 +218,14 @@ onMounted(async () => {
                         <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">{{ $t('registration.country') }} <span class="text-red-500">*</span></label>
-                                <SearchSelect :model-value="form.country_id" :options="countryOptions" :placeholder="$t('registration.countryPlaceholder')"
+                                <LockedField v-if="countryLocked" :value="scopeCountry?.name" />
+                                <SearchSelect v-else :model-value="form.country_id" :options="countryOptions" :placeholder="$t('registration.countryPlaceholder')"
                                     :search-placeholder="$t('registration.country')" @update:model-value="onCountrySelected" />
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">{{ $t('registration.venue') }} <span class="text-red-500">*</span></label>
-                                <SearchSelect v-model="form.school_id" :options="schoolOptions" :loading="cascadeLoading"
+                                <LockedField v-if="venueLocked" :value="scopeVenue?.name" />
+                                <SearchSelect v-else v-model="form.school_id" :options="schoolOptions" :loading="cascadeLoading"
                                     remote :searching="schoolSearching" :total="schoolTotal" :selected-option="selectedSchool" @search="onSchoolSearch"
                                     :placeholder="form.country_id ? $t('registration.venuePlaceholder') : $t('registration.venueCountryFirst')"
                                     :search-placeholder="$t('registration.venue')" />

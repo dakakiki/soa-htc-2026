@@ -11,6 +11,8 @@ import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import LockedField from '@/components/LockedField.vue';
+import { useScope } from '@/composables/useScope';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import Tooltip from '@/components/Tooltip.vue';
 import ExportButton from '@/components/ExportButton.vue';
@@ -26,6 +28,8 @@ const confirm = useConfirmStore();
 // Editing a venue and administering the register are different rights: a
 // country coordinator corrects its venues, only an admin adds, deletes or
 // switches one off (legacy user_level 5 vs 10).
+// A coordinator works inside one country, so that filter is fixed.
+const { countryLocked, country: scopeCountry } = useScope();
 const canEdit = computed(() => session.can('schools.edit'));
 const canManage = computed(() => session.can('schools.manage'));
 
@@ -155,6 +159,11 @@ onMounted(async () => {
     } catch {
         // filters and level columns are optional
     }
+    // A pinned country is the filter, so the region cascade has something to
+    // work from without the user picking what they cannot change.
+    if (countryLocked.value) {
+        filters.country_id = scopeCountry.value?.id ?? null;
+    }
     if (filters.country_id) {
         try {
             const { data } = await listRegions(filters.country_id);
@@ -194,7 +203,9 @@ onMounted(async () => {
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
 
             <!-- Column 2: Country / Region -->
-            <SearchSelect :model-value="filters.country_id" :options="countryOptions" dense
+            <LockedField v-if="countryLocked" dense :value="scopeCountry?.name"
+                class="lg:col-start-2 lg:row-start-1" />
+            <SearchSelect v-else :model-value="filters.country_id" :options="countryOptions" dense
                 class="lg:col-start-2 lg:row-start-1" :placeholder="$t('venue.countryPlaceholder')"
                 :search-placeholder="$t('venue.country')" @update:model-value="onCountryFilterSelected" />
             <SearchSelect :model-value="filters.region_id" :options="regionOptions" dense :loading="cascadeLoading"

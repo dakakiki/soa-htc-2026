@@ -7,6 +7,8 @@ import { listCountries, listRegions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import LockedField from '@/components/LockedField.vue';
+import { useScope } from '@/composables/useScope';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import type { Country, Region } from '@/types/models';
 
@@ -39,6 +41,7 @@ const saving = ref(false);
 const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
 
+const { countryLocked, country: scopeCountry } = useScope();
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
 
@@ -207,7 +210,9 @@ const fileBtn =
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700">{{ $t('venue.country') }} *</label>
+                            <LockedField v-if="countryLocked" :value="scopeCountry?.name" />
                             <SearchSelect
+                                v-else
                                 :model-value="form.country_id"
                                 :options="countryOptions"
                                 :clearable="false"

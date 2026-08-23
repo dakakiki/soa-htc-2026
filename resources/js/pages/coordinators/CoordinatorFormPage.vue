@@ -10,6 +10,8 @@ import { useSessionStore } from '@/stores/session';
 import { IconX } from '@tabler/icons-vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import LockedField from '@/components/LockedField.vue';
+import { useScope } from '@/composables/useScope';
 import Tooltip from '@/components/Tooltip.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
@@ -69,6 +71,7 @@ const error = ref<string | null>(null);
 // its own country — the server enforces both (CoordinatorScope), this keeps the
 // form from offering what would come back as a validation error.
 const isAdmin = computed(() => session.can('users.manage'));
+const { countryLocked, country: scopeCountry } = useScope();
 const coordinatorRoles = computed(() =>
     roles.value.filter((r) => (isAdmin.value ? COORDINATOR_ROLE_KEYS.includes(r.key) : r.key === SCHOOL_COORDINATOR_KEY)),
 );
@@ -224,6 +227,13 @@ onMounted(async () => {
         countries.value = countryData.data;
         roles.value = roleData.data;
 
+        // A country coordinator only ever adds people to its own country, and the
+        // venue picker needs that country before it can offer anything.
+        if (!isEdit.value && countryLocked.value && scopeCountry.value) {
+            form.country_id = scopeCountry.value.id;
+            await onCountryChange();
+        }
+
         if (isEdit.value && id.value !== null) {
             const res = await getCoordinator(id.value);
             const c = res.data.data;
@@ -324,7 +334,9 @@ const fileBtn =
                     <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">{{ $t('coordinator.country') }} *</label>
+                            <LockedField v-if="countryLocked" :value="scopeCountry?.name" />
                             <SearchSelect
+                                v-else
                                 :model-value="form.country_id"
                                 :options="countryOptions"
                                 :clearable="false"

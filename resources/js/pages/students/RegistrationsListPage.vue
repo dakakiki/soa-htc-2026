@@ -14,6 +14,8 @@ import ExportButton from '@/components/ExportButton.vue';
 import RowActions from '@/components/RowActions.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
+import LockedField from '@/components/LockedField.vue';
+import { useScope } from '@/composables/useScope';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import RegistrationResultsModal from '@/pages/students/RegistrationResultsModal.vue';
 import AttendanceReportModal from '@/pages/students/AttendanceReportModal.vue';
@@ -31,6 +33,9 @@ const confirm = useConfirmStore();
 
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asNumber = (v: unknown): number | null => (v ? Number(v) : null);
+// A coordinator's country (and a venue coordinator's region and venue) are
+// given, so those filters are shown fixed instead of as searchable selects.
+const { countryLocked, country: scopeCountry, regionLocked, region: scopeRegion, venueLocked, venue: scopeVenue } = useScope();
 const canInsert = computed(() => session.user?.can_student_insert ?? false);
 // The two file flows were never a school coordinator's job (legacy: 10 and 5).
 const canBulk = computed(() => session.can('students.bulk'));
@@ -301,6 +306,18 @@ onMounted(async () => {
     // No initial list — the roster is huge; results appear once the user filters.
     // But if the URL already carries filters (e.g. returning from add/edit), restore
     // that same filtered result: rebuild the cascade options and reload the page.
+    // Pinned scope doubles as the filter, so a coordinator lands on their own
+    // roster instead of an empty screen waiting for a choice they cannot make.
+    if (countryLocked.value) {
+        filters.country_id = scopeCountry.value?.id ?? null;
+    }
+    if (regionLocked.value) {
+        filters.region_id = scopeRegion.value?.id ?? null;
+    }
+    if (venueLocked.value) {
+        filters.school_id = scopeVenue.value?.id ?? null;
+    }
+
     const hasFilters = filters.search || filters.country_id || filters.region_id || filters.school_id
         || filters.grade || filters.level_id || filters.exam_round_id || filters.attendance;
     if (hasFilters) {
@@ -357,16 +374,23 @@ onMounted(async () => {
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
 
             <!-- Column 2: Country / Region -->
-            <SearchSelect :model-value="filters.country_id" :options="countryOptions" dense
+            <LockedField v-if="countryLocked" dense :value="scopeCountry?.name"
+                class="lg:col-start-2 lg:row-start-1" />
+            <SearchSelect v-else :model-value="filters.country_id" :options="countryOptions" dense
                 class="lg:col-start-2 lg:row-start-1" :placeholder="$t('registration.filterCountry')"
                 :search-placeholder="$t('registration.country')" @update:model-value="onCountry" />
-            <SearchSelect :model-value="filters.region_id" :options="regionOptions" dense :loading="regionLoading"
+
+            <LockedField v-if="regionLocked" dense :value="scopeRegion?.name"
+                class="lg:col-start-2 lg:row-start-2" />
+            <SearchSelect v-else :model-value="filters.region_id" :options="regionOptions" dense :loading="regionLoading"
                 class="lg:col-start-2 lg:row-start-2" :disabled="filters.country_id === null"
                 :placeholder="$t('registration.filterRegion')" :search-placeholder="$t('reports.region')"
                 @update:model-value="onRegion" />
 
             <!-- Column 3: Venue (server-side search — all venues reachable, not just first page) -->
-            <SearchSelect :model-value="filters.school_id" :options="schoolOptions" dense :loading="schoolLoading"
+            <LockedField v-if="venueLocked" dense :value="scopeVenue?.name"
+                class="lg:col-start-3 lg:row-start-1" />
+            <SearchSelect v-else :model-value="filters.school_id" :options="schoolOptions" dense :loading="schoolLoading"
                 remote :searching="schoolSearching" :total="schoolTotal" :selected-option="selectedSchoolFilter" @search="onSchoolSearch"
                 class="lg:col-start-3 lg:row-start-1" :disabled="filters.country_id === null"
                 :placeholder="$t('registration.filterVenue')" :search-placeholder="$t('registration.venue')"
