@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, reactive, ref } from 'vue';
+import { nextTick, onBeforeUnmount, reactive, ref } from 'vue';
 
 /**
- * Hover label for a control that shows only an icon.
+ * Hover label for a control that shows only an icon, or a longer explanation for
+ * one that already has a label.
  *
  * The bubble is teleported to `<body>` and positioned with fixed coordinates
  * rather than being absolutely placed next to the trigger: most of these controls
@@ -21,30 +22,59 @@ const props = withDefaults(
 
 /** Distance between the control and the bubble. */
 const GAP = 8;
+/** Kept clear of the window edges so the bubble never sits flush against them. */
+const MARGIN = 8;
 
 const anchor = ref<HTMLElement | null>(null);
+const bubble = ref<HTMLElement | null>(null);
 const shown = ref(false);
-const at = reactive({ top: 0, left: 0, transform: '' });
+const at = reactive({ top: 0, left: 0 });
 
-function place(): void {
+/**
+ * Place the bubble, then pull it back inside the window. Long text wraps to a
+ * fixed maximum width, so the overflow to correct for is bounded — but a control
+ * near an edge would still push it off-screen without this.
+ */
+async function place(): Promise<void> {
     const el = anchor.value;
     if (!el) {
         return;
     }
     const r = el.getBoundingClientRect();
 
-    if (props.position === 'right') {
-        at.top = r.top + r.height / 2;
-        at.left = r.right + GAP;
-        at.transform = 'translateY(-50%)';
-    } else if (props.position === 'bottom') {
-        at.top = r.bottom + GAP;
-        at.left = r.left + r.width / 2;
-        at.transform = 'translateX(-50%)';
-    } else {
-        at.top = r.top - GAP;
-        at.left = r.left + r.width / 2;
-        at.transform = 'translate(-50%, -100%)';
+    // Measure from the left edge first. A fixed element only gets the width left
+    // over to its right, so measuring it where it will finally sit — often hard
+    // against the right edge — would wrap the text far narrower than the maximum.
+    at.left = 0;
+    at.top = 0;
+
+    await nextTick();
+
+    const b = bubble.value?.getBoundingClientRect();
+    if (!b) {
+        return;
+    }
+
+    at.left = props.position === 'right' ? r.right + GAP : r.left + r.width / 2;
+    at.top = props.position === 'right'
+        ? r.top + r.height / 2
+        : props.position === 'bottom' ? r.bottom + GAP : r.top - GAP;
+
+    // Horizontal: the bubble is centred on the control (or sits to its right), so
+    // work out the real edges and shift it just enough to clear the window.
+    const left = props.position === 'right' ? at.left : at.left - b.width / 2;
+    const overflowRight = left + b.width - (window.innerWidth - MARGIN);
+    const overflowLeft = MARGIN - left;
+    if (overflowRight > 0) {
+        at.left -= overflowRight;
+    } else if (overflowLeft > 0) {
+        at.left += overflowLeft;
+    }
+
+    // Vertical: a control near the top has no room above it, so the bubble flips
+    // under it rather than being cut off.
+    if (props.position === 'top' && r.top - GAP - b.height < MARGIN) {
+        at.top = r.bottom + GAP + b.height;
     }
 }
 
@@ -52,8 +82,8 @@ function show(): void {
     if (!props.text) {
         return;
     }
-    place();
     shown.value = true;
+    void place();
     // Fixed coordinates go stale the moment anything scrolls, so the bubble is
     // dismissed rather than left floating over unrelated content.
     window.addEventListener('scroll', hide, { capture: true, passive: true, once: true });
@@ -87,9 +117,11 @@ onBeforeUnmount(() => window.removeEventListener('scroll', hide, { capture: true
         >
             <span
                 v-if="shown && text"
+                ref="bubble"
                 role="tooltip"
-                class="pointer-events-none fixed z-[100] whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg"
-                :style="{ top: `${at.top}px`, left: `${at.left}px`, transform: at.transform }"
+                class="pointer-events-none fixed z-[100] max-w-xs rounded-md bg-gray-900 px-2 py-1 text-center text-xs font-medium leading-snug text-white shadow-lg"
+                :class="position === 'right' ? '-translate-y-1/2' : position === 'bottom' ? '-translate-x-1/2' : '-translate-x-1/2 -translate-y-full'"
+                :style="{ top: `${at.top}px`, left: `${at.left}px` }"
             >{{ text }}</span>
         </Transition>
     </Teleport>
