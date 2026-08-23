@@ -71,6 +71,7 @@ class DashboardController extends Controller
 
         $stats = $this->registrationStats($season?->id, $allowedSchoolIds);
         $data['kpis'] = $this->kpis($stats, $season, $allowedSchoolIds);
+        $data['trend'] = $allowedSchoolIds === null ? $this->trend($season, $stats['students']) : null;
         $data['attention'] = $this->attention($user, $season, $allowedSchoolIds, $stats);
 
         return ['data' => $data];
@@ -221,6 +222,35 @@ class DashboardController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * Roster size per round: the archived rounds plus the season under way, so
+     * the current number is read against where it stood a year ago. Rounds the
+     * archive does not hold (r12 is missing from the legacy dump) are simply
+     * absent — the chart draws bars, not a line, so a gap cannot read as a slope.
+     *
+     * @return list<array{round: int, students: int, current: bool}>
+     */
+    private function trend(?Season $season, int $currentStudents): array
+    {
+        $rows = DB::table('archive_registrations')
+            ->groupBy('round_number')
+            ->orderBy('round_number')
+            ->selectRaw('round_number, count(*) as n')
+            ->get()
+            ->map(fn ($row): array => [
+                'round' => (int) $row->round_number,
+                'students' => (int) $row->n,
+                'current' => false,
+            ])
+            ->all();
+
+        if ($season !== null) {
+            $rows[] = ['round' => $season->round_number, 'students' => $currentStudents, 'current' => true];
+        }
+
+        return $rows;
     }
 
     /**

@@ -219,6 +219,33 @@ class DashboardTest extends TestCase
         $this->assertSame(0, collect($rows)->sum('students'));
     }
 
+    public function test_the_trend_carries_the_archived_rounds_plus_the_one_under_way(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $school = School::query()->firstOrFail();
+
+        $this->actingAs($admin)->postJson('/api/registrations', [
+            'school_id' => $school->id,
+            'difficulty_level_id' => DifficultyLevel::where('level_short', 'H2')->value('id'),
+            'name' => 'Trend Student',
+            'grade' => 7,
+        ])->assertCreated();
+
+        $trend = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.trend');
+
+        // The seeded database has no archive, so the season under way is the
+        // whole series — and it is the one flagged current.
+        $last = end($trend);
+        $this->assertSame(14, $last['round']);
+        $this->assertSame(1, $last['students']);
+        $this->assertTrue($last['current']);
+
+        // A coordinator compares nothing across rounds.
+        $this->actingAs($this->scopedCoordinator($school))
+            ->getJson('/api/dashboard')
+            ->assertJsonPath('data.trend', null);
+    }
+
     /** A coordinator bound to the given venues (one venue = the venue level). */
     private function scopedCoordinator(School $school, School ...$more): User
     {

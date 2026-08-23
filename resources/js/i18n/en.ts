@@ -71,6 +71,11 @@ export default {
             venues_without_city: 'venues with no city — they cannot be placed on a map',
             students_missing_dob: 'students with no date of birth — they cannot sit a test',
         },
+        trend: {
+            title: 'Students by round',
+            source: 'archive · current round in progress',
+            round: 'R{n}',
+        },
         tables: {
             countries: 'Countries',
             venues: 'My venues',

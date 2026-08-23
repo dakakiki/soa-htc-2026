@@ -62,6 +62,13 @@ const pct = (part: number, whole: number): string => (whole === 0 ? '—' : `${M
 const points = (row: { score: number | null; max_score: number | null }): string =>
     row.score === null || row.max_score === null ? '—' : `${row.score} / ${row.max_score}`;
 
+/** Bars are scaled against the tallest round, with a floor so a small one still shows. */
+const trend = computed(() => {
+    const rows = data.value?.trend ?? [];
+    const peak = Math.max(...rows.map((r) => r.students), 1);
+    return rows.map((r) => ({ ...r, height: Math.max(Math.round((r.students / peak) * 100), 3) }));
+});
+
 const tableCard = 'rounded-lg border border-gray-200 bg-white';
 const th = 'px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500';
 const td = 'px-4 py-2 text-sm text-gray-600 tabular-nums';
@@ -149,6 +156,26 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                     </div>
                     <div class="p-4">
                         <WorldChoropleth :rows="data.by_country" />
+                    </div>
+                </div>
+
+                <!-- Roster by round. Bars, not a line: the archive has no round 12,
+                     and a line would draw straight through the hole. -->
+                <div v-if="trend.length > 1" :class="tableCard">
+                    <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+                        <h2 class="text-sm font-semibold text-gray-900">{{ $t('dashboard.trend.title') }}</h2>
+                        <span class="ml-auto text-xs text-gray-500">{{ $t('dashboard.trend.source') }}</span>
+                    </div>
+                    <div class="flex items-end gap-4 px-4 pb-3 pt-6">
+                        <div v-for="row in trend" :key="row.round" class="flex flex-1 flex-col items-center gap-1">
+                            <span class="text-xs tabular-nums text-gray-500">{{ row.students.toLocaleString() }}</span>
+                            <div class="flex h-24 w-full items-end">
+                                <div class="w-full rounded-t"
+                                    :class="row.current ? 'bg-brand-palette-1' : 'bg-brand-palette-4'"
+                                    :style="{ height: `${row.height}%` }"></div>
+                            </div>
+                            <span class="text-xs text-gray-500">{{ $t('dashboard.trend.round', { n: row.round }) }}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -273,26 +300,6 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                     </div>
                 </div>
 
-                <div v-if="session.can('users.manage') || session.can('schools.manage') || session.can('roles.manage')">
-                    <p class="mb-2 text-sm text-gray-500">{{ $t('dashboard.quickActions') }}</p>
-                    <div class="flex flex-wrap gap-2">
-                        <RouterLink
-                            v-if="session.can('users.manage')"
-                            to="/users/new"
-                            class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
-                        >{{ $t('dashboard.newUser') }}</RouterLink>
-                        <RouterLink
-                            v-if="session.can('schools.manage')"
-                            to="/venues/new"
-                            class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
-                        >{{ $t('dashboard.newVenue') }}</RouterLink>
-                        <RouterLink
-                            v-if="session.can('roles.manage')"
-                            to="/roles"
-                            class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
-                        >{{ $t('dashboard.manageRoles') }}</RouterLink>
-                    </div>
-                </div>
             </div>
 
             <!-- Waiting on someone. An empty rail is the point: nothing pending. -->

@@ -482,6 +482,8 @@ export interface DashboardData {
     by_venue: VenueDashboardRow[] | null;
     /** The first page of the roster, for a scope of exactly one venue. */
     students_preview: StudentPreviewRow[] | null;
+    /** Roster size per round, archive plus the season under way. */
+    trend: { round: number; students: number; current: boolean }[] | null;
 }
 
 export interface Paginated<T> {
