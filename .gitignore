@@ -1,3 +1,4 @@
+*.code-workspace
 *.log
 .DS_Store
 .env
