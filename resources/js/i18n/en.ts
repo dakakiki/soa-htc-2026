@@ -320,7 +320,6 @@ export default {
         canEditStudents: 'Can edit students',
         canDeleteStudents: 'Can delete students',
         canResetResults: 'Can reset test results',
-        id: 'ID',
         searchNameEmail: 'Name, Email',
         empty: 'No users.',
         error: 'Could not load users.',

@@ -197,7 +197,6 @@ onMounted(async () => {
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                     <tr>
-                        <th class="px-4 py-3">{{ $t('user.id') }}</th>
                         <th class="px-4 py-3">{{ $t('user.name') }}</th>
                         <th class="px-4 py-3">{{ $t('user.country') }}</th>
                         <th class="px-4 py-3">{{ $t('user.region') }}</th>
@@ -212,7 +211,6 @@ onMounted(async () => {
                         :key="user.id"
                         class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft"
                     >
-                        <td class="px-4 py-3 text-gray-500">{{ user.id }}</td>
                         <td class="px-4 py-3">
                             <RouterLink :to="{ name: 'users.edit', params: { id: user.id } }" class="font-medium text-gray-900 hover:text-brand-primary">
                                 {{ user.name }}
@@ -241,7 +239,7 @@ onMounted(async () => {
                         </td>
                     </tr>
                     <tr v-if="!loading && users.length === 0">
-                        <td colspan="7" class="px-4 py-6 text-center text-gray-400">{{ $t('user.empty') }}</td>
+                        <td colspan="6" class="px-4 py-6 text-center text-gray-400">{{ $t('user.empty') }}</td>
                     </tr>
                 </tbody>
             </table>
