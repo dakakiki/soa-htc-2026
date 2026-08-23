@@ -38,6 +38,9 @@ return [
     ],
     'coordinator' => [
         'role_invalid' => 'Select a coordinator role (country or school coordinator).',
+        'role_above_actor' => 'You may only manage school coordinators.',
+        'country_outside_actor' => 'You may only manage coordinators in your own country.',
+        'school_outside_actor' => 'Select venues from the ones assigned to you.',
     ],
     'difficulty' => [
         'countries_required' => 'Select at least one country, or enable "all countries".',

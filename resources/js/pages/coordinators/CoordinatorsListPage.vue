@@ -26,7 +26,10 @@ const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
 const confirm = useConfirmStore();
-const canManage = computed(() => session.can('users.manage'));
+// A country coordinator manages the school coordinators under it; the import
+// creates country coordinators (ADR-0030), so that one stays with `users.manage`.
+const canManage = computed(() => session.can('coordinators.manage'));
+const canImport = computed(() => session.can('users.manage'));
 
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asNumber = (v: unknown): number | null => (v ? Number(v) : null);
@@ -251,7 +254,7 @@ onMounted(async () => {
                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                     ><IconPlus :size="16" />{{ $t('coordinator.add') }}</RouterLink>
                 </Tooltip>
-                <ExportButton :icon="IconUpload" :label="$t('coordinator.import.title')"
+                <ExportButton v-if="canImport" :icon="IconUpload" :label="$t('coordinator.import.title')"
                     :tooltip="$t('coordinator.import.tooltip')" @click="importOpen = true" />
                 <ExportButton :loading="exporting" :tooltip="$t('coordinator.exportTooltip')" @click="exportList" />
             </div>

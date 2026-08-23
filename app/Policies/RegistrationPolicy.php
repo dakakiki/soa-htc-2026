@@ -9,19 +9,20 @@ use App\Models\User;
 
 /**
  * Object-level authorization for student registrations. Viewing follows the
- * school scope (`schools.view` + the user's bound schools); creating, editing
- * and deleting are gated by the per-user student flags, still within scope.
+ * school scope (`students.view` + the user's bound schools); creating, editing
+ * and deleting are gated by the per-user student flags, still within scope —
+ * the same shape the legacy app had for user_level 1/5/10.
  */
 class RegistrationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasPermission('schools.view');
+        return $user->hasPermission('students.view');
     }
 
     public function view(User $user, Registration $registration): bool
     {
-        return $user->hasPermission('schools.view') && $this->inScope($user, $registration);
+        return $user->hasPermission('students.view') && $this->inScope($user, $registration);
     }
 
     public function create(User $user): bool

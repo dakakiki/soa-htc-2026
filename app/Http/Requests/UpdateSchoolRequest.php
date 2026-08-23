@@ -31,7 +31,11 @@ class UpdateSchoolRequest extends FormRequest
             'country_id' => ['sometimes', 'integer', 'exists:countries,id'],
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'name' => ['sometimes', 'string', 'max:255'],
-            'status' => ['sometimes', 'in:active,inactive'],
+            // Editing a venue and switching it off are different rights: the
+            // status toggle stays with `schools.manage` (legacy: admin only).
+            'status' => $this->user()?->hasPermission('schools.manage')
+                ? ['sometimes', 'in:active,inactive']
+                : ['prohibited'],
             'city' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:100'],

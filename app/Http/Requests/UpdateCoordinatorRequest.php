@@ -17,7 +17,7 @@ class UpdateCoordinatorRequest extends FormRequest
     {
         $user = $this->route('coordinator');
 
-        return $user instanceof User && ($this->user()?->can('update', $user) ?? false);
+        return $user instanceof User && ($this->user()?->can('manageCoordinator', $user) ?? false);
     }
 
     /**
@@ -66,6 +66,14 @@ class UpdateCoordinatorRequest extends FormRequest
 
             $user = $this->route('coordinator');
             $countryId = $this->integer('country_id') ?: ($user instanceof User ? $user->country_id : null);
+
+            CoordinatorScope::validateActorLimits(
+                $validator,
+                $this->user(),
+                Role::find($this->input('role_id')),
+                (array) $this->input('school_ids', []),
+                $this->integer('country_id') ?: null,
+            );
 
             CoordinatorScope::validate(
                 $validator,

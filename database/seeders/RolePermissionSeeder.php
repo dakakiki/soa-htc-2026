@@ -20,7 +20,11 @@ class RolePermissionSeeder extends Seeder
     private const PERMISSIONS = [
         'schools.view' => 'View schools within the user scope',
         'schools.view.all' => 'View all schools (bypass scope)',
-        'schools.manage' => 'Create, update and delete schools',
+        'schools.edit' => 'Edit schools within the user scope',
+        'schools.manage' => 'Create and delete schools, and change their status',
+        'students.view' => 'View students within the user scope',
+        'students.bulk' => 'Bulk student import and attendance update (file flows)',
+        'coordinators.manage' => 'Manage coordinators within the user scope',
         'seasons.view' => 'View seasons',
         'seasons.manage' => 'Create and manage seasons',
         'users.manage' => 'Manage staff users and season assignments',
@@ -43,13 +47,22 @@ class RolePermissionSeeder extends Seeder
                 'name' => SystemRole::Admin->label(),
                 'permissions' => array_keys(self::PERMISSIONS),
             ],
+            // Mirrors what the legacy app granted user_level 5: students and the
+            // venues of their country (edit only), plus the school coordinators
+            // under them. Row-level scope comes from the season assignment.
             SystemRole::CountryCoordinator->value => [
                 'name' => SystemRole::CountryCoordinator->label(),
-                'permissions' => ['schools.view', 'seasons.view'],
+                'permissions' => [
+                    'students.view', 'students.bulk', 'schools.view', 'schools.edit',
+                    'coordinators.manage', 'seasons.view',
+                ],
             ],
+            // Legacy user_level 1: students of their own venue(s) and nothing else.
+            // `schools.view` is data access for the venue picker and columns, not
+            // the Venues screen (that one needs `schools.edit`).
             SystemRole::SchoolCoordinator->value => [
                 'name' => SystemRole::SchoolCoordinator->label(),
-                'permissions' => ['schools.view', 'seasons.view'],
+                'permissions' => ['students.view', 'schools.view', 'seasons.view'],
             ],
             SystemRole::Student->value => [
                 'name' => SystemRole::Student->label(),

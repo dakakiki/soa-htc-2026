@@ -32,6 +32,8 @@ const confirm = useConfirmStore();
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asNumber = (v: unknown): number | null => (v ? Number(v) : null);
 const canInsert = computed(() => session.user?.can_student_insert ?? false);
+// The two file flows were never a school coordinator's job (legacy: 10 and 5).
+const canBulk = computed(() => session.can('students.bulk'));
 const canEdit = computed(() => session.user?.can_student_edit ?? false);
 const canDelete = computed(() => session.user?.can_student_delete ?? false);
 
@@ -331,9 +333,9 @@ onMounted(async () => {
                     {{ $t('registration.add') }}
                     </RouterLink>
                 </Tooltip>
-                <ExportButton v-if="canInsert" :icon="IconUpload" :label="$t('registration.import.title')"
+                <ExportButton v-if="canInsert && canBulk" :icon="IconUpload" :label="$t('registration.import.title')"
                     :tooltip="$t('registration.import.tooltip')" @click="importOpen = true" />
-                <ExportButton v-if="canEdit" :icon="IconClipboardCheck" :label="$t('registration.attendanceUpdate.title')"
+                <ExportButton v-if="canEdit && canBulk" :icon="IconClipboardCheck" :label="$t('registration.attendanceUpdate.title')"
                     :tooltip="$t('registration.attendanceUpdate.tooltip')" @click="attendanceImportOpen = true" />
             </div>
         </div>

@@ -728,6 +728,33 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0038 — Pristupni model preslikan iz legacy-ja: `user_level` 10/5/1 → permisije + row scope
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda („uvesti pristupe istim funkcijama userima kao što su imali"). **IMPLEMENTIRANO** (suite 353 zeleno).
+- **Kontekst:** Legacy app nema middleware po nivou — pristup je efektivno definisan **vidljivošću menija** (`resources/views/dashboard/left.blade.php`), gate-ovima u blade-ovima i `switch ($ulogovan->user_level)` scope-om u kontrolerima. Kod nas su obe koordinatorske role imale samo `schools.view` + `seasons.view`, pa country coordinator nije mogao ni do Coordinators ekrana ni da ispravi venue, a school coordinator je video Venues modul koji u legacy-ju nikad nije imao.
+- **Matrica (izvor: legacy meni + view gate-ovi):**
+
+| Funkcija | 10 admin | 5 country | 1 venue |
+| --- | :-: | :-: | :-: |
+| Students (scope-ovano) · export · attendance PDF · SOA cert | ✅ | ✅ | ✅ |
+| Student add/edit/delete | ✅ | po `can_student_*` | po `can_student_*` |
+| Student bulk import + attendance update (fajl) | ✅ | ✅ | ❌ |
+| Coordinators | ✅ svi | ✅ samo **school** coordinatori, svoja država/venue-i | ❌ |
+| Venues — lista i izmena | ✅ | ✅ | ❌ |
+| Venue add / delete / status | ✅ | ❌ | ❌ |
+| Countries · Regions · Difficulty · Quizzes · Results · Reports · Archive · Settings | ✅ | ❌ | ❌ |
+
+- **Odluka:**
+  - **Scope mehanika se ne dira** — `allowedSchoolIds()` (sezonska dodela → venue pivot) radi tačno ono što je legacy radio preko `user_schools`, a `RegistrationPolicy` je već poštovao `can_student_insert/edit/delete`. Menjaju se **dodele permisija i gate-ovi**, ne model.
+  - **`schools.edit` se odvaja od `schools.manage`.** Izmena venue-a je scope-ovano pravo (country coordinator ispravlja svoje venue-e), a **dodavanje, brisanje i status ostaju admin**. Status je **field-level**: `UpdateSchoolRequest` mu daje `prohibited` bez `schools.manage`, jer je isti PUT nosilac i imena i statusa (inline toggle u listi).
+  - **`students.view` se odvaja od `schools.view`.** `schools.view` ostaje **pristup podacima o venue-ima** (picker i kolone na studentskom ekranu, treba i school coordinator-u), a **Venues stranica počinje od `schools.edit`** — tako nivo 1 zadrži podatke, a izgubi modul, kao u legacy-ju.
+  - **`students.bulk`** pokriva oba fajl-toka (import + attendance update). Nije izvedeno iz `can_student_*` flag-ova jer legacy razdvaja: nivo 1 sme da unese studenta pojedinačno, ali nikad fajlom.
+  - **`coordinators.manage`** odvojen od `users.manage`. `UserPolicy::manageCoordinator()` propušta admina za bilo koga, a country coordinator-a **samo za school coordinatora iste države**; lista i export se serverski sužavaju (`manageableRoleIds()` + `country_id` clamp), a `CoordinatorScope::validateActorLimits()` obara pokušaj da se kroz payload napravi ravnopravan ili tuđi nalog. **Coordinator import ostaje admin** — importer pravi country coordinatore (ADR-0030), što je iznad plafona nivoa 5.
+  - **Reports i Archive ostaju admin-only** (legacy parity, potvrdio vlasnik) iako bi scope-ovani izveštaj po državi bio izvodljiv.
+- **Posledica:** 4 nove permisije (`schools.edit`, `students.view`, `students.bulk`, `coordinators.manage`) → katalog ima 17; `PermissionMatrixTest` drži matricu (12 testova) da UI gate i API gate ne odu na različite strane. **Nije preneto jer ne postoji u novom app-u:** legacy `/students/invigilators` (bio je isključivo za nivo 1), portal CMS i Accounting moduli.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

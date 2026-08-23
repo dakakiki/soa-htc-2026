@@ -206,7 +206,7 @@ class RegistrationController extends Controller
      */
     public function importTemplate(): Response
     {
-        $this->authorize('create', Registration::class);
+        $this->authorize('students.bulk');
 
         $headers = ['Name', 'Date Of Birth', 'School (if different from venue)', 'Grade', 'Category'];
         $hint = [
@@ -230,7 +230,7 @@ class RegistrationController extends Controller
      */
     public function importCategorySets(Request $request): JsonResponse
     {
-        $this->authorize('create', Registration::class);
+        $this->authorize('students.bulk');
 
         $validated = $request->validate([
             'country_id' => ['required', 'integer', 'exists:countries,id'],
@@ -258,6 +258,7 @@ class RegistrationController extends Controller
      */
     public function import(Request $request): JsonResponse
     {
+        $this->authorize('students.bulk');
         $this->authorize('create', Registration::class);
 
         $validated = $request->validate([
@@ -287,7 +288,7 @@ class RegistrationController extends Controller
      */
     public function importErrors(Request $request): Response
     {
-        $this->authorize('create', Registration::class);
+        $this->authorize('students.bulk');
 
         $validated = $request->validate([
             'school_id' => ['required', 'integer', 'exists:schools,id'],
@@ -314,7 +315,7 @@ class RegistrationController extends Controller
     /** The attendance-update template (.xlsx): Candidate no | Absent (0/1). */
     public function attendanceImportTemplate(): Response
     {
-        $this->authorize('viewAny', Registration::class);
+        $this->authorize('students.bulk');
 
         return response(XlsxWriter::toString(['Candidate no', 'Absent'], [['10000000', '0/1']], 'Attendance'), 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -329,6 +330,7 @@ class RegistrationController extends Controller
      */
     public function attendanceImport(Request $request): JsonResponse
     {
+        $this->authorize('students.bulk');
         abort_unless($request->user()?->can_student_edit ?? false, 403);
 
         $validated = $request->validate([

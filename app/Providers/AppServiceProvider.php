@@ -59,6 +59,11 @@ class AppServiceProvider extends ServiceProvider
         // ability rather than a policy per lookup model.
         Gate::define('content.manage', fn (User $user): bool => $user->hasPermission('content.manage'));
 
+        // Bulk student file flows (import + attendance update). Separate from the
+        // per-user student flags: legacy gave these to admins and country
+        // coordinators only, never to a school coordinator.
+        Gate::define('students.bulk', fn (User $user): bool => $user->hasPermission('students.bulk'));
+
         // Results area: essay grading (5b), publication (5c) and attempt reset (5e).
         Gate::define('results.manage', fn (User $user): bool => $user->hasPermission('results.manage'));
 

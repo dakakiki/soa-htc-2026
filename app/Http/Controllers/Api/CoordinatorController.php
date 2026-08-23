@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Support\CoordinatorExporter;
@@ -32,9 +33,9 @@ class CoordinatorController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $this->authorize('viewAny', User::class);
+        $this->authorize('viewAnyCoordinator', User::class);
 
-        $roleIds = $this->coordinatorRoleIds();
+        $roleIds = $this->manageableRoleIds();
         $seasonId = SeasonContext::active()?->id;
 
         $users = $this->filteredCoordinators($request, $roleIds, $seasonId)
@@ -63,9 +64,9 @@ class CoordinatorController extends Controller
      */
     public function export(Request $request): Response
     {
-        $this->authorize('viewAny', User::class);
+        $this->authorize('viewAnyCoordinator', User::class);
 
-        $roleIds = $this->coordinatorRoleIds();
+        $roleIds = $this->manageableRoleIds();
         $seasonId = SeasonContext::active()?->id;
 
         $ids = $this->filteredCoordinators($request, $roleIds, $seasonId)->pluck('id')->all();
@@ -181,8 +182,16 @@ class CoordinatorController extends Controller
                 ->when($seasonId, fn ($q) => $q->where('season_id', $seasonId));
         };
 
+        $actor = $request->user();
+
         return User::query()
             ->whereHas('seasonAssignments', $scoped)
+            // A country coordinator only ever sees their own country's people;
+            // the role restriction rides along in $roleIds.
+            ->when(
+                ! $actor->hasPermission('users.manage'),
+                fn ($query) => $query->where('country_id', $actor->country_id)
+            )
             ->when($request->filled('search'), function ($query) use ($request): void {
                 $term = '%'.$request->string('search').'%';
                 $query->where(fn ($w) => $w->where('name', 'like', $term)
@@ -209,7 +218,7 @@ class CoordinatorController extends Controller
 
     public function show(User $coordinator): CoordinatorResource
     {
-        $this->authorize('view', $coordinator);
+        $this->authorize('manageCoordinator', $coordinator);
 
         return CoordinatorResource::make($this->loadCoordinator($coordinator));
     }
@@ -271,7 +280,7 @@ class CoordinatorController extends Controller
      */
     public function deleteAsset(User $coordinator, string $asset): CoordinatorResource
     {
-        $this->authorize('update', $coordinator);
+        $this->authorize('manageCoordinator', $coordinator);
 
         $column = match ($asset) {
             'image' => 'image_path',
@@ -289,7 +298,7 @@ class CoordinatorController extends Controller
 
     public function destroy(Request $request, User $coordinator): Response
     {
-        $this->authorize('delete', $coordinator);
+        $this->authorize('manageCoordinator', $coordinator);
 
         if ($request->user()->id === $coordinator->id) {
             throw ValidationException::withMessages(['user' => [trans('messages.user.self_delete')]]);
@@ -339,6 +348,22 @@ class CoordinatorController extends Controller
     private function coordinatorRoleIds()
     {
         return Role::whereIn('key', CoordinatorScope::ROLE_KEYS)->pluck('id');
+    }
+
+    /**
+     * The roles the signed-in user may see and manage here. An admin manages both
+     * coordinator roles; a country coordinator only school coordinators — the same
+     * ceiling the legacy screen had (user_level 5 could pick level 1 only).
+     *
+     * @return Collection<int, int>
+     */
+    private function manageableRoleIds(): Collection
+    {
+        if (request()->user()?->hasPermission('users.manage')) {
+            return $this->coordinatorRoleIds();
+        }
+
+        return Role::whereIn('key', [SystemRole::SchoolCoordinator->value])->pluck('id');
     }
 
     /** @return list<int> */

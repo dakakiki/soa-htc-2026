@@ -14,7 +14,7 @@ class StoreCoordinatorRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('create', User::class) ?? false;
+        return $this->user()?->can('createCoordinator', User::class) ?? false;
     }
 
     /**
@@ -49,6 +49,14 @@ class StoreCoordinatorRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            CoordinatorScope::validateActorLimits(
+                $validator,
+                $this->user(),
+                Role::find($this->input('role_id')),
+                (array) $this->input('school_ids', []),
+                $this->integer('country_id') ?: null,
+            );
+
             CoordinatorScope::validate(
                 $validator,
                 Role::find($this->input('role_id')),

@@ -23,6 +23,10 @@ const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
 const confirm = useConfirmStore();
+// Editing a venue and administering the register are different rights: a
+// country coordinator corrects its venues, only an admin adds, deletes or
+// switches one off (legacy user_level 5 vs 10).
+const canEdit = computed(() => session.can('schools.edit'));
 const canManage = computed(() => session.can('schools.manage'));
 
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -170,7 +174,7 @@ onMounted(async () => {
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('venue.title') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ $t('common.total', { count: total }) }}</p>
             </div>
-            <div v-if="canManage" class="flex flex-wrap items-center justify-end gap-2">
+            <div v-if="canEdit" class="flex flex-wrap items-center justify-end gap-2">
                 <Tooltip :text="$t('venue.add')">
                     <RouterLink
                     :to="{ name: 'venues.new' }"
@@ -256,7 +260,7 @@ onMounted(async () => {
                         </td>
                         <td class="px-4 py-3">
                             <RowActions
-                                :edit-to="canManage ? { name: 'venues.edit', params: { id: school.id } } : null"
+                                :edit-to="canEdit ? { name: 'venues.edit', params: { id: school.id } } : null"
                                 :deletable="canManage"
                                 @delete="remove(school)"
                             />

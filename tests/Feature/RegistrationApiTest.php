@@ -36,11 +36,11 @@ class RegistrationApiTest extends TestCase
         return User::where('email', 'admin@soahtc.test')->firstOrFail();
     }
 
-    /** A school coordinator scoped to exactly the given schools, with student rights. */
-    private function scopedCoordinator(array $schoolIds, array $flags = []): User
+    /** A coordinator scoped to exactly the given schools, with student rights. */
+    private function scopedCoordinator(array $schoolIds, array $flags = [], ?SystemRole $as = null): User
     {
         $season = Season::where('round_number', 14)->firstOrFail();
-        $role = Role::where('key', SystemRole::SchoolCoordinator->value)->firstOrFail();
+        $role = Role::where('key', ($as ?? SystemRole::SchoolCoordinator)->value)->firstOrFail();
         $user = User::factory()->create(array_merge([
             'can_student_insert' => true, 'can_student_edit' => true, 'can_student_delete' => true,
         ], $flags));
@@ -492,7 +492,7 @@ class RegistrationApiTest extends TestCase
             ->assertJsonPath('data.attendance', 'absent');
 
         // A coordinator without edit rights cannot change attendance.
-        $noEdit = $this->scopedCoordinator([$school->id], ['can_student_edit' => false]);
+        $noEdit = $this->scopedCoordinator([$school->id], ['can_student_edit' => false], SystemRole::CountryCoordinator);
         $this->actingAs($noEdit)
             ->putJson("/api/registrations/{$registration->id}", ['attendance' => 'present'])
             ->assertForbidden();
@@ -709,7 +709,7 @@ class RegistrationApiTest extends TestCase
     {
         $schools = School::query()->take(2)->get();
         $outsider = $this->newStudent($schools[1]->id, 'Outsider');
-        $coordinator = $this->scopedCoordinator([$schools[0]->id]);
+        $coordinator = $this->scopedCoordinator([$schools[0]->id], [], SystemRole::CountryCoordinator);
 
         // A student outside the coordinator's venues is simply not found (untouched).
         $this->actingAs($coordinator)
@@ -719,6 +719,21 @@ class RegistrationApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('updated', 0)
             ->assertJsonPath('not_found', 1);
+    }
+
+    public function test_school_coordinator_cannot_run_the_bulk_file_flows(): void
+    {
+        $school = School::firstOrFail();
+        $coordinator = $this->scopedCoordinator([$school->id]);
+
+        // Legacy gave import and the attendance update to levels 10 and 5 only,
+        // even though this user may add and edit students one by one.
+        $this->actingAs($coordinator)->get('/api/registrations/import/template')->assertForbidden();
+        $this->actingAs($coordinator)
+            ->post('/api/registrations/attendance-import', [
+                'file' => $this->attendanceFile([['14000001', '1']]),
+            ])
+            ->assertForbidden();
     }
 
     public function test_attendance_import_requires_edit_right(): void

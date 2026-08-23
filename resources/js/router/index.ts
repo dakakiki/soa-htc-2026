@@ -60,25 +60,27 @@ const routes: RouteRecordRaw[] = [
         path: '/venues',
         name: 'venues',
         component: () => import('@/pages/venues/VenuesListPage.vue'),
-        meta: { requiresAuth: true, permission: 'schools.view' },
+        // `schools.view` is data access (venue pickers on the students screen);
+        // the Venues screen itself starts at edit rights, as in the legacy app.
+        meta: { requiresAuth: true, permission: 'schools.edit' },
     },
     {
         path: '/students',
         name: 'registrations',
         component: () => import('@/pages/students/RegistrationsListPage.vue'),
-        meta: { requiresAuth: true, permission: 'schools.view' },
+        meta: { requiresAuth: true, permission: 'students.view' },
     },
     {
         path: '/students/new',
         name: 'registrations.new',
         component: () => import('@/pages/students/RegistrationFormPage.vue'),
-        meta: { requiresAuth: true, permission: 'schools.view' },
+        meta: { requiresAuth: true, permission: 'students.view' },
     },
     {
         path: '/students/:id/edit',
         name: 'registrations.edit',
         component: () => import('@/pages/students/RegistrationFormPage.vue'),
-        meta: { requiresAuth: true, permission: 'schools.view' },
+        meta: { requiresAuth: true, permission: 'students.view' },
     },
     {
         path: '/venues/new',
@@ -90,13 +92,13 @@ const routes: RouteRecordRaw[] = [
         path: '/venues/:id',
         name: 'venues.view',
         component: () => import('@/pages/venues/VenueViewPage.vue'),
-        meta: { requiresAuth: true, permission: 'schools.view' },
+        meta: { requiresAuth: true, permission: 'schools.edit' },
     },
     {
         path: '/venues/:id/edit',
         name: 'venues.edit',
         component: () => import('@/pages/venues/VenueFormPage.vue'),
-        meta: { requiresAuth: true, permission: 'schools.manage' },
+        meta: { requiresAuth: true, permission: 'schools.edit' },
     },
     {
         path: '/profile',
@@ -126,19 +128,19 @@ const routes: RouteRecordRaw[] = [
         path: '/coordinators',
         name: 'coordinators',
         component: () => import('@/pages/coordinators/CoordinatorsListPage.vue'),
-        meta: { requiresAuth: true, permission: 'users.manage' },
+        meta: { requiresAuth: true, permission: 'coordinators.manage' },
     },
     {
         path: '/coordinators/new',
         name: 'coordinators.new',
         component: () => import('@/pages/coordinators/CoordinatorFormPage.vue'),
-        meta: { requiresAuth: true, permission: 'users.manage' },
+        meta: { requiresAuth: true, permission: 'coordinators.manage' },
     },
     {
         path: '/coordinators/:id/edit',
         name: 'coordinators.edit',
         component: () => import('@/pages/coordinators/CoordinatorFormPage.vue'),
-        meta: { requiresAuth: true, permission: 'users.manage' },
+        meta: { requiresAuth: true, permission: 'coordinators.manage' },
     },
     {
         path: '/locations',

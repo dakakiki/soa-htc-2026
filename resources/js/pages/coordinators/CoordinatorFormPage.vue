@@ -6,6 +6,7 @@ import { createCoordinator, getCoordinator, updateCoordinator, deleteCoordinator
 import { listCountries, listRegions, listRoles } from '@/api/reference';
 import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
+import { useSessionStore } from '@/stores/session';
 import { IconX } from '@tabler/icons-vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
@@ -23,6 +24,7 @@ const COORDINATOR_ROLE_KEYS = [COUNTRY_COORDINATOR_KEY, SCHOOL_COORDINATOR_KEY];
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
+const session = useSessionStore();
 
 const id = computed(() => (route.params.id ? Number(route.params.id) : null));
 const isEdit = computed(() => id.value !== null);
@@ -63,7 +65,13 @@ const schoolTotal = ref(0);
 const preselectedSchools = ref<MultiSelectOption[]>([]);
 const error = ref<string | null>(null);
 
-const coordinatorRoles = computed(() => roles.value.filter((r) => COORDINATOR_ROLE_KEYS.includes(r.key)));
+// A country coordinator may only create school coordinators, and only inside
+// its own country — the server enforces both (CoordinatorScope), this keeps the
+// form from offering what would come back as a validation error.
+const isAdmin = computed(() => session.can('users.manage'));
+const coordinatorRoles = computed(() =>
+    roles.value.filter((r) => (isAdmin.value ? COORDINATOR_ROLE_KEYS.includes(r.key) : r.key === SCHOOL_COORDINATOR_KEY)),
+);
 const selectedRoleKey = computed(() => roles.value.find((r) => r.id === form.role_id)?.key);
 const isSingleSchool = computed(() => selectedRoleKey.value === SCHOOL_COORDINATOR_KEY);
 

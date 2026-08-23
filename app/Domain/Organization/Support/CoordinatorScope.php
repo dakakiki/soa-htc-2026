@@ -8,6 +8,7 @@ use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
+use App\Models\User;
 use Illuminate\Contracts\Validation\Validator;
 
 /**
@@ -20,6 +21,39 @@ final class CoordinatorScope
         SystemRole::CountryCoordinator->value,
         SystemRole::SchoolCoordinator->value,
     ];
+
+    /**
+     * Extra ceiling for a manager who is not an admin: a country coordinator may
+     * only create school coordinators, inside their own country, on venues they
+     * hold themselves. Admins (`users.manage`) skip all three.
+     *
+     * @param  list<int>  $schoolIds
+     */
+    public static function validateActorLimits(
+        Validator $validator,
+        User $actor,
+        ?Role $role,
+        array $schoolIds,
+        ?int $countryId,
+    ): void {
+        if ($actor->hasPermission('users.manage')) {
+            return;
+        }
+
+        if ($role !== null && $role->key !== SystemRole::SchoolCoordinator->value) {
+            $validator->errors()->add('role_id', trans('messages.coordinator.role_above_actor'));
+        }
+
+        if ($countryId !== null && $countryId !== $actor->country_id) {
+            $validator->errors()->add('country_id', trans('messages.coordinator.country_outside_actor'));
+        }
+
+        $allowed = $actor->allowedSchoolIds();
+
+        if ($allowed !== null && array_diff($schoolIds, $allowed->all()) !== []) {
+            $validator->errors()->add('school_ids', trans('messages.coordinator.school_outside_actor'));
+        }
+    }
 
     /**
      * @param  list<int>  $schoolIds
