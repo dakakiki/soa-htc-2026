@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
+use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\SeasonUserAssignment;
+use Database\Seeders\MasterDataSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -28,6 +30,21 @@ class MasterDataTest extends TestCase
         $this->assertSame('admin@soahtc.test', $assignment->user->email);
         $this->assertSame('Season 2026', $assignment->season->name);
         $this->assertSame(SystemRole::Admin->value, $assignment->role->key);
+    }
+
+    public function test_reseeding_after_the_legacy_migration_does_not_duplicate_countries(): void
+    {
+        $this->seed();
+
+        // What the legacy import leaves behind: the olympic code, not the ISO one.
+        Country::where('iso_alpha2', 'RS')->update(['code' => 'SRB', 'name' => 'Serbia']);
+
+        $this->seed(MasterDataSeeder::class);
+
+        $this->assertDatabaseCount('countries', 3);
+        $this->assertSame(1, Country::where('iso_alpha2', 'RS')->count());
+        // The row that was already there keeps its migrated code.
+        $this->assertSame('SRB', Country::where('iso_alpha2', 'RS')->value('code'));
     }
 
     public function test_system_roles_have_expected_permissions(): void

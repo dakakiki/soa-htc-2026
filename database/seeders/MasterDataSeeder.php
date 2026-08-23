@@ -39,9 +39,13 @@ class MasterDataSeeder extends Seeder
             ['code' => 'MK', 'name' => 'North Macedonia', 'iso_alpha2' => 'MK', 'iso_numeric' => 807],
             ['code' => 'EG', 'name' => 'Egypt', 'iso_alpha2' => 'EG', 'iso_numeric' => 818],
         ])->mapWithKeys(fn (array $c) => [
+            // Matched on the ISO alpha-2 code rather than on `code`: after the
+            // legacy migration the same country carries its olympic code (Serbia
+            // is SRB, Egypt EGY), so looking it up by `code` would find nothing
+            // and seed a second Serbia on every run.
             $c['code'] => Country::query()->firstOrCreate(
-                ['code' => $c['code']],
-                ['name' => $c['name'], 'iso_alpha2' => $c['iso_alpha2'], 'iso_numeric' => $c['iso_numeric']],
+                ['iso_alpha2' => $c['iso_alpha2']],
+                ['code' => $c['code'], 'name' => $c['name'], 'iso_numeric' => $c['iso_numeric']],
             ),
         ]);
 
