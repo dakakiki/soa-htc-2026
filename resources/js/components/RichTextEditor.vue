@@ -5,31 +5,58 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import { TextStyle, Color } from '@tiptap/extension-text-style';
+import Image from '@tiptap/extension-image';
+import { TableKit } from '@tiptap/extension-table/kit';
 import {
-    IconBold, IconItalic, IconUnderline, IconH2,
+    IconBold, IconItalic, IconUnderline, IconH2, IconH3, IconH4,
     IconList, IconListNumbers, IconLink, IconClearFormatting, IconPalette,
+    IconPhoto, IconTable, IconTablePlus, IconTableMinus, IconTableOff,
+    IconColumnInsertRight, IconColumnRemove,
 } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
 import Tooltip from '@/components/Tooltip.vue';
+import MediaPickerModal from '@/components/MediaPickerModal.vue';
+import type { CmsMedia } from '@/types/models';
 import { useThemeStore } from '@/stores/theme';
 
 const { t } = useI18n();
 
-const props = withDefaults(defineProps<{ modelValue: string; placeholder?: string }>(), { placeholder: '' });
+/**
+ * `rich` turns on the article toolset — images, tables and the smaller headings.
+ * It is off everywhere else on purpose: a certificate or a question body has no
+ * business holding a table, and the extra buttons would only be noise there.
+ *
+ * `minHeight` is a Tailwind class, because a page body needs far more room than
+ * a one-paragraph field.
+ */
+const props = withDefaults(
+    defineProps<{ modelValue: string; placeholder?: string; rich?: boolean; minHeight?: string }>(),
+    { placeholder: '', rich: false, minHeight: 'min-h-[8rem]' },
+);
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>();
 
 const editor = useEditor({
     content: props.modelValue || '',
     // TextStyle + Color let text carry a colour (rendered as inline <span style="color">,
     // which mPDF also honours in the certificate PDF).
-    extensions: [StarterKit, Underline, Link.configure({ openOnClick: false }), TextStyle, Color],
+    extensions: [
+        StarterKit,
+        Underline,
+        Link.configure({ openOnClick: false }),
+        TextStyle,
+        Color,
+        // Only the article editor gets images and tables; see the `rich` prop.
+        ...(props.rich
+            ? [Image.configure({ inline: false }), TableKit.configure({ table: { resizable: true } })]
+            : []),
+    ],
     onUpdate: ({ editor }) => {
         const html = editor.getHTML();
         // Treat an empty document as an empty string, not "<p></p>".
         emit('update:modelValue', editor.getText().trim() === '' ? '' : html);
     },
     editorProps: {
-        attributes: { class: 'prose-content min-h-[8rem] px-3 py-2 focus:outline-none' },
+        attributes: { class: `prose-content ${props.minHeight} px-3 py-2 focus:outline-none` },
     },
 });
 
@@ -81,6 +108,14 @@ const colorSwatches = computed<{ label: string; value: string }[]>(() => {
     ];
 });
 
+const showMedia = ref(false);
+
+/** Insert a library image at the cursor, with its alt text. */
+function insertImage(media: CmsMedia): void {
+    editor.value?.chain().focus().setImage({ src: media.url, alt: media.alt ?? '' }).run();
+    showMedia.value = false;
+}
+
 const showColors = ref(false);
 function applyColor(value: string): void {
     editor.value?.chain().focus().setColor(value).run();
@@ -100,6 +135,11 @@ function clearColor(): void {
             <Tooltip :text="t('editor.underline')"><button type="button" :class="btn(editor.isActive('underline'))" :aria-label="t('editor.underline')" @click="editor.chain().focus().toggleUnderline().run()"><IconUnderline :size="16" /></button></Tooltip>
             <span class="mx-1 h-5 w-px bg-gray-200" />
             <Tooltip :text="t('editor.heading')"><button type="button" :class="btn(editor.isActive('heading', { level: 2 }))" :aria-label="t('editor.heading')" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><IconH2 :size="16" /></button></Tooltip>
+            <!-- The smaller headings only matter in a long article. -->
+            <template v-if="rich">
+                <Tooltip :text="t('editor.heading3')"><button type="button" :class="btn(editor.isActive('heading', { level: 3 }))" :aria-label="t('editor.heading3')" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"><IconH3 :size="16" /></button></Tooltip>
+                <Tooltip :text="t('editor.heading4')"><button type="button" :class="btn(editor.isActive('heading', { level: 4 }))" :aria-label="t('editor.heading4')" @click="editor.chain().focus().toggleHeading({ level: 4 }).run()"><IconH4 :size="16" /></button></Tooltip>
+            </template>
             <Tooltip :text="t('editor.bulletList')"><button type="button" :class="btn(editor.isActive('bulletList'))" :aria-label="t('editor.bulletList')" @click="editor.chain().focus().toggleBulletList().run()"><IconList :size="16" /></button></Tooltip>
             <Tooltip :text="t('editor.numberedList')"><button type="button" :class="btn(editor.isActive('orderedList'))" :aria-label="t('editor.numberedList')" @click="editor.chain().focus().toggleOrderedList().run()"><IconListNumbers :size="16" /></button></Tooltip>
             <Tooltip :text="t('editor.link')"><button type="button" :class="btn(editor.isActive('link'))" :aria-label="t('editor.link')" @click="setLink"><IconLink :size="16" /></button></Tooltip>
@@ -121,9 +161,24 @@ function clearColor(): void {
                 </div>
             </div>
             <span class="mx-1 h-5 w-px bg-gray-200" />
+            <template v-if="rich">
+                <span class="mx-1 h-5 w-px bg-gray-200" />
+                <Tooltip :text="t('editor.image')"><button type="button" :class="btn(showMedia)" :aria-label="t('editor.image')" @click="showMedia = true"><IconPhoto :size="16" /></button></Tooltip>
+                <Tooltip :text="t('editor.table')"><button type="button" :class="btn(editor.isActive('table'))" :aria-label="t('editor.table')" @click="editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()"><IconTable :size="16" /></button></Tooltip>
+                <!-- Row and column controls only mean anything inside a table. -->
+                <template v-if="editor.isActive('table')">
+                    <Tooltip :text="t('editor.addRow')"><button type="button" :class="btn(false)" :aria-label="t('editor.addRow')" @click="editor.chain().focus().addRowAfter().run()"><IconTablePlus :size="16" /></button></Tooltip>
+                    <Tooltip :text="t('editor.deleteRow')"><button type="button" :class="btn(false)" :aria-label="t('editor.deleteRow')" @click="editor.chain().focus().deleteRow().run()"><IconTableMinus :size="16" /></button></Tooltip>
+                    <Tooltip :text="t('editor.addColumn')"><button type="button" :class="btn(false)" :aria-label="t('editor.addColumn')" @click="editor.chain().focus().addColumnAfter().run()"><IconColumnInsertRight :size="16" /></button></Tooltip>
+                    <Tooltip :text="t('editor.deleteColumn')"><button type="button" :class="btn(false)" :aria-label="t('editor.deleteColumn')" @click="editor.chain().focus().deleteColumn().run()"><IconColumnRemove :size="16" /></button></Tooltip>
+                    <Tooltip :text="t('editor.deleteTable')"><button type="button" :class="btn(false)" :aria-label="t('editor.deleteTable')" @click="editor.chain().focus().deleteTable().run()"><IconTableOff :size="16" /></button></Tooltip>
+                </template>
+            </template>
             <Tooltip :text="t('editor.clearFormatting')"><button type="button" :class="btn(false)" :aria-label="t('editor.clearFormatting')" @click="editor.chain().focus().unsetAllMarks().clearNodes().run()"><IconClearFormatting :size="16" /></button></Tooltip>
         </div>
         <EditorContent :editor="editor" />
+
+        <MediaPickerModal v-if="showMedia" @close="showMedia = false" @select="insertImage" />
     </div>
 </template>
 
@@ -157,5 +212,43 @@ function clearColor(): void {
 }
 :deep(.prose-content:focus) {
     outline: none;
+}
+/* Images and tables exist only in the `rich` editor, but the rules are harmless
+   elsewhere: without those extensions the nodes never appear. */
+:deep(.prose-content img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.375rem;
+}
+:deep(.prose-content table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 0.5rem;
+    table-layout: fixed;
+}
+:deep(.prose-content th),
+:deep(.prose-content td) {
+    border: 1px solid #d1d5db;
+    padding: 0.35rem 0.5rem;
+    vertical-align: top;
+    position: relative;
+}
+:deep(.prose-content th) {
+    background: #f9fafb;
+    font-weight: 600;
+    text-align: left;
+}
+/* The cell the caret is in, so row/column buttons act somewhere visible. */
+:deep(.prose-content .selectedCell) {
+    background: var(--color-brand-primary-soft, #eff6ff);
+}
+:deep(.prose-content .column-resize-handle) {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--color-brand-primary, #2563eb);
+    cursor: col-resize;
 }
 </style>

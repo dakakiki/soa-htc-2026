@@ -38,6 +38,7 @@ onMounted(load);
 
     <article v-else-if="page" class="mx-auto max-w-3xl space-y-6">
         <h1 class="text-3xl font-semibold leading-tight tracking-tight">{{ page.title }}</h1>
+        <img v-if="page.image_url" :src="page.image_url" :alt="page.title" class="w-full rounded-lg object-cover" />
         <!-- eslint-disable-next-line vue/no-v-html -- admin-authored WYSIWYG content -->
         <div v-if="page.body" class="cms-content" v-html="page.body" />
     </article>

@@ -2,9 +2,11 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { createCmsPage, getCmsPage, updateCmsPage, type CmsPagePayload } from '@/api/cms';
+import { createCmsPage, getCmsPage, updateCmsPage, deleteCmsPageImage, type CmsPagePayload } from '@/api/cms';
 import { apiErrorMessage } from '@/api/http';
+import { IconUpload } from '@tabler/icons-vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
+import ImageThumb from '@/components/ImageThumb.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 
@@ -26,6 +28,8 @@ const form = reactive({
 });
 
 const currentPath = ref<string | null>(null);
+const imageFile = ref<File | null>(null);
+const currentImageUrl = ref<string | null>(null);
 const saving = ref(false);
 const error = ref<string | null>(null);
 
@@ -33,6 +37,22 @@ const statusOptions = computed(() => [
     { value: 'published', label: t('cms.published'), activeClass: 'bg-green-500 text-white' },
     { value: 'draft', label: t('cms.draft'), activeClass: 'bg-gray-400 text-white' },
 ]);
+
+function onFileChange(event: Event): void {
+    imageFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+}
+
+async function removeImage(): Promise<void> {
+    if (id.value === null) {
+        return;
+    }
+    try {
+        const { data } = await deleteCmsPageImage(id.value);
+        currentImageUrl.value = data.data.image_url;
+    } catch (e) {
+        error.value = apiErrorMessage(e);
+    }
+}
 
 function goBack(): void {
     if (window.history.length > 1) {
@@ -58,9 +78,9 @@ async function submit(): Promise<void> {
 
     try {
         if (isEdit.value && id.value !== null) {
-            await updateCmsPage(id.value, payload);
+            await updateCmsPage(id.value, payload, imageFile.value);
         } else {
-            await createCmsPage(payload);
+            await createCmsPage(payload, imageFile.value);
         }
         goBack();
     } catch (e) {
@@ -85,12 +105,15 @@ onMounted(async () => {
         form.seo_title = p.seo_title ?? '';
         form.seo_description = p.seo_description ?? '';
         currentPath.value = p.path;
+        currentImageUrl.value = p.image_url;
     } catch (e) {
         error.value = apiErrorMessage(e);
     }
 });
 
 const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
+const fileBtn =
+    'mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-400 hover:bg-brand-primary-soft';
 </script>
 
 <template>
@@ -119,6 +142,18 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
                         <label class="block text-sm font-medium text-gray-700">{{ $t('cms.publishedAt') }}</label>
                         <input v-model="form.published_at" type="datetime-local" :class="field" />
                         <p class="mt-1 text-xs text-gray-500">{{ $t('cms.publishedAtHint') }}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('cms.image') }}</label>
+                        <label :class="fileBtn">
+                            <IconUpload :size="16" />
+                            <span class="truncate">{{ imageFile?.name || $t('cms.chooseImage') }}</span>
+                            <input type="file" accept="image/*" class="hidden" @change="onFileChange" />
+                        </label>
+                        <div v-if="currentImageUrl && !imageFile" class="mt-2">
+                            <ImageThumb :src="currentImageUrl" :alt="form.title" @remove="removeImage" />
+                        </div>
                     </div>
 
                     <div v-if="currentPath" class="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
@@ -152,7 +187,7 @@ const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
                     <div>
                         <label class="block text-sm font-medium text-gray-700">{{ $t('cms.body') }}</label>
                         <div class="mt-1">
-                            <RichTextEditor v-model="form.body" />
+                            <RichTextEditor v-model="form.body" rich min-height="min-h-[32rem]" />
                         </div>
                     </div>
                 </div>

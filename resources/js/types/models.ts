@@ -514,6 +514,19 @@ export interface CmsCategory {
     posts_count?: number;
 }
 
+export interface CmsMedia {
+    id: number;
+    url: string;
+    original_name: string;
+    mime_type: string;
+    size: number;
+    width: number | null;
+    height: number | null;
+    alt: string | null;
+    uploaded_by?: string | null;
+    created_at: string | null;
+}
+
 export interface CmsPost {
     id: number;
     title: string;
@@ -538,6 +551,7 @@ export interface CmsPage {
     slug: string;
     path: string;
     body: string | null;
+    image_url: string | null;
     status: string;
     published_at: string | null;
     seo_title: string | null;
@@ -565,6 +579,7 @@ export interface PublicPage {
     slug: string;
     path: string;
     body: string | null;
+    image_url: string | null;
     seo_title: string | null;
     seo_description: string | null;
     published_at: string | null;

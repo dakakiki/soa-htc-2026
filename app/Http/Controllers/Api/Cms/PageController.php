@@ -16,6 +16,7 @@ use App\Http\Resources\CmsPageResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Standing pages of the public site. Admin-only (`cms.manage`).
@@ -50,11 +51,15 @@ class PageController extends Controller
 
     public function store(StoreCmsPageRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        $data = $request->safe()->except('image');
         // A page sits at the root of the site, so a derived slug has to dodge
         // the application's own routes as well as the pages already there.
         $data['slug'] = ContentSlug::make('cms_pages', $data['slug'] ?? null, $data['title'], null, true);
         $data['published_at'] = $this->publishedAt($data, null);
+
+        if ($request->hasFile('image')) {
+            $data['image_path'] = $request->file('image')->store('cms', 'public');
+        }
 
         $page = Page::create($data);
         $page->forceFill(['translation_group' => $page->id])->save();
@@ -64,7 +69,7 @@ class PageController extends Controller
 
     public function update(UpdateCmsPageRequest $request, Page $page): CmsPageResource
     {
-        $data = $request->validated();
+        $data = $request->safe()->except('image');
         $wasPublic = $page->status === PublicationStatus::Published;
         $oldSlug = $page->slug;
 
@@ -73,6 +78,13 @@ class PageController extends Controller
         }
 
         $data['published_at'] = $this->publishedAt($data, $page);
+
+        if ($request->hasFile('image')) {
+            if ($page->image_path) {
+                Storage::disk('public')->delete($page->image_path);
+            }
+            $data['image_path'] = $request->file('image')->store('cms', 'public');
+        }
 
         $page->update($data);
 
@@ -87,10 +99,27 @@ class PageController extends Controller
     {
         $this->authorize('cms.manage');
 
+        if ($page->image_path) {
+            Storage::disk('public')->delete($page->image_path);
+        }
+
         ContentRedirects::forget(Redirect::TYPE_PAGE, $page->id);
         $page->delete();
 
         return response()->json(null, 204);
+    }
+
+    /** Removes the featured image, leaving the page itself alone. */
+    public function deleteImage(Page $page): CmsPageResource
+    {
+        $this->authorize('cms.manage');
+
+        if ($page->image_path) {
+            Storage::disk('public')->delete($page->image_path);
+            $page->update(['image_path' => null]);
+        }
+
+        return CmsPageResource::make($page->refresh());
     }
 
     /**

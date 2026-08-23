@@ -16,7 +16,7 @@ class Page extends Model
     protected $table = 'cms_pages';
 
     protected $fillable = [
-        'title', 'slug', 'body', 'status', 'published_at',
+        'title', 'slug', 'body', 'image_path', 'status', 'published_at',
         'seo_title', 'seo_description', 'locale', 'translation_group',
     ];
 

@@ -8,6 +8,7 @@ use App\Domain\Cms\Models\Page;
 use App\Domain\Cms\Support\PublicPaths;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /** @mixin Page */
 class CmsPageResource extends JsonResource
@@ -23,6 +24,7 @@ class CmsPageResource extends JsonResource
             'slug' => $this->slug,
             'path' => PublicPaths::page($this->slug),
             'body' => $this->body,
+            'image_url' => $this->image_path === null ? null : Storage::disk('public')->url($this->image_path),
             'status' => $this->status->value,
             'published_at' => $this->published_at?->toIso8601String(),
             'seo_title' => $this->seo_title,

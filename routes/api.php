@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AttemptController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Cms\CategoryController as CmsCategoryController;
+use App\Http\Controllers\Api\Cms\MediaController as CmsMediaController;
 use App\Http\Controllers\Api\Cms\PageController as CmsPageController;
 use App\Http\Controllers\Api\Cms\PostController as CmsPostController;
 use App\Http\Controllers\Api\CoordinatorController;
@@ -133,6 +134,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('posts/{post}/image', [CmsPostController::class, 'deleteImage'])->whereNumber('post');
         Route::apiResource('pages', CmsPageController::class)
             ->parameters(['pages' => 'page'])->names('cms.pages');
+        Route::delete('pages/{page}/image', [CmsPageController::class, 'deleteImage'])->whereNumber('page');
+        // The media library: uploaded once, referenced from anywhere.
+        Route::apiResource('media', CmsMediaController::class)
+            ->only(['index', 'store', 'update', 'destroy'])
+            ->parameters(['media' => 'media'])->names('cms.media');
     });
 
     Route::get('countries', [CountryController::class, 'index']);

@@ -27,6 +27,7 @@ class StoreCmsPageRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'slug' => CmsSlugRules::optional('cms_pages'),
             'body' => ['nullable', 'string'],
+            'image' => ['nullable', 'image', 'max:5120'],
             'status' => ['sometimes', Rule::enum(PublicationStatus::class)],
             'published_at' => ['nullable', 'date'],
             'seo_title' => ['nullable', 'string', 'max:255'],

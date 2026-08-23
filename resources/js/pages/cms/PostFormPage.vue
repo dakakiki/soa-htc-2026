@@ -173,10 +173,10 @@ const fileBtn =
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('cms.post.image') }}</label>
+                        <label class="block text-sm font-medium text-gray-700">{{ $t('cms.image') }}</label>
                         <label :class="fileBtn">
                             <IconUpload :size="16" />
-                            <span class="truncate">{{ imageFile?.name || $t('cms.post.chooseImage') }}</span>
+                            <span class="truncate">{{ imageFile?.name || $t('cms.chooseImage') }}</span>
                             <input type="file" accept="image/*" class="hidden" @change="onFileChange" />
                         </label>
                         <div v-if="currentImageUrl && !imageFile" class="mt-2">
@@ -218,7 +218,7 @@ const fileBtn =
                     <div>
                         <label class="block text-sm font-medium text-gray-700">{{ $t('cms.body') }}</label>
                         <div class="mt-1">
-                            <RichTextEditor v-model="form.body" />
+                            <RichTextEditor v-model="form.body" rich min-height="min-h-[32rem]" />
                         </div>
                     </div>
                 </div>

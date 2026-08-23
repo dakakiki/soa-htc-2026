@@ -113,6 +113,9 @@ class SpaController extends Controller
                 return [
                     'title' => ($page->seo_title ?: $page->title).' · '.$defaults['site_name'],
                     'description' => $page->seo_description ?: $this->summarise($page->body),
+                    'image' => $page->image_path === null
+                        ? $defaults['image']
+                        : Storage::disk('public')->url($page->image_path),
                 ] + $defaults;
             }
         }

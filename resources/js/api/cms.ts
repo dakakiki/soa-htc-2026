@@ -127,12 +127,36 @@ export function getCmsPage(id: number) {
     return http.get<{ data: CmsPage }>(`/api/cms/pages/${id}`);
 }
 
-export function createCmsPage(payload: CmsPagePayload) {
-    return http.post<{ data: CmsPage }>('/api/cms/pages', payload);
+/** Multipart, because a page carries a featured image just as a post does. */
+function pageFormData(payload: Partial<CmsPagePayload>, image?: File | null): FormData {
+    const fd = new FormData();
+
+    Object.entries(payload).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+            fd.append(key, String(value));
+        }
+    });
+
+    if (image) {
+        fd.append('image', image);
+    }
+
+    return fd;
 }
 
-export function updateCmsPage(id: number, payload: Partial<CmsPagePayload>) {
-    return http.put<{ data: CmsPage }>(`/api/cms/pages/${id}`, payload);
+export function createCmsPage(payload: CmsPagePayload, image?: File | null) {
+    return http.post<{ data: CmsPage }>('/api/cms/pages', pageFormData(payload, image));
+}
+
+export function updateCmsPage(id: number, payload: Partial<CmsPagePayload>, image?: File | null) {
+    // Method spoofing: multipart bodies aren't parsed on PUT, so POST with _method.
+    const fd = pageFormData(payload, image);
+    fd.append('_method', 'PUT');
+    return http.post<{ data: CmsPage }>(`/api/cms/pages/${id}`, fd);
+}
+
+export function deleteCmsPageImage(id: number) {
+    return http.delete<{ data: CmsPage }>(`/api/cms/pages/${id}/image`);
 }
 
 export function deleteCmsPage(id: number) {

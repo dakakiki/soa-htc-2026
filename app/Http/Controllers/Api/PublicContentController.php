@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\PublicPostResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * What the website itself reads. No authentication and no permission: every
@@ -66,6 +67,7 @@ class PublicContentController extends Controller
             'slug' => $page->slug,
             'path' => PublicPaths::page($page->slug),
             'body' => $page->body,
+            'image_url' => $page->image_path === null ? null : Storage::disk('public')->url($page->image_path),
             'seo_title' => $page->seo_title,
             'seo_description' => $page->seo_description,
             'published_at' => $page->published_at?->toIso8601String(),

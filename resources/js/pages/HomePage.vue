@@ -54,7 +54,9 @@ onMounted(async () => {
                 <article v-for="post in posts" :key="post.slug"
                     class="flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:border-gray-300 hover:shadow-sm">
                     <RouterLink :to="post.path" class="flex h-full flex-col">
-                        <img v-if="post.image_url" :src="post.image_url" :alt="post.title" class="h-36 w-full object-cover" />
+                        <span v-if="post.image_url" role="img" :aria-label="post.title"
+                            class="block h-36 w-full bg-gray-100 bg-cover bg-center"
+                            :style="{ backgroundImage: `url(${post.image_url})` }" />
                         <div class="flex flex-1 flex-col gap-2 p-4">
                             <h3 class="font-semibold leading-snug text-gray-900">{{ post.title }}</h3>
                             <p v-if="post.excerpt" class="line-clamp-3 text-sm text-gray-600">{{ post.excerpt }}</p>

@@ -87,7 +87,11 @@ const chip = 'rounded-full border px-3 py-1 text-sm transition';
             <article v-for="post in posts" :key="post.slug"
                 class="flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:border-gray-300 hover:shadow-sm">
                 <RouterLink :to="post.path" class="flex h-full flex-col">
-                    <img v-if="post.image_url" :src="post.image_url" :alt="post.title" class="h-40 w-full object-cover" />
+                    <!-- The cover is a background rather than an <img>: cards vary in
+                         width, and `cover` crops to fill instead of letterboxing. -->
+                    <span v-if="post.image_url" role="img" :aria-label="post.title"
+                        class="block h-40 w-full bg-gray-100 bg-cover bg-center"
+                        :style="{ backgroundImage: `url(${post.image_url})` }" />
                     <div class="flex flex-1 flex-col gap-2 p-4">
                         <div class="flex flex-wrap gap-1 text-xs text-gray-500">
                             <span v-for="c in post.categories" :key="c.slug" class="rounded bg-gray-100 px-2 py-0.5">{{ c.name }}</span>

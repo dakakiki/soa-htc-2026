@@ -97,3 +97,25 @@
     border-top: 1px solid #e5e7eb;
     margin: 2rem 0;
 }
+
+/* Tables and images an author inserted in the article editor. */
+.cms-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 1rem;
+    font-size: 0.95rem;
+}
+.cms-content th,
+.cms-content td {
+    border: 1px solid #d1d5db;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+}
+.cms-content th {
+    background: #f9fafb;
+    font-weight: 600;
+}
+.cms-content figure {
+    margin: 0 0 1rem;
+}

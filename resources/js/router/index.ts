@@ -380,6 +380,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'cms.manage' },
     },
     {
+        path: '/website/media',
+        name: 'cms.media',
+        component: () => import('@/pages/cms/MediaListPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
         path: '/website/categories',
         name: 'cms.categories',
         component: () => import('@/pages/cms/CategoriesListPage.vue'),
