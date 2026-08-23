@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { getPublicPost } from '@/api/publicContent';
+import { setDocumentTitle } from '@/utils/documentTitle';
 import type { PublicPost } from '@/types/models';
 
 /**
@@ -21,6 +22,7 @@ async function load(): Promise<void> {
     try {
         const { data } = await getPublicPost(String(route.params.slug));
         post.value = data.data;
+        setDocumentTitle(post.value.seo_title || post.value.title);
     } catch {
         // A draft, a deleted post or a typed-in slug all look the same here.
         notFound.value = true;

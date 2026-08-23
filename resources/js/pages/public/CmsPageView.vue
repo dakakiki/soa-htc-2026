@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { getPublicPage } from '@/api/publicContent';
 import NotFoundPage from '@/pages/NotFoundPage.vue';
+import { setDocumentTitle } from '@/utils/documentTitle';
 import type { PublicPage } from '@/types/models';
 
 /**
@@ -22,6 +23,7 @@ async function load(): Promise<void> {
     try {
         const { data } = await getPublicPage(String(route.params.slug));
         page.value = data.data;
+        setDocumentTitle(page.value.seo_title || page.value.title);
     } catch {
         notFound.value = true;
     } finally {

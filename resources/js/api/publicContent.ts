@@ -1,5 +1,5 @@
 import { http } from '@/api/http';
-import type { Paginated, PublicCategory, PublicPage, PublicPost } from '@/types/models';
+import type { Paginated, PublicCategory, PublicMenu, PublicPage, PublicPost } from '@/types/models';
 
 /**
  * The website's own reads. Unauthenticated, and the server only ever returns
@@ -19,4 +19,9 @@ export function getPublicPage(slug: string) {
 
 export function listPublicCategories() {
     return http.get<{ data: PublicCategory[] }>('/api/public/categories');
+}
+
+/** A navigation, already resolved to labels and addresses. */
+export function getPublicMenu(slug: string) {
+    return http.get<{ data: PublicMenu }>(`/api/public/menus/${slug}`);
 }

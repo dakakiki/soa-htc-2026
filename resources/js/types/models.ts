@@ -632,6 +632,20 @@ export interface PublicPage {
     published_at: string | null;
 }
 
+/** A navigation as the site renders it: no ids, no drafts, nothing to resolve. */
+export interface PublicMenuItem {
+    label: string;
+    href: string | null;
+    target: string;
+    children: PublicMenuItem[];
+}
+
+export interface PublicMenu {
+    name: string;
+    slug: string;
+    items: PublicMenuItem[];
+}
+
 export interface PublicCategory {
     id: number;
     name: string;

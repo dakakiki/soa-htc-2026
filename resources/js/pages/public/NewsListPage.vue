@@ -3,6 +3,8 @@ import { onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { listPublicCategories, listPublicPosts } from '@/api/publicContent';
 import { apiErrorMessage } from '@/api/http';
+import { setDocumentTitle } from '@/utils/documentTitle';
+import { useI18n } from 'vue-i18n';
 import type { PublicCategory, PublicPost } from '@/types/models';
 
 /**
@@ -11,6 +13,7 @@ import type { PublicCategory, PublicPost } from '@/types/models';
  */
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 
 const posts = ref<PublicPost[]>([]);
 const categories = ref<PublicCategory[]>([]);
@@ -50,6 +53,7 @@ const formatDate = (iso: string | null): string =>
 watch(() => route.query.category, () => void load(1));
 
 onMounted(async () => {
+    setDocumentTitle(t('public.news.title'));
     try {
         const { data } = await listPublicCategories();
         categories.value = data.data;

@@ -6,6 +6,7 @@ use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Cms\Enums\PublicationStatus;
 use App\Domain\Cms\Models\Category;
+use App\Domain\Cms\Models\Menu;
 use App\Domain\Cms\Models\Page;
 use App\Domain\Cms\Models\Post;
 use App\Domain\Identity\Enums\SystemRole;
@@ -158,6 +159,52 @@ class MasterDataSeeder extends Seeder
         );
 
         $post->categories()->syncWithoutDetaching([$category->id]);
+
+        $this->seedMenus();
+    }
+
+    /**
+     * The header and footer navigations, as the live soa-htc.org carries them.
+     * Only filled when the menu is new — an edited menu is the admin's, not the
+     * seeder's.
+     */
+    private function seedMenus(): void
+    {
+        $cookiePolicy = Page::query()->where('slug', 'cookie-policy')->value('id');
+
+        $menus = [
+            'public-header' => ['Public header', [
+                ['type' => 'custom', 'url' => '/#block_Start', 'label' => 'Start Quiz'],
+                ['type' => 'custom', 'url' => '/#block_Results', 'label' => 'Sample Exam'],
+                ['type' => 'custom', 'url' => '/#block_Results', 'label' => 'Check Results'],
+                ['type' => 'custom', 'url' => '/#block_Coordinators', 'label' => 'Coordinators'],
+                ['type' => 'custom', 'url' => '/#block_CompetitionRules', 'label' => 'Category check'],
+            ]],
+            'public-footer' => ['Public footer', [
+                ['type' => 'custom', 'url' => 'https://hippo-thecontest.org/pvc-policy/', 'label' => 'Privacy Policy', 'link_target' => '_blank'],
+                // The live site links its own cookie policy by absolute URL; here
+                // it is a page we hold, so it points at the page itself.
+                ['type' => 'page', 'page_id' => $cookiePolicy, 'label' => 'Cookie Policy'],
+                ['type' => 'custom', 'url' => 'https://hippo-thecontest.org/data-processors/', 'label' => 'Data Processors', 'link_target' => '_blank'],
+                ['type' => 'custom', 'url' => 'https://hippo-thecontest.org/dpa/', 'label' => 'DPA', 'link_target' => '_blank'],
+            ]],
+        ];
+
+        foreach ($menus as $slug => [$name, $items]) {
+            $menu = Menu::query()->firstOrCreate(['slug' => $slug], ['name' => $name]);
+
+            if ($menu->items()->exists()) {
+                continue;
+            }
+
+            foreach ($items as $position => $item) {
+                if (($item['type'] ?? null) === 'page' && ($item['page_id'] ?? null) === null) {
+                    continue;
+                }
+
+                $menu->items()->create($item + ['position' => $position]);
+            }
+        }
     }
 
     /**
