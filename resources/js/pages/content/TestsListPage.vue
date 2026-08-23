@@ -121,28 +121,34 @@ onMounted(async () => {
             </RouterLink>
         </div>
 
-        <form class="flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="load(1)">
+            <!-- Column 1: search (stays first). Press Enter to apply. -->
             <input v-model="filters.search" type="search" :placeholder="$t('test.searchTitle')"
-                class="w-56 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <select v-model="filters.level_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
+
+            <!-- Column 2: Difficulty level -->
+            <select v-model="filters.level_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-2 lg:row-start-1" @change="load(1)">
                 <option :value="null">{{ $t('test.filterLevel') }}</option>
                 <optgroup v-for="g in levelGroups" :key="g.label" :label="g.label">
                     <option v-for="l in g.levels" :key="l.id" :value="l.id">{{ l.level_short }}</option>
                 </optgroup>
             </select>
-            <select v-model="filters.test_type_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+
+            <!-- Column 3: Test type -->
+            <select v-model="filters.test_type_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-3 lg:row-start-1" @change="load(1)">
                 <option :value="null">{{ $t('test.filterType') }}</option>
                 <option v-for="ty in types" :key="ty.id" :value="ty.id">{{ ty.name }}</option>
             </select>
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+
+            <!-- Column 4: Status -->
+            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-1" @change="load(1)">
                 <option value="">{{ $t('test.filterStatus') }}</option>
                 <option value="active">{{ $t('test.statusActive') }}</option>
                 <option value="inactive">{{ $t('test.statusInactive') }}</option>
             </select>
-            <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
-                {{ $t('common.search') }}
-            </button>
         </form>
+        </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
         <p class="text-sm text-gray-500">{{ $t('common.results', { count: total }) }}</p>

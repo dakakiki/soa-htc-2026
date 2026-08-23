@@ -107,26 +107,32 @@ onMounted(async () => {
             </RouterLink>
         </div>
 
-        <form class="flex flex-wrap items-center gap-2" @submit.prevent="load(1)">
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="load(1)">
+            <!-- Column 1: search (stays first). Press Enter to apply. -->
             <input v-model="filters.search" type="search" :placeholder="$t('question.searchTitle')"
-                class="w-56 rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-            <select v-model="filters.question_type" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
+
+            <!-- Column 2: Question type -->
+            <select v-model="filters.question_type" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-2 lg:row-start-1" @change="load(1)">
                 <option value="">{{ $t('question.filterType') }}</option>
                 <option v-for="o in TYPE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
-            <select v-model="filters.tag_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+
+            <!-- Column 3: Tag -->
+            <select v-model="filters.tag_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-3 lg:row-start-1" @change="load(1)">
                 <option :value="null">{{ $t('question.filterTag') }}</option>
                 <option v-for="tag in tags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
             </select>
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+
+            <!-- Column 4: Status -->
+            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-1" @change="load(1)">
                 <option value="">{{ $t('question.filterStatus') }}</option>
                 <option value="active">{{ $t('question.statusActive') }}</option>
                 <option value="inactive">{{ $t('question.statusInactive') }}</option>
             </select>
-            <button type="submit" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
-                {{ $t('common.search') }}
-            </button>
         </form>
+        </div>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
         <p class="text-sm text-gray-500">{{ $t('common.results', { count: total }) }}</p>
