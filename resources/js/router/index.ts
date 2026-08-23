@@ -33,6 +33,18 @@ const routes: RouteRecordRaw[] = [
         meta: { guestOnly: true, zone: 'public' },
     },
     {
+        path: '/news',
+        name: 'news',
+        component: () => import('@/pages/public/NewsListPage.vue'),
+        meta: { zone: 'public' },
+    },
+    {
+        path: '/news/:slug',
+        name: 'news.post',
+        component: () => import('@/pages/public/NewsPostPage.vue'),
+        meta: { zone: 'public' },
+    },
+    {
         path: '/student/access/:mode(sample|competition)',
         name: 'student.access.form',
         component: () => import('@/pages/student/StudentAccessFormPage.vue'),
@@ -330,6 +342,59 @@ const routes: RouteRecordRaw[] = [
         name: 'reset',
         component: () => import('@/pages/results/ResetPage.vue'),
         meta: { requiresAuth: true, permission: 'results.manage' },
+    },
+    {
+        path: '/website/pages',
+        name: 'cms.pages',
+        component: () => import('@/pages/cms/PagesListPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
+        path: '/website/pages/new',
+        name: 'cms.pages.new',
+        component: () => import('@/pages/cms/PageFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
+        path: '/website/pages/:id/edit',
+        name: 'cms.pages.edit',
+        component: () => import('@/pages/cms/PageFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
+        path: '/website/posts',
+        name: 'cms.posts',
+        component: () => import('@/pages/cms/PostsListPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
+        path: '/website/posts/new',
+        name: 'cms.posts.new',
+        component: () => import('@/pages/cms/PostFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
+        path: '/website/posts/:id/edit',
+        name: 'cms.posts.edit',
+        component: () => import('@/pages/cms/PostFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
+        path: '/website/categories',
+        name: 'cms.categories',
+        component: () => import('@/pages/cms/CategoriesListPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    /*
+     * A CMS page lives at the root (`/about`). It is declared last so every
+     * application route wins the match first; the component itself falls back to
+     * the not-found screen when the slug is not a published page.
+     */
+    {
+        path: '/:slug',
+        name: 'cms.page',
+        component: () => import('@/pages/public/CmsPageView.vue'),
+        meta: { zone: 'public' },
     },
     {
         path: '/:pathMatch(.*)*',

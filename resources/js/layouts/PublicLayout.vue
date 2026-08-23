@@ -8,7 +8,8 @@ import { useThemeStore } from '@/stores/theme';
  * Public website shell (ADR-0014, PROJECT_CONTEXT §8.6): header → content →
  * footer. Never renders admin chrome, even when an admin is signed in — the
  * only admin affordance is a discreet "Back to dashboard" link. The nav is
- * hard-coded for now; CMS-driven public.header/public.footer arrive in Faza 8.
+ * hard-coded still: pages and posts are managed (ADR-0042), but the menus
+ * themselves (public.header/public.footer) are a later round.
  */
 const session = useSessionStore();
 const themeStore = useThemeStore();
@@ -27,6 +28,7 @@ const year = new Date().getFullYear();
 
                 <nav class="hidden items-center gap-5 text-sm sm:flex">
                     <RouterLink :to="{ name: 'home' }" class="text-gray-600 hover:text-gray-900">{{ $t('public.nav.home') }}</RouterLink>
+                    <RouterLink :to="{ name: 'news' }" class="text-gray-600 hover:text-gray-900">{{ $t('public.nav.news') }}</RouterLink>
                     <RouterLink :to="{ name: 'student.access.form', params: { mode: 'competition' } }" class="text-gray-600 hover:text-gray-900">{{ $t('student.nav.startQuiz') }}</RouterLink>
                     <RouterLink :to="{ name: 'student.access.form', params: { mode: 'sample' } }" class="text-gray-600 hover:text-gray-900">{{ $t('student.nav.sampleExam') }}</RouterLink>
                 </nav>

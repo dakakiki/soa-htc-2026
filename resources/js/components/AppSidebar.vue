@@ -32,6 +32,10 @@ import {
     IconTag,
     IconClockHour4,
     IconCategory,
+    IconWorldWww,
+    IconArticle,
+    IconNews,
+    IconFolders,
     IconChevronDown,
     IconChevronUp,
     IconChevronsLeft,
@@ -111,6 +115,18 @@ const nav: NavNode[] = [
             { label: t('nav.reports'), icon: IconChartBar, to: 'reports', prefix: 'reports', perm: 'reports.view' },
             { label: t('nav.archive'), icon: IconArchive, to: 'results.archive', prefix: 'results.archive', perm: 'reports.view' },
             { label: t('nav.reset'), icon: IconRotate, to: 'reset', prefix: 'reset', perm: 'results.manage' },
+        ],
+    },
+    // The public website: its own module, gated by its own permission.
+    {
+        kind: 'group',
+        key: 'website',
+        label: t('nav.website'),
+        icon: IconWorldWww,
+        children: [
+            { label: t('nav.pages'), icon: IconArticle, to: 'cms.pages', prefix: 'cms.pages', perm: 'cms.manage' },
+            { label: t('nav.posts'), icon: IconNews, to: 'cms.posts', prefix: 'cms.posts', perm: 'cms.manage' },
+            { label: t('nav.postCategories'), icon: IconFolders, to: 'cms.categories', prefix: 'cms.categories', perm: 'cms.manage' },
         ],
     },
     // Access and Settings stay last.

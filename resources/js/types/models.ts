@@ -499,6 +499,84 @@ export interface SearchResults {
     coordinators?: { id: number; name: string; email: string; country: string | null }[];
 }
 
+/* ------------------------------------------------------------------ website */
+
+export interface CmsCategory {
+    id: number;
+    parent_id: number | null;
+    parent?: { id: number; name: string } | null;
+    name: string;
+    slug: string;
+    description: string | null;
+    status: string;
+    position: number;
+    locale: string;
+    posts_count?: number;
+}
+
+export interface CmsPost {
+    id: number;
+    title: string;
+    slug: string;
+    /** The address this post has on the public site. */
+    path: string;
+    excerpt: string | null;
+    body: string | null;
+    image_url: string | null;
+    author?: { id: number; name: string } | null;
+    status: string;
+    published_at: string | null;
+    seo_title: string | null;
+    seo_description: string | null;
+    locale: string;
+    categories?: { id: number; name: string; slug: string }[];
+}
+
+export interface CmsPage {
+    id: number;
+    title: string;
+    slug: string;
+    path: string;
+    body: string | null;
+    status: string;
+    published_at: string | null;
+    seo_title: string | null;
+    seo_description: string | null;
+    locale: string;
+}
+
+/** What the public site reads — no draft fields, no author account. */
+export interface PublicPost {
+    title: string;
+    slug: string;
+    path: string;
+    excerpt: string | null;
+    body: string | null;
+    image_url: string | null;
+    author?: string | null;
+    published_at: string | null;
+    seo_title: string | null;
+    seo_description: string | null;
+    categories?: { name: string; slug: string }[];
+}
+
+export interface PublicPage {
+    title: string;
+    slug: string;
+    path: string;
+    body: string | null;
+    seo_title: string | null;
+    seo_description: string | null;
+    published_at: string | null;
+}
+
+export interface PublicCategory {
+    id: number;
+    name: string;
+    slug: string;
+    posts_count: number;
+}
+
 export interface Paginated<T> {
     data: T[];
     meta: {

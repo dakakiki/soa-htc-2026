@@ -38,3 +38,62 @@
         cursor: pointer;
     }
 }
+
+/*
+ * Rendering for admin-authored rich text on the public site (CMS pages and
+ * posts). Tailwind's reset strips headings, lists and links, and the editor's
+ * own styles are scoped to the editor — so the published article needs its own,
+ * at reading size rather than form size.
+ */
+.cms-content {
+    color: #1f2937;
+    line-height: 1.7;
+}
+.cms-content p {
+    margin: 0 0 1rem;
+}
+.cms-content h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 2rem 0 0.75rem;
+}
+.cms-content h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+}
+.cms-content ul,
+.cms-content ol {
+    padding-left: 1.5rem;
+    margin: 0 0 1rem;
+}
+.cms-content ul {
+    list-style: disc;
+}
+.cms-content ol {
+    list-style: decimal;
+}
+.cms-content li {
+    margin: 0.25rem 0;
+}
+.cms-content a {
+    color: var(--color-brand-link, #2563eb);
+    text-decoration: underline;
+}
+.cms-content blockquote {
+    border-left: 3px solid var(--color-brand-palette-3, #97bddd);
+    padding-left: 1rem;
+    margin: 0 0 1rem;
+    color: #4b5563;
+}
+.cms-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+}
+.cms-content hr {
+    border: 0;
+    border-top: 1px solid #e5e7eb;
+    margin: 2rem 0;
+}
