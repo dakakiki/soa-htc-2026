@@ -473,6 +473,10 @@ export default {
             title: 'Question',
             essay: 'Written answer — marked by hand.',
         },
+        numbering: {
+            none: 'No labels',
+            hint: 'How the options are labelled. The label is added for you — do not type it into the answer.',
+        },
         addAnswer: 'Add answer',
         answerText: 'Answer text',
         correct: 'Correct',

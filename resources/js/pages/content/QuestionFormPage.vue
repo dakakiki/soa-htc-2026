@@ -6,6 +6,7 @@ import { createQuestion, getQuestion, updateQuestion } from '@/api/questions';
 import { questionTagsApi } from '@/api/content';
 import { listLevelOptions } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
+import { answerMarker } from '@/utils/answerNumbering';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
@@ -34,8 +35,8 @@ const TYPE_OPTIONS = [
     { value: 'essay', label: 'Essay' },
 ];
 
-const form = reactive<{ title: string; description: string; question_type: string; points: number; question_tag_id: number | null; status: string; level_ids: number[] }>({
-    title: '', description: '', question_type: 'multiple_choice', points: 1, question_tag_id: null, status: 'active', level_ids: [],
+const form = reactive<{ title: string; description: string; question_type: string; answer_numbering: string | null; points: number; question_tag_id: number | null; status: string; level_ids: number[] }>({
+    title: '', description: '', question_type: 'multiple_choice', answer_numbering: null, points: 1, question_tag_id: null, status: 'active', level_ids: [],
 });
 const answers = ref<QuestionAnswer[]>([{ text: '', is_correct: true, position: 1 }]);
 const imageFile = ref<File | null>(null);
@@ -78,6 +79,8 @@ async function save(): Promise<void> {
         title: form.title || null,
         description: form.description || null,
         question_type: form.question_type,
+        // Gap answers are accepted spellings, never a labelled list.
+        answer_numbering: isGap.value ? null : form.answer_numbering,
         points: form.points,
         question_tag_id: form.question_tag_id,
         status: form.status,
@@ -112,6 +115,7 @@ onMounted(async () => {
             form.title = q.title ?? '';
             form.description = q.description ?? '';
             form.question_type = q.question_type;
+            form.answer_numbering = q.answer_numbering;
             form.points = q.points;
             form.question_tag_id = q.tag?.id ?? null;
             form.status = q.status;
@@ -151,22 +155,42 @@ onMounted(async () => {
 
                     <!-- Answers / gaps -->
                     <div v-if="showAnswers">
-                        <div class="mb-1 flex items-center justify-between">
+                        <!-- Header columns line up with the rows below: the controls end where
+                             the answer field ends, and "Correct" sits over its toggles instead
+                             of being repeated on every line. -->
+                        <div class="mb-3 flex items-center gap-2">
                             <label class="block text-sm font-medium text-gray-700">{{ isGap ? $t('question.gaps') : $t('question.answers') }}</label>
-                            <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200" @click="addAnswer">
-                                <IconPlus :size="14" /> {{ isGap ? $t('question.addGap') : $t('question.addAnswer') }}
-                            </button>
+                            <div class="flex flex-1 items-center justify-end gap-2">
+                                <!-- Optional: many questions read fine as a plain list. -->
+                                <select v-if="!isGap" v-model="form.answer_numbering"
+                                    class="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700"
+                                    :title="$t('question.numbering.hint')">
+                                    <option :value="null">{{ $t('question.numbering.none') }}</option>
+                                    <option value="lower_alpha">a) b) c)</option>
+                                    <option value="upper_alpha">A) B) C)</option>
+                                    <option value="numeric">1) 2) 3)</option>
+                                </select>
+                                <button type="button" class="inline-flex items-center gap-1 rounded-md bg-brand-primary px-3 py-1 text-xs font-medium text-brand-on-primary hover:bg-brand-primary-hover" @click="addAnswer">
+                                    <IconPlus :size="14" /> {{ isGap ? $t('question.addGap') : $t('question.addAnswer') }}
+                                </button>
+                            </div>
+                            <span v-if="!isGap" class="w-16 shrink-0 text-center text-xs font-medium text-gray-500">{{ $t('question.correct') }}</span>
+                            <span class="w-4 shrink-0"></span>
                         </div>
                         <p v-if="isGap" class="mb-2 text-xs text-gray-500">{{ $t('question.gapHint') }}</p>
                         <div class="space-y-2">
                             <div v-for="(a, i) in answers" :key="i" class="flex items-center gap-2">
                                 <span v-if="isGap" class="w-14 shrink-0 text-xs font-medium text-gray-500">{{ $t('question.gapN', { n: i + 1 }) }}</span>
+                                <!-- The marker the competitor will see, so the author can tell
+                                     at a glance it no longer belongs in the text. -->
+                                <span v-else-if="form.answer_numbering" class="w-7 shrink-0 text-sm font-semibold text-gray-500">
+                                    {{ answerMarker(form.answer_numbering, i) }}
+                                </span>
                                 <input v-model="a.text" type="text" :placeholder="isGap ? $t('question.gapPlaceholder') : $t('question.answerText')" class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-                                <label v-if="!isGap" class="flex shrink-0 items-center gap-1.5 text-xs text-gray-600">
+                                <span v-if="!isGap" class="flex w-16 shrink-0 justify-center">
                                     <ToggleSwitch v-model="a.is_correct" :aria-label="$t('question.correct')" />
-                                    {{ $t('question.correct') }}
-                                </label>
-                                <button type="button" class="shrink-0 text-red-500 hover:text-red-700" @click="removeAnswer(i)"><IconTrash :size="16" /></button>
+                                </span>
+                                <button type="button" class="w-4 shrink-0 text-red-600 hover:text-red-700" @click="removeAnswer(i)"><IconTrash :size="16" /></button>
                             </div>
                         </div>
                     </div>

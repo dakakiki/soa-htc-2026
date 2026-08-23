@@ -239,6 +239,7 @@ class AttemptController extends Controller
                 'title' => $question->title,
                 'description' => $question->description,
                 'question_type' => $question->question_type->value,
+                'answer_numbering' => $question->answer_numbering?->value,
                 'points' => (float) $question->points,
                 'position' => (int) $question->pivot->position,
                 'image_url' => $question->image_path ? Storage::disk('public')->url($question->image_path) : null,

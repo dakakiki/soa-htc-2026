@@ -6,6 +6,7 @@ import { IconClock, IconCircleCheck } from '@tabler/icons-vue';
 import { startTest, submitAttempt } from '@/api/student';
 import { apiErrorMessage } from '@/api/http';
 import { useStudentSessionStore } from '@/stores/studentSession';
+import { answerMarker } from '@/utils/answerNumbering';
 import type { AttemptQuestion, AttemptSession, SubmitAnswer } from '@/types/models';
 
 const route = useRoute();
@@ -253,12 +254,14 @@ onUnmounted(() => {
                     <!-- Multiple choice -->
                     <div v-if="q.question_type === 'multiple_choice'" class="mt-4 space-y-2">
                         <label
-                            v-for="opt in q.options"
+                            v-for="(opt, oi) in q.options"
                             :key="opt.id"
                             class="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50"
                             :class="(mc[q.id] ?? []).includes(opt.id) ? 'border-brand-primary bg-brand-primary-soft' : ''"
                         >
                             <input type="radio" :name="`q-${q.id}`" :checked="(mc[q.id] ?? []).includes(opt.id)" class="accent-brand-primary" @change="pickOption(q.id, opt.id)" />
+                            <!-- Marker comes from the option's position, not its text. -->
+                            <span v-if="q.answer_numbering" class="shrink-0 font-semibold text-gray-500">{{ answerMarker(q.answer_numbering, oi) }}</span>
                             <span>{{ opt.text }}</span>
                         </label>
                     </div>

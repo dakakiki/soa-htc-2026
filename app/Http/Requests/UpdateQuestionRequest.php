@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domain\Assessment\Enums\AnswerNumbering;
 use App\Domain\Assessment\Enums\QuestionType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,6 +27,7 @@ class UpdateQuestionRequest extends FormRequest
             'title' => ['sometimes', 'nullable', 'string', 'max:3000'],
             'description' => ['nullable', 'string'],
             'question_type' => ['sometimes', 'required', Rule::enum(QuestionType::class)],
+            'answer_numbering' => ['sometimes', 'nullable', Rule::enum(AnswerNumbering::class)],
             'points' => ['sometimes', 'required', 'numeric', 'min:0', 'max:999'],
             'question_tag_id' => ['nullable', 'integer', 'exists:question_tags,id'],
             'status' => ['sometimes', 'in:active,inactive'],

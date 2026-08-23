@@ -23,6 +23,7 @@ class QuestionResource extends JsonResource
             'description' => $this->description,
             'question_type' => $this->question_type->value,
             'question_type_label' => $this->question_type->label(),
+            'answer_numbering' => $this->answer_numbering?->value,
             'points' => (float) $this->points,
             'status' => $this->status,
             'tag' => $this->when($this->question_tag_id !== null, fn () => [

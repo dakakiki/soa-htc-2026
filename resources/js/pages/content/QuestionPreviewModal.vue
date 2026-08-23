@@ -5,6 +5,7 @@ import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { getQuestion } from '@/api/questions';
 import { apiErrorMessage } from '@/api/http';
+import { answerMarker } from '@/utils/answerNumbering';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import type { Question } from '@/types/models';
 
@@ -87,10 +88,11 @@ watch(() => props.questionId, async (id) => {
                             {{ question.question_type === 'gap_filling' ? $t('question.gaps') : $t('question.answers') }}
                         </p>
                         <ul class="space-y-1">
-                            <li v-for="a in question.answers" :key="a.id ?? a.position"
+                            <li v-for="(a, ai) in question.answers" :key="a.id ?? a.position"
                                 class="flex items-start gap-2 rounded-md border px-3 py-1.5 text-sm"
                                 :class="a.is_correct ? 'border-green-200 bg-green-50 text-green-800' : 'border-gray-200 text-gray-700'">
                                 <IconCheck v-if="a.is_correct" :size="16" class="mt-0.5 shrink-0" />
+                                <span v-if="question.answer_numbering" class="shrink-0 font-semibold">{{ answerMarker(question.answer_numbering, ai) }}</span>
                                 <span class="min-w-0 break-words">{{ a.text }}</span>
                             </li>
                         </ul>

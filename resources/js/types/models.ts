@@ -72,9 +72,10 @@ export interface AttemptQuestionOption {
 
 export interface AttemptQuestion {
     id: number;
-    title: string;
+    title: string | null;
     description: string | null;
     question_type: QuestionType;
+    answer_numbering: string | null;
     points: number;
     position: number;
     image_url: string | null;
@@ -201,6 +202,9 @@ export interface Question {
     description: string | null;
     question_type: string;
     question_type_label: string;
+    // How the options are labelled: 'lower_alpha' | 'upper_alpha' | 'numeric', or
+    // null for a plain list. The marker is rendered, never stored in the text.
+    answer_numbering: string | null;
     points: number;
     status: string;
     tag?: { id: number; name?: string };
