@@ -25,17 +25,21 @@ async function logout(): Promise<void> {
 
 <template>
     <div class="flex h-screen flex-col overflow-hidden bg-gray-50 text-gray-900">
-        <header class="flex shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 py-3">
-            <RouterLink to="/dashboard" class="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <!-- The bar runs on palette slot 4 (Theme settings), so its content is light-on-dark. -->
+        <header class="flex shrink-0 items-center gap-4 bg-brand-palette-4 px-4 py-3">
+            <RouterLink to="/dashboard" class="flex items-center gap-5 tracking-tight text-white">
                 <img v-if="themeStore.theme?.logo_url" :src="themeStore.theme.logo_url" :alt="$t('app.name')" class="h-8 max-w-[12rem] object-contain" />
-                <span v-else>{{ $t('app.name') }}</span>
+                <!-- Weight and colour are the author's call in the editor, so the bar only sets the size. -->
+                <!-- eslint-disable-next-line vue/no-v-html -- admin-authored WYSIWYG content -->
+                <span v-if="themeStore.theme?.site_title" class="text-[1.35rem] leading-none [&_p]:m-0" v-html="themeStore.theme.site_title" />
+                <span v-else-if="!themeStore.theme?.logo_url" class="text-[1.35rem] leading-none">{{ $t('app.name') }}</span>
             </RouterLink>
             <div class="ml-auto flex items-center gap-4 text-sm">
-                <span class="text-gray-500">{{ session.user?.email }}</span>
+                <span class="text-white">{{ session.user?.email }}</span>
                 <Tooltip :text="t('nav.logout')" position="bottom">
                     <button
                         :aria-label="t('nav.logout')"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-red-600 hover:bg-gray-200"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/25 bg-white/10 text-red-300 hover:bg-white/20"
                         @click="logout"
                     >
                         <IconLogout :size="18" />

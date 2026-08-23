@@ -116,9 +116,16 @@ export type ThemeColorKey =
     | 'accent'
     | 'accent_hover'
     | 'link'
-    | 'border';
+    | 'border'
+    // Free palette slots (no fixed role) — shared with the public/CMS side.
+    | 'palette_1'
+    | 'palette_2'
+    | 'palette_3'
+    | 'palette_4';
 
 export interface Theme {
+    /** Rich-text site name (admin-authored HTML), rendered next to the logo. */
+    site_title: string | null;
     logo_url: string | null;
     logo_icon_url: string | null;
     colors: Record<ThemeColorKey, string>;

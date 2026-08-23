@@ -20,6 +20,15 @@
     --color-brand-accent-hover: #0f766e;
     --color-brand-link: #2563eb;
     --color-brand-border: #e5e7eb;
+
+    /*
+     * Free palette slots: no fixed role, set once in Theme settings and used by
+     * the public/CMS side (and anywhere in the admin) as `bg-brand-palette-1` etc.
+     */
+    --color-brand-palette-1: #fbba00;
+    --color-brand-palette-2: #f39200;
+    --color-brand-palette-3: #97bddd;
+    --color-brand-palette-4: #003758;
 }
 
 @layer base {

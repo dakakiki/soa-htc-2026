@@ -12,6 +12,10 @@ const DEFAULT_COLORS: Record<ThemeColorKey, string> = {
     accent_hover: '#0f766e',
     link: '#2563eb',
     border: '#e5e7eb',
+    palette_1: '#fbba00',
+    palette_2: '#f39200',
+    palette_3: '#97bddd',
+    palette_4: '#003758',
 };
 
 /** Push the brand colours onto :root as CSS variables Tailwind utilities read. */

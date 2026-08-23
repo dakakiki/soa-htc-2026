@@ -131,8 +131,8 @@ const nav: NavNode[] = [
         icon: IconSettings,
         children: [
             { label: t('nav.locations'), icon: IconWorld, to: 'locations', prefix: 'locations', perm: 'locations.manage' },
-            { label: t('nav.theme'), icon: IconPalette, to: 'settings.theme', prefix: 'settings.theme', perm: 'settings.manage' },
             { label: t('nav.certificate'), icon: IconCertificate, to: 'settings.certificate', prefix: 'settings.certificate', perm: 'settings.manage' },
+            { label: t('nav.theme'), icon: IconPalette, to: 'settings.theme', prefix: 'settings.theme', perm: 'settings.manage' },
         ],
     },
 ];

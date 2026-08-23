@@ -24,6 +24,7 @@ class SettingResource extends JsonResource
         }
 
         return [
+            'site_title' => $this->site_title,
             'logo_url' => $this->logo_path ? Storage::disk('public')->url($this->logo_path) : null,
             'logo_icon_url' => $this->logo_icon_path ? Storage::disk('public')->url($this->logo_icon_path) : null,
             'colors' => $colors,

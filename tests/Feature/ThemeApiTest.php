@@ -63,7 +63,8 @@ class ThemeApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.logo_url', null)
             ->assertJsonPath('data.colors.primary', '#2563eb')
-            ->assertJsonCount(8, 'data.colors');
+            ->assertJsonPath('data.colors.palette_1', '#fbba00')
+            ->assertJsonCount(12, 'data.colors');
     }
 
     public function test_admin_can_update_colours(): void
@@ -74,6 +75,19 @@ class ThemeApiTest extends TestCase
             ->assertJsonPath('data.colors.primary', '#0a0b0c');
 
         $this->assertDatabaseHas('settings', ['id' => 1, 'color_primary' => '#0a0b0c']);
+    }
+
+    public function test_site_title_is_saved_and_served_publicly(): void
+    {
+        $title = '<p>SOA <strong>HTC</strong></p>';
+
+        $this->actingAs($this->admin())
+            ->putJson('/api/settings/theme', array_merge($this->colors(), ['site_title' => $title]))
+            ->assertOk()
+            ->assertJsonPath('data.site_title', $title);
+
+        // The header renders it before login too, so it rides on the public payload.
+        $this->getJson('/api/theme')->assertOk()->assertJsonPath('data.site_title', $title);
     }
 
     public function test_invalid_hex_is_rejected(): void
@@ -100,6 +114,87 @@ class ThemeApiTest extends TestCase
         Storage::disk('public')->assertExists($path);
     }
 
+    public function test_logo_can_be_deleted(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin())
+            ->put('/api/settings/theme', array_merge($this->colors(), [
+                'logo' => UploadedFile::fake()->image('logo.png'),
+            ]))
+            ->assertOk();
+
+        $path = Setting::current()->logo_path;
+        $this->assertNotNull($path);
+
+        $this->actingAs($this->admin())
+            ->deleteJson('/api/settings/theme/assets/logo')
+            ->assertOk()
+            ->assertJsonPath('data.logo_url', null);
+
+        $this->assertNull(Setting::current()->logo_path);
+        Storage::disk('public')->assertMissing($path);
+
+        // An unknown asset key is a 404, not a silent no-op.
+        $this->actingAs($this->admin())
+            ->deleteJson('/api/settings/theme/assets/nope')
+            ->assertNotFound();
+    }
+
+    public function test_svg_logo_is_stored_sanitized(): void
+    {
+        Storage::fake('public');
+
+        $svg = <<<'SVG'
+            <?xml version="1.0"?>
+            <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 120 40" onload="alert(1)">
+                <script type="text/javascript">alert(document.cookie)</script>
+                <style>.a{fill:#003758}</style>
+                <a xlink:href="javascript:alert(1)"><tspan>click</tspan></a>
+                <rect class="a" width="120" height="40" fill="url(#g)"/>
+                <foreignObject><body xmlns="http://www.w3.org/1999/xhtml"><img src="x" onerror="alert(1)"/></body></foreignObject>
+                <linearGradient id="g"><stop offset="0" stop-color="#fbba00"/></linearGradient>
+            </svg>
+            SVG;
+
+        $this->actingAs($this->admin())
+            ->put('/api/settings/theme', array_merge($this->colors(), [
+                'logo' => UploadedFile::fake()->createWithContent('logo.svg', $svg),
+            ]))
+            ->assertOk();
+
+        $path = Setting::current()->logo_path;
+        $this->assertNotNull($path);
+        $this->assertStringEndsWith('.svg', $path);
+
+        $stored = Storage::disk('public')->get($path);
+        // Script, handlers, foreign markup and external links never reach the disk…
+        $this->assertStringNotContainsString('script', $stored);
+        $this->assertStringNotContainsString('onload', $stored);
+        $this->assertStringNotContainsString('foreignObject', $stored);
+        $this->assertStringNotContainsString('javascript:', $stored);
+        $this->assertStringNotContainsString('DOCTYPE', $stored);
+        // …while the artwork itself survives, gradient reference included.
+        $this->assertStringContainsString('<rect', $stored);
+        $this->assertStringContainsString('url(#g)', $stored);
+        $this->assertStringContainsString('#fbba00', $stored);
+    }
+
+    public function test_svg_that_is_not_an_svg_document_is_rejected(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin())
+            ->put('/api/settings/theme', array_merge($this->colors(), [
+                'logo' => UploadedFile::fake()->createWithContent('logo.svg', '<html><body>nope</body></html>'),
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('logo');
+
+        $this->assertNull(Setting::current()->logo_path);
+    }
+
     public function test_non_image_logo_is_rejected(): void
     {
         $this->actingAs($this->admin())
@@ -119,6 +214,8 @@ class ThemeApiTest extends TestCase
         $this->actingAs($user)
             ->putJson('/api/settings/theme', $this->colors())
             ->assertForbidden();
+
+        $this->actingAs($user)->deleteJson('/api/settings/theme/assets/logo')->assertForbidden();
     }
 
     public function test_admin_reads_certificate_settings_with_default_body(): void

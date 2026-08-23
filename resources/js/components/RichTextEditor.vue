@@ -73,6 +73,11 @@ const colorSwatches = computed<{ label: string; value: string }[]>(() => {
         { label: t('editor.colorAccent'), value: c?.accent ?? '#0d9488' },
         { label: t('editor.colorAccentDark'), value: c?.accent_hover ?? '#0f766e' },
         { label: t('editor.colorLink'), value: c?.link ?? '#2563eb' },
+        // The free palette slots from Theme settings — the house colours authors reach for.
+        { label: t('editor.colorPalette1'), value: c?.palette_1 ?? '#fbba00' },
+        { label: t('editor.colorPalette2'), value: c?.palette_2 ?? '#f39200' },
+        { label: t('editor.colorPalette3'), value: c?.palette_3 ?? '#97bddd' },
+        { label: t('editor.colorPalette4'), value: c?.palette_4 ?? '#003758' },
     ];
 });
 
@@ -103,9 +108,11 @@ function clearColor(): void {
                 <div v-if="showColors" class="fixed inset-0 z-10" @click="showColors = false" />
                 <div v-if="showColors" class="absolute left-0 top-9 z-20 w-44 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
                     <div class="grid grid-cols-5 gap-1.5">
-                        <button v-for="s in colorSwatches" :key="s.value" type="button" :aria-label="s.label" :title="s.label"
-                            class="h-6 w-6 rounded border border-gray-200 transition hover:scale-110"
-                            :style="{ backgroundColor: s.value }" @click="applyColor(s.value)" />
+                        <Tooltip v-for="s in colorSwatches" :key="s.label" :text="s.label">
+                            <button type="button" :aria-label="s.label"
+                                class="h-6 w-6 rounded border border-gray-200 transition hover:scale-110"
+                                :style="{ backgroundColor: s.value }" @click="applyColor(s.value)" />
+                        </Tooltip>
                     </div>
                     <button type="button" class="mt-2 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs text-gray-600 hover:bg-gray-100" @click="clearColor">
                         <span class="h-4 w-4 rounded border border-gray-300 bg-white" />

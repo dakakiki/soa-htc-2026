@@ -10,8 +10,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateCertificateRequest;
 use App\Http\Requests\UpdateThemeRequest;
 use App\Http\Resources\SettingResource;
+use App\Support\SvgSanitizer;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class SettingsController extends Controller
 {
@@ -32,16 +36,70 @@ class SettingsController extends Controller
 
         foreach (['logo' => 'logo_path', 'logo_icon' => 'logo_icon_path'] as $field => $column) {
             if ($request->hasFile($field)) {
+                $path = $this->storeBrandingFile($request->file($field), $field);
+
                 if ($setting->{$column}) {
                     Storage::disk('public')->delete($setting->{$column});
                 }
-                $data[$column] = $request->file($field)->store('branding', 'public');
+                $data[$column] = $path;
             }
         }
 
         $setting->update($data);
 
         return SettingResource::make($setting);
+    }
+
+    /**
+     * Remove the uploaded logo or icon: delete the file and clear its column, so
+     * the field is empty and a new image can be uploaded (mirrors the certificate
+     * assets). Returns the refreshed theme payload.
+     */
+    public function deleteThemeAsset(string $asset): SettingResource
+    {
+        $setting = Setting::current();
+        $this->authorize('update', $setting);
+
+        $column = match ($asset) {
+            'logo' => 'logo_path',
+            'icon' => 'logo_icon_path',
+            default => abort(404),
+        };
+
+        if ($setting->{$column}) {
+            Storage::disk('public')->delete($setting->{$column});
+            $setting->update([$column => null]);
+        }
+
+        return SettingResource::make($setting);
+    }
+
+    /**
+     * Store one branding upload and return its path. Raster files go to disk as
+     * they are; an SVG is sanitized first and only the rewritten markup is saved,
+     * so the file served from our origin cannot script (see SvgSanitizer).
+     */
+    private function storeBrandingFile(UploadedFile $file, string $field): string
+    {
+        $isSvg = strtolower((string) $file->getClientOriginalExtension()) === 'svg'
+            || $file->getMimeType() === 'image/svg+xml';
+
+        if (! $isSvg) {
+            return $file->store('branding', 'public');
+        }
+
+        $clean = SvgSanitizer::sanitize((string) file_get_contents($file->getRealPath()));
+
+        if ($clean === null) {
+            throw ValidationException::withMessages([
+                $field => 'The '.str_replace('_', ' ', $field).' is not a readable SVG image.',
+            ]);
+        }
+
+        $path = 'branding/'.Str::random(40).'.svg';
+        Storage::disk('public')->put($path, $clean);
+
+        return $path;
     }
 
     /** The admin-editable certificate content + assets (for the Settings editor). */

@@ -175,6 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Branding/theme (read is public via /theme above; writing is gated).
     // PUT so the SPA can send multipart via POST + _method spoofing (like schools).
     Route::put('settings/theme', [SettingsController::class, 'updateTheme']);
+    Route::delete('settings/theme/assets/{asset}', [SettingsController::class, 'deleteThemeAsset']);
     // Certificate content admin (body template + logo/signature/QR uploads).
     Route::get('settings/certificate', [SettingsController::class, 'certificate']);
     Route::put('settings/certificate', [SettingsController::class, 'updateCertificate']);

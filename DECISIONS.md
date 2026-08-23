@@ -683,6 +683,22 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0035 — Theme: SVG logo se prihvata ali se prepisuje pri uploadu; 4 slobodna slota palete
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda. **IMPLEMENTIRANO** (suite 326 zeleno).
+- **Kontekst:** Vlasnik je pokušao da postavi `SOA-HTC_logo.svg` i dobio 422 („must be a file of type: png, jpg, jpeg, webp"). Zabrana je bila namerna: branding fajlovi se serviraju sa `storage/` na **našem originu**, a SVG otvoren kao dokument izvršava sve što nosi (`<script>`, `onload=`) — same-origin stored XSS. Ali logotip je po prirodi vektor; rasterski logo se mutno skalira na retina ekranima i u sidebar ikonici. Uz to, dolazi javni/CMS deo, gde se koristi kućna paleta (`#fbba00`, `#f39200`, `#97bddd`, `#003758`…) koja se ne poklapa ni sa jednim od 8 semantičkih tokena.
+- **Odluka:**
+  - **SVG se prihvata, ali se originalni bajtovi nikad ne čuvaju.** `App\Support\SvgSanitizer` parsira upload i **prepisuje** ga po whitelisti (elementi koje logotip realno koristi), pa se na disk piše samo rezultat. Ide napolje: sve van whiteliste (`<script>`, `<foreignObject>`, `<a>`, `<animate>`, strani namespace-i tipa Illustrator `i:`), svaki `on*` atribut, `href` koji nije `#fragment` (na `<image>` još i `data:image/`), `style`/CSS sa `@import`/`expression(`/`javascript:`/`-moz-binding`, i **svaki `url()` koji ne pokazuje u sam dokument**. DOCTYPE se briše, a parsira se bez `LIBXML_NOENT` (entiteti se ne šire — nema billion-laughs) i sa `LIBXML_NONET`.
+  - **`<style>` ostaje** iako je najlakše bilo izbaciti ga: Illustrator eksport boje drži baš tamo (`.st0{fill:#003758}`), pa bi brisanje obesmislilo logotip. Uklanja se samo ako sam CSS pokaže napolje.
+  - **Fajl koji nije SVG dokument** (pogrešan koreni element, neispravan XML) je **422 na polju**, ne tiho odbacivanje.
+  - **4 slobodna slota:** `color_palette_1..4` (default = paleta koju je vlasnik dao). Namerno **bez semantike** — to je kućna paleta koja se podešava na jednom mestu i troši kao `bg-brand-palette-1` (CSS varijable idu na `:root` istim mehanizmom kao ostali tokeni). Alternativa (imenovani tokeni: `danger`, `success`, `page`, `surface`) je odbijena jer vlasnik traži boje **za javni sajt/CMS**, a ne još kontrole nad admin skinom.
+  - **Izuzetak: slot 4 nosi pozadinu admin top bara** (odluka vlasnika istog dana). Bar je time tamna traka, pa je njegov sadržaj light-on-dark: naziv aplikacije i e-mail beli, logout dugme `white/10` sa `red-300` ikonicom, donja siva linija uklonjena. **Posledica koju treba znati:** logo se sada bira svetao (vlasnik je postavio beli SVG), a **public/student/login zaglavlja su i dalje bela** → tamo je taj logo nevidljiv dok se i oni ne prebace na tamnu traku ili se ne doda tamna varijanta logotipa.
+  - **Iste 4 boje su i u WYSIWYG paleti** (RichTextEditor), pored 5 postojećih semantičkih — autori sadržaja pišu u kućnim bojama.
+  - **Site title je rich-text polje** (`settings.site_title`, nullable TEXT, max 1000) prikazano **pored logotipa u top baru**. WYSIWYG jer naslov nosi svoje naglaske i boje (isti obrazac kao `cert_header_title`), render `v-html` po postojećoj konvenciji za admin-authored sadržaj. Ide u **javni** `/api/theme` payload — isti naslov treba i pre logina i kasnije na javnom sajtu. Fallback na `app.name` iz kataloga poruka ostaje, ali samo kad nema **ni** logotipa **ni** naslova.
+- **Posledica:** migracija `add_palette_colors_to_settings_table`; `Setting::COLOR_KEYS` sada 12 (payload `/api/theme` isto 12); `SettingsController::storeBrandingFile()` je jedina tačka upisa branding fajla; Theme strana je uvedena u karticu sa Cancel/Save podnožjem po ADR-0031, dobila je `ImageThumb` sa crvenim X (ruta `DELETE settings/theme/assets/{logo|icon}`, isto kao sertifikatski asseti), a pregled logotipa/ikonice stoji na boji top bara jer se beo logo na beloj kartici ne vidi. **Ograničenje:** sanitizer čisti **samo Theme logo/ikonicu** — sertifikatski asseti ostaju rasterski (mPDF ionako slabo vari SVG).
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

@@ -22,11 +22,18 @@ class Setting extends Model
         'color_accent_hover',
         'color_link',
         'color_border',
+        // Free palette slots — no fixed role, shared with the public/CMS side.
+        'color_palette_1',
+        'color_palette_2',
+        'color_palette_3',
+        'color_palette_4',
     ];
 
     protected $fillable = [
         'logo_path',
         'logo_icon_path',
+        // Rich-text site name rendered next to the logo (admin + public header).
+        'site_title',
         // Admin-editable certificate content + assets (see SoaCertificate).
         'cert_header_title',
         'cert_body',
