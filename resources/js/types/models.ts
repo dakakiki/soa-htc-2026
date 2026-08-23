@@ -427,13 +427,36 @@ export interface Coordinator {
     schools: CoordinatorSchool[];
 }
 
-/** One country on the dashboard map, keyed by ISO 3166-1 numeric. */
+/** One country on the dashboard map and in the country table. */
 export interface CountryMapRow {
     iso: number;
+    /** The country row behind it — the table links with this. */
+    id: number;
     name: string;
     students: number;
     venues: number;
     submitted: number;
+    published: number;
+}
+
+export interface VenueDashboardRow {
+    id: number;
+    name: string;
+    city: string | null;
+    students: number;
+    absent: number;
+    submitted: number;
+}
+
+export interface StudentPreviewRow {
+    id: number;
+    competitor_number: string;
+    name: string;
+    grade: number | null;
+    level: string | null;
+    attendance: string;
+    score: number | null;
+    max_score: number | null;
 }
 
 export interface DashboardData {
@@ -443,6 +466,22 @@ export interface DashboardData {
     coordinators: { count: number } | null;
     /** Present only for accounts that see beyond one country (the map audience). */
     by_country: CountryMapRow[] | null;
+    kpis: {
+        students: number;
+        submitted: number;
+        present: number;
+        absent: number;
+        /** Null for a scoped account: one country is not a statistic. */
+        countries: number | null;
+        venues_active: number | null;
+        students_previous_round: number | null;
+    };
+    /** Only non-empty items, so an empty list means nothing is pending. */
+    attention: { key: string; count: number }[];
+    /** The coordinator's venues; null for an admin and for a single-venue scope. */
+    by_venue: VenueDashboardRow[] | null;
+    /** The first page of the roster, for a scope of exactly one venue. */
+    students_preview: StudentPreviewRow[] | null;
 }
 
 export interface Paginated<T> {
