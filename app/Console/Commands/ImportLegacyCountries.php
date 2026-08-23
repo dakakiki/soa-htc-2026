@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Domain\Migration\LegacyCountries;
 use App\Domain\Organization\Models\Country;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +34,11 @@ class ImportLegacyCountries extends Command
         $legacy = DB::connection('legacy');
         $countries = $legacy->table('el_country')->get();
 
+        // Rows that are one country in reality are imported once, under the id
+        // that survives ({@see LegacyCountries}); the other is skipped entirely,
+        // and everything that referenced it is remapped by the importers below.
+        $countries = $countries->reject(fn ($lc): bool => LegacyCountries::isFolded((int) $lc->country_id))->values();
+
         // Reconcile un-tagged seed rows onto their legacy country_id by name.
         foreach ($countries as $lc) {
             $norm = mb_strtolower(trim((string) $lc->country_name));
@@ -45,10 +51,15 @@ class ImportLegacyCountries extends Command
 
         $imported = 0;
         $this->withProgressBar($countries, function ($lc) use (&$imported): void {
+            $legacyId = (int) $lc->country_id;
+
             Country::query()->updateOrCreate(
-                ['legacy_id' => (int) $lc->country_id],
+                ['legacy_id' => $legacyId],
                 [
-                    'name' => mb_substr((string) $lc->country_name, 0, 255),
+                    // A merged country is named after the country, not after the
+                    // partner organisation the legacy row was named for.
+                    'name' => LegacyCountries::NAMES[$legacyId]
+                        ?? mb_substr((string) $lc->country_name, 0, 255),
                     'code' => mb_strtoupper(mb_substr(trim((string) $lc->country_short), 0, 3)),
                 ],
             );

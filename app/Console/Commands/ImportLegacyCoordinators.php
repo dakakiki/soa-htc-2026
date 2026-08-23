@@ -6,9 +6,9 @@ namespace App\Console\Commands;
 
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
+use App\Domain\Migration\LegacyCountries;
 use App\Domain\Migration\LegacyText;
 use App\Domain\Migration\Models\LegacyIdMap;
-use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Support\SeasonContext;
@@ -55,7 +55,9 @@ class ImportLegacyCoordinators extends Command
         $roleIds = Role::query()
             ->whereIn('key', [SystemRole::Admin->value, SystemRole::CountryCoordinator->value])
             ->pluck('id', 'key');
-        $countryMap = Country::query()->whereNotNull('legacy_id')->pluck('id', 'legacy_id');
+        // Folded duplicates resolve onto the country that survived, so a row
+        // of a merged legacy country is not quarantined as "country not mapped".
+        $countryMap = LegacyCountries::map();
         $regionMap = Region::query()->whereNotNull('legacy_id')->pluck('id', 'legacy_id');
         // legacy school id → our school id (covers merged venues).
         $schoolMap = LegacyIdMap::query()

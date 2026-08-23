@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Domain\Organization\Models\Country;
+use App\Domain\Migration\LegacyCountries;
 use App\Domain\Organization\Models\Region;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +28,9 @@ class ImportLegacyRegions extends Command
         $legacy = DB::connection('legacy');
 
         // legacy country_id => our country id
-        $countryMap = Country::query()->whereNotNull('legacy_id')->pluck('id', 'legacy_id');
+        // Folded duplicates resolve onto the country that survived, so a row
+        // of a merged legacy country is not quarantined as "country not mapped".
+        $countryMap = LegacyCountries::map();
 
         $regions = $legacy->table('regions')->get();
         $imported = 0;

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Domain\Migration\LegacyCountries;
 use App\Domain\Migration\LegacyText;
 use App\Domain\Migration\Models\LegacyIdMap;
-use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
 use Illuminate\Console\Command;
@@ -40,7 +40,9 @@ class ImportLegacySchools extends Command
     public function handle(): int
     {
         $legacy = DB::connection('legacy');
-        $countryMap = Country::query()->whereNotNull('legacy_id')->pluck('id', 'legacy_id');
+        // Folded duplicates resolve onto the country that survived, so a row
+        // of a merged legacy country is not quarantined as "country not mapped".
+        $countryMap = LegacyCountries::map();
         $regionMap = Region::query()->whereNotNull('legacy_id')->pluck('id', 'legacy_id');
 
         $schools = $legacy->table('schools')->get();
