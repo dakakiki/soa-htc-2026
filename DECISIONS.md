@@ -803,6 +803,26 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0042 — CMS: pages, posts i kategorije; javne adrese i server-render meta tagova
+
+- **Status:** Prihvaćeno (2026-08-23); vlasnik proizvoda (obim potvrđen: „posts, categories i pages" + javni deo; navigacija i PageLayout ostaju za sledeću rundu). **IMPLEMENTIRANO.**
+- **Kontekst:** Javni deo je bio prazna ljuštura — home stranica je prikazivala API health-check, a header meni je bio hardkodovan uz komentar „CMS stiže u Fazi 8". `PROJECT_CONTEXT` §8.6 definiše `PageLayout` / `Page` / `Category` / `Post` + navigaciju kao zaseban domen. **Legacy dump nema CMS tabele** (29 tabela, sve takmičarske) — nema se šta migrirati, kreće se prazno.
+- **Odluke:**
+  - **`cms.manage` je zasebna permisija, ne deo `content.manage`.** Takmičarski sadržaj (kvizovi, testovi, pitanja) i sadržaj sajta su različiti poslovi, a CMS po §8.6 ne sme da dodirne pokušaj, tajmer ni rezultat. Katalog: 17 → **18** permisija; admin-only, matrica u `PermissionMatrixTest`.
+  - **Javna čitanja imaju svoj kontroler bez autentikacije**, a sužava ih `Post::scopeLive()` / `Page::scopeLive()` (objavljeno **i** `published_at <= now()`). Razdvojeno od admin kontrolera namerno: javna strana ne sme da dođe do draft-a doteranim parametrom.
+  - **Stranica živi u korenu (`/{slug}`)** jer to čitalac očekuje od sajta. Cena je rezervisana lista (`PublicPaths::RESERVED`) koja preslikava top-level segmente iz `resources/js/router/index.ts` — **novoj top-level ruti mesto je i tamo**. Ukucan slug koji se sudara se odbija (422), a izveden iz naslova se sufiksuje (`dashboard-2`).
+  - **Promena slug-a objavljenog sadržaja ostavlja redirect koji pokazuje na ZAPIS, ne na novi slug** — pa lanac preimenovanja (a → b → c) i dalje razrešava iz najstarije adrese u jednom upitu. Draft ne ostavlja ništa: nikad nije ni imao javnu adresu. 301 servira `SpaController`, pre nego što se SPA podigne.
+  - **Brisanje kategorije nikad ne briše objave** (§8.6): dok drži ijednu, brisanje se odbija sa 422; pod-kategorije se otkače (`parent_id = null`).
+  - **`published_at`:** prazno pri objavi = sada; datum u budućnosti = zakazano; povratak u draft **zadržava** datum, da ponovna objava ne prebaci tekst na vrh liste.
+  - **Locale-spreman, ali jednojezičan.** Kolone `locale` + `translation_group` na svakom zapisu umesto zasebnih translations tabela; slug je unique **po locale-u**. Dodavanje jezika je red u tabeli, ne migracija — što §8.7 i traži, bez cene duplog modela sada.
+  - **Meta tagovi se renderuju na serveru.** Aplikacija je SPA, pa bi bez toga svaka javna adresa delila jedan `<title>` i ne bi imala nikakav preview kad se link okači u chat ili na mrežu — crawler ne izvršava JavaScript. `SpaController` puni `title` / `description` / canonical / OG / Twitter za stranicu ili objavu, a sve ostalo (admin, studentski deo, nepoznata putanja) dobija podrazumevane vrednosti sajta. **Renderuje se samo `<head>`** — stranicu i dalje crta Vue.
+  - 🪤 **Školjka mora da se renderuje i kad baza ćuti.** `SpaController` je sada na putanji SVAKOG ne-API zahteva, pa jedan neuspeo upit znači 500 na svakoj adresi aplikacije — uključujući admin. Meta tagovi su ukras, aplikacija nije: greška pri čitanju pada na podrazumevani `<title>` i školjka se servira. Uhvaćeno testom `ExampleTest`, koji gadja `/` bez migrirane baze — on i ostaje čuvar tog ponašanja.
+  - 🪤 **Multipart ne ume da prenese prazan niz.** Post forma šalje sliku, pa ide `FormData`; „nijedna kategorija" se prenosi kao jedan prazan `category_ids[]` (validacija `nullable`, kontroler filtrira). Bez toga se kategorije nikad ne bi mogle skinuti sa objave.
+- **Posledica:** pet tabela (`cms_pages`, `cms_posts`, `cms_categories`, `cms_category_post`, `cms_redirects`); grupa **Website** u sidebar-u (Pages / Posts / Categories); javne rute `/news`, `/news/{slug}` i `/{slug}`; `.cms-content` stilovi za tekst iz editora (Tailwind reset briše naslove i liste, a stilovi editora su scoped); demo sadržaj se seeduje **samo u `local`** — test koji broji objavljene tekstove mora da kreće od praznog sajta. Home stranica više ne prikazuje API health-check nego najnovije objave.
+- **NIJE rađeno (svesno, van dogovorenog obima):** `PageLayout` zone i **upravljiva navigacija** (`public.header` / `public.footer` / `admin.top` / `admin.right_sidebar`) — javni meni je i dalje hardkodovan u `PublicLayout.vue`. Uz to, otvaranjem javnog dela **postaje vidljiv beli logo na belom javnom zaglavlju** (ranije odloženo pitanje, sada stvarno).
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

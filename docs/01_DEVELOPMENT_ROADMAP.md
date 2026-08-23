@@ -209,7 +209,8 @@ Uslov završetka:
 **Stanje (2026-08-23) — Theme i navigacija su urađeni pre same faze:**
 
 - **Theme (ADR-0035):** ne pet nego **12 tokena** — 8 semantičkih plus **4 slobodna slota palete** za javni/CMS deo; slot 4 nosi pozadinu admin top bara. SVG logo se prihvata, ali se pri uploadu prepisuje kroz whitelist sanitizer (na disk ide samo očišćena verzija). Uz to rich-text **site title** pored logotipa, već u javnom `/api/theme` payload-u.
-- **Navigacija i autorizacija (ADR-0038):** legacy `user_level` 10/5/1 preslikan u permisije + row scope; matricu drži `PermissionMatrixTest`. Public deo se **ne dira** dok se ne otvori CMS (vlasnik, 2026-08-23) — trenutni logo je beo, pa bi na belim public zaglavljima bio nevidljiv.
+- **CMS — stranice, objave, kategorije (ADR-0042, 2026-08-23):** isporučeno je **tri od četiri** celine iz §8.6. `Page` / `Post` / `Category` sa draft+published, zakazanom objavom, SEO poljima i redirect-om posle promene slug-a; javne rute `/news`, `/news/{slug}` i stranica u korenu (`/{slug}`, uz rezervisanu listu aplikacionih putanja). Sopstvena permisija **`cms.manage`** (katalog 17 → 18), model je locale-spreman (`locale` + `translation_group`) iako je aktivan samo `en`. Meta tagovi javnih adresa se renderuju na **serveru** pre nego što se SPA podigne — SPA inače nema šta da pokaže crawler-u. **Ostaje:** `PageLayout` zone i upravljiva navigacija; javni meni je još hardkodovan.
+- **Navigacija i autorizacija (ADR-0038):** legacy `user_level` 10/5/1 preslikan u permisije + row scope; matricu drži `PermissionMatrixTest`. Public deo se nije dirao dok se nije otvorio CMS (vlasnik, 2026-08-23); **sada je otvoren (ADR-0042)**, pa je beo logo na belim public zaglavljima postao stvarna stavka, a ne odloženo pitanje.
 
 ### Faza 9 — Accounting compatibility
 
