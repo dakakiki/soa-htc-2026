@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AttemptController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Cms\CategoryController as CmsCategoryController;
 use App\Http\Controllers\Api\Cms\MediaController as CmsMediaController;
+use App\Http\Controllers\Api\Cms\MenuController as CmsMenuController;
 use App\Http\Controllers\Api\Cms\PageController as CmsPageController;
 use App\Http\Controllers\Api\Cms\PostController as CmsPostController;
 use App\Http\Controllers\Api\CoordinatorController;
@@ -68,6 +69,7 @@ Route::prefix('public')->group(function () {
     Route::get('posts/{slug}', [PublicContentController::class, 'post']);
     Route::get('categories', [PublicContentController::class, 'categories']);
     Route::get('pages/{slug}', [PublicContentController::class, 'page']);
+    Route::get('menus/{slug}', [PublicContentController::class, 'menu']);
 });
 
 /*
@@ -130,11 +132,15 @@ Route::middleware('auth:sanctum')->group(function () {
             ->parameters(['categories' => 'category'])->names('cms.categories');
         Route::apiResource('posts', CmsPostController::class)
             ->parameters(['posts' => 'post'])->names('cms.posts');
-        // Removing the cover image without touching the post itself (ImageThumb).
-        Route::delete('posts/{post}/image', [CmsPostController::class, 'deleteImage'])->whereNumber('post');
         Route::apiResource('pages', CmsPageController::class)
             ->parameters(['pages' => 'page'])->names('cms.pages');
-        Route::delete('pages/{page}/image', [CmsPageController::class, 'deleteImage'])->whereNumber('page');
+        // Navigation. Items are saved as one tree (see MenuController), and the
+        // target picker is its own endpoint so the form can search server-side.
+        Route::get('menu-targets', [CmsMenuController::class, 'targets']);
+        Route::put('menus/{menu}/items', [CmsMenuController::class, 'saveItems'])->whereNumber('menu');
+        Route::apiResource('menus', CmsMenuController::class)
+            ->parameters(['menus' => 'menu'])->names('cms.menus');
+
         // The media library: uploaded once, referenced from anywhere.
         Route::apiResource('media', CmsMediaController::class)
             ->only(['index', 'store', 'update', 'destroy'])

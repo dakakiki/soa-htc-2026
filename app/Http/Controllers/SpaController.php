@@ -90,7 +90,7 @@ class SpaController extends Controller
         $segments = explode('/', trim($path, '/'));
 
         if ($segments[0] === PublicPaths::POST_PREFIX && isset($segments[1])) {
-            $post = Post::query()->live()->where('slug', $segments[1])->first();
+            $post = Post::query()->live()->with('image')->where('slug', $segments[1])->first();
 
             if ($post !== null) {
                 return [
@@ -98,24 +98,20 @@ class SpaController extends Controller
                     'description' => $post->seo_description ?: $this->summarise($post->excerpt ?? $post->body),
                     // A post without a cover still deserves a card, so the site
                     // logo stands in.
-                    'image' => $post->image_path === null
-                        ? $defaults['image']
-                        : Storage::disk('public')->url($post->image_path),
+                    'image' => $post->image?->url() ?? $defaults['image'],
                     'type' => 'article',
                 ] + $defaults;
             }
         }
 
         if (count($segments) === 1 && $segments[0] !== '' && ! PublicPaths::isReserved($segments[0])) {
-            $page = Page::query()->live()->where('slug', $segments[0])->first();
+            $page = Page::query()->live()->with('image')->where('slug', $segments[0])->first();
 
             if ($page !== null) {
                 return [
                     'title' => ($page->seo_title ?: $page->title).' · '.$defaults['site_name'],
                     'description' => $page->seo_description ?: $this->summarise($page->body),
-                    'image' => $page->image_path === null
-                        ? $defaults['image']
-                        : Storage::disk('public')->url($page->image_path),
+                    'image' => $page->image?->url() ?? $defaults['image'],
                 ] + $defaults;
             }
         }

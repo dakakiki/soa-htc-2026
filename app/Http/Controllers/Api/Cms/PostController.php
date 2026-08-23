@@ -16,7 +16,6 @@ use App\Http\Resources\CmsPostResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * News posts on the public site. Admin-only (`cms.manage`).
@@ -28,7 +27,7 @@ class PostController extends Controller
         $this->authorize('cms.manage');
 
         $query = Post::query()
-            ->with(['author:id,name', 'categories:id,name,slug'])
+            ->with(['author:id,name', 'categories:id,name,slug', 'image'])
             ->orderByDesc('published_at')
             ->orderByDesc('id');
 
@@ -52,19 +51,15 @@ class PostController extends Controller
     {
         $this->authorize('cms.manage');
 
-        return CmsPostResource::make($post->load(['author:id,name', 'categories:id,name,slug']));
+        return CmsPostResource::make($post->load(['author:id,name', 'categories:id,name,slug', 'image']));
     }
 
     public function store(StoreCmsPostRequest $request): JsonResponse
     {
-        $data = $request->safe()->except(['image', 'category_ids']);
+        $data = $request->safe()->except('category_ids');
         $data['slug'] = ContentSlug::make('cms_posts', $data['slug'] ?? null, $data['title']);
         $data['author_id'] = $request->user()->id;
         $data['published_at'] = $this->publishedAt($data, null);
-
-        if ($request->hasFile('image')) {
-            $data['image_path'] = $request->file('image')->store('cms', 'public');
-        }
 
         $post = Post::create($data);
         $post->forceFill(['translation_group' => $post->id])->save();
@@ -75,7 +70,7 @@ class PostController extends Controller
 
     public function update(UpdateCmsPostRequest $request, Post $post): CmsPostResource
     {
-        $data = $request->safe()->except(['image', 'category_ids']);
+        $data = $request->safe()->except('category_ids');
         $wasPublic = $post->status === PublicationStatus::Published;
         $oldSlug = $post->slug;
 
@@ -84,13 +79,6 @@ class PostController extends Controller
         }
 
         $data['published_at'] = $this->publishedAt($data, $post);
-
-        if ($request->hasFile('image')) {
-            if ($post->image_path) {
-                Storage::disk('public')->delete($post->image_path);
-            }
-            $data['image_path'] = $request->file('image')->store('cms', 'public');
-        }
 
         $post->update($data);
 
@@ -106,31 +94,15 @@ class PostController extends Controller
         return CmsPostResource::make($this->fresh($post));
     }
 
+    /** The featured image is library property and outlives the post. */
     public function destroy(Post $post): JsonResponse
     {
         $this->authorize('cms.manage');
-
-        if ($post->image_path) {
-            Storage::disk('public')->delete($post->image_path);
-        }
 
         ContentRedirects::forget(Redirect::TYPE_POST, $post->id);
         $post->delete();
 
         return response()->json(null, 204);
-    }
-
-    /** Removes the cover image, leaving the post itself alone. */
-    public function deleteImage(Post $post): CmsPostResource
-    {
-        $this->authorize('cms.manage');
-
-        if ($post->image_path) {
-            Storage::disk('public')->delete($post->image_path);
-            $post->update(['image_path' => null]);
-        }
-
-        return CmsPostResource::make($this->fresh($post));
     }
 
     /**
@@ -171,6 +143,6 @@ class PostController extends Controller
 
     private function fresh(Post $post): Post
     {
-        return $post->fresh(['author:id,name', 'categories:id,name,slug']);
+        return $post->fresh(['author:id,name', 'categories:id,name,slug', 'image']);
     }
 }

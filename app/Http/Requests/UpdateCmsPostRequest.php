@@ -26,8 +26,8 @@ class UpdateCmsPostRequest extends FormRequest
             'slug' => CmsSlugRules::optional('cms_posts', $this->route('post')?->id),
             'excerpt' => ['nullable', 'string', 'max:2000'],
             'body' => ['nullable', 'string'],
-            // Raster only, as in the media library (ADR-0035 keeps SVG to the theme).
-            'image' => ['nullable', 'mimes:jpeg,jpg,png,webp,gif', 'max:5120'],
+            // The featured image is picked from the library, not uploaded here.
+            'image_media_id' => ['nullable', 'integer', 'exists:cms_media,id'],
             'status' => ['sometimes', Rule::enum(PublicationStatus::class)],
             'published_at' => ['nullable', 'date'],
             'seo_title' => ['nullable', 'string', 'max:255'],

@@ -19,7 +19,7 @@ class Post extends Model
     protected $table = 'cms_posts';
 
     protected $fillable = [
-        'title', 'slug', 'excerpt', 'body', 'image_path', 'author_id',
+        'title', 'slug', 'excerpt', 'body', 'image_media_id', 'author_id',
         'status', 'published_at', 'seo_title', 'seo_description', 'locale', 'translation_group',
     ];
 
@@ -27,6 +27,7 @@ class Post extends Model
     {
         return [
             'author_id' => 'integer',
+            'image_media_id' => 'integer',
             'translation_group' => 'integer',
             'status' => PublicationStatus::class,
             'published_at' => 'datetime',
@@ -44,6 +45,17 @@ class Post extends Model
         $query->where('status', PublicationStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
+    }
+
+    /**
+     * The featured image, taken from the media library rather than uploaded
+     * here — deleting the file nulls this instead of leaving a broken link.
+     *
+     * @return BelongsTo<Media, $this>
+     */
+    public function image(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'image_media_id');
     }
 
     /** @return BelongsTo<User, $this> */

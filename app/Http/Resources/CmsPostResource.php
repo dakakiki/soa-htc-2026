@@ -8,7 +8,6 @@ use App\Domain\Cms\Models\Post;
 use App\Domain\Cms\Support\PublicPaths;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 /** @mixin Post */
 class CmsPostResource extends JsonResource
@@ -25,7 +24,8 @@ class CmsPostResource extends JsonResource
             'path' => PublicPaths::post($this->slug),
             'excerpt' => $this->excerpt,
             'body' => $this->body,
-            'image_url' => $this->image_path === null ? null : Storage::disk('public')->url($this->image_path),
+            'image_media_id' => $this->image_media_id,
+            'image_url' => $this->image?->url(),
             'author' => $this->whenLoaded('author', fn () => $this->author === null ? null : [
                 'id' => $this->author->id,
                 'name' => $this->author->name,

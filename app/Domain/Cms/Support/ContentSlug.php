@@ -14,6 +14,9 @@ use Illuminate\Support\Str;
  * reserved; this handles the other case — the field left blank, where the slug
  * comes from the title and may well collide with an existing one. Then it is
  * suffixed (`about`, `about-2`, `about-3`) rather than failing the save.
+ *
+ * `$locale` scopes uniqueness for content that comes in language variants. Pass
+ * null for a table that has no `locale` column at all — menus, for one.
  */
 final class ContentSlug
 {
@@ -26,7 +29,7 @@ final class ContentSlug
         string $fallback,
         ?int $ignoreId = null,
         bool $avoidReserved = false,
-        string $locale = 'en',
+        ?string $locale = 'en',
     ): string {
         $base = Str::slug((string) ($slug === null || $slug === '' ? $fallback : $slug));
 
@@ -42,7 +45,7 @@ final class ContentSlug
             }
 
             $taken = DB::table($table)
-                ->where('locale', $locale)
+                ->when($locale !== null, fn ($q) => $q->where('locale', $locale))
                 ->where('slug', $candidate)
                 ->when($ignoreId !== null, fn ($q) => $q->where('id', '!=', $ignoreId))
                 ->exists();

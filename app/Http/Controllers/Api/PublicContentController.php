@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Cms\Enums\MenuItemType;
 use App\Domain\Cms\Models\Category;
+use App\Domain\Cms\Models\Menu;
+use App\Domain\Cms\Models\MenuItem;
 use App\Domain\Cms\Models\Page;
 use App\Domain\Cms\Models\Post;
 use App\Domain\Cms\Support\PublicPaths;
@@ -12,7 +15,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\PublicPostResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Collection;
 
 /**
  * What the website itself reads. No authentication and no permission: every
@@ -28,11 +31,10 @@ class PublicContentController extends Controller
     {
         $query = Post::query()
             ->live()
-            ->with('categories:id,name,slug')
+            ->with(['categories:id,name,slug', 'author:id,name', 'image'])
             ->orderByDesc('published_at')
             // The card list has no use for the article body.
-            ->select(['id', 'title', 'slug', 'excerpt', 'image_path', 'published_at', 'author_id'])
-            ->with('author:id,name');
+            ->select(['id', 'title', 'slug', 'excerpt', 'image_media_id', 'published_at', 'author_id']);
 
         if ($request->filled('category')) {
             $slug = $request->string('category')->value();
@@ -49,7 +51,7 @@ class PublicContentController extends Controller
         $post = Post::query()
             ->live()
             ->where('slug', $slug)
-            ->with(['categories:id,name,slug', 'author:id,name'])
+            ->with(['categories:id,name,slug', 'author:id,name', 'image'])
             ->firstOrFail();
 
         return PublicPostResource::make($post);
@@ -60,18 +62,70 @@ class PublicContentController extends Controller
      */
     public function page(string $slug): array
     {
-        $page = Page::query()->live()->where('slug', $slug)->firstOrFail();
+        $page = Page::query()->live()->with('image')->where('slug', $slug)->firstOrFail();
 
         return ['data' => [
             'title' => $page->title,
             'slug' => $page->slug,
             'path' => PublicPaths::page($page->slug),
             'body' => $page->body,
-            'image_url' => $page->image_path === null ? null : Storage::disk('public')->url($page->image_path),
+            'image_url' => $page->image?->url(),
             'seo_title' => $page->seo_title,
             'seo_description' => $page->seo_description,
             'published_at' => $page->published_at?->toIso8601String(),
         ]];
+    }
+
+    /**
+     * One menu, resolved: label, address and target, ready to render. Items
+     * whose target is gone or not published are dropped rather than published
+     * as dead links — a menu is not the place to advertise a draft.
+     *
+     * @return array<string, mixed>
+     */
+    public function menu(string $slug): array
+    {
+        $menu = Menu::query()->where('slug', $slug)->firstOrFail();
+
+        $menu->load([
+            'rootItems.page', 'rootItems.post', 'rootItems.category',
+            'rootItems.children.page', 'rootItems.children.post', 'rootItems.children.category',
+        ]);
+
+        return ['data' => [
+            'name' => $menu->name,
+            'slug' => $menu->slug,
+            'items' => $this->visibleItems($menu->rootItems),
+        ]];
+    }
+
+    /**
+     * @param  Collection<int, MenuItem>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function visibleItems($items): array
+    {
+        return $items
+            ->filter(fn (MenuItem $item): bool => $this->isVisible($item))
+            ->map(fn (MenuItem $item): array => [
+                'label' => $item->resolvedLabel(),
+                'href' => $item->resolvedHref(),
+                'target' => $item->link_target,
+                'children' => $item->relationLoaded('children') ? $this->visibleItems($item->children) : [],
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** A link is only worth showing when there is something published behind it. */
+    private function isVisible(MenuItem $item): bool
+    {
+        return match ($item->type) {
+            MenuItemType::Page => $item->page !== null && $item->page->newQuery()->live()->whereKey($item->page_id)->exists(),
+            MenuItemType::Post => $item->post !== null && $item->post->newQuery()->live()->whereKey($item->post_id)->exists(),
+            MenuItemType::Category => $item->category !== null && $item->category->status === 'active',
+            MenuItemType::Custom => $item->url !== null && $item->url !== '',
+        };
     }
 
     /**

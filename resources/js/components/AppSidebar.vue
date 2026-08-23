@@ -37,6 +37,7 @@ import {
     IconNews,
     IconFolders,
     IconPhoto,
+    IconMenu2,
     IconChevronDown,
     IconChevronUp,
     IconChevronsLeft,
@@ -129,6 +130,7 @@ const nav: NavNode[] = [
             { label: t('nav.posts'), icon: IconNews, to: 'cms.posts', prefix: 'cms.posts', perm: 'cms.manage' },
             { label: t('nav.postCategories'), icon: IconFolders, to: 'cms.categories', prefix: 'cms.categories', perm: 'cms.manage' },
             { label: t('nav.media'), icon: IconPhoto, to: 'cms.media', prefix: 'cms.media', perm: 'cms.manage' },
+            { label: t('nav.menus'), icon: IconMenu2, to: 'cms.menus', prefix: 'cms.menus', perm: 'cms.manage' },
         ],
     },
     // Access and Settings stay last.

@@ -380,6 +380,18 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'cms.manage' },
     },
     {
+        path: '/website/menus',
+        name: 'cms.menus',
+        component: () => import('@/pages/cms/MenusListPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
+        path: '/website/menus/:id',
+        name: 'cms.menus.edit',
+        component: () => import('@/pages/cms/MenuEditPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
         path: '/website/media',
         name: 'cms.media',
         component: () => import('@/pages/cms/MediaListPage.vue'),

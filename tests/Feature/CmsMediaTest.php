@@ -96,21 +96,45 @@ class CmsMediaTest extends TestCase
         Storage::disk('public')->assertMissing($path);
     }
 
-    public function test_a_page_carries_a_featured_image_that_can_be_removed_on_its_own(): void
+    public function test_a_page_points_at_a_library_image_rather_than_a_copy(): void
     {
-        $page = $this->actingAs($this->admin())->post('/api/cms/pages', [
+        $this->actingAs($this->admin())->post('/api/cms/media', [
+            'files' => [UploadedFile::fake()->image('cover.jpg')],
+        ])->assertCreated();
+
+        $media = Media::query()->firstOrFail();
+
+        $page = $this->actingAs($this->admin())->postJson('/api/cms/pages', [
             'title' => 'With A Picture',
-            'image' => UploadedFile::fake()->image('cover.jpg'),
+            'image_media_id' => $media->id,
         ])->assertCreated()->json('data');
 
+        $this->assertSame($media->id, $page['image_media_id']);
         $this->assertNotNull($page['image_url']);
 
+        // Clearing the field is just unsetting the reference.
         $this->actingAs($this->admin())
-            ->deleteJson("/api/cms/pages/{$page['id']}/image")
+            ->putJson("/api/cms/pages/{$page['id']}", ['image_media_id' => null])
             ->assertOk()
             ->assertJsonPath('data.image_url', null);
+    }
 
-        // The page itself is untouched.
-        $this->assertDatabaseHas('cms_pages', ['id' => $page['id'], 'title' => 'With A Picture']);
+    public function test_deleting_a_library_file_leaves_the_post_standing(): void
+    {
+        $this->actingAs($this->admin())->post('/api/cms/media', [
+            'files' => [UploadedFile::fake()->image('shared.jpg')],
+        ])->assertCreated();
+
+        $media = Media::query()->firstOrFail();
+
+        $post = $this->actingAs($this->admin())->postJson('/api/cms/posts', [
+            'title' => 'Uses The Picture',
+            'image_media_id' => $media->id,
+        ])->assertCreated()->json('data');
+
+        $this->actingAs($this->admin())->deleteJson("/api/cms/media/{$media->id}")->assertNoContent();
+
+        // The reference is nulled, not left pointing at a file that is gone.
+        $this->assertDatabaseHas('cms_posts', ['id' => $post['id'], 'image_media_id' => null]);
     }
 }

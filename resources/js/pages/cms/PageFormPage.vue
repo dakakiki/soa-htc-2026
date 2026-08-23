@@ -2,13 +2,15 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { createCmsPage, getCmsPage, updateCmsPage, deleteCmsPageImage, type CmsPagePayload } from '@/api/cms';
+import { createCmsPage, getCmsPage, updateCmsPage, type CmsPagePayload } from '@/api/cms';
 import { apiErrorMessage } from '@/api/http';
-import { IconUpload } from '@tabler/icons-vue';
+import { IconPhoto } from '@tabler/icons-vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import ImageThumb from '@/components/ImageThumb.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
+import MediaPickerModal from '@/components/MediaPickerModal.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
+import type { CmsMedia } from '@/types/models';
 
 const route = useRoute();
 const router = useRouter();
@@ -25,11 +27,12 @@ const form = reactive({
     published_at: '',
     seo_title: '',
     seo_description: '',
+    image_media_id: null as number | null,
 });
 
 const currentPath = ref<string | null>(null);
-const imageFile = ref<File | null>(null);
-const currentImageUrl = ref<string | null>(null);
+const imageUrl = ref<string | null>(null);
+const showMedia = ref(false);
 const saving = ref(false);
 const error = ref<string | null>(null);
 
@@ -38,20 +41,18 @@ const statusOptions = computed(() => [
     { value: 'draft', label: t('cms.draft'), activeClass: 'bg-gray-400 text-white' },
 ]);
 
-function onFileChange(event: Event): void {
-    imageFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+
+/** The featured image is a reference to the library, not a new upload. */
+function pickImage(media: CmsMedia): void {
+    form.image_media_id = media.id;
+    imageUrl.value = media.url;
+    showMedia.value = false;
 }
 
-async function removeImage(): Promise<void> {
-    if (id.value === null) {
-        return;
-    }
-    try {
-        const { data } = await deleteCmsPageImage(id.value);
-        currentImageUrl.value = data.data.image_url;
-    } catch (e) {
-        error.value = apiErrorMessage(e);
-    }
+/** Clearing only unsets the reference; the file stays in the library. */
+function clearImage(): void {
+    form.image_media_id = null;
+    imageUrl.value = null;
 }
 
 function goBack(): void {
@@ -74,13 +75,14 @@ async function submit(): Promise<void> {
         published_at: form.published_at || null,
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
+        image_media_id: form.image_media_id,
     };
 
     try {
         if (isEdit.value && id.value !== null) {
-            await updateCmsPage(id.value, payload, imageFile.value);
+            await updateCmsPage(id.value, payload);
         } else {
-            await createCmsPage(payload, imageFile.value);
+            await createCmsPage(payload);
         }
         goBack();
     } catch (e) {
@@ -105,7 +107,8 @@ onMounted(async () => {
         form.seo_title = p.seo_title ?? '';
         form.seo_description = p.seo_description ?? '';
         currentPath.value = p.path;
-        currentImageUrl.value = p.image_url;
+        form.image_media_id = p.image_media_id;
+        imageUrl.value = p.image_url;
     } catch (e) {
         error.value = apiErrorMessage(e);
     }
@@ -113,7 +116,7 @@ onMounted(async () => {
 
 const field = 'mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm';
 const fileBtn =
-    'mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-400 hover:bg-brand-primary-soft';
+    'mt-1 flex w-full cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-left text-sm text-gray-600 hover:border-blue-400 hover:bg-brand-primary-soft';
 </script>
 
 <template>
@@ -146,13 +149,12 @@ const fileBtn =
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700">{{ $t('cms.image') }}</label>
-                        <label :class="fileBtn">
-                            <IconUpload :size="16" />
-                            <span class="truncate">{{ imageFile?.name || $t('cms.chooseImage') }}</span>
-                            <input type="file" accept="image/*" class="hidden" @change="onFileChange" />
-                        </label>
-                        <div v-if="currentImageUrl && !imageFile" class="mt-2">
-                            <ImageThumb :src="currentImageUrl" :alt="form.title" @remove="removeImage" />
+                        <button type="button" :class="fileBtn" @click="showMedia = true">
+                            <IconPhoto :size="16" />
+                            <span class="truncate">{{ $t('cms.chooseImage') }}</span>
+                        </button>
+                        <div v-if="imageUrl" class="mt-2">
+                            <ImageThumb :src="imageUrl" :alt="form.title" @remove="clearImage" />
                         </div>
                     </div>
 
@@ -205,5 +207,7 @@ const fileBtn =
                 </button>
             </div>
         </form>
+
+        <MediaPickerModal v-if="showMedia" @close="showMedia = false" @select="pickImage" />
     </section>
 </template>

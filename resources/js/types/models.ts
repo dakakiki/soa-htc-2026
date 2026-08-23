@@ -535,6 +535,7 @@ export interface CmsPost {
     path: string;
     excerpt: string | null;
     body: string | null;
+    image_media_id: number | null;
     image_url: string | null;
     author?: { id: number; name: string } | null;
     status: string;
@@ -551,12 +552,58 @@ export interface CmsPage {
     slug: string;
     path: string;
     body: string | null;
+    image_media_id: number | null;
     image_url: string | null;
     status: string;
     published_at: string | null;
     seo_title: string | null;
     seo_description: string | null;
     locale: string;
+}
+
+export type CmsMenuItemType = 'page' | 'post' | 'category' | 'custom';
+
+export interface CmsMenuItem {
+    id: number;
+    type: CmsMenuItemType;
+    page_id: number | null;
+    post_id: number | null;
+    category_id: number | null;
+    url: string | null;
+    /** The per-item override; null means "use the target's own name". */
+    label: string | null;
+    /** What the target is called, so the editor can show what a cleared label falls back to. */
+    target_name: string | null;
+    resolved_label: string;
+    href: string | null;
+    link_target: string;
+    children: CmsMenuItem[];
+}
+
+export interface CmsMenu {
+    id: number;
+    name: string;
+    slug: string;
+    items_count?: number;
+    items?: CmsMenuItem[];
+}
+
+/** One item as it is sent back to the server. */
+export interface CmsMenuItemPayload {
+    type: CmsMenuItemType;
+    page_id?: number | null;
+    post_id?: number | null;
+    category_id?: number | null;
+    url?: string | null;
+    label?: string | null;
+    link_target?: string;
+    children?: CmsMenuItemPayload[];
+}
+
+export interface CmsMenuTarget {
+    id: number;
+    label: string;
+    slug: string;
 }
 
 /** What the public site reads — no draft fields, no author account. */

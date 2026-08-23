@@ -8,7 +8,6 @@ use App\Domain\Cms\Models\Post;
 use App\Domain\Cms\Support\PublicPaths;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * A post as the public site sees it: no status, no draft fields, no author
@@ -29,7 +28,7 @@ class PublicPostResource extends JsonResource
             'path' => PublicPaths::post($this->slug),
             'excerpt' => $this->excerpt,
             'body' => $this->body,
-            'image_url' => $this->image_path === null ? null : Storage::disk('public')->url($this->image_path),
+            'image_url' => $this->image?->url(),
             'author' => $this->whenLoaded('author', fn () => $this->author?->name),
             'published_at' => $this->published_at?->toIso8601String(),
             'seo_title' => $this->seo_title,
