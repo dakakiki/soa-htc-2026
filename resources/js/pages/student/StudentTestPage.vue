@@ -110,6 +110,18 @@ function onScroll(): void {
     scrolled.value = window.scrollY > 8;
 }
 
+/**
+ * Width the pinned header spans. `100vw` counts the scrollbar and would push the
+ * page sideways, so it is measured instead — and measured through an observer,
+ * because the value changes the moment the questions render and the scrollbar
+ * appears, well after this component mounts.
+ */
+let viewportWatcher: ResizeObserver | undefined;
+
+function measureViewport(): void {
+    document.documentElement.style.setProperty('--vw', `${document.documentElement.clientWidth}px`);
+}
+
 function buildAnswers(): SubmitAnswer[] {
     if (session.value === null) {
         return [];
@@ -147,6 +159,10 @@ onMounted(async () => {
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll(); // a reload can restore the page mid-scroll
 
+    measureViewport();
+    viewportWatcher = new ResizeObserver(measureViewport);
+    viewportWatcher.observe(document.documentElement);
+
     try {
         const { data } = await startTest(student.token ?? '', testId);
         session.value = data;
@@ -169,6 +185,8 @@ onMounted(async () => {
 onUnmounted(() => {
     stopTicker();
     window.removeEventListener('scroll', onScroll);
+    viewportWatcher?.disconnect();
+    document.documentElement.style.removeProperty('--vw');
 });
 </script>
 
@@ -191,9 +209,12 @@ onUnmounted(() => {
         <p v-else-if="error" class="text-sm text-red-600">{{ error }}</p>
 
         <template v-else-if="session">
+            <!-- Pinned, it spans the window; in place it lines up with the question cards. -->
             <header
-                class="sticky top-0 z-10 -mx-6 border-b border-gray-200 bg-white/95 px-6 text-center backdrop-blur transition-[padding] duration-200"
-                :class="scrolled ? 'py-2' : 'py-4'"
+                class="sticky top-0 z-10 border-b border-gray-200 bg-white/95 text-center backdrop-blur transition-all duration-200"
+                :class="scrolled
+                    ? 'ml-[calc(50%-var(--vw,100%)/2)] w-[var(--vw,100%)] px-6 py-2 shadow-sm'
+                    : 'py-4'"
             >
                 <h1
                     class="font-extrabold tracking-tight text-gray-900 transition-all duration-200"
