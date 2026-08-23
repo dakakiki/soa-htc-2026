@@ -148,6 +148,8 @@ Izlazi:
 
 **Dopuna (2026-08-23) — ADR-0039:** izveštajni sloj je dobio i **dashboard po nivou pristupa**. Sadržaj bira *scope*, ne rola: bez ograničenja → svetska karta (spajanje preko ISO 3166-1) + tabela zemalja; više od jednog venue-a → tabela venue-a; tačno jedan venue → sam spisak studenata. Uz KPI trake ide traka **„Waiting on you"** koja vraća samo ne-nulte stavke i samo one na koje korisnik sme da deluje, pa prazna traka znači da ništa ne čeka. Trend prijava po rundama crta **trake, ne liniju**, jer arhiva nema rundu 12.
 
+**Dopuna (2026-08-23) — ADR-0040:** dashboard je dobio i **globalnu pretragu** (takmičarski broj, student, venue, zemlja, osoblje) — svaka grupa rezultata prošla je kroz isti gate i isti row scope kao ekran na koji vodi. Uz to, stavke iz „Waiting on you" vode na **filtrirane** liste: `?missing=dob` na studentima, `?missing=coordinator` i `?missing=city` na venue-ima, pa se broj na dashboardu i broj na ekranu poklapaju.
+
 ### Faza 6 — Migracija, performanse i produkciona spremnost
 
 Glavne aktivnosti:
