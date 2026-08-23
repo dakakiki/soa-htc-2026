@@ -61,12 +61,20 @@ function onDragEnd(): void {
             <div class="flex min-w-0 flex-1 items-center gap-2">
                 <slot name="item" :item="item" :index="i" />
             </div>
-            <button type="button" class="shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === 0"
-                :aria-label="t('common.moveUp')" @click="move(i, i - 1)"><IconArrowUp :size="16" /></button>
-            <button type="button" class="shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === modelValue.length - 1"
-                :aria-label="t('common.moveDown')" @click="move(i, i + 1)"><IconArrowDown :size="16" /></button>
-            <button type="button" class="shrink-0 text-red-500 hover:text-red-700"
-                :aria-label="t('common.remove')" @click="removeAt(i)"><IconTrash :size="16" /></button>
+            <!-- Reordering and acting on a row are different jobs, so they sit in
+                 separated groups rather than one undifferentiated strip of icons. -->
+            <div class="flex shrink-0 items-center gap-1 border-l border-gray-200 pl-3">
+                <button type="button" class="text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === 0"
+                    :aria-label="t('common.moveUp')" @click="move(i, i - 1)"><IconArrowUp :size="16" /></button>
+                <button type="button" class="text-gray-400 hover:text-gray-700 disabled:opacity-30" :disabled="i === modelValue.length - 1"
+                    :aria-label="t('common.moveDown')" @click="move(i, i + 1)"><IconArrowDown :size="16" /></button>
+            </div>
+            <div class="flex shrink-0 items-center gap-2 border-l border-gray-200 pl-3">
+                <!-- Caller's actions (view, edit, …); remove stays last, as everywhere else. -->
+                <slot name="actions" :item="item" :index="i" />
+                <button type="button" class="text-red-600 hover:text-red-700"
+                    :aria-label="t('common.remove')" @click="removeAt(i)"><IconTrash :size="16" /></button>
+            </div>
         </li>
         <li v-if="modelValue.length === 0" class="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-400">
             <IconPlus :size="16" /> {{ emptyText }}

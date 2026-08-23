@@ -469,6 +469,10 @@ export default {
         levelsPlaceholder: 'Select levels…',
         levelsSelected: '{count} levels',
         answers: 'Answers',
+        preview: {
+            title: 'Question',
+            essay: 'Written answer — marked by hand.',
+        },
         addAnswer: 'Add answer',
         answerText: 'Answer text',
         correct: 'Correct',

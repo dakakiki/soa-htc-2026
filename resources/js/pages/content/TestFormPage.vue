@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { createTest, getTest, updateTest } from '@/api/tests';
 import { listQuestions } from '@/api/questions';
@@ -14,6 +14,9 @@ import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import OrderableList from '@/components/OrderableList.vue';
+import Tooltip from '@/components/Tooltip.vue';
+import QuestionPreviewModal from './QuestionPreviewModal.vue';
+import { IconEye, IconPencil } from '@tabler/icons-vue';
 import type { Lookup } from '@/api/content';
 import type { LevelOption, Question, TestQuestionRef } from '@/types/models';
 
@@ -33,6 +36,8 @@ const form = reactive<{ title: string; description: string; test_type_id: number
     title: '', description: '', test_type_id: null, duration: null, status: 'active', level_ids: [],
 });
 const selected = ref<TestQuestionRef[]>([]);
+// Question shown in the preview modal; null keeps it closed.
+const previewId = ref<number | null>(null);
 
 const types = ref<Lookup[]>([]);
 const levels = ref<LevelOption[]>([]);
@@ -183,7 +188,22 @@ onMounted(async () => {
                         <OrderableList v-model="selected" :empty-text="$t('test.noQuestions')" class="mt-3">
                             <template #item="{ item }">
                                 <span class="flex-1 truncate">{{ toPlainText(item.title) || $t('common.dash') }}</span>
-                                <span class="shrink-0 text-xs text-gray-400">{{ item.points }}</span>
+                                <Tooltip :text="$t('question.points')">
+                                    <span class="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">{{ item.points }}</span>
+                                </Tooltip>
+                            </template>
+                            <template #actions="{ item }">
+                                <Tooltip :text="$t('common.view')">
+                                    <button type="button" class="text-orange-500 hover:text-orange-600"
+                                        :aria-label="$t('common.view')" @click="previewId = item.id"><IconEye :size="16" /></button>
+                                </Tooltip>
+                                <!-- New tab: this test is unsaved, and leaving would drop it. -->
+                                <Tooltip :text="$t('common.edit')">
+                                    <RouterLink :to="{ name: 'questions.edit', params: { id: item.id } }" target="_blank"
+                                        class="text-green-600 hover:text-green-700" :aria-label="$t('common.edit')">
+                                        <IconPencil :size="16" />
+                                    </RouterLink>
+                                </Tooltip>
                             </template>
                         </OrderableList>
                     </div>
@@ -222,5 +242,7 @@ onMounted(async () => {
                 </div>
             </form>
         </div>
+
+        <QuestionPreviewModal :question-id="previewId" @close="previewId = null" />
     </section>
 </template>
