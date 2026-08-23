@@ -65,9 +65,10 @@ class CoordinatorResource extends JsonResource
                 'city' => $s->city,
                 'country' => $s->relationLoaded('country') ? $s->country?->name : null,
                 'status' => $s->status,
-                // Zero until results exist; then keyed by level short (e.g. {"H1": 19}).
-                'level_counts' => (object) [],
-                'total_competitors' => 0,
+                // Keyed by level short (e.g. {"H1": 19}); attached per page by the
+                // controller, same source as the venues list.
+                'level_counts' => (object) ($s->level_counts ?? []),
+                'total_competitors' => array_sum((array) ($s->level_counts ?? [])),
             ])->values(),
         ];
     }

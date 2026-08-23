@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Competition\Models\Registration;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
+use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
@@ -65,5 +68,33 @@ class VenueLevelColumnsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.total_competitors', 0)
             ->assertJsonPath('data.0.level_counts', []);
+    }
+
+    public function test_school_level_counts_follow_the_registered_competitors(): void
+    {
+        $school = School::firstOrFail();
+        $level = DifficultyLevel::whereNotNull('level_short')->firstOrFail();
+        $seasonId = Season::where('round_number', 14)->value('id');
+
+        foreach (range(1, 4) as $i) {
+            Registration::create([
+                'season_id' => $seasonId,
+                'competitor_number' => '14'.str_pad((string) $i, 6, '0', STR_PAD_LEFT),
+                'sequence' => $i,
+                'school_id' => $school->id,
+                'country_id' => $school->country_id,
+                'difficulty_level_id' => $level->id,
+                'name' => 'Student '.$i,
+                'date_of_birth' => '2010-05-01',
+                'grade' => 6,
+                'status' => 'active',
+            ]);
+        }
+
+        $this->actingAs($this->admin())
+            ->getJson('/api/schools?search='.urlencode($school->name))
+            ->assertOk()
+            ->assertJsonPath('data.0.total_competitors', 4)
+            ->assertJsonPath('data.0.level_counts.'.$level->level_short, 4);
     }
 }

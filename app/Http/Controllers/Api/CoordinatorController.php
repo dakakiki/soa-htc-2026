@@ -10,6 +10,7 @@ use App\Domain\Organization\Support\CoordinatorExporter;
 use App\Domain\Organization\Support\CoordinatorImporter;
 use App\Domain\Organization\Support\CoordinatorScope;
 use App\Domain\Organization\Support\SeasonContext;
+use App\Domain\Organization\Support\VenueCompetitorCounts;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCoordinatorRequest;
 use App\Http\Requests\UpdateCoordinatorRequest;
@@ -49,6 +50,8 @@ class CoordinatorController extends Controller
             ->orderBy('name')
             ->paginate(min(max($request->integer('per_page', 20), 1), 200))
             ->withQueryString();
+
+        $this->attachVenueCounts($users->getCollection());
 
         return CoordinatorResource::collection($users);
     }
@@ -140,6 +143,29 @@ class CoordinatorController extends Controller
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="coordinators-import-errors.xlsx"',
         ]);
+    }
+
+    /**
+     * Fill in the competitor counts on every venue these coordinators scope, so the
+     * venues modal shows the same BH…S5 figures as the venues list. One query for
+     * the whole page.
+     *
+     * @param  Collection<int, User>  $users
+     */
+    private function attachVenueCounts(Collection $users): void
+    {
+        $schools = $users
+            ->flatMap(fn (User $user) => $user->relationLoaded('seasonAssignments') ? $user->seasonAssignments : [])
+            ->flatMap(fn (SeasonUserAssignment $assignment) => $assignment->relationLoaded('schools') ? $assignment->schools : []);
+
+        if ($schools->isEmpty()) {
+            return;
+        }
+
+        $counts = VenueCompetitorCounts::for($schools->pluck('id')->unique()->values()->all());
+        $schools->each(function ($school) use ($counts): void {
+            $school->level_counts = $counts[$school->id] ?? [];
+        });
     }
 
     /**

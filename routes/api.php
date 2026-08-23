@@ -128,6 +128,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('permissions', [PermissionController::class, 'index']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    // Venues export + bulk import (.xlsx) — registered before the apiResource so
+    // "schools/export" isn't captured as a {school} show.
+    Route::get('schools/export', [SchoolController::class, 'export']);
+    Route::get('schools/import/template', [SchoolController::class, 'importTemplate']);
+    Route::post('schools/import', [SchoolController::class, 'import']);
+    Route::post('schools/import/errors', [SchoolController::class, 'importErrors']);
+
     Route::apiResource('schools', SchoolController::class);
     // Filtered students roster export (.xlsx) + printable attendance register (PDF).
     // Declared before the resource so the static paths aren't caught by {registration}.

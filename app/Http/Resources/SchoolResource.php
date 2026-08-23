@@ -37,10 +37,11 @@ class SchoolResource extends JsonResource
             'invigilators_count' => $this->invigilators_count,
             'school_type' => $this->school_type?->value,
             'image_url' => $this->image_path ? Storage::disk('public')->url($this->image_path) : null,
-            // Competitor counts per difficulty level; empty/zero until results are
-            // imported, then keyed by level short (e.g. {"H1": 19}).
-            'level_counts' => (object) [],
-            'total_competitors' => 0,
+            // Competitor counts per difficulty level, keyed by level short (e.g.
+            // {"H1": 19}). Attached per page by the controller — absent on the
+            // single-venue endpoints, where the listing columns aren't shown.
+            'level_counts' => (object) ($this->level_counts ?? []),
+            'total_competitors' => array_sum((array) ($this->level_counts ?? [])),
         ];
     }
 }

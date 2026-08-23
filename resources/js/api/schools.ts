@@ -63,3 +63,33 @@ export function setSchoolStatus(id: number, status: string) {
 export function deleteSchool(id: number) {
     return http.delete(`/api/schools/${id}`);
 }
+
+/** Export the currently filtered venues as an .xlsx (legacy layout). */
+export function exportSchools(params: SchoolListParams = {}) {
+    return http.get('/api/schools/export', { params, responseType: 'blob' });
+}
+
+/** Download the venues import .xlsx template. */
+export function schoolImportTemplate() {
+    return http.get('/api/schools/import/template', { responseType: 'blob' });
+}
+
+export interface SchoolImportSummary {
+    created: number;
+    updated: number;
+    error_count: number;
+}
+
+/** Bulk create/update venues from a filled-in .xlsx (an exported file works too). */
+export function importSchools(file: File) {
+    const fd = new FormData();
+    fd.append('file', file);
+    return http.post<SchoolImportSummary>('/api/schools/import', fd);
+}
+
+/** The same file back with an "Error" column marking each invalid row. */
+export function importSchoolErrors(file: File) {
+    const fd = new FormData();
+    fd.append('file', file);
+    return http.post('/api/schools/import/errors', fd, { responseType: 'blob' });
+}

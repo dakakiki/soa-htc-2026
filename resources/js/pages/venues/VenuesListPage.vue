@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { IconPlus } from '@tabler/icons-vue';
+import { IconPlus, IconUpload } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { useConfirmStore } from '@/stores/confirm';
-import { deleteSchool, listSchools, setSchoolStatus } from '@/api/schools';
+import { deleteSchool, listSchools, setSchoolStatus, exportSchools } from '@/api/schools';
 import { listCountries, listRegions, listLevelColumns } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
 import RowActions from '@/components/RowActions.vue';
@@ -13,6 +13,9 @@ import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import Tooltip from '@/components/Tooltip.vue';
+import ExportButton from '@/components/ExportButton.vue';
+import VenueImportModal from './VenueImportModal.vue';
+import { saveBlob } from '@/utils/download';
 import type { Country, Region, School } from '@/types/models';
 
 const { t } = useI18n();
@@ -32,6 +35,8 @@ const total = ref(0);
 const loading = ref(false);
 const cascadeLoading = ref(false);
 const error = ref<string | null>(null);
+const exporting = ref(false);
+const importOpen = ref(false);
 
 const countries = ref<Country[]>([]);
 const regions = ref<Region[]>([]);
@@ -79,6 +84,23 @@ async function load(target = page.value): Promise<void> {
     }
 }
 
+async function exportList(): Promise<void> {
+    exporting.value = true;
+    try {
+        const { data } = await exportSchools({
+            search: filters.search || undefined,
+            country_id: filters.country_id ?? undefined,
+            region_id: filters.region_id ?? undefined,
+            status: filters.status || undefined,
+        });
+        saveBlob(data as Blob, `${new Date().toISOString().slice(0, 10)}_Venues_Export.xlsx`);
+    } catch (e) {
+        error.value = apiErrorMessage(e, t('venue.exportFailed'));
+    } finally {
+        exporting.value = false;
+    }
+}
+
 async function onCountryFilterChange(): Promise<void> {
     filters.region_id = null;
     regions.value = [];
@@ -95,14 +117,6 @@ async function onCountryFilterChange(): Promise<void> {
 async function onCountryFilterSelected(value: number | null): Promise<void> {
     filters.country_id = value;
     await onCountryFilterChange();
-}
-
-async function resetFilters(): Promise<void> {
-    filters.search = '';
-    filters.country_id = null;
-    filters.region_id = null;
-    filters.status = '';
-    regions.value = [];
     await load(1);
 }
 
@@ -156,15 +170,19 @@ onMounted(async () => {
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('venue.title') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ $t('common.total', { count: total }) }}</p>
             </div>
-            <RouterLink
-                v-if="canManage"
-                :to="{ name: 'venues.new' }"
-                class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-            ><IconPlus :size="16" />{{ $t('venue.add') }}</RouterLink>
+            <div v-if="canManage" class="flex flex-wrap items-center justify-end gap-2">
+                <RouterLink
+                    :to="{ name: 'venues.new' }"
+                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
+                ><IconPlus :size="16" />{{ $t('venue.add') }}</RouterLink>
+                <ExportButton :icon="IconUpload" :label="$t('venue.import.title')"
+                    :tooltip="$t('venue.import.tooltip')" @click="importOpen = true" />
+                <ExportButton :loading="exporting" :tooltip="$t('venue.exportTooltip')" @click="exportList" />
+            </div>
         </div>
 
         <div class="rounded-lg border border-gray-200 bg-white p-4">
-        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="load(1)">
+        <form class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" @submit.prevent="load(1)">
             <!-- Column 1: search -->
             <input v-model="filters.search" type="search" :placeholder="$t('venue.searchNameCity')"
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
@@ -173,24 +191,17 @@ onMounted(async () => {
             <SearchSelect :model-value="filters.country_id" :options="countryOptions" dense
                 class="lg:col-start-2 lg:row-start-1" :placeholder="$t('venue.countryPlaceholder')"
                 :search-placeholder="$t('venue.country')" @update:model-value="onCountryFilterSelected" />
-            <SearchSelect v-model="filters.region_id" :options="regionOptions" dense :loading="cascadeLoading"
+            <SearchSelect :model-value="filters.region_id" :options="regionOptions" dense :loading="cascadeLoading"
                 class="lg:col-start-2 lg:row-start-2" :disabled="!filters.country_id"
-                :placeholder="$t('venue.region')" :search-placeholder="$t('venue.region')" />
+                :placeholder="$t('venue.region')" :search-placeholder="$t('venue.region')"
+                @update:model-value="(v: number | null) => { filters.region_id = v; load(1); }" />
 
             <!-- Column 3: Status -->
-            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-3 lg:row-start-1">
+            <select v-model="filters.status" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-3 lg:row-start-1" @change="load(1)">
                 <option value="">{{ $t('venue.filterStatus') }}</option>
                 <option value="active">{{ $t('venue.statusActive') }}</option>
                 <option value="inactive">{{ $t('venue.statusInactive') }}</option>
             </select>
-
-            <!-- Column 4: Filter above Reset -->
-            <button type="submit" class="w-full rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover lg:col-start-4 lg:row-start-1">
-                {{ $t('common.filter') }}
-            </button>
-            <button type="button" class="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 lg:col-start-4 lg:row-start-2" @click="resetFilters">
-                {{ $t('venue.filterReset') }}
-            </button>
         </form>
         </div>
 
@@ -265,5 +276,7 @@ onMounted(async () => {
                 {{ $t('common.next') }}
             </button>
         </div>
+
+        <VenueImportModal :open="importOpen" @close="importOpen = false" @imported="load(1)" />
     </section>
 </template>
