@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Organization\Support;
 
-use App\Models\User;
 use App\Support\XlsxWriter;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Builds the country-coordinators export as a [headers, rows] pair the caller
@@ -37,45 +37,70 @@ final class CoordinatorExporter
             return [self::HEADERS, []];
         }
 
-        $users = User::query()
-            ->whereIn('id', $userIds)
-            ->with([
-                'country',
-                'region',
-                'seasonAssignments' => function ($query) use ($roleIds, $seasonId): void {
-                    $query->whereIn('role_id', $roleIds)
-                        ->when($seasonId, fn ($q) => $q->where('season_id', $seasonId))
-                        ->with('schools');
-                },
-            ])
-            ->orderBy('name')
-            ->get();
+        $venuesByUser = self::venuesByUser($userIds, $roleIds, $seasonId);
+
+        // Flat query builder rather than Eloquent: a country coordinator can scope
+        // hundreds of venues, and hydrating those models cost seconds for a report
+        // that only needs their names.
+        $users = DB::table('users as u')
+            ->leftJoin('countries as c', 'u.country_id', '=', 'c.id')
+            ->leftJoin('regions as r', 'u.region_id', '=', 'r.id')
+            ->whereIn('u.id', $userIds)
+            ->orderBy('u.name')
+            ->get([
+                'u.id', 'u.name', 'u.email', 'u.city', 'u.address', 'u.phone', 'u.status',
+                'u.can_student_insert', 'u.can_student_edit', 'u.can_student_delete',
+                'u.can_reset_test_results', 'c.name as country', 'r.name as region',
+            ]);
+
+        $yesNo = fn ($flag): string => $flag ? 'Yes' : 'No';
 
         $rows = [];
         foreach ($users as $user) {
-            $venues = $user->seasonAssignments
-                ->flatMap(fn ($assignment) => $assignment->schools)
-                ->pluck('name')
-                ->unique()
-                ->implode(', ');
-
             $rows[] = [
                 $user->name,
                 $user->email,
-                $user->country?->name,
-                $user->region?->name,
-                $venues !== '' ? $venues : null,
+                $user->country,
+                $user->region,
+                $venuesByUser[(int) $user->id] ?? null,
                 $user->city,
                 $user->address,
                 $user->phone,
                 $user->status,
-                $user->can_student_insert ? 'Yes' : 'No',
-                $user->can_student_edit ? 'Yes' : 'No',
-                $user->can_student_delete ? 'Yes' : 'No',
-                $user->can_reset_test_results ? 'Yes' : 'No',
+                $yesNo($user->can_student_insert),
+                $yesNo($user->can_student_edit),
+                $yesNo($user->can_student_delete),
+                $yesNo($user->can_reset_test_results),
             ];
         }
 
         return [self::HEADERS, $rows];
+    }
+
+    /**
+     * The venue names each coordinator scopes, comma-joined, keyed by user id —
+     * one join instead of hydrating every school model.
+     *
+     * @param  list<int>  $userIds
+     * @param  Collection<int, int>  $roleIds
+     * @return array<int, string>
+     */
+    private static function venuesByUser(array $userIds, Collection $roleIds, ?int $seasonId): array
+    {
+        $links = DB::table('assignment_schools as a')
+            ->join('season_user_assignments as sua', 'a.season_user_assignment_id', '=', 'sua.id')
+            ->join('schools as s', 'a.school_id', '=', 's.id')
+            ->whereIn('sua.user_id', $userIds)
+            ->whereIn('sua.role_id', $roleIds)
+            ->when($seasonId, fn ($q) => $q->where('sua.season_id', $seasonId))
+            ->orderBy('s.name')
+            ->get(['sua.user_id', 's.name']);
+
+        $names = [];
+        foreach ($links as $link) {
+            $names[(int) $link->user_id][(string) $link->name] = true;
+        }
+
+        return array_map(fn (array $set): string => implode(', ', array_keys($set)), $names);
     }
 }
