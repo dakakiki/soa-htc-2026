@@ -110,4 +110,34 @@ class SchoolApiTest extends TestCase
 
         $this->assertDatabaseHas('schools', ['name' => 'New Admin School']);
     }
+
+    public function test_the_missing_filter_finds_venues_without_a_coordinator(): void
+    {
+        $schools = School::query()->orderBy('name')->get();
+        $this->schoolCoordinatorFor($schools[0]);
+
+        $names = collect(
+            $this->actingAs($this->admin())->getJson('/api/schools?missing=coordinator')->assertOk()->json('data')
+        )->pluck('name');
+
+        // The coordinated venue drops out; the other two are what the dashboard counts.
+        $this->assertCount(2, $names);
+        $this->assertFalse($names->contains($schools[0]->name));
+    }
+
+    public function test_the_missing_filter_finds_venues_without_a_city(): void
+    {
+        $schools = School::query()->orderBy('name')->get();
+        $schools[0]->forceFill(['city' => 'Belgrade'])->save();
+        $schools[1]->forceFill(['city' => ''])->save();
+
+        $names = collect(
+            $this->actingAs($this->admin())->getJson('/api/schools?missing=city')->assertOk()->json('data')
+        )->pluck('name');
+
+        // An empty string counts as missing, the same as null.
+        $this->assertFalse($names->contains($schools[0]->name));
+        $this->assertTrue($names->contains($schools[1]->name));
+        $this->assertTrue($names->contains($schools[2]->name));
+    }
 }

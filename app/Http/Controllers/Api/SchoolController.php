@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Support\SchoolExporter;
 use App\Domain\Organization\Support\SchoolImporter;
+use App\Domain\Organization\Support\SeasonContext;
 use App\Domain\Organization\Support\VenueCompetitorCounts;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSchoolRequest;
@@ -19,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -155,6 +157,9 @@ class SchoolController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
         }
+        // Gaps in the register, so the dashboard's pending list can link to the
+        // exact rows it counted rather than to the whole list.
+        $this->applyMissing($query, $request->string('missing')->value());
 
         // Server-side scope: non-admins see only their allowed schools.
         $allowed = $request->user()->allowedSchoolIds();
@@ -163,6 +168,35 @@ class SchoolController extends Controller
         }
 
         return $query;
+    }
+
+    /**
+     * The "what is missing here" filter. A venue nobody coordinates gets no
+     * students entered; a venue with no city cannot be placed on a map. Both
+     * mirror the anti-joins the dashboard counts with.
+     */
+    private function applyMissing(Builder $query, string $missing): void
+    {
+        if ($missing === 'city') {
+            $query->where(fn ($q) => $q->whereNull('city')->orWhere('city', ''));
+
+            return;
+        }
+
+        if ($missing !== 'coordinator') {
+            return;
+        }
+
+        $seasonId = SeasonContext::active()?->id;
+
+        $query->whereNotExists(function ($sub) use ($seasonId): void {
+            $sub->select(DB::raw(1))
+                ->from('assignment_schools as sas')
+                ->join('season_user_assignments as sa', 'sa.id', '=', 'sas.season_user_assignment_id')
+                ->whereColumn('sas.school_id', 'schools.id')
+                ->where('sa.status', 'active')
+                ->when($seasonId !== null, fn ($q) => $q->where('sa.season_id', $seasonId));
+        });
     }
 
     public function store(StoreSchoolRequest $request): JsonResponse

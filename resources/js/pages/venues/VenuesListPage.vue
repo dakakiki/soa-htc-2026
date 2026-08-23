@@ -51,11 +51,12 @@ const regions = ref<Region[]>([]);
 const levelColumns = ref<string[]>([]);
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
-const filters = reactive<{ search: string; country_id: number | null; region_id: number | null; status: string }>({
+const filters = reactive<{ search: string; country_id: number | null; region_id: number | null; status: string; missing: string }>({
     search: asString(route.query.search),
     country_id: asNumber(route.query.country_id),
     region_id: asNumber(route.query.region_id),
     status: asString(route.query.status),
+    missing: asString(route.query.missing),
 });
 
 function syncUrl(p: number): void {
@@ -64,6 +65,7 @@ function syncUrl(p: number): void {
     if (filters.country_id) query.country_id = String(filters.country_id);
     if (filters.region_id) query.region_id = String(filters.region_id);
     if (filters.status) query.status = filters.status;
+    if (filters.missing) query.missing = filters.missing;
     if (p > 1) query.page = String(p);
     router.replace({ query });
 }
@@ -79,6 +81,7 @@ async function load(target = page.value): Promise<void> {
             country_id: filters.country_id ?? undefined,
             region_id: filters.region_id ?? undefined,
             status: filters.status || undefined,
+            missing: filters.missing || undefined,
         });
         schools.value = data.data;
         page.value = data.meta.current_page;
@@ -100,6 +103,7 @@ async function exportList(): Promise<void> {
             country_id: filters.country_id ?? undefined,
             region_id: filters.region_id ?? undefined,
             status: filters.status || undefined,
+            missing: filters.missing || undefined,
         });
         saveBlob(data as Blob, `${new Date().toISOString().slice(0, 10)}_Venues_Export.xlsx`);
     } catch (e) {
@@ -218,6 +222,13 @@ onMounted(async () => {
                 <option value="">{{ $t('venue.filterStatus') }}</option>
                 <option value="active">{{ $t('venue.statusActive') }}</option>
                 <option value="inactive">{{ $t('venue.statusInactive') }}</option>
+            </select>
+
+            <!-- Gaps in the register — where the dashboard's pending list lands. -->
+            <select v-model="filters.missing" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-3 lg:row-start-2" @change="load(1)">
+                <option value="">{{ $t('venue.filterMissing') }}</option>
+                <option value="coordinator">{{ $t('venue.missingCoordinator') }}</option>
+                <option value="city">{{ $t('venue.missingCity') }}</option>
             </select>
         </form>
         </div>

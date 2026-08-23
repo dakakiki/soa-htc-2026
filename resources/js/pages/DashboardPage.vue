@@ -5,6 +5,7 @@ import { useSessionStore } from '@/stores/session';
 import { getDashboard } from '@/api/dashboard';
 import { apiErrorMessage } from '@/api/http';
 import { useScope } from '@/composables/useScope';
+import GlobalSearch from '@/components/GlobalSearch.vue';
 import type { DashboardData } from '@/types/models';
 
 // The map pulls in the world geometry and a projection, so it loads only for
@@ -39,16 +40,17 @@ const rosterDelta = computed<string | null>(() => {
 });
 
 /*
- * Each pending item is a count plus a place to deal with it. Items whose screen
- * has no matching filter yet are shown without a link rather than dropping the
- * user on an unfiltered list.
+ * Each pending item is a count plus a place to deal with it — filtered to the
+ * same rows that were counted, so the number on the dashboard and the number on
+ * the screen agree. The counts are for active venues only, hence the status.
  */
 const ATTENTION_ROUTES: Record<string, { name: string; query?: Record<string, string> }> = {
     essays_pending: { name: 'grading' },
     results_unpublished: { name: 'publishing' },
-    venues_without_coordinator: { name: 'venues' },
-    venues_without_students: { name: 'venues' },
-    venues_without_city: { name: 'venues' },
+    venues_without_coordinator: { name: 'venues', query: { missing: 'coordinator', status: 'active' } },
+    venues_without_students: { name: 'venues', query: { status: 'active' } },
+    venues_without_city: { name: 'venues', query: { missing: 'city', status: 'active' } },
+    students_missing_dob: { name: 'registrations', query: { missing: 'dob' } },
 };
 
 const attention = computed(() => data.value?.attention ?? []);
@@ -106,6 +108,10 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
 
         <div v-if="data" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div class="space-y-6">
+                <!-- One box instead of "filter first": the fastest way to one
+                     competitor, venue or colleague inside this account's scope. -->
+                <GlobalSearch />
+
                 <!-- KPI strip: the same cards everywhere, minus the ones a scoped
                      account has no use for (its own country, its own venue). -->
                 <div v-if="kpis" class="grid grid-cols-2 gap-3 lg:grid-cols-4">

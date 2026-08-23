@@ -87,6 +87,7 @@ const filters = reactive<{
     level_id: number | null;
     exam_round_id: number | null;
     attendance: string;
+    missing: string;
 }>({
     search: asString(route.query.search),
     country_id: asNumber(route.query.country_id),
@@ -96,6 +97,7 @@ const filters = reactive<{
     level_id: asNumber(route.query.level_id),
     exam_round_id: asNumber(route.query.exam_round_id),
     attendance: asString(route.query.attendance),
+    missing: asString(route.query.missing),
 });
 // Fallback label for a restored venue that isn't in the current server page.
 const selectedSchoolFilter = ref<SearchSelectOption | null>(null);
@@ -221,6 +223,7 @@ async function exportList(): Promise<void> {
             level_id: filters.level_id ?? undefined,
             exam_round_id: filters.exam_round_id ?? undefined,
             attendance: filters.attendance || undefined,
+            missing: filters.missing || undefined,
         });
         saveBlob(data as Blob, `${new Date().toISOString().slice(0, 10)}_Students_Export.xlsx`);
     } catch (e) {
@@ -242,6 +245,7 @@ function syncUrl(p: number): void {
     if (filters.level_id) query.level_id = String(filters.level_id);
     if (filters.exam_round_id) query.exam_round_id = String(filters.exam_round_id);
     if (filters.attendance) query.attendance = filters.attendance;
+    if (filters.missing) query.missing = filters.missing;
     if (p > 1) query.page = String(p);
     router.replace({ query });
 }
@@ -262,6 +266,7 @@ async function load(target = page.value): Promise<void> {
             level_id: filters.level_id ?? undefined,
             exam_round_id: filters.exam_round_id ?? undefined,
             attendance: filters.attendance || undefined,
+            missing: filters.missing || undefined,
         });
         rows.value = data.data;
         page.value = data.meta.current_page;
@@ -319,7 +324,7 @@ onMounted(async () => {
     }
 
     const hasFilters = filters.search || filters.country_id || filters.region_id || filters.school_id
-        || filters.grade || filters.level_id || filters.exam_round_id || filters.attendance;
+        || filters.grade || filters.level_id || filters.exam_round_id || filters.attendance || filters.missing;
     if (hasFilters) {
         if (filters.country_id) {
             await Promise.all([loadRegions(), loadSchools()]);
@@ -372,6 +377,12 @@ onMounted(async () => {
             <!-- Column 1: search (stays first). Press Enter to apply. -->
             <input v-model="filters.search" type="search" :placeholder="$t('registration.searchPlaceholder')"
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
+
+            <!-- Records with something missing — where the dashboard's pending list lands. -->
+            <select v-model="filters.missing" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-2" @change="load(1)">
+                <option value="">{{ $t('registration.filterMissing') }}</option>
+                <option value="dob">{{ $t('registration.missingDob') }}</option>
+            </select>
 
             <!-- Column 2: Country / Region -->
             <LockedField v-if="countryLocked" dense :value="scopeCountry?.name"

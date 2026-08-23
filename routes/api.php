@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ResultsController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
+use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StudentAuthController;
 use App\Http\Controllers\Api\StudentAvailabilityController;
@@ -92,6 +93,10 @@ Route::prefix('student')->group(function () {
  */
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'show']);
+
+    // One search box over students, venues, countries and staff. Each group is
+    // gated and scoped exactly like the screen it leads to (see SearchController).
+    Route::get('search', [SearchController::class, 'index']);
 
     // Self-service profile of the signed-in account (no permission gate: the
     // role decides which fields are editable, see ProfileController).

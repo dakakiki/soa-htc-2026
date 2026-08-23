@@ -402,6 +402,12 @@ class RegistrationController extends Controller
         if ($request->filled('attendance')) {
             $query->where('attendance', $request->string('attendance'));
         }
+        // Incomplete records, so the dashboard's pending list can link to the
+        // exact rows it counted. Without a date of birth a competitor cannot
+        // identify for the test.
+        if ($request->string('missing')->value() === 'dob') {
+            $query->whereNull('date_of_birth');
+        }
         // Exam round: competitors with an attempt on a test belonging to an exam
         // of that round (participation, mirroring the legacy per-round flags).
         if ($request->filled('exam_round_id')) {

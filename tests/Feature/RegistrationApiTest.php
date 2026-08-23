@@ -736,6 +736,25 @@ class RegistrationApiTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_the_missing_filter_finds_students_without_a_date_of_birth(): void
+    {
+        $school = School::firstOrFail();
+        $level = $this->level();
+
+        $this->actingAs($this->admin())
+            ->postJson('/api/registrations', ['school_id' => $school->id, 'difficulty_level_id' => $level->id, 'name' => 'Has Dob', 'grade' => 6, 'date_of_birth' => '2013-05-04'])
+            ->assertCreated();
+        $this->actingAs($this->admin())
+            ->postJson('/api/registrations', ['school_id' => $school->id, 'difficulty_level_id' => $level->id, 'name' => 'No Dob', 'grade' => 6])
+            ->assertCreated();
+
+        // Same rows the dashboard counts, so the two numbers agree.
+        $rows = $this->actingAs($this->admin())->getJson('/api/registrations?missing=dob')->assertOk()->json('data');
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('No Dob', $rows[0]['name']);
+    }
+
     public function test_attendance_import_requires_edit_right(): void
     {
         $school = School::firstOrFail();

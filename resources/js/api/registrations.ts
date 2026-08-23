@@ -23,6 +23,8 @@ export interface RegistrationListParams {
     exam_round_id?: number;
     status?: string;
     attendance?: string;
+    /** Incomplete records: 'dob' keeps only students with no date of birth. */
+    missing?: string;
     per_page?: number;
 }
 

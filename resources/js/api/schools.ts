@@ -22,6 +22,8 @@ export interface SchoolListParams {
     per_page?: number;
     search?: string;
     status?: string;
+    /** Gaps in the register: 'coordinator' or 'city'. */
+    missing?: string;
 }
 
 export function listSchools(params: SchoolListParams = {}) {

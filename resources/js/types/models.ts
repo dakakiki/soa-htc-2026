@@ -486,6 +486,19 @@ export interface DashboardData {
     trend: { round: number; students: number; current: boolean }[] | null;
 }
 
+/**
+ * Global search hits, grouped by what they are. A group is absent when the
+ * account may not see it and when it simply has no matches — the SPA renders
+ * whatever arrives, in a fixed order.
+ */
+export interface SearchResults {
+    students?: { id: number; competitor_number: string; name: string; venue: string | null; country: string | null }[];
+    venues?: { id: number; name: string; city: string | null; country: string | null }[];
+    countries?: { id: number; name: string; code: string; students: number }[];
+    users?: { id: number; name: string; email: string; country: string | null }[];
+    coordinators?: { id: number; name: string; email: string; country: string | null }[];
+}
+
 export interface Paginated<T> {
     data: T[];
     meta: {
