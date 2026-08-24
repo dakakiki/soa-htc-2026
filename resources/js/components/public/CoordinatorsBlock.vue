@@ -30,7 +30,7 @@ const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBloc
                 <h2 class="text-[clamp(2.25rem,5vw,3.5rem)] font-semibold leading-none tracking-[-0.04em]">
                     {{ c.title }}
                 </h2>
-                <p v-if="c.lead" class="max-w-[460px] text-[17px] leading-relaxed text-white/70">{{ c.lead }}</p>
+                <div v-if="c.lead" class="rich-text max-w-[460px] text-[17px] leading-relaxed text-white/70" v-html="c.lead"></div>
                 <div v-if="buttons.length" class="flex flex-wrap items-center gap-5 pt-1">
                     <BlockButton v-for="(button, i) in buttons" :key="i" :button="button" on-dark />
                 </div>

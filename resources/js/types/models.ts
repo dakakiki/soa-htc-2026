@@ -679,7 +679,7 @@ export interface PublicBlock {
  */
 export interface LayoutField {
     key: string;
-    kind: 'text' | 'textarea' | 'number' | 'enum' | 'list' | 'button' | 'buttons';
+    kind: 'text' | 'textarea' | 'rich' | 'number' | 'enum' | 'list' | 'button' | 'buttons';
     label: string;
     max?: number;
     min?: number;

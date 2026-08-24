@@ -40,6 +40,49 @@
 }
 
 /*
+ * Short admin-authored paragraphs inside a layout block (ADR-0043) — a lead, a
+ * rule, a caption. Unlike `.cms-content` this sets no colour and no size: the
+ * section around it already decides those, and the design would be undone if a
+ * paragraph reset itself to article grey.
+ *
+ * `strong` is 600, not 700: the font pipeline ships 400/500/600, so bold would
+ * otherwise be synthesised by the browser.
+ */
+.rich-text > :first-child {
+    margin-top: 0;
+}
+.rich-text > :last-child {
+    margin-bottom: 0;
+}
+.rich-text p {
+    margin: 0 0 0.75em;
+}
+.rich-text strong,
+.rich-text b {
+    font-weight: 600;
+}
+.rich-text em {
+    font-style: italic;
+}
+.rich-text a {
+    text-decoration: underline;
+}
+.rich-text ul,
+.rich-text ol {
+    margin: 0 0 0.75em;
+    padding-left: 1.25rem;
+}
+.rich-text ul {
+    list-style: disc;
+}
+.rich-text ol {
+    list-style: decimal;
+}
+.rich-text li {
+    margin: 0.15em 0;
+}
+
+/*
  * Rendering for admin-authored rich text on the public site (CMS pages and
  * posts). Tailwind's reset strips headings, lists and links, and the editor's
  * own styles are scoped to the editor — so the published article needs its own,

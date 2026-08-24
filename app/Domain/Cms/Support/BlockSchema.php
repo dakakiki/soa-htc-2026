@@ -73,25 +73,25 @@ final class BlockSchema
                 self::text('eyebrow', 'Label above the heading', 60),
                 self::text('title_accent', 'Heading, accented word', 40),
                 self::text('title', 'Heading', 120),
-                self::textarea('lead', 'Intro paragraph', 400),
+                self::rich('lead', 'Intro paragraph', 1600),
                 self::buttons(),
             ],
             BlockType::Notice => [
                 self::text('title', 'Heading', 120),
                 self::list('rules', 'Rules', [
                     self::text('marker', 'Marker', 4),
-                    self::textarea('text', 'Rule', 300),
+                    self::rich('text', 'Rule', 1200),
                 ], 6),
-                self::textarea('footnote', 'Consequence', 400),
+                self::rich('footnote', 'Consequence', 1600),
             ],
             BlockType::Category => [
                 self::text('eyebrow', 'Label above the heading', 60),
                 self::text('title', 'Heading', 120),
-                self::textarea('lead', 'Intro paragraph', 400),
+                self::rich('lead', 'Intro paragraph', 1600),
                 self::list('groups', 'Groups', [
                     self::text('numeral', 'Numeral', 4),
                     self::text('title', 'Title', 120),
-                    self::textarea('text', 'Description', 300),
+                    self::rich('text', 'Description', 1200),
                 ], 4),
                 self::buttons(),
             ],
@@ -101,19 +101,19 @@ final class BlockSchema
                     self::enum('accent', 'Accent', ['primary', 'amber']),
                     self::text('title', 'Heading', 120),
                     self::text('note', 'Small print', 120),
-                    self::textarea('text', 'Paragraph', 400),
+                    self::rich('text', 'Paragraph', 1600),
                     self::button('button', 'Button'),
                 ], 2),
             ],
             BlockType::Coordinators => [
                 self::text('eyebrow', 'Label above the heading', 60),
                 self::text('title', 'Heading', 120),
-                self::textarea('lead', 'Intro paragraph', 400),
+                self::rich('lead', 'Intro paragraph', 1600),
                 self::buttons(),
             ],
             BlockType::Contact => [
                 self::text('title', 'Heading', 120),
-                self::textarea('lead', 'Intro paragraph', 400),
+                self::rich('lead', 'Intro paragraph', 1600),
                 self::list('links', 'Links', [
                     self::text('label', 'Label', 60),
                     self::text('value', 'Shown text', 160),
@@ -172,7 +172,9 @@ final class BlockSchema
     {
         return match ($field['kind']) {
             'text' => [$path => ['nullable', 'string', 'max:'.$field['max']]],
-            'textarea' => [$path => ['nullable', 'string', 'max:'.$field['max']]],
+            // Rich text is admin-authored markup, so the cap has to leave room for
+            // the tags as well as the words.
+            'textarea', 'rich' => [$path => ['nullable', 'string', 'max:'.$field['max']]],
             'number' => [$path => ['nullable', 'integer', 'min:'.$field['min'], 'max:'.$field['max']]],
             'enum' => [$path => ['nullable', Rule::in($field['options'])]],
             'button' => self::buttonRules($path),
@@ -216,6 +218,13 @@ final class BlockSchema
     private static function textarea(string $key, string $label, int $max): array
     {
         return ['key' => $key, 'kind' => 'textarea', 'label' => $label, 'max' => $max];
+    }
+
+    /** A paragraph the admin writes in the editor: bold, italic, links, lists. */
+    /** @return array<string, mixed> */
+    private static function rich(string $key, string $label, int $max): array
+    {
+        return ['key' => $key, 'kind' => 'rich', 'label' => $label, 'max' => $max];
     }
 
     /** @return array<string, mixed> */

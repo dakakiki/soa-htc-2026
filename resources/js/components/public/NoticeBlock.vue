@@ -19,7 +19,7 @@ const rules = computed(() => (props.block.content.rules ?? []) as { marker: stri
                     </svg>
                 </span>
                 <h2 class="text-[30px] font-semibold leading-tight tracking-[-0.03em] text-brand-palette-4">{{ c.title }}</h2>
-                <p v-if="c.footnote" class="text-sm leading-relaxed text-brand-palette-4/50">{{ c.footnote }}</p>
+                <div v-if="c.footnote" class="rich-text text-sm leading-relaxed text-brand-palette-4/50" v-html="c.footnote"></div>
             </div>
 
             <div class="flex flex-col justify-center">
@@ -27,7 +27,7 @@ const rules = computed(() => (props.block.content.rules ?? []) as { marker: stri
                     class="flex items-baseline gap-5 py-5"
                     :class="i < rules.length - 1 ? 'border-b border-brand-palette-4/10' : ''">
                     <span class="shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/30">{{ rule.marker }}</span>
-                    <p class="text-[17px] leading-relaxed text-brand-palette-4/85">{{ rule.text }}</p>
+                    <div class="rich-text text-[17px] leading-relaxed text-brand-palette-4/85" v-html="rule.text"></div>
                 </div>
             </div>
         </div>

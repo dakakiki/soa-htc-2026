@@ -22,9 +22,8 @@ const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBloc
                     <h2 class="text-[clamp(2.25rem,5vw,3.75rem)] font-semibold leading-none tracking-[-0.04em] text-brand-palette-4">
                         {{ c.title }}
                     </h2>
-                    <p v-if="c.lead" class="max-w-[420px] text-[17px] leading-relaxed text-brand-palette-4/75">
-                        {{ c.lead }}
-                    </p>
+                    <div v-if="c.lead" class="rich-text max-w-[420px] text-[17px] leading-relaxed text-brand-palette-4/75"
+                        v-html="c.lead"></div>
                     <div v-if="buttons.length" class="flex flex-wrap items-center gap-4 pt-1">
                         <BlockButton v-for="(button, i) in buttons" :key="i" :button="button" />
                     </div>
@@ -37,7 +36,7 @@ const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBloc
                         <span class="text-[76px] font-semibold leading-[0.85] tracking-[-0.05em] text-white">{{ group.numeral }}</span>
                         <div class="flex flex-col gap-1">
                             <p class="text-lg font-semibold text-brand-palette-4">{{ group.title }}</p>
-                            <p class="leading-relaxed text-brand-palette-4/70">{{ group.text }}</p>
+                            <div class="rich-text leading-relaxed text-brand-palette-4/70" v-html="group.text"></div>
                         </div>
                     </div>
                 </div>

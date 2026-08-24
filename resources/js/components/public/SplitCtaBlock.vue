@@ -41,7 +41,7 @@ const rule = (accent?: string): string =>
                 <p v-if="column.note" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/45">
                     {{ column.note }}
                 </p>
-                <p v-if="column.text" class="text-[17px] leading-relaxed text-brand-palette-4/70">{{ column.text }}</p>
+                <div v-if="column.text" class="rich-text text-[17px] leading-relaxed text-brand-palette-4/70" v-html="column.text"></div>
                 <div v-if="column.button" class="pt-2">
                     <BlockButton :button="column.button" />
                 </div>

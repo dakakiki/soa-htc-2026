@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { IconPlus, IconTrash } from '@tabler/icons-vue';
 import { updateLayoutBlock } from '@/api/cmsLayout';
 import { apiErrorMessage } from '@/api/http';
 import LayoutButtonFields from '@/components/cms/LayoutButtonFields.vue';
 import MediaPickerModal from '@/components/MediaPickerModal.vue';
 import ImageThumb from '@/components/ImageThumb.vue';
+import RichTextEditor from '@/components/RichTextEditor.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import type { CmsLayoutBlock, CmsMedia, LayoutButtonValue, LayoutField, LayoutRegistry, LayoutTypeInfo } from '@/types/models';
 
 /**
@@ -34,6 +37,8 @@ const error = ref<string | null>(null);
 const pickerOpen = ref(false);
 
 const field = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none';
+/** The same icon chip the admin's row actions use. */
+const chip = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200';
 
 function emptyButton(): LayoutButtonValue {
     return {
@@ -45,7 +50,11 @@ function emptyButton(): LayoutButtonValue {
     };
 }
 
-/** A blank row for a repeatable list, with every declared key present. */
+/**
+ * A blank row for a repeatable list, with every declared key already present.
+ * An editor bound to an undefined value has nothing to write into, and the
+ * rich-text editor in particular needs a string.
+ */
 function emptyRow(item: LayoutField[]): Record<string, unknown> {
     const row: Record<string, unknown> = {};
     item.forEach((sub) => {
@@ -136,6 +145,14 @@ const title = computed(() => props.type.label);
                         <input v-model="content[f.key] as string" type="text" :maxlength="f.max" :class="field" />
                     </label>
 
+                    <!-- Paragraphs go through the editor: this copy carries bold,
+                         italics and links, and the public side renders the markup. -->
+                    <div v-else-if="f.kind === 'rich'">
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ f.label }}</span>
+                        <RichTextEditor :model-value="(content[f.key] ?? '') as string"
+                            @update:model-value="content[f.key] = $event" />
+                    </div>
+
                     <label v-else-if="f.kind === 'textarea'" class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700">{{ f.label }}</span>
                         <textarea v-model="content[f.key] as string" rows="3" :maxlength="f.max" :class="field" />
@@ -169,6 +186,7 @@ const title = computed(() => props.type.label);
                             <button type="button"
                                 class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                                 @click="addRow(f)">
+                                <IconPlus :size="16" />
                                 {{ $t('layout.addRow') }}
                             </button>
                         </div>
@@ -178,9 +196,12 @@ const title = computed(() => props.type.label);
                                 class="rounded-lg border border-gray-200 p-4">
                                 <div class="mb-3 flex items-center justify-between">
                                     <span class="font-mono text-xs uppercase tracking-wider text-gray-400">{{ i + 1 }}</span>
-                                    <button type="button" class="text-sm text-red-600 hover:underline" @click="removeRow(f.key, i)">
-                                        {{ $t('common.remove') }}
-                                    </button>
+                                    <Tooltip :text="$t('common.remove')">
+                                        <button type="button" :aria-label="$t('common.remove')"
+                                            :class="[chip, 'text-red-600']" @click="removeRow(f.key, i)">
+                                            <IconTrash :size="16" />
+                                        </button>
+                                    </Tooltip>
                                 </div>
 
                                 <LayoutButtonFields v-if="f.kind === 'buttons'"
@@ -194,6 +215,11 @@ const title = computed(() => props.type.label);
                                             <LayoutButtonFields
                                                 :model-value="(rows(f.key)[i][sub.key] ?? emptyButton()) as LayoutButtonValue"
                                                 :registry="registry"
+                                                @update:model-value="rows(f.key)[i][sub.key] = $event" />
+                                        </div>
+                                        <div v-else-if="sub.kind === 'rich'" class="sm:col-span-2">
+                                            <span class="mb-1 block text-sm font-medium text-gray-700">{{ sub.label }}</span>
+                                            <RichTextEditor :model-value="(rows(f.key)[i][sub.key] ?? '') as string"
                                                 @update:model-value="rows(f.key)[i][sub.key] = $event" />
                                         </div>
                                         <label v-else-if="sub.kind === 'textarea'" class="block sm:col-span-2">
@@ -218,13 +244,13 @@ const title = computed(() => props.type.label);
                 </template>
             </div>
 
-            <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
-                <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            <div class="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+                <button type="button" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
                     @click="emit('close')">
                     {{ $t('common.cancel') }}
                 </button>
                 <button type="button" :disabled="saving"
-                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-60"
+                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
                     @click="save">
                     {{ saving ? $t('common.saving') : $t('common.save') }}
                 </button>

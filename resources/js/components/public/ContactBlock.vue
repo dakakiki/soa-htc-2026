@@ -18,7 +18,7 @@ const external = (url: string): boolean => /^https?:/.test(url);
                 <h2 class="text-[clamp(1.75rem,3.5vw,2.375rem)] font-semibold leading-tight tracking-[-0.035em] text-brand-palette-4">
                     {{ c.title }}
                 </h2>
-                <p v-if="c.lead" class="leading-relaxed text-brand-palette-4/60">{{ c.lead }}</p>
+                <div v-if="c.lead" class="rich-text leading-relaxed text-brand-palette-4/60" v-html="c.lead"></div>
             </div>
 
             <div class="flex flex-col">

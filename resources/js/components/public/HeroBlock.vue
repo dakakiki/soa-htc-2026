@@ -40,9 +40,10 @@ const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBloc
                     {{ c.title }}
                 </h1>
 
-                <p v-if="c.lead" class="max-w-[520px] text-lg leading-relaxed text-brand-palette-4/70">
-                    {{ c.lead }}
-                </p>
+                <!-- Admin-authored markup: the section keeps colour and size, the
+                     paragraph only brings its emphasis. -->
+                <div v-if="c.lead" class="rich-text max-w-[520px] text-lg leading-relaxed text-brand-palette-4/70"
+                    v-html="c.lead"></div>
 
                 <div v-if="buttons.length" class="flex flex-wrap items-center gap-5 pt-1">
                     <BlockButton v-for="(button, i) in buttons" :key="i" :button="button" />
