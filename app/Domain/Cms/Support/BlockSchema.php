@@ -1,0 +1,256 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\Cms\Support;
+
+use App\Domain\Cms\Enums\BlockType;
+use Illuminate\Validation\Rule;
+
+/**
+ * What each block type is made of (ADR-0043).
+ *
+ * One declaration serves two masters: the admin form is built from `fields()`,
+ * and the payload is validated by `rules()`. Keeping them together is the point
+ * — a field the form offers but validation rejects, or the reverse, is the usual
+ * way a JSON payload rots.
+ */
+final class BlockSchema
+{
+    /**
+     * Button looks, bound to the brand palette. Deliberately an enum and not a
+     * colour picker: the legacy module carried a free `back_color`, which is how
+     * a designed page turns motley six months after launch. The palette itself
+     * is changed in one place, in Theme settings.
+     */
+    public const BUTTON_STYLES = ['primary', 'navy', 'amber', 'outline', 'link'];
+
+    /**
+     * Where a button may point. Same rule as a menu item (ADR-0042): internal
+     * targets are foreign keys, so renaming a slug moves the link with it, and
+     * only `url` carries a literal address. `file` is a document from the media
+     * library — the category document is downloaded, not visited.
+     */
+    public const TARGET_TYPES = ['page', 'post', 'category', 'route', 'file', 'url'];
+
+    /**
+     * Season gates a button may be subject to. A button with no gate is governed
+     * by its own switch alone; `competition` also requires an active competition
+     * quiz, `sample` its sample counterpart. This is the data half of the rule
+     * that out of season the competition entry disappears whatever the admin set.
+     */
+    public const GATES = ['competition', 'sample'];
+
+    /** How many of this type a zone may hold; null means no limit. */
+    public static function maxInstances(BlockType $type): ?int
+    {
+        return match ($type) {
+            // Three hero sections are not a choice, they are a mistake.
+            BlockType::Hero, BlockType::Contact, BlockType::News => 1,
+            default => null,
+        };
+    }
+
+    /** Whether this type uses the block's image reference. */
+    public static function usesImage(BlockType $type): bool
+    {
+        return in_array($type, [
+            BlockType::Hero,
+            BlockType::Coordinators,
+            BlockType::ImageBand,
+        ], true);
+    }
+
+    /**
+     * The editable shape of a type, for the admin form.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function fields(BlockType $type): array
+    {
+        return match ($type) {
+            BlockType::Hero => [
+                self::text('eyebrow', 'Label above the heading', 60),
+                self::text('title_accent', 'Heading, accented word', 40),
+                self::text('title', 'Heading', 120),
+                self::textarea('lead', 'Intro paragraph', 400),
+                self::buttons(),
+            ],
+            BlockType::Notice => [
+                self::text('title', 'Heading', 120),
+                self::list('rules', 'Rules', [
+                    self::text('marker', 'Marker', 4),
+                    self::textarea('text', 'Rule', 300),
+                ], 6),
+                self::textarea('footnote', 'Consequence', 400),
+            ],
+            BlockType::Category => [
+                self::text('eyebrow', 'Label above the heading', 60),
+                self::text('title', 'Heading', 120),
+                self::textarea('lead', 'Intro paragraph', 400),
+                self::list('groups', 'Groups', [
+                    self::text('numeral', 'Numeral', 4),
+                    self::text('title', 'Title', 120),
+                    self::textarea('text', 'Description', 300),
+                ], 4),
+                self::buttons(),
+            ],
+            BlockType::SplitCta => [
+                self::text('eyebrow', 'Label above the columns', 60),
+                self::list('columns', 'Columns', [
+                    self::enum('accent', 'Accent', ['primary', 'amber']),
+                    self::text('title', 'Heading', 120),
+                    self::text('note', 'Small print', 120),
+                    self::textarea('text', 'Paragraph', 400),
+                    self::button('button', 'Button'),
+                ], 2),
+            ],
+            BlockType::Coordinators => [
+                self::text('eyebrow', 'Label above the heading', 60),
+                self::text('title', 'Heading', 120),
+                self::textarea('lead', 'Intro paragraph', 400),
+                self::buttons(),
+            ],
+            BlockType::Contact => [
+                self::text('title', 'Heading', 120),
+                self::textarea('lead', 'Intro paragraph', 400),
+                self::list('links', 'Links', [
+                    self::text('label', 'Label', 60),
+                    self::text('value', 'Shown text', 160),
+                    self::text('url', 'Address', 500),
+                ], 4),
+            ],
+            BlockType::News => [
+                self::text('title', 'Heading', 120),
+                self::number('limit', 'How many articles', 1, 6),
+            ],
+            BlockType::ImageBand => [
+                self::text('caption_label', 'Caption label', 40),
+                self::text('caption', 'Caption', 200),
+            ],
+        };
+    }
+
+    /**
+     * The request key the payload travels under.
+     *
+     * 🪤 Not `data`: a `JsonResource` whose array already has a `data` key is
+     * treated as pre-wrapped, so the response would come back unwrapped while
+     * every other endpoint returns `{"data": …}`. Naming the payload `content`
+     * keeps one shape across the API.
+     */
+    public const KEY = 'content';
+
+    /**
+     * Validation for a payload of this type. Anything the schema does not name
+     * is rejected by the controller, so the column cannot quietly collect junk.
+     *
+     * @return array<string, mixed>
+     */
+    public static function rules(BlockType $type): array
+    {
+        $rules = [];
+
+        foreach (self::fields($type) as $field) {
+            $rules += self::rulesFor(self::KEY.'.'.$field['key'], $field);
+        }
+
+        return $rules;
+    }
+
+    /** The keys a payload of this type may carry. @return list<string> */
+    public static function allowedKeys(BlockType $type): array
+    {
+        return array_map(static fn (array $f): string => $f['key'], self::fields($type));
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return array<string, mixed>
+     */
+    private static function rulesFor(string $path, array $field): array
+    {
+        return match ($field['kind']) {
+            'text' => [$path => ['nullable', 'string', 'max:'.$field['max']]],
+            'textarea' => [$path => ['nullable', 'string', 'max:'.$field['max']]],
+            'number' => [$path => ['nullable', 'integer', 'min:'.$field['min'], 'max:'.$field['max']]],
+            'enum' => [$path => ['nullable', Rule::in($field['options'])]],
+            'button' => self::buttonRules($path),
+            'buttons' => [$path => ['sometimes', 'array', 'max:3']]
+                + self::buttonRules($path.'.*'),
+            'list' => [$path => ['sometimes', 'array', 'max:'.$field['max']]]
+                + array_reduce(
+                    $field['item'],
+                    static fn (array $carry, array $sub): array => $carry + self::rulesFor($path.'.*.'.$sub['key'], $sub),
+                    [],
+                ),
+            default => [],
+        };
+    }
+
+    /** @return array<string, mixed> */
+    private static function buttonRules(string $path): array
+    {
+        return [
+            $path => ['nullable', 'array'],
+            $path.'.label' => ['required_with:'.$path, 'string', 'max:80'],
+            $path.'.style' => ['required_with:'.$path, Rule::in(self::BUTTON_STYLES)],
+            $path.'.status' => ['required_with:'.$path, 'boolean'],
+            $path.'.gate' => ['nullable', Rule::in(self::GATES)],
+            $path.'.target' => ['required_with:'.$path, 'array'],
+            $path.'.target.type' => ['required_with:'.$path.'.target', Rule::in(self::TARGET_TYPES)],
+            // A foreign key for internal targets; `route`, `url` and `file` use
+            // the value instead.
+            $path.'.target.id' => ['nullable', 'integer'],
+            $path.'.target.value' => ['nullable', 'string', 'max:500'],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private static function text(string $key, string $label, int $max): array
+    {
+        return ['key' => $key, 'kind' => 'text', 'label' => $label, 'max' => $max];
+    }
+
+    /** @return array<string, mixed> */
+    private static function textarea(string $key, string $label, int $max): array
+    {
+        return ['key' => $key, 'kind' => 'textarea', 'label' => $label, 'max' => $max];
+    }
+
+    /** @return array<string, mixed> */
+    private static function number(string $key, string $label, int $min, int $max): array
+    {
+        return ['key' => $key, 'kind' => 'number', 'label' => $label, 'min' => $min, 'max' => $max];
+    }
+
+    /**
+     * @param  list<string>  $options
+     * @return array<string, mixed>
+     */
+    private static function enum(string $key, string $label, array $options): array
+    {
+        return ['key' => $key, 'kind' => 'enum', 'label' => $label, 'options' => $options];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $item
+     * @return array<string, mixed>
+     */
+    private static function list(string $key, string $label, array $item, int $max): array
+    {
+        return ['key' => $key, 'kind' => 'list', 'label' => $label, 'item' => $item, 'max' => $max];
+    }
+
+    /** @return array<string, mixed> */
+    private static function button(string $key, string $label): array
+    {
+        return ['key' => $key, 'kind' => 'button', 'label' => $label];
+    }
+
+    /** @return array<string, mixed> */
+    private static function buttons(): array
+    {
+        return ['key' => 'buttons', 'kind' => 'buttons', 'label' => 'Buttons'];
+    }
+}
