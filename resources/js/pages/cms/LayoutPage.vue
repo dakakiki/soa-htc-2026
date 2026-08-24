@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconPlus } from '@tabler/icons-vue';
+import { IconPencil, IconPlus, IconTrash } from '@tabler/icons-vue';
 import {
     createLayoutBlock,
     deleteLayoutBlock,
@@ -16,6 +16,7 @@ import LayoutBlockEditor from '@/components/cms/LayoutBlockEditor.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import OrderableList from '@/components/OrderableList.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
+import Tooltip from '@/components/Tooltip.vue';
 import type { CmsLayoutBlock, LayoutRegistry, LayoutTypeInfo, LayoutZoneInfo } from '@/types/models';
 
 /**
@@ -49,6 +50,9 @@ const typeOf = (key: string): LayoutTypeInfo | null =>
 const used = (key: string): number => blocks.value.filter((b) => b.type === key).length;
 
 const isFull = (type: LayoutTypeInfo): boolean => type.max !== null && used(type.key) >= type.max;
+
+/** Same icon chip the row actions use everywhere else in the admin. */
+const chip = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200';
 
 /** A section's own heading if it has one, else what the type is called. */
 function title(block: CmsLayoutBlock): string {
@@ -181,6 +185,9 @@ onMounted(load);
         <div class="relative min-h-[8rem] rounded-lg border border-gray-200 bg-white p-4">
             <LoadingOverlay v-if="loading" />
 
+            <!-- `removable` stays off: dropping a section from the list is not the
+                 same as deleting it, so the delete below asks first and goes to
+                 the server. -->
             <OrderableList :model-value="blocks" :empty-text="$t('layout.empty')" :removable="false"
                 @update:model-value="onReorder">
                 <template #item="{ item }">
@@ -191,16 +198,27 @@ onMounted(load);
                         {{ title(item) }}
                     </span>
 
-                    <ToggleSwitch :model-value="item.status" @update:model-value="toggle(item, $event)" />
+                    <!-- The switch says what it will do, not what it is. -->
+                    <Tooltip :text="item.status ? $t('layout.hideSection') : $t('layout.showSection')">
+                        <ToggleSwitch :model-value="item.status"
+                            :aria-label="item.status ? $t('layout.hideSection') : $t('layout.showSection')"
+                            @update:model-value="toggle(item, $event)" />
+                    </Tooltip>
+                </template>
 
-                    <button type="button" class="rounded-md px-2 py-1 text-sm text-brand-link hover:underline"
-                        @click="editing = item">
-                        {{ $t('common.edit') }}
-                    </button>
-                    <button type="button" class="rounded-md px-2 py-1 text-sm text-red-600 hover:underline"
-                        @click="remove(item)">
-                        {{ $t('common.remove') }}
-                    </button>
+                <template #actions="{ item }">
+                    <Tooltip :text="$t('common.edit')">
+                        <button type="button" :aria-label="$t('common.edit')" :class="[chip, 'text-green-600']"
+                            @click="editing = item">
+                            <IconPencil :size="16" />
+                        </button>
+                    </Tooltip>
+                    <Tooltip :text="$t('common.remove')">
+                        <button type="button" :aria-label="$t('common.remove')" :class="[chip, 'text-red-600']"
+                            @click="remove(item)">
+                            <IconTrash :size="16" />
+                        </button>
+                    </Tooltip>
                 </template>
             </OrderableList>
         </div>

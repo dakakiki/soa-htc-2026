@@ -451,6 +451,8 @@ export default {
         empty: 'This zone has no sections yet.',
         addSection: 'Add section',
         addRow: 'Add',
+        showSection: 'Show this section on the page',
+        hideSection: 'Hide this section from the page',
         image: 'Image',
         chooseImage: 'Choose an image',
         changeImage: 'Change image',
