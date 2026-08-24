@@ -673,6 +673,64 @@ export interface PublicBlock {
     image: { url: string; alt: string | null } | null;
 }
 
+/**
+ * One editable field of a block type. The server declares these (BlockSchema),
+ * so the form and the validation cannot drift apart.
+ */
+export interface LayoutField {
+    key: string;
+    kind: 'text' | 'textarea' | 'number' | 'enum' | 'list' | 'button' | 'buttons';
+    label: string;
+    max?: number;
+    min?: number;
+    options?: string[];
+    item?: LayoutField[];
+}
+
+export interface LayoutTypeInfo {
+    key: string;
+    label: string;
+    /** How many of this type a zone may hold; null means no limit. */
+    max: number | null;
+    uses_image: boolean;
+    fields: LayoutField[];
+}
+
+export interface LayoutZoneInfo {
+    key: string;
+    label: string;
+    description: string;
+    types: LayoutTypeInfo[];
+}
+
+export interface LayoutRegistry {
+    zones: LayoutZoneInfo[];
+    button_styles: string[];
+    target_types: string[];
+    gates: string[];
+}
+
+/** A button as the editor holds it, before the server decides who sees it. */
+export interface LayoutButtonValue {
+    label: string;
+    style: string;
+    status: boolean;
+    gate: string | null;
+    target: { type: string; id: number | null; value: string | null };
+}
+
+export interface CmsLayoutBlock {
+    id: number;
+    zone: string;
+    type: string;
+    type_label: string;
+    position: number;
+    status: boolean;
+    content: Record<string, unknown>;
+    image?: CmsMedia | null;
+    image_media_id: number | null;
+}
+
 /** Which round is running, and whether it can be entered. */
 export interface SiteStatus {
     round: number | null;

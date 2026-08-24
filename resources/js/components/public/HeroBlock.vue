@@ -19,14 +19,17 @@ const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBloc
 
 <template>
     <section id="block_Start" class="relative overflow-hidden scroll-mt-20">
+        <!-- The dissolve has to be finished before the headline starts, so the
+             first stops stay near-opaque well past the text column's right edge;
+             the photograph only appears in the outer third. -->
         <div v-if="block.image" aria-hidden="true"
-            class="pointer-events-none absolute inset-y-0 right-0 hidden w-[56%] lg:block">
+            class="pointer-events-none absolute inset-y-0 right-0 hidden w-[52%] lg:block">
             <img :src="block.image.url" alt="" class="h-full w-full object-cover" />
-            <div class="absolute inset-0 bg-[linear-gradient(to_right,#fbfaf8_0%,rgba(251,250,248,0.93)_12%,rgba(251,250,248,0.48)_34%,rgba(251,250,248,0.07)_62%,rgba(251,250,248,0)_100%)]"></div>
+            <div class="absolute inset-0 bg-[linear-gradient(to_right,#fbfaf8_0%,rgba(251,250,248,0.97)_22%,rgba(251,250,248,0.62)_44%,rgba(251,250,248,0.14)_70%,rgba(251,250,248,0)_100%)]"></div>
         </div>
 
         <div class="relative mx-auto w-full max-w-[1240px] px-6 py-16 lg:py-24">
-            <div class="flex max-w-[700px] flex-col gap-6">
+            <div class="flex max-w-[640px] flex-col gap-6">
                 <p v-if="c.eyebrow" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/40">
                     {{ c.eyebrow }}
                 </p>
