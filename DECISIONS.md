@@ -839,7 +839,8 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   - **Šta je link a šta ruter:** sve što napušta sajt ili traži novi tab je običan `<a>`; sve interno ide kroz ruter da se SPA ne bi ponovo učitavao.
   - 🪤 **Server-render `<head>`-a pokriva samo PRVI zahtev.** Kretanje kroz SPA ne učitava dokument, pa je tab zadržavao naslov prve strane; javni ekrani sada postavljaju `document.title` posle učitavanja (`utils/documentTitle.ts`). Crawler i deljeni link i dalje dobijaju server-renderovanu verziju.
   - **Ostalo neurađeno:** anchor linkovi iz starog sajta (`/#block_Start`, `/#block_Results`, …) pokazuju na sekcije koje nova naslovna strana nema — vode na `/` bez greške. Prebacivanje na prave rute je jedna izmena po stavci u adminu.
-- **NIJE rađeno (svesno, van dogovorenog obima):** `PageLayout` zone i **`PageLayout` zone** i **admin navigacije** (`admin.top` / `admin.right_sidebar`) — javne (`public.header` / `public.footer`) su vezane, admin sidebar je i dalje data-driven u kodu (ADR-0038). Uz to, otvaranjem javnog dela **postaje vidljiv beli logo na belom javnom zaglavlju** (ranije odloženo pitanje, sada stvarno).
+- **NIJE rađeno (svesno, van dogovorenog obima):** **`PageLayout` zone** i **admin navigacije** (`admin.top` / `admin.right_sidebar`) — javne (`public.header` / `public.footer`) su vezane, admin sidebar je i dalje data-driven u kodu (ADR-0038). Uz to, otvaranjem javnog dela **postaje vidljiv beli logo na belom javnom zaglavlju** (ranije odloženo pitanje, sada stvarno).
+  - **Razrešeno u ADR-0043 (2026-08-24):** zone su isporučene, a beli logo je rešen tamnom varijantom u Theme settings. **Ostaju samo admin navigacije.**
 
 ---
 
