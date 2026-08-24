@@ -1,70 +1,55 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { RouterLink } from 'vue-router';
-import { listPublicPosts } from '@/api/publicContent';
-import type { PublicPost } from '@/types/models';
+import { onMounted, ref, type Component } from 'vue';
+import { getPublicLayout } from '@/api/publicContent';
+import { setDocumentTitle } from '@/utils/documentTitle';
+import CategoryBlock from '@/components/public/CategoryBlock.vue';
+import ContactBlock from '@/components/public/ContactBlock.vue';
+import CoordinatorsBlock from '@/components/public/CoordinatorsBlock.vue';
+import HeroBlock from '@/components/public/HeroBlock.vue';
+import ImageBandBlock from '@/components/public/ImageBandBlock.vue';
+import NewsBlock from '@/components/public/NewsBlock.vue';
+import NoticeBlock from '@/components/public/NoticeBlock.vue';
+import SplitCtaBlock from '@/components/public/SplitCtaBlock.vue';
+import type { PublicBlock } from '@/types/models';
 
 /**
- * The site's front page: what the contest is, the two ways a competitor gets
- * in, and the latest news. The intro copy is still a language string; a proper
- * editable home page follows when page layouts land.
+ * The front page is the `public.home` zone (ADR-0043): whatever sections the
+ * admin arranged, in their order. Nothing here decides what is shown — blocks
+ * and buttons the visitor must not see never leave the server.
+ *
+ * A type with no component is skipped rather than rendered blank, so retiring a
+ * type in code cannot break a page that still holds one.
  */
-const posts = ref<PublicPost[]>([]);
+const COMPONENTS: Record<string, Component> = {
+    hero: HeroBlock,
+    notice: NoticeBlock,
+    category: CategoryBlock,
+    split_cta: SplitCtaBlock,
+    coordinators: CoordinatorsBlock,
+    contact: ContactBlock,
+    news: NewsBlock,
+    image_band: ImageBandBlock,
+};
 
-const formatDate = (iso: string | null): string =>
-    iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+const blocks = ref<PublicBlock[]>([]);
 
 onMounted(async () => {
+    setDocumentTitle(null);
+
     try {
-        const { data } = await listPublicPosts({ per_page: 3 });
-        posts.value = data.data;
+        const { data } = await getPublicLayout('public.home');
+        blocks.value = data.data.blocks;
     } catch {
-        // The front page still stands without the news strip.
+        // An empty front page is a visible problem the admin can fix; a hidden
+        // hard-coded copy would quietly ignore whatever they arrange.
     }
 });
 </script>
 
 <template>
-    <section class="space-y-12">
-        <header class="space-y-4">
-            <h1 class="text-4xl font-semibold tracking-tight">{{ $t('home.title') }}</h1>
-            <p class="max-w-2xl text-lg text-gray-600">{{ $t('home.subtitle') }}</p>
-
-            <div class="flex flex-wrap gap-3 pt-2">
-                <RouterLink :to="{ name: 'student.access.form', params: { mode: 'competition' } }"
-                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
-                    {{ $t('student.nav.startQuiz') }}
-                </RouterLink>
-                <RouterLink :to="{ name: 'student.access.form', params: { mode: 'sample' } }"
-                    class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    {{ $t('student.nav.sampleExam') }}
-                </RouterLink>
-            </div>
-        </header>
-
-        <section v-if="posts.length" class="space-y-4">
-            <div class="flex items-baseline justify-between">
-                <h2 class="text-xl font-semibold tracking-tight">{{ $t('public.news.latest') }}</h2>
-                <RouterLink :to="{ name: 'news' }" class="text-sm text-brand-link hover:underline">
-                    {{ $t('public.news.readAll') }}
-                </RouterLink>
-            </div>
-
-            <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                <article v-for="post in posts" :key="post.slug"
-                    class="flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:border-gray-300 hover:shadow-sm">
-                    <RouterLink :to="post.path" class="flex h-full flex-col">
-                        <span v-if="post.image_url" role="img" :aria-label="post.title"
-                            class="block h-36 w-full bg-gray-100 bg-cover bg-center"
-                            :style="{ backgroundImage: `url(${post.image_url})` }" />
-                        <div class="flex flex-1 flex-col gap-2 p-4">
-                            <h3 class="font-semibold leading-snug text-gray-900">{{ post.title }}</h3>
-                            <p v-if="post.excerpt" class="line-clamp-3 text-sm text-gray-600">{{ post.excerpt }}</p>
-                            <p class="mt-auto pt-2 text-xs text-gray-400">{{ formatDate(post.published_at) }}</p>
-                        </div>
-                    </RouterLink>
-                </article>
-            </div>
-        </section>
-    </section>
+    <div>
+        <template v-for="(block, i) in blocks" :key="i">
+            <component :is="COMPONENTS[block.type]" v-if="COMPONENTS[block.type]" :block="block" />
+        </template>
+    </div>
 </template>

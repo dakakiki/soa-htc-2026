@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Support\EntryWindow;
 use App\Domain\Cms\Enums\MenuItemType;
 use App\Domain\Cms\Models\Category;
 use App\Domain\Cms\Models\LayoutBlock;
@@ -14,6 +15,7 @@ use App\Domain\Cms\Models\Post;
 use App\Domain\Cms\Support\LayoutButtons;
 use App\Domain\Cms\Support\LayoutZones;
 use App\Domain\Cms\Support\PublicPaths;
+use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PublicPostResource;
 use Illuminate\Http\Request;
@@ -153,6 +155,28 @@ class PublicContentController extends Controller
             'slug' => $c->slug,
             'posts_count' => $c->posts_count,
         ])->all()];
+    }
+
+    /**
+     * What the site says about itself in the status strip: which round is running
+     * and whether it can be entered.
+     *
+     * Both entry flags are derived (see {@see EntryWindow}) rather than typed by
+     * an admin, so the strip cannot claim a round is live after it has closed.
+     *
+     * @return array<string, mixed>
+     */
+    public function site(): array
+    {
+        $season = SeasonContext::active();
+
+        return ['data' => [
+            'round' => $season?->round_number,
+            'year' => $season?->year,
+            'season' => $season?->name,
+            'competition_open' => EntryWindow::competitionOpen(),
+            'sample_open' => EntryWindow::sampleOpen(),
+        ]];
     }
 
     /**

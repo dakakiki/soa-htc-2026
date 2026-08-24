@@ -71,6 +71,9 @@ Route::prefix('public')->group(function () {
     Route::get('categories', [PublicContentController::class, 'categories']);
     Route::get('pages/{slug}', [PublicContentController::class, 'page']);
     Route::get('menus/{slug}', [PublicContentController::class, 'menu']);
+    // Which round is running and whether it can be entered — both derived, so the
+    // strip cannot claim a round is live after it closed.
+    Route::get('site', [PublicContentController::class, 'site']);
     // The sections of a layout zone (ADR-0043). Switched-off blocks and buttons
     // are filtered server-side, so the page never has to know they existed.
     Route::get('layout/{zone}', [PublicContentController::class, 'layout']);

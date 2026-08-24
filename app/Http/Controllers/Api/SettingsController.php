@@ -32,9 +32,9 @@ class SettingsController extends Controller
     {
         $setting = Setting::current();
 
-        $data = $request->safe()->except(['logo', 'logo_icon']);
+        $data = $request->safe()->except(['logo', 'logo_dark', 'logo_icon']);
 
-        foreach (['logo' => 'logo_path', 'logo_icon' => 'logo_icon_path'] as $field => $column) {
+        foreach (['logo' => 'logo_path', 'logo_dark' => 'logo_dark_path', 'logo_icon' => 'logo_icon_path'] as $field => $column) {
             if ($request->hasFile($field)) {
                 $path = $this->storeBrandingFile($request->file($field), $field);
 
@@ -62,6 +62,7 @@ class SettingsController extends Controller
 
         $column = match ($asset) {
             'logo' => 'logo_path',
+            'logo_dark' => 'logo_dark_path',
             'icon' => 'logo_icon_path',
             default => abort(404),
         };

@@ -136,6 +136,7 @@ export interface Theme {
     /** Rich-text site name (admin-authored HTML), rendered next to the logo. */
     site_title: string | null;
     logo_url: string | null;
+    logo_dark_url: string | null;
     logo_icon_url: string | null;
     colors: Record<ThemeColorKey, string>;
 }
@@ -651,6 +652,34 @@ export interface PublicCategory {
     name: string;
     slug: string;
     posts_count: number;
+}
+
+/**
+ * A layout button the server has already decided is visible (ADR-0043): both the
+ * admin's switch and the season gate passed, and it has somewhere to go.
+ */
+export interface PublicBlockButton {
+    label: string;
+    href: string;
+    style: 'primary' | 'navy' | 'amber' | 'outline' | 'link';
+    download: boolean;
+    external: boolean;
+}
+
+/** One section of a zone. `content` is shaped by the block's type. */
+export interface PublicBlock {
+    type: string;
+    content: Record<string, unknown>;
+    image: { url: string; alt: string | null } | null;
+}
+
+/** Which round is running, and whether it can be entered. */
+export interface SiteStatus {
+    round: number | null;
+    year: number | null;
+    season: string | null;
+    competition_open: boolean;
+    sample_open: boolean;
 }
 
 export interface Paginated<T> {

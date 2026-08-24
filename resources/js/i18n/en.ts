@@ -342,6 +342,13 @@ export default {
             home: 'Home',
             news: 'News',
             login: 'Login',
+            menu: 'Menu',
+            close: 'Close menu',
+        },
+        status: {
+            round: 'Round {round} · {year}',
+            open: 'Live exams open',
+            closed: 'Live exams closed · sample open',
         },
         news: {
             title: 'News',
@@ -355,6 +362,9 @@ export default {
         backToDashboard: 'Back to dashboard',
         footer: {
             copyright: '© {year} {name}',
+            tagline: 'The English language contest for school students, run with local venues and coordinators.',
+            services: 'User services',
+            privacy: 'Privacy centre',
         },
     },
     student: {
@@ -1073,7 +1083,9 @@ export default {
         palette2: 'Palette 2',
         palette3: 'Palette 3',
         palette4: 'Palette 4',
-        logoHint: 'PNG, JPG, WEBP or SVG, up to 2 MB.',
+        logoHint: 'PNG, JPG, WEBP or SVG, up to 2 MB. Used on dark surfaces.',
+        logoDark: 'Logo (dark)',
+        logoDarkHint: 'The variant for light backgrounds, such as the public header. Without it the site name is shown in words.',
         preview: 'Preview',
         activeNav: 'Active menu item',
         sampleLink: 'A sample link',
