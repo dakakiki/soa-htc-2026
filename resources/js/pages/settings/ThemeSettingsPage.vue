@@ -56,8 +56,10 @@ const colors = reactive<Record<ThemeColorKey, string>>({
 
 const siteTitle = ref('');
 const logoUrl = ref<string | null>(null);
+const darkLogoUrl = ref<string | null>(null);
 const iconUrl = ref<string | null>(null);
 const logoFile = ref<File | null>(null);
+const darkLogoFile = ref<File | null>(null);
 const iconFile = ref<File | null>(null);
 
 const loading = ref(true);
@@ -75,6 +77,9 @@ const ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml';
 function onLogoChange(e: Event): void {
     logoFile.value = (e.target as HTMLInputElement).files?.[0] ?? null;
 }
+function onDarkLogoChange(e: Event): void {
+    darkLogoFile.value = (e.target as HTMLInputElement).files?.[0] ?? null;
+}
 function onIconChange(e: Event): void {
     iconFile.value = (e.target as HTMLInputElement).files?.[0] ?? null;
 }
@@ -87,6 +92,7 @@ async function load(): Promise<void> {
         Object.assign(colors, data.data.colors);
         siteTitle.value = data.data.site_title ?? '';
         logoUrl.value = data.data.logo_url;
+        darkLogoUrl.value = data.data.logo_dark_url;
         iconUrl.value = data.data.logo_icon_url;
     } catch (e) {
         error.value = apiErrorMessage(e, t('themeSettings.error'));
@@ -103,13 +109,15 @@ async function save(): Promise<void> {
     error.value = null;
     saved.value = false;
     try {
-        const { data } = await updateTheme({ ...colors }, { logo: logoFile.value, logo_icon: iconFile.value }, siteTitle.value);
+        const { data } = await updateTheme({ ...colors }, { logo: logoFile.value, logo_dark: darkLogoFile.value, logo_icon: iconFile.value }, siteTitle.value);
         // Apply app-wide immediately and reset file pickers to the stored images.
         themeStore.apply(data.data);
         siteTitle.value = data.data.site_title ?? '';
         logoUrl.value = data.data.logo_url;
+        darkLogoUrl.value = data.data.logo_dark_url;
         iconUrl.value = data.data.logo_icon_url;
         logoFile.value = null;
+        darkLogoFile.value = null;
         iconFile.value = null;
         saved.value = true;
     } catch (e) {
@@ -127,6 +135,7 @@ async function removeAsset(asset: ThemeAsset): Promise<void> {
         const { data } = await deleteThemeAsset(asset);
         themeStore.apply(data.data);
         logoUrl.value = data.data.logo_url;
+        darkLogoUrl.value = data.data.logo_dark_url;
         iconUrl.value = data.data.logo_icon_url;
     } catch (e) {
         error.value = apiErrorMessage(e, t('themeSettings.saveFailed'));
@@ -136,6 +145,7 @@ async function removeAsset(asset: ThemeAsset): Promise<void> {
 // Discard unsaved edits by reloading the saved values (no dedicated back target here).
 function cancel(): void {
     logoFile.value = null;
+    darkLogoFile.value = null;
     iconFile.value = null;
     saved.value = false;
     void load();
@@ -167,7 +177,7 @@ onMounted(load);
                     </div>
 
                     <!-- Logos -->
-                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">{{ $t('themeSettings.logo') }}</label>
                             <label v-if="canManage" :class="fileBtn">
@@ -182,6 +192,22 @@ onMounted(load);
                                     :removable="canManage" @remove="removeAsset('logo')" />
                             </div>
                             <p class="mt-1 text-xs text-gray-400">{{ $t('themeSettings.logoHint') }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('themeSettings.logoDark') }}</label>
+                            <label v-if="canManage" :class="fileBtn">
+                                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
+                                </svg>
+                                <span class="truncate">{{ darkLogoFile?.name || $t('themeSettings.chooseImage') }}</span>
+                                <input type="file" :accept="ACCEPT" class="hidden" @change="onDarkLogoChange" />
+                            </label>
+                            <!-- Previewed on a light chip: this is the variant for light surfaces. -->
+                            <div v-if="darkLogoUrl && !darkLogoFile" class="mt-2 inline-flex rounded border border-gray-200 bg-white p-2">
+                                <ImageThumb :src="darkLogoUrl" alt="dark logo" img-class="h-10 max-w-[12rem] object-contain"
+                                    :removable="canManage" @remove="removeAsset('logo_dark')" />
+                            </div>
+                            <p class="mt-1 text-xs text-gray-400">{{ $t('themeSettings.logoDarkHint') }}</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">{{ $t('themeSettings.icon') }}</label>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AttemptController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Cms\CategoryController as CmsCategoryController;
+use App\Http\Controllers\Api\Cms\LayoutController as CmsLayoutController;
 use App\Http\Controllers\Api\Cms\MediaController as CmsMediaController;
 use App\Http\Controllers\Api\Cms\MenuController as CmsMenuController;
 use App\Http\Controllers\Api\Cms\PageController as CmsPageController;
@@ -70,6 +71,12 @@ Route::prefix('public')->group(function () {
     Route::get('categories', [PublicContentController::class, 'categories']);
     Route::get('pages/{slug}', [PublicContentController::class, 'page']);
     Route::get('menus/{slug}', [PublicContentController::class, 'menu']);
+    // Which round is running and whether it can be entered — both derived, so the
+    // strip cannot claim a round is live after it closed.
+    Route::get('site', [PublicContentController::class, 'site']);
+    // The sections of a layout zone (ADR-0043). Switched-off blocks and buttons
+    // are filtered server-side, so the page never has to know they existed.
+    Route::get('layout/{zone}', [PublicContentController::class, 'layout']);
 });
 
 /*
@@ -140,6 +147,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('menus/{menu}/items', [CmsMenuController::class, 'saveItems'])->whereNumber('menu');
         Route::apiResource('menus', CmsMenuController::class)
             ->parameters(['menus' => 'menu'])->names('cms.menus');
+
+        /*
+         * Page layout (ADR-0043). Zones come from code, so there is no endpoint
+         * that creates one; `layout/zones` publishes the registry the editor
+         * builds its forms from. Order is saved as the whole list, as for menus.
+         */
+        Route::get('layout/zones', [CmsLayoutController::class, 'zones']);
+        Route::get('layout/{zone}', [CmsLayoutController::class, 'index']);
+        Route::post('layout/{zone}/blocks', [CmsLayoutController::class, 'store']);
+        Route::put('layout/{zone}/order', [CmsLayoutController::class, 'saveOrder']);
+        Route::put('layout-blocks/{block}', [CmsLayoutController::class, 'update'])->whereNumber('block');
+        Route::delete('layout-blocks/{block}', [CmsLayoutController::class, 'destroy'])->whereNumber('block');
 
         // The media library: uploaded once, referenced from anywhere.
         Route::apiResource('media', CmsMediaController::class)

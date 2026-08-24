@@ -1,5 +1,13 @@
 import { http } from '@/api/http';
-import type { Paginated, PublicCategory, PublicMenu, PublicPage, PublicPost } from '@/types/models';
+import type {
+    Paginated,
+    PublicBlock,
+    PublicCategory,
+    PublicMenu,
+    PublicPage,
+    PublicPost,
+    SiteStatus,
+} from '@/types/models';
 
 /**
  * The website's own reads. Unauthenticated, and the server only ever returns
@@ -24,4 +32,17 @@ export function listPublicCategories() {
 /** A navigation, already resolved to labels and addresses. */
 export function getPublicMenu(slug: string) {
     return http.get<{ data: PublicMenu }>(`/api/public/menus/${slug}`);
+}
+
+/**
+ * The sections of a layout zone. Blocks and buttons the visitor must not see
+ * never arrive, so nothing here has to be filtered again.
+ */
+export function getPublicLayout(zone: string) {
+    return http.get<{ data: { zone: string; blocks: PublicBlock[] } }>(`/api/public/layout/${zone}`);
+}
+
+/** Which round is running and whether it is open — both derived server-side. */
+export function getSiteStatus() {
+    return http.get<{ data: SiteStatus }>('/api/public/site');
 }

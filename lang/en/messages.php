@@ -53,4 +53,9 @@ return [
         'slug_reserved' => 'This address is used by the application. Choose another slug.',
         'category_in_use' => 'This category still has posts. Move or delete them first.',
     ],
+    'layout' => [
+        'type_not_allowed' => 'That section cannot be placed in this zone.',
+        'type_limit' => 'This zone already holds its :type section. There can be :max.',
+        'order_mismatch' => 'The order must list every section in this zone, and only those.',
+    ],
 ];

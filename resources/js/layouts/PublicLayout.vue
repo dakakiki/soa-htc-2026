@@ -1,40 +1,52 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { RouterLink } from 'vue-router';
-import { IconArrowLeft, IconChevronDown } from '@tabler/icons-vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
+import { IconArrowLeft, IconChevronDown, IconMenu2, IconX } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
-import { getPublicMenu } from '@/api/publicContent';
+import { getPublicMenu, getSiteStatus } from '@/api/publicContent';
 import PublicMenuLink from '@/components/PublicMenuLink.vue';
-import type { PublicMenu } from '@/types/models';
+import type { PublicMenu, SiteStatus } from '@/types/models';
 
 /**
- * Public website shell (ADR-0014, PROJECT_CONTEXT §8.6): header → content →
- * footer. Never renders admin chrome, even when an admin is signed in — the
- * only admin affordance is a discreet "Back to dashboard" link.
+ * Public website shell (ADR-0014, §8.6): status strip → header → content →
+ * footer. Never renders admin chrome, even when an admin is signed in — the only
+ * admin affordance is a discreet "Back to dashboard" link.
  *
- * The menus come from the CMS (ADR-0042), by the handles `public-header` and
+ * The menus come from the CMS (ADR-0042) by the handles `public-header` and
  * `public-footer`. There is deliberately no hard-coded fallback: an empty
  * navigation is a visible problem the admin can fix, where a hidden copy of the
  * old links would quietly ignore whatever they change.
  */
+const route = useRoute();
 const session = useSessionStore();
 const themeStore = useThemeStore();
 
 const header = ref<PublicMenu | null>(null);
 const footer = ref<PublicMenu | null>(null);
-/** Index of the open submenu, or null. */
+const site = ref<SiteStatus | null>(null);
+
 const openSub = ref<number | null>(null);
+const mobileOpen = ref(false);
+/** Hash of the section under the reader's eye, for the header's active state. */
+const activeHash = ref('');
 
 const year = new Date().getFullYear();
+
+const fullBleed = computed(() => route.meta.fullBleed === true);
+
+/**
+ * The header sits on the page colour, so it needs the dark logo. Without one the
+ * site name in words is the honest fallback — a white mark on off-white is not
+ * a logo, it is a blank space.
+ */
+const headerLogo = computed(() => themeStore.theme?.logo_dark_url ?? null);
 
 async function loadMenu(slug: string): Promise<PublicMenu | null> {
     try {
         const { data } = await getPublicMenu(slug);
         return data.data;
     } catch {
-        // A menu that has not been created yet is not an error worth showing a
-        // visitor; the header simply carries the logo and the login button.
         return null;
     }
 }
@@ -43,75 +55,229 @@ function onClickOutside(): void {
     openSub.value = null;
 }
 
+/** `/#block_Start` → `#block_Start`; anything without a hash → ''. */
+function hashOf(href: string | null | undefined): string {
+    const at = (href ?? '').indexOf('#');
+
+    return at === -1 ? '' : (href as string).slice(at);
+}
+
+/*
+ * Scroll spy. The front page is one long document reached through hash links, so
+ * the header only tells the reader where they are if it follows the sections.
+ */
+let spy: IntersectionObserver | null = null;
+
+function watchSections(): void {
+    spy?.disconnect();
+    activeHash.value = '';
+
+    const sections = Array.from(document.querySelectorAll<HTMLElement>('main section[id]'));
+    if (!sections.length) {
+        return;
+    }
+
+    spy = new IntersectionObserver(
+        (entries) => {
+            entries
+                .filter((entry) => entry.isIntersecting)
+                .forEach((entry) => {
+                    activeHash.value = `#${entry.target.id}`;
+                });
+        },
+        // A band across the middle: whichever section crosses it wins.
+        { rootMargin: '-45% 0px -50% 0px' },
+    );
+
+    sections.forEach((section) => spy?.observe(section));
+}
+
+const navLink = (href: string | null | undefined): string => {
+    const on = activeHash.value !== '' && hashOf(href) === activeHash.value;
+
+    return [
+        'inline-flex items-center text-sm transition-colors',
+        on
+            ? 'font-medium text-brand-palette-4 shadow-[inset_0_-6px_0_rgba(251,186,0,0.5)]'
+            : 'text-brand-palette-4/60 hover:text-brand-palette-2',
+    ].join(' ');
+};
+
+const subLink = 'block rounded-md px-3 py-2 text-sm text-brand-palette-4/70 hover:bg-brand-palette-3/20 hover:text-brand-palette-4';
+const mobileLink = 'block border-b border-brand-palette-4/10 py-3.5 text-base font-medium text-brand-palette-4/80 hover:text-brand-palette-4';
+const footerLink = 'text-sm text-white/55 transition-colors hover:text-brand-palette-1';
+
 onMounted(async () => {
     document.addEventListener('click', onClickOutside);
-    [header.value, footer.value] = await Promise.all([loadMenu('public-header'), loadMenu('public-footer')]);
+    watchSections();
+
+    const [headerMenu, footerMenu] = await Promise.all([loadMenu('public-header'), loadMenu('public-footer')]);
+    header.value = headerMenu;
+    footer.value = footerMenu;
+
+    try {
+        const { data } = await getSiteStatus();
+        site.value = data.data;
+    } catch {
+        // The strip simply stays quiet if the season cannot be read.
+    }
 });
 
-onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
+onBeforeUnmount(() => {
+    document.removeEventListener('click', onClickOutside);
+    spy?.disconnect();
+    document.body.classList.remove('overflow-hidden');
+});
 
-const navLink = 'text-gray-600 hover:text-gray-900';
-const subLink = 'block px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900';
+watch(
+    () => route.fullPath,
+    async () => {
+        mobileOpen.value = false;
+        openSub.value = null;
+        await nextTick();
+        watchSections();
+    },
+);
+
+watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', open));
 </script>
 
 <template>
-    <div class="flex min-h-screen flex-col bg-white text-gray-900">
-        <header class="border-b border-gray-200">
-            <div class="mx-auto flex w-full max-w-[1200px] items-center gap-6 px-6 py-4">
-                <RouterLink :to="{ name: 'home' }" class="flex items-center gap-2 text-lg font-semibold tracking-tight">
-                    <img v-if="themeStore.theme?.logo_url" :src="themeStore.theme.logo_url" :alt="$t('app.name')" class="h-8 max-w-[12rem] object-contain" />
+    <div class="flex min-h-screen flex-col bg-[#fbfaf8] text-brand-palette-4">
+        <!-- Status strip: which round, and whether it can be entered. Both come
+             from the server; nobody types the state by hand. -->
+        <div v-if="site" class="bg-brand-palette-4 text-white">
+            <div class="mx-auto flex h-[38px] w-full max-w-[1240px] items-center gap-4 px-6">
+                <span v-if="site.round" class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/85">
+                    {{ $t('public.status.round', { round: site.round, year: site.year }) }}
+                </span>
+                <span class="ml-auto inline-flex items-center gap-2 sm:ml-0">
+                    <span class="h-1.5 w-1.5 rounded-full"
+                        :class="site.competition_open
+                            ? 'bg-brand-palette-1 shadow-[0_0_0_3px_rgba(251,186,0,0.25)]'
+                            : 'bg-white/40'" />
+                    <span class="font-mono text-[11px] uppercase tracking-[0.16em]"
+                        :class="site.competition_open ? 'text-brand-palette-1' : 'text-white/60'">
+                        {{ site.competition_open ? $t('public.status.open') : $t('public.status.closed') }}
+                    </span>
+                </span>
+                <span v-if="site.season" class="ml-auto hidden font-mono text-[11px] uppercase tracking-[0.16em] text-white/50 sm:block">
+                    {{ site.season }}
+                </span>
+            </div>
+        </div>
+
+        <header class="border-b border-brand-palette-4/12">
+            <div class="mx-auto flex h-[78px] w-full max-w-[1240px] items-center gap-10 px-6">
+                <RouterLink :to="{ name: 'home' }" class="flex shrink-0 items-center gap-2.5 text-base font-semibold tracking-tight">
+                    <img v-if="headerLogo" :src="headerLogo" :alt="$t('app.name')" class="h-8 max-w-[12rem] object-contain" />
                     <span v-else>{{ $t('app.name') }}</span>
                 </RouterLink>
 
-                <nav v-if="header?.items.length" class="hidden items-center gap-5 text-sm sm:flex">
+                <nav v-if="header?.items.length" class="hidden items-center gap-7 lg:flex">
                     <template v-for="(item, i) in header.items" :key="i">
-                        <!-- A parent with children opens a panel; everything else is a link. -->
                         <div v-if="item.children.length" class="relative" @click.stop>
-                            <button type="button" class="inline-flex items-center gap-1" :class="navLink"
-                                @click="openSub = openSub === i ? null : i">
+                            <button type="button" :class="navLink(null)" @click="openSub = openSub === i ? null : i">
                                 {{ item.label }}
-                                <IconChevronDown :size="14" class="opacity-60" />
+                                <IconChevronDown :size="14" class="ml-1 opacity-60" />
                             </button>
                             <div v-if="openSub === i"
-                                class="absolute left-0 top-7 z-20 min-w-[12rem] rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                                class="absolute left-0 top-9 z-20 min-w-[13rem] rounded-xl border border-brand-palette-4/10 bg-white p-1 shadow-xl">
                                 <PublicMenuLink v-for="(child, j) in item.children" :key="j" :item="child" :link-class="subLink" />
                             </div>
                         </div>
-                        <PublicMenuLink v-else :item="item" :link-class="navLink" />
+                        <PublicMenuLink v-else :item="item" :link-class="navLink(item.href)" />
                     </template>
                 </nav>
 
-                <div class="ml-auto flex items-center gap-3 text-sm">
-                    <RouterLink
-                        v-if="session.isAuthenticated"
-                        :to="{ name: 'dashboard' }"
-                        class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-100"
-                    >
+                <div class="ml-auto flex items-center gap-2">
+                    <RouterLink v-if="session.isAuthenticated" :to="{ name: 'dashboard' }"
+                        class="inline-flex items-center gap-1.5 rounded-full border border-brand-palette-4/20 px-4 py-2.5 text-sm font-medium text-brand-palette-4/80 transition-colors hover:bg-brand-palette-4/5">
                         <IconArrowLeft :size="16" />
-                        {{ $t('public.backToDashboard') }}
+                        <span class="hidden sm:inline">{{ $t('public.backToDashboard') }}</span>
                     </RouterLink>
-                    <RouterLink
-                        v-else
-                        :to="{ name: 'login' }"
-                        class="rounded-md bg-brand-primary px-3 py-1.5 font-medium text-brand-on-primary hover:bg-brand-primary-hover"
-                    >
+                    <RouterLink v-else :to="{ name: 'login' }"
+                        class="inline-flex items-center gap-2 rounded-full bg-brand-palette-4 px-5 py-2.5 text-sm font-medium text-white transition hover:brightness-125">
                         {{ $t('public.nav.login') }}
                     </RouterLink>
+
+                    <button v-if="header?.items.length" type="button"
+                        class="-mr-2 grid h-11 w-11 place-items-center rounded-lg text-brand-palette-4/70 hover:bg-brand-palette-4/5 lg:hidden"
+                        :aria-label="mobileOpen ? $t('public.nav.close') : $t('public.nav.menu')"
+                        :aria-expanded="mobileOpen" @click.stop="mobileOpen = !mobileOpen">
+                        <IconX v-if="mobileOpen" :size="22" />
+                        <IconMenu2 v-else :size="22" />
+                    </button>
                 </div>
+            </div>
+
+            <!-- Small screens: the same navigation as a drawer. The header had no
+                 navigation at all below `sm` before this — the items were hidden
+                 with nothing put in their place. -->
+            <div v-if="mobileOpen" class="border-t border-brand-palette-4/10 lg:hidden" @click.stop>
+                <nav class="mx-auto w-full max-w-[1240px] px-6 pb-4">
+                    <template v-for="(item, i) in header?.items ?? []" :key="i">
+                        <div v-if="item.children.length" class="border-b border-brand-palette-4/10 py-3">
+                            <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-2">{{ item.label }}</p>
+                            <PublicMenuLink v-for="(child, j) in item.children" :key="j" :item="child"
+                                link-class="mt-2 block text-base text-brand-palette-4/80 hover:text-brand-palette-4"
+                                @click="mobileOpen = false" />
+                        </div>
+                        <PublicMenuLink v-else :item="item" :link-class="mobileLink" @click="mobileOpen = false" />
+                    </template>
+                </nav>
             </div>
         </header>
 
-        <main class="mx-auto w-full max-w-[1200px] flex-1 px-6 py-10">
+        <main class="flex-1" :class="fullBleed ? '' : 'mx-auto w-full max-w-[1240px] px-6 py-10'">
             <slot />
         </main>
 
-        <footer class="border-t border-gray-200">
-            <div class="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-6 text-sm text-gray-500">
-                <span>{{ $t('public.footer.copyright', { year, name: $t('app.name') }) }}</span>
+        <!-- The footer is an island: inset from the page edges and rounded, so
+             the navy reads as a block on the paper rather than a bleeding band. -->
+        <footer class="px-4 pb-6 sm:px-8">
+            <div class="mx-auto w-full max-w-[1240px] rounded-[28px] bg-brand-palette-4 px-8 py-11 text-white sm:px-12">
+                <div class="grid gap-10 pb-9 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="lg:col-span-2">
+                        <RouterLink :to="{ name: 'home' }" class="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight">
+                            <img v-if="themeStore.theme?.logo_url" :src="themeStore.theme.logo_url" :alt="$t('app.name')" class="h-8 max-w-[12rem] object-contain" />
+                            <span v-else>{{ $t('app.name') }}</span>
+                        </RouterLink>
+                        <p class="mt-4 max-w-[300px] text-sm leading-relaxed text-white/50">{{ $t('public.footer.tagline') }}</p>
+                    </div>
 
-                <nav v-if="footer?.items.length" class="flex flex-wrap items-center gap-x-5 gap-y-2 sm:ml-auto">
-                    <PublicMenuLink v-for="(item, i) in footer.items" :key="i" :item="item" link-class="hover:text-gray-900" />
-                </nav>
+                    <!-- Both columns are the CMS menus, so the admin edits them in one place. -->
+                    <div v-if="header?.items.length">
+                        <h2 class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-1">
+                            {{ $t('public.footer.services') }}
+                        </h2>
+                        <ul class="mt-4 space-y-2.5">
+                            <li v-for="(item, i) in header.items" :key="i">
+                                <PublicMenuLink :item="item" :link-class="footerLink" />
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div v-if="footer?.items.length">
+                        <h2 class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-1">
+                            {{ $t('public.footer.privacy') }}
+                        </h2>
+                        <ul class="mt-4 space-y-2.5">
+                            <li v-for="(item, i) in footer.items" :key="i">
+                                <PublicMenuLink :item="item" :link-class="footerLink" />
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-4 border-t border-white/12 pt-5">
+                    <span class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/35">
+                        {{ $t('public.footer.copyright', { year, name: $t('app.name') }) }}
+                    </span>
+                    <span v-if="site?.round" class="ml-auto font-mono text-[11px] uppercase tracking-[0.16em] text-white/35">
+                        {{ $t('public.status.round', { round: site.round, year: site.year }) }}
+                    </span>
+                </div>
             </div>
         </footer>
     </div>

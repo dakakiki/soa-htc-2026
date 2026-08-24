@@ -7,6 +7,8 @@ export function getTheme() {
 
 export interface ThemeFiles {
     logo?: File | null;
+    /** The dark variant, for light surfaces such as the public header. */
+    logo_dark?: File | null;
     logo_icon?: File | null;
 }
 
@@ -23,6 +25,9 @@ export function updateTheme(colors: Record<ThemeColorKey, string>, files?: Theme
     if (files?.logo) {
         fd.append('logo', files.logo);
     }
+    if (files?.logo_dark) {
+        fd.append('logo_dark', files.logo_dark);
+    }
     if (files?.logo_icon) {
         fd.append('logo_icon', files.logo_icon);
     }
@@ -30,9 +35,9 @@ export function updateTheme(colors: Record<ThemeColorKey, string>, files?: Theme
     return http.post<{ data: Theme }>('/api/settings/theme', fd);
 }
 
-export type ThemeAsset = 'logo' | 'icon';
+export type ThemeAsset = 'logo' | 'logo_dark' | 'icon';
 
-/** Delete the stored logo or icon from the server, freeing the field for a new one. */
+/** Delete a stored branding image from the server, freeing the field for a new one. */
 export function deleteThemeAsset(asset: ThemeAsset) {
     return http.delete<{ data: Theme }>(`/api/settings/theme/assets/${asset}`);
 }

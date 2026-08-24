@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Support\EntryWindow;
 use App\Domain\Cms\Enums\MenuItemType;
 use App\Domain\Cms\Models\Category;
+use App\Domain\Cms\Models\LayoutBlock;
 use App\Domain\Cms\Models\Menu;
 use App\Domain\Cms\Models\MenuItem;
 use App\Domain\Cms\Models\Page;
 use App\Domain\Cms\Models\Post;
+use App\Domain\Cms\Support\LayoutButtons;
+use App\Domain\Cms\Support\LayoutZones;
 use App\Domain\Cms\Support\PublicPaths;
+use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PublicPostResource;
 use Illuminate\Http\Request;
@@ -150,5 +155,61 @@ class PublicContentController extends Controller
             'slug' => $c->slug,
             'posts_count' => $c->posts_count,
         ])->all()];
+    }
+
+    /**
+     * What the site says about itself in the status strip: which round is running
+     * and whether it can be entered.
+     *
+     * Both entry flags are derived (see {@see EntryWindow}) rather than typed by
+     * an admin, so the strip cannot claim a round is live after it has closed.
+     *
+     * @return array<string, mixed>
+     */
+    public function site(): array
+    {
+        $season = SeasonContext::active();
+
+        return ['data' => [
+            'round' => $season?->round_number,
+            'year' => $season?->year,
+            'season' => $season?->name,
+            'competition_open' => EntryWindow::competitionOpen(),
+            'sample_open' => EntryWindow::sampleOpen(),
+        ]];
+    }
+
+    /**
+     * The sections of a layout zone, ready to render (ADR-0043).
+     *
+     * Blocks the admin has switched off never leave the server, and every button
+     * passes {@see LayoutButtons} — which enforces both the admin's switch and
+     * the season gate. A hero out of season therefore arrives with its sample
+     * button and without its competition one, rather than with a disabled
+     * control the page has to reason about.
+     *
+     * @return array<string, mixed>
+     */
+    public function layout(string $zone): array
+    {
+        abort_unless(LayoutZones::exists($zone), 404);
+
+        $blocks = LayoutBlock::query()
+            ->inZone($zone)
+            ->enabled()
+            ->with('image')
+            ->get()
+            ->map(fn (LayoutBlock $block): array => [
+                'type' => $block->type->value,
+                'content' => LayoutButtons::resolvePayload($block->data ?? []),
+                'image' => $block->image === null ? null : [
+                    'url' => $block->image->url(),
+                    'alt' => $block->image->alt,
+                ],
+            ])
+            ->values()
+            ->all();
+
+        return ['data' => ['zone' => $zone, 'blocks' => $blocks]];
     }
 }

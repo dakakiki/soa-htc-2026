@@ -31,6 +31,8 @@ class Setting extends Model
 
     protected $fillable = [
         'logo_path',
+        // The dark variant, for light surfaces (the public header). See migration.
+        'logo_dark_path',
         'logo_icon_path',
         // Rich-text site name rendered next to the logo (admin + public header).
         'site_title',

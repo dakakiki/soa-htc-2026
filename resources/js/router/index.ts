@@ -16,6 +16,11 @@ declare module 'vue-router' {
         zone?: Zone;
         /** Redirect an already-identified competitor away (e.g. the access form). */
         studentGuestOnly?: boolean;
+        /**
+         * Render straight into the shell, without its centred container — for a
+         * page that paints its own edge-to-edge sections (the front page).
+         */
+        fullBleed?: boolean;
     }
 }
 
@@ -24,7 +29,7 @@ const routes: RouteRecordRaw[] = [
         path: '/',
         name: 'home',
         component: () => import('@/pages/HomePage.vue'),
-        meta: { zone: 'public' },
+        meta: { zone: 'public', fullBleed: true },
     },
     {
         path: '/login',
@@ -392,6 +397,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'cms.manage' },
     },
     {
+        path: '/cms/layout',
+        name: 'cms.layout',
+        component: () => import('@/pages/cms/LayoutPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    {
         path: '/website/media',
         name: 'cms.media',
         component: () => import('@/pages/cms/MediaListPage.vue'),
@@ -422,9 +433,29 @@ const routes: RouteRecordRaw[] = [
     },
 ];
 
+/** Clears the sticky public header when an address points at a section. */
+const HEADER_OFFSET = 80;
+
 export const router = createRouter({
     history: createWebHistory(),
     routes,
+    /**
+     * Hash addresses are real navigation here: the header menu carries
+     * `/#block_Start` and friends over from the live site, so those have to land
+     * on the section rather than at the top of the page. The wait for a frame
+     * lets the target page paint before we measure it.
+     */
+    scrollBehavior(to, _from, saved) {
+        if (to.hash) {
+            return new Promise((resolve) => {
+                requestAnimationFrame(() =>
+                    resolve({ el: to.hash, top: HEADER_OFFSET, behavior: 'smooth' }),
+                );
+            });
+        }
+
+        return saved ?? { top: 0 };
+    },
 });
 
 router.beforeEach(async (to) => {

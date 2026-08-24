@@ -136,6 +136,7 @@ export interface Theme {
     /** Rich-text site name (admin-authored HTML), rendered next to the logo. */
     site_title: string | null;
     logo_url: string | null;
+    logo_dark_url: string | null;
     logo_icon_url: string | null;
     colors: Record<ThemeColorKey, string>;
 }
@@ -651,6 +652,92 @@ export interface PublicCategory {
     name: string;
     slug: string;
     posts_count: number;
+}
+
+/**
+ * A layout button the server has already decided is visible (ADR-0043): both the
+ * admin's switch and the season gate passed, and it has somewhere to go.
+ */
+export interface PublicBlockButton {
+    label: string;
+    href: string;
+    style: 'primary' | 'navy' | 'amber' | 'outline' | 'link';
+    download: boolean;
+    external: boolean;
+}
+
+/** One section of a zone. `content` is shaped by the block's type. */
+export interface PublicBlock {
+    type: string;
+    content: Record<string, unknown>;
+    image: { url: string; alt: string | null } | null;
+}
+
+/**
+ * One editable field of a block type. The server declares these (BlockSchema),
+ * so the form and the validation cannot drift apart.
+ */
+export interface LayoutField {
+    key: string;
+    kind: 'text' | 'textarea' | 'rich' | 'number' | 'enum' | 'list' | 'button' | 'buttons';
+    label: string;
+    max?: number;
+    min?: number;
+    options?: string[];
+    item?: LayoutField[];
+}
+
+export interface LayoutTypeInfo {
+    key: string;
+    label: string;
+    /** How many of this type a zone may hold; null means no limit. */
+    max: number | null;
+    uses_image: boolean;
+    fields: LayoutField[];
+}
+
+export interface LayoutZoneInfo {
+    key: string;
+    label: string;
+    description: string;
+    types: LayoutTypeInfo[];
+}
+
+export interface LayoutRegistry {
+    zones: LayoutZoneInfo[];
+    button_styles: string[];
+    target_types: string[];
+    gates: string[];
+}
+
+/** A button as the editor holds it, before the server decides who sees it. */
+export interface LayoutButtonValue {
+    label: string;
+    style: string;
+    status: boolean;
+    gate: string | null;
+    target: { type: string; id: number | null; value: string | null };
+}
+
+export interface CmsLayoutBlock {
+    id: number;
+    zone: string;
+    type: string;
+    type_label: string;
+    position: number;
+    status: boolean;
+    content: Record<string, unknown>;
+    image?: CmsMedia | null;
+    image_media_id: number | null;
+}
+
+/** Which round is running, and whether it can be entered. */
+export interface SiteStatus {
+    round: number | null;
+    year: number | null;
+    season: string | null;
+    competition_open: boolean;
+    sample_open: boolean;
 }
 
 export interface Paginated<T> {

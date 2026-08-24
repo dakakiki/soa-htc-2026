@@ -28,6 +28,7 @@ class UpdateThemeRequest extends FormRequest
             // uploaded: SettingsController rewrites it through App\Support\SvgSanitizer
             // first (an SVG on our own origin can otherwise carry inline <script>).
             'logo' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg', 'max:2048'],
+            'logo_dark' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg', 'max:2048'],
             'logo_icon' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg', 'max:2048'],
         ];
 
