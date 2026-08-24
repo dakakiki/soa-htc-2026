@@ -618,7 +618,7 @@ Ova pitanja ne blokiraju izradu tehničkog skeleton-a, ali moraju biti rešena p
 17. Da li mobilno polaganje mora raditi samo online ili se kasnije očekuje offline režim; šta se dešava pri prekidu mreže tokom testa bez autosave-a?
 18. Da li isti mobilni nalog treba da zadrži pregled svojih ranijih sezonskih registracija, iako povezivanje iste osobe kroz godine nije prioritet analitike?
 19. Koji konkretni logo formati, dimenzije i varijante su obavezni: desktop, mobile/app icon, favicon, svetla i tamna varijanta?
-20. Da li `PageLayout` koristi unapred programirane template-e sa definisanim content zonama ili administrator treba da sklapa stranicu od odobrenih content blokova?
+20. ~~Da li `PageLayout` koristi unapred programirane template-e sa definisanim content zonama ili administrator treba da sklapa stranicu od odobrenih content blokova?~~ **Razrešeno — ADR-0043 (2026-08-24): oboje.** Template definiše zone (registar u kodu) i tipove blokova koje zona prima; administrator bira redosled, vidljivost i sadržaj unutar njih, ali ne može da izmisli ni zonu ni tip.
 21. Kada se bude dodavao prvi jezik posle engleskog, da li svaki locale dobija sopstveni URL prefiks i lokalizovan slug ili se zadržava zajednički slug?
 22. Koji konkretni kontekstualni moduli, pored navigacionih linkova, treba da budu dozvoljeni u admin `right_sidebar` zoni?
 
