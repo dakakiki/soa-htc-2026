@@ -170,7 +170,8 @@ class MasterDataSeeder extends Seeder
     }
 
     /**
-     * The header and the footer as records (ADR-0045).
+     * The header and the footer as records (ADR-0045), and the copy of the screens
+     * the application draws itself (ADR-0046).
      *
      * Before this the header drew `public-header` and the footer drew both menus
      * by handle, hard-coded in the shell, with its paragraph and both column
@@ -196,6 +197,39 @@ class MasterDataSeeder extends Seeder
                         .' they enter with their candidate number.</p>',
                 ],
             ]);
+        }
+
+        // The competitor entry screen, once per stream. Each note points at the
+        // other way in, which is the only place either is mentioned.
+        $identify = [
+            LayoutZones::PUBLIC_IDENTIFY_COMPETITION => [
+                'eyebrow' => 'Competition entry',
+                'title' => 'Start your quiz',
+                'lead' => '<p>Three things off your candidate card, and the password your invigilator'
+                    .' reads out. No account, no sign-in.</p>',
+                'aside' => '<p>Just practising? <a href="/student/access/sample">Try a sample exam</a>'
+                    .' — no password needed.</p>',
+            ],
+            LayoutZones::PUBLIC_IDENTIFY_SAMPLE => [
+                'eyebrow' => 'Sample exam',
+                'title' => 'Practise first',
+                'lead' => '<p>The same three things off your candidate card. Nothing you answer here'
+                    .' counts towards the contest.</p>',
+                'aside' => '<p>Sitting the real thing? <a href="/student/access/competition">Start your'
+                    .' quiz</a> — your invigilator reads out the password.</p>',
+            ],
+        ];
+
+        foreach ($identify as $zone => $data) {
+            if (! LayoutBlock::query()->where('zone', $zone)->exists()) {
+                LayoutBlock::query()->create([
+                    'zone' => $zone,
+                    'type' => BlockType::Identify,
+                    'status' => true,
+                    'position' => 1,
+                    'data' => $data,
+                ]);
+            }
         }
 
         $headerMenu = Menu::query()->where('slug', 'public-header')->value('id');
@@ -383,8 +417,12 @@ class MasterDataSeeder extends Seeder
 
         $menus = [
             'public-header' => ['Public header', [
-                ['type' => 'custom', 'url' => '/#block_Start', 'label' => 'Start Quiz'],
-                ['type' => 'custom', 'url' => '/#block_Results', 'label' => 'Sample Exam'],
+                // The live site sends both of these to anchors on the front page —
+                // it had no entry screens to send them to, and "Sample Exam" shared
+                // its anchor with "Check Results". We do have the screens, and a
+                // menu entry named after one should open it.
+                ['type' => 'custom', 'url' => '/student/access/competition', 'label' => 'Start Quiz'],
+                ['type' => 'custom', 'url' => '/student/access/sample', 'label' => 'Sample Exam'],
                 ['type' => 'custom', 'url' => '/#block_Results', 'label' => 'Check Results'],
                 ['type' => 'custom', 'url' => '/#block_Coordinators', 'label' => 'Coordinators'],
                 ['type' => 'custom', 'url' => '/#block_CompetitionRules', 'label' => 'Category check'],

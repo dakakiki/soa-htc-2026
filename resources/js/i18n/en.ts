@@ -380,63 +380,78 @@ export default {
             sampleExam: 'Sample Exam',
         },
         access: {
-            title: 'Start your quiz',
-            chooseSubtitle: 'Choose how you want to enter.',
-            sampleTitle: 'Sample exams',
-            sampleDesc: 'Practice mode — no password needed.',
-            competitionTitle: 'Competition exams',
-            competitionDesc: 'Official contest — the exam password is required.',
-            headerSample: 'Sample — start your quiz',
-            headerCompetition: 'Start your quiz',
+            // The heading, the label above it, the paragraph and the note under it
+            // are CONTENT and live in the `public.identify.competition` and
+            // `public.identify.sample` layout zones (ADR-0046) — one per stream.
+            // What stays here is interface: field labels, button text, errors.
             country: 'Country',
             countryPlaceholder: 'Choose…',
             candidateNo: 'Candidate no',
             dob: 'Date of Birth',
             examPassword: 'Exam Password',
+            examPasswordPlaceholder: 'Read out in the room',
             startQuiz: 'Start quiz',
             starting: 'Starting…',
             error: 'We could not verify your details. Please check and try again.',
         },
         dashboard: {
-            title: 'Your assessments',
-            competitor: 'Competitor',
+            // Everything on this screen is either DATA (the quiz, exam and test
+            // names, the marks) or a statement of a rule the engine enforces, so
+            // unlike the public screens it carries no editable copy and no zone
+            // (ADR-0046 applies to authored headings and paragraphs).
+            //
+            // 🪤 There is deliberately no quiz-password wording here any more.
+            // The exam password is asked for once, at entry; the second prompt
+            // this screen used to carry was a leftover of the legacy flow and
+            // the owner's rule is that "that option does not exist".
+            yourQuiz: 'Your quiz',
             signOut: 'Sign out',
             empty: 'No assessments are available yet.',
             error: 'Could not load your assessments.',
-            sample: 'Sample',
-            competition: 'Competition',
-            locked: 'Locked',
-            available: 'Available',
-            durationMin: '{n} min',
             noTests: 'No tests in this exam.',
-            passwordLabel: 'Quiz password',
-            passwordPlaceholder: 'Enter the quiz password',
-            unlock: 'Unlock',
-            unlocking: 'Unlocking…',
-            unlockError: 'We could not unlock this quiz. Please check the password and try again.',
-            lockedHint: 'Enter the password to reveal this quiz’s tests.',
+            // Not a label on screen: the locked row is drawn as an icon, and this
+            // is what a screen reader reads in its place.
+            locked: 'Locked',
+            durationMin: '{n} min',
             start: 'Start',
             resume: 'Continue',
-            completedLabel: 'Completed',
-            result: 'Result: {score} / {max}',
+            completedLabel: 'Done',
+            sequence: 'Tests open one after another, in this order.',
+            opensLater: 'Opens once the round before it has been marked and published.',
         },
         test: {
+            // 🪤 No points anywhere on this screen. The owner's rule
+            // (2026-08-25): a competitor must not know what a question is worth
+            // while they are answering it. The mark per test appears after
+            // publication, on the tests screen.
             loading: 'Loading the test…',
             error: 'Could not start this test.',
-            timeLeft: 'Time left',
-            questionOf: 'Question {n} of {total}',
-            points: '{n} pts',
+            questionNo: 'Question {n}',
+            answeredOf: '{n} of {total} answered',
+            questions: 'Questions',
+            answeredKey: 'answered',
+            blankKey: 'blank',
             essayPlaceholder: 'Write your answer…',
-            gapPlaceholder: 'Answer',
-            submit: 'Submit test',
-            submitting: 'Submitting…',
-            confirmTitle: 'Submit your test?',
-            confirmBody: 'You cannot change your answers after submitting.',
-            cancel: 'Keep working',
-            done: 'Test submitted',
-            doneBody: 'Your answers have been recorded.',
-            backToList: 'Back to assessments',
-            timeUp: 'Time is up — your answers were submitted automatically.',
+            gapPlaceholder: 'Type your answer',
+            handIn: 'Hand in',
+            handingIn: 'Handing in…',
+            noReturn: 'You cannot come back to a test once it is handed in.',
+            confirmTitle: 'Hand in this test?',
+            confirmBody: 'Once it is handed in you cannot come back to it.',
+            confirmTimeLeft: 'You still have {time} on the clock.',
+            unanswered: '{n} question has no answer | {n} questions have no answer',
+            unansweredNumbers: 'Number {list}. | Numbers {list}.',
+            handInNow: 'Hand in now',
+            keepWorking: 'Keep working',
+            done: 'Handed in',
+            doneBody: 'Your answers are with us. Marks are published after the round closes,'
+                + ' and they appear on your tests screen.',
+            timeUp: 'Time ran out, so your answers were handed in for you.',
+            summaryTest: 'Test',
+            summaryAnswered: 'Answered',
+            summaryHandedIn: 'Handed in',
+            nextOpens: 'Your next test opens once this one has been marked and published.',
+            backToList: 'Back to my tests',
         },
     },
     home: {
@@ -823,7 +838,10 @@ export default {
         removeGap: 'Remove gap',
         gapN: 'Gap {n}',
         gapPlaceholder: 'answer1|answer2',
-        gapHint: 'Put [answer] in the description at each gap. For each gap, list acceptable answers separated by | (pipe).',
+        // 🪤 vue-i18n reads a bare `|` as the plural separator and renders only
+        // the branch before it, so this hint used to stop at "separated by".
+        // `{'|'}` is the literal form — same family of trap as a bare `@`.
+        gapHint: "Put [answer] in the description at each gap. For each gap, list acceptable answers separated by {'|'} (pipe).",
         image: 'Image',
         audio: 'Audio',
         chooseImage: 'Choose image…',

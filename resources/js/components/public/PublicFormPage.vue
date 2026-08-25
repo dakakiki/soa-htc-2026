@@ -21,14 +21,26 @@ defineSlots<{
     /** The form itself. */
     default: () => unknown;
 }>();
+
+withDefaults(
+    defineProps<{
+        /**
+         * A form whose fields sit two to a row rather than one (competitor entry,
+         * with eight date boxes across). It takes the gutter the narrow shape
+         * leaves between the columns; the words give up a column to pay for it.
+         */
+        wide?: boolean;
+    }>(),
+    { wide: false },
+);
 </script>
 
 <template>
     <div class="grid gap-10 py-4 lg:grid-cols-12 lg:gap-16 lg:py-12">
-        <div class="lg:col-span-6">
+        <div :class="wide ? 'lg:col-span-5' : 'lg:col-span-6'">
             <slot name="intro" />
         </div>
-        <div class="lg:col-span-5 lg:col-start-8">
+        <div :class="wide ? 'lg:col-span-7' : 'lg:col-span-5 lg:col-start-8'">
             <slot />
         </div>
     </div>

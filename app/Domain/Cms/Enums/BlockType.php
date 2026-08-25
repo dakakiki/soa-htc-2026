@@ -28,8 +28,10 @@ enum BlockType: string
     case Footer = 'footer';
     // Screen copy. A screen the application draws itself — a form, not something
     // assembled from sections — but whose heading and paragraph are still words
-    // somebody has to be able to change without a commit.
+    // somebody has to be able to change without a commit. `Identify` serves two
+    // zones, one per entry stream: the same screen, two sets of words.
     case Login = 'login';
+    case Identify = 'identify';
 
     public function label(): string
     {
@@ -45,6 +47,7 @@ enum BlockType: string
             self::Header => 'Header',
             self::Footer => 'Footer',
             self::Login => 'Sign in',
+            self::Identify => 'Competitor entry',
         };
     }
 
@@ -54,11 +57,11 @@ enum BlockType: string
      * section" button — there is nothing to add or reorder.
      *
      * Covers two kinds: the chrome (header, footer) and the copy of a screen the
-     * application draws itself (sign-in). Both are one record edited as fields;
-     * only the front page is a list.
+     * application draws itself (sign-in, competitor entry). Both are one record
+     * edited as fields; only the front page is a list.
      */
     public function isSingle(): bool
     {
-        return in_array($this, [self::Header, self::Footer, self::Login], true);
+        return in_array($this, [self::Header, self::Footer, self::Login, self::Identify], true);
     }
 }

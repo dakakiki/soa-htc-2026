@@ -258,12 +258,17 @@ class CmsLayoutTest extends TestCase
         $this->assertTrue($zones->has(LayoutZones::PUBLIC_HEADER));
         $this->assertTrue($zones->has(LayoutZones::PUBLIC_FOOTER));
         $this->assertTrue($zones->has(LayoutZones::PUBLIC_LOGIN));
+        // Competitor entry is two zones, one per stream, because the two are two
+        // screens to whoever arrives at them.
+        $this->assertTrue($zones->has(LayoutZones::PUBLIC_IDENTIFY_COMPETITION));
+        $this->assertTrue($zones->has(LayoutZones::PUBLIC_IDENTIFY_SAMPLE));
         // The front page is a list of sections; the rest are one record edited as
         // a form, and the editor branches on this rather than on a hard-coded list
         // of zone names.
         $this->assertFalse($zones[LayoutZones::PUBLIC_HOME]['is_single']);
         $this->assertTrue($zones[LayoutZones::PUBLIC_HEADER]['is_single']);
         $this->assertTrue($zones[LayoutZones::PUBLIC_LOGIN]['is_single']);
+        $this->assertTrue($zones[LayoutZones::PUBLIC_IDENTIFY_SAMPLE]['is_single']);
 
         // The menu field's options ship with the registry, so the form needs no
         // second request to know what it may offer.
@@ -345,6 +350,48 @@ class CmsLayoutTest extends TestCase
         $this->assertSame('Staff access', $content['eyebrow']);
         $this->assertSame('Sign in', $content['title']);
         $this->assertSame('<p>Competitors do not sign in.</p>', $content['lead']);
+    }
+
+    public function test_each_entry_stream_publishes_its_own_words(): void
+    {
+        $this->chrome(LayoutZones::PUBLIC_IDENTIFY_COMPETITION, BlockType::Identify, [
+            'eyebrow' => 'Competition entry',
+            'title' => 'Start your quiz',
+            'lead' => '<p>Three things off your candidate card.</p>',
+            'aside' => '<p>Just practising? <a href="/student/access/sample">Try a sample exam</a>.</p>',
+        ]);
+        $this->chrome(LayoutZones::PUBLIC_IDENTIFY_SAMPLE, BlockType::Identify, [
+            'eyebrow' => 'Sample exam',
+            'title' => 'Practise first',
+            'lead' => '<p>Nothing here counts.</p>',
+            'aside' => null,
+        ]);
+
+        $competition = $this->getJson('/api/public/layout/'.LayoutZones::PUBLIC_IDENTIFY_COMPETITION)
+            ->assertOk()->json('data.blocks.0.content');
+        $sample = $this->getJson('/api/public/layout/'.LayoutZones::PUBLIC_IDENTIFY_SAMPLE)
+            ->assertOk()->json('data.blocks.0.content');
+
+        // One screen, one route with a parameter — but two records, so neither
+        // stream's words can be edited by accident from the other's tab.
+        $this->assertSame('Start your quiz', $competition['title']);
+        $this->assertSame('Practise first', $sample['title']);
+        $this->assertStringContainsString('/student/access/sample', $competition['aside']);
+        // The note is the admin's to leave out; an empty one is not a missing one.
+        $this->assertNull($sample['aside']);
+    }
+
+    public function test_the_entry_screen_refuses_a_note_longer_than_the_schema_allows(): void
+    {
+        $block = $this->chrome(LayoutZones::PUBLIC_IDENTIFY_SAMPLE, BlockType::Identify, ['title' => 'Practise first']);
+
+        $this->actingAs($this->admin())
+            ->putJson('/api/cms/layout-blocks/'.$block->id, [
+                'status' => true,
+                'content' => ['title' => 'Practise first', 'aside' => str_repeat('a', 801)],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['content.aside']);
     }
 
     public function test_a_menu_reference_must_point_at_a_menu_that_exists(): void

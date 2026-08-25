@@ -5,6 +5,12 @@ import { ref, watch } from 'vue';
  * Date-of-birth entry as eight single-character boxes (D D M M Y Y Y Y), mirroring
  * the legacy access form. Emits an ISO `YYYY-MM-DD` string once all eight are
  * filled, otherwise an empty string.
+ *
+ * The boxes share the row rather than each taking a fixed width: eight 64px boxes
+ * came to 512px and ran off the side of every phone, and this screen is the one
+ * the owner expects to be used through the PWA more than anywhere else. A box's
+ * letter stays faint until the box holds a digit, so the row itself shows how far
+ * along the entry is.
  */
 const props = defineProps<{ modelValue: string }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>();
@@ -55,9 +61,9 @@ watch(
 </script>
 
 <template>
-    <div class="flex justify-center gap-1.5">
-        <div v-for="(label, i) in labels" :key="i" class="flex flex-col items-center gap-1">
-            <span class="text-xs font-semibold text-brand-primary">{{ label }}</span>
+    <div class="flex gap-1.5 sm:gap-2">
+        <div v-for="(label, i) in labels" :key="i" class="flex flex-1 flex-col items-center gap-1.5">
+            <span class="font-mono text-[10px]" :class="digits[i] === '' ? 'text-brand-palette-4/35' : 'text-brand-palette-2'">{{ label }}</span>
             <input
                 :ref="(el) => setRef(el as Element | null, i)"
                 :value="digits[i]"
@@ -65,7 +71,7 @@ watch(
                 inputmode="numeric"
                 maxlength="1"
                 :aria-label="label"
-                class="h-[4.6rem] w-16 rounded-md border border-gray-300 text-center text-3xl focus:border-brand-primary focus:outline-none"
+                class="h-[54px] w-full rounded-[10px] border border-brand-palette-4/20 bg-transparent text-center font-mono text-xl text-brand-palette-4 focus:border-brand-palette-4 focus:outline-none sm:h-16 sm:rounded-xl sm:text-2xl"
                 @input="onInput(i, $event)"
                 @keydown="onKeydown(i, $event)"
             />

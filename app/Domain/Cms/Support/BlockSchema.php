@@ -48,7 +48,7 @@ final class BlockSchema
             // Three hero sections are not a choice, they are a mistake.
             BlockType::Hero, BlockType::Contact, BlockType::News => 1,
             // Chrome and screen copy: one record per zone, always.
-            BlockType::Header, BlockType::Footer, BlockType::Login => 1,
+            BlockType::Header, BlockType::Footer, BlockType::Login, BlockType::Identify => 1,
             default => null,
         };
     }
@@ -157,6 +157,16 @@ final class BlockSchema
                 self::text('eyebrow', 'Label above the heading', 60),
                 self::text('title', 'Heading', 120),
                 self::rich('lead', 'Paragraph', 1600),
+            ],
+            // The competitor entry screen's words, per stream. Same three as the
+            // sign-in screen plus the note under them, which is where each stream
+            // points at the other — the only place a competitor is told that the
+            // other way in exists.
+            BlockType::Identify => [
+                self::text('eyebrow', 'Label above the heading', 60),
+                self::text('title', 'Heading', 120),
+                self::rich('lead', 'Paragraph', 1600),
+                self::rich('aside', 'Note under the paragraph', 800),
             ],
         };
     }

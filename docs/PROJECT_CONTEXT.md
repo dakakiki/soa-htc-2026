@@ -217,7 +217,10 @@ Saglasnost roditelja/staratelja za učešće maloletnog takmičara nije deo apli
 - Dozvoljen je jedan pokušaj po takmičaru i testu.
 - Administrator može omogućiti novi pokušaj resetovanjem prethodnog rezultata kroz administraciju/edit takmičara.
 - Pokretanje i završavanje moraju biti idempotentni radi zaštite od dvoklika i ponovljenih HTTP zahteva.
-- Da li testovi moraju strogo da se rade redom još nije potvrđeno; dostupnost uvek određuje backend prema konfiguraciji runde.
+- ~~Da li testovi moraju strogo da se rade redom još nije potvrđeno~~ — **razrešeno:** **ADR-0017** (strogo
+  redom) i **ADR-0021** (sledeći čeka da admin objavi prethodni), suženo **ADR-0049** na **takmičarske**
+  kvizove: u sample kvizu je svaki test otvoren od početka. Dostupnost i dalje određuje isključivo backend
+  (`StudentAvailability`), a ne klijent.
 - Reset rezultata mora biti autorizovana i auditovana komanda, ne javni `GET` endpoint. U novom sistemu prethodni attempt/result treba označiti kao poništen (`void`) ili arhivirati, umesto fizičkog brisanja audit istorije.
 
 ### 7.3 Čuvanje odgovora
@@ -390,9 +393,18 @@ Navigacija je poseban domen i ne treba je hardkodovati u Vue komponentama:
 
 > **Kako je ovo na kraju rešeno:** predlog iznad je iz pripreme; sprovedene odluke su u `DECISIONS.md`
 > — **ADR-0043** (zone su registar u kodu, sekcije su tipizovani blokovi), **ADR-0045** (`public.header`
-> i `public.footer` su zone sa jednim zapisom, tabovi u `Website → Layout`) i **ADR-0046** (svaki ekran
-> koji nosi naslov i pasus dobija zonu; labele polja i dugmad ostaju interfejs). `admin.top` i
+> i `public.footer` su zone sa jednim zapisom, tabovi u `Website → Layout`), **ADR-0046** (svaki ekran
+> koji nosi naslov i pasus dobija zonu; labele polja i dugmad ostaju interfejs) i **ADR-0047** (ekran sa
+> dva toka dobija zonu po toku — `public.identify.competition` i `public.identify.sample`). `admin.top` i
 > `admin.right_sidebar` iz tabele ispod **još nisu urađeni** — admin sidebar je i dalje data-driven u kodu.
+>
+> **OTVORENO — sezonski gate za stavke menija (2026-08-25):** dugme u layout bloku nosi `gate`
+> (`competition`/`sample`) koji `LayoutButtons` proverava kroz `EntryWindow` — *postoji li aktivan kviz tog
+> tipa* — pa van sezone ulaz za takmičenje nestane sam. **Stavka menija taj gate nema.** Otkad „Start Quiz"
+> i „Sample Exam" u zaglavlju vode na `/student/access/{mode}` a ne na sidra na početnoj, van sezone vode na
+> ekran na kojem se takmičar identifikuje i zatekne prazno. Rešenje kad dođe red: isto polje `gate` na
+> `cms_menu_items`, provera na istom mestu gde se stavka razrešava (`MenuItem::resolvedHref()` odnosno
+> resurs koji objavljuje meni), da postoji **jedno** pravilo o sezoni a ne dva.
 
 `Navigation` ima stabilni ključ/lokaciju, a uređene hijerarhijske `NavigationItem` stavke podržavaju roditelja, redosled, naziv, aktivnost i cilj. Cilj treba prvenstveno da bude interna `Page`, `Post`, kategorija ili imenovana aplikaciona ruta; spoljašnji URL je dozvoljen samo kao eksplicitno označen tip sa validacijom protokola. Admin navigacija sme da referencira sistemske rute, ali njena izmena ne može dodeliti novu permission niti zaobići policy proveru.
 
@@ -605,7 +617,9 @@ Pre prenosa treba napraviti inventar accounting ekrana, akcija, tabela, statusa,
 
 Ova pitanja ne blokiraju izradu tehničkog skeleton-a, ali moraju biti rešena pre finalizacije odgovarajućih modula:
 
-1. Da li testovi moraju strogo redom i da li se sledeći otključava završetkom prethodnog ili i minimalnim rezultatom?
+1. ~~Da li testovi moraju strogo redom i da li se sledeći otključava završetkom prethodnog ili i minimalnim rezultatom?~~
+   **Razrešeno:** ADR-0017 (strogo redom) + ADR-0021 (otključava ga **objava** prethodnog, ne sam završetak),
+   a ADR-0049 to ograničava na takmičarske kvizove.
 2. Pošto nema autosave-a, šta se dešava ako se browser zatvori ili internet prekine pre ručne potvrde/automatskog submit-a: gubitak odgovora, povratak u isti attempt ili administratorski reset?
 3. Da li administrator pre objavljivanja rezultata objavljuje ceo exam/quiz odjednom ili može pojedinačni rezultat/test?
 4. Da li essay podržava parcijalne bodove i da li je potrebna posebna potvrda ocene pre objave?

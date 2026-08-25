@@ -55,6 +55,17 @@ final class LayoutZones
     public const PUBLIC_LOGIN = 'public.login';
 
     /**
+     * The competitor entry screen's copy — one zone per stream, keyed by the same
+     * word the route carries (`/student/access/{mode}`). Two zones rather than one
+     * record with two sets of fields: a visitor arrives at one of them from one of
+     * two buttons, and an admin editing "the sample screen" should find its words
+     * without picking them out of the competition screen's.
+     */
+    public const PUBLIC_IDENTIFY_COMPETITION = 'public.identify.competition';
+
+    public const PUBLIC_IDENTIFY_SAMPLE = 'public.identify.sample';
+
+    /**
      * Zone key => what it is, and which block types it accepts.
      *
      * @return array<string, array{label: string, description: string, types: list<BlockType>}>
@@ -90,6 +101,16 @@ final class LayoutZones
                 'label' => 'Sign in',
                 'description' => 'The heading and the paragraph on the staff sign-in screen. The fields and the button are interface, not content.',
                 'types' => [BlockType::Login],
+            ],
+            self::PUBLIC_IDENTIFY_COMPETITION => [
+                'label' => 'Start quiz',
+                'description' => 'The words on the competitor entry screen for the contest itself, where the exam password is asked for.',
+                'types' => [BlockType::Identify],
+            ],
+            self::PUBLIC_IDENTIFY_SAMPLE => [
+                'label' => 'Sample exam',
+                'description' => 'The words on the same screen entered in practice mode, where no password is asked for.',
+                'types' => [BlockType::Identify],
             ],
         ];
     }

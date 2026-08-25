@@ -947,6 +947,217 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0047 — Ulazak takmičara: dve zone za jedan ekran, i široka varijanta javne forme
+
+- **Status:** Prihvaćeno (2026-08-25); vlasnik proizvoda. **IMPLEMENTIRANO** za `/student/access/:mode`.
+- **Kontekst:** Drugi ekran redizajna auth/studentskog toka, po pravilu iz ADR-0046. Ekran je jedna
+  ruta sa parametrom (`sample|competition`), ali su to dva različita obećanja: jedan traži lozinku
+  koju dežurni pročita u sali, drugi je vežba i ne broji se. Nacrt: platno `03 · Identify` (mobilni i
+  desktop).
+- **Odluke:**
+  - **Dve zone, ne jedan zapis sa dva seta polja.** `public.identify.competition` i
+    `public.identify.sample`, ključ nosi istu reč koju nosi ruta. Jedan zapis sa poljima
+    `eyebrow/sample_eyebrow/…` dao bi formu od šest skoro istih polja u kojoj se lako uređuje pogrešna
+    polovina; ovako svaki tok ima svoj tab i tri polja, tačno kao „Sign in".
+  - **Četvrto polje je `aside`** — pasus ispod linije koji **pokazuje na drugi tok** („Just practising?
+    Try a sample exam"). To je jedino mesto na kojem takmičar sazna da drugi ulaz postoji, pa
+    je sadržaj, a ne interfejs. Prazan `aside` znači da napomene nema — ne postoji skriveni fallback,
+    isto pravilo kao za ostatak zone.
+  - **`PublicFormPage` dobija `wide`.** Prijava ima jedno polje po redu i staje u 5 kolona; ulazak
+    takmičara ima dva polja po redu i osam kutija datuma u nizu, pa uzima 7 kolona a naslov ustupa
+    jednu (5+7 umesto 6+5 sa razmakom). Varijanta je prop na zajedničkoj komponenti, ne drugi raspored
+    — ekran i dalje ne može da zameni mesta naslovu i formi.
+  - **`SearchSelect` dobija `underlined`.** Javno polje je linija ispod vrednosti, a ne kutija;
+    padajuća lista ostaje ista, jer je meni i izgleda isto na obe strane aplikacije.
+- ⚡ **`DateBoxes` je do sada bio neupotrebljiv na telefonu:** osam kutija po `w-16` = 512px na ekranu
+  od 390px. Sada dele red (`flex-1`), pa je kutija 35×54 na telefonu i 64px visoka od `sm` naviše —
+  izmereno u pravom viewport-u od 389px, bez horizontalnog skrola. **Ovaj ekran je razlog zašto je
+  mobilni prelom crtan prvi** (vlasnik: testovi će se najčešće koristiti kroz PWA).
+- 🪤 **`tracking` na polju lozinke razmakne i placeholder.** `tracking-[0.22em]` je za tačkice
+  ukucane lozinke; dok je polje prazno razvlači „Read out in the room" u nešto što se teško čita.
+  Klasa se vezuje na vrednost, ne na polje.
+- 🪤 **Dve klase za istu osobinu u `class` i `:class` istog elementa nisu „poslednja pobeđuje"** —
+  odlučuje redosled u CSS-u. Zato veličina slova nije u zajedničkom `field` stringu (kandidatski broj
+  je mono 24px, lozinka 18px), a narandžasta labela je svoj string, a ne `label` + preklapanje.
+- **Posledica:** `BlockType::Identify` + `isSingle()`; `LayoutZones::PUBLIC_IDENTIFY_COMPETITION`
+  i `…_SAMPLE`; polja `eyebrow/title/lead/aside` u `BlockSchema`; `PublicFormPage` prop `wide`;
+  `SearchSelect` prop `underlined`; `DateBoxes` prelomljen za telefon; `StudentAccessFormPage` čita
+  zonu po `mode` (watch, ne `onMounted` — ista komponenta služi obe rute); mrtvi ključevi ekrana
+  izbačeni iz `en.ts`. Testovi: `CmsLayoutTest` 22.
+- **Ostaje za naredne ekrane:** spisak testova (`/student`, tu ide i brisanje `unlockQuiz` forme) i
+  test u toku.
+
+---
+
+## ADR-0048 — „My tests": ekran bez sopstvenog teksta; lozinka kviza se traži jednom, na ulazu
+
+- **Status:** Prihvaćeno (2026-08-25); vlasnik proizvoda. **IMPLEMENTIRANO** za `/student`.
+- **Kontekst:** Treći ekran runde. Nacrt: `04 · My tests` (mobilni i desktop). Vlasnikovo pravilo od
+  2026-08-25: *„nema lozinke kviza na ekranu My tests — ta opcija ne postoji."*
+- **Odluke:**
+  - **Ovaj ekran NEMA zonu, i to nije previd.** ADR-0046 daje administraciju ekranu koji nosi
+    **napisan** naslov i pasus. Ovde je naslov **podatak** (ime kviza), a dve rečenice ispod
+    („Tests open one after another…", „Opens once the round before it has been marked and published.")
+    opisuju pravilo koje kod sprovodi (ADR-0017/0021) — admin koji ih promeni nije uredio stranu nego
+    slagao o pravilu. Zona bi ovde bila treći mehanizam za nešto što nije sadržaj.
+  - **Forma za lozinku kviza je obrisana sa ekrana.** `unlockQuiz` **ostaje u API sloju**, ali sa
+    **tačno jednim pozivaocem** — `enterCompetition` na ulazu, gde dežurni pročita lozinku. Zaključan
+    kviz koji ipak stigne do ovog ekrana prikazuje svoje testove zaključanima; to je istina, a ne
+    ćorsokak prerušen u formu. Funkcija nosi komentar da se forma ne vraća.
+  - **Runde koje takmičar još nije dostigao vide se prigušene, ne skrivaju se** (promena ponašanja:
+    `visibleExams()` ih je izbacivao). Po nacrtu: znati da finale postoji i zašto je zatvoreno vredi
+    više od kraće strane. **Otvaranje se nije promenilo** — i dalje čeka da admin objavi prethodnu
+    rundu (ADR-0021), pa je ovo prikaz, ne pristup.
+  - **Runda u igri dobija širu kolonu** (7/12), ostale užu (5/12) i teku iza nje — sa dve runde sezone
+    to je tačno 7/5 iz nacrta, a sa više ostaje mreža umesto specijalnog slučaja.
+  - **Broj runde (`01`, `02`) se čita iz pozicije, nikad iz naslova** — isto pravilo kao za pitanja
+    (ADR-0033).
+  - **Statusna traka je izdvojena u `SiteStatusStrip`** i deli je javni i studentski omotač; komponenta
+    prima `site` kao prop jer javni shell tu istu vrednost već čita za podnožje — jedan zahtev po strani.
+- ⚡ **Studentski omotač je prešao u jezik javnog dela** (ista podloga, isto mastilo, ista traka), ali
+  **bez navigacije sajta**: takmičar usred testiranja ima jedno mesto na kojem treba da bude, a meni je
+  poziv da ga napusti. **Na telefonu nema ni trake ni znaka** — red je samo ko je prijavljen i izlaz.
+- 🪤 **Studentsko zaglavlje je crtalo `logo_url` (belu varijantu) na skoro beloj podlozi.** Prešlo je na
+  `logo_dark_url`, isto kao javni shell; ime u rečima ostaje pošten fallback.
+- 🪤 Deljeni `mono` string **ne nosi ni veličinu ni boju** — svako mesto postavlja svoju. Dve utility
+  klase za istu osobinu na istom elementu rešava redosled u CSS-u, ne redosled u atributu (vidi ADR-0047).
+- **Posledica:** `StudentDashboardPage` prepisan (bez `unlockQuiz`, bez `visibleExams`); `StudentLayout`
+  redizajniran; `SiteStatusStrip` izdvojen iz `PublicLayout`; `student.dashboard` u `en.ts` očišćen od
+  mrtvih i lozinkinih ključeva, dobio `yourQuiz`/`sequence`/`opensLater`, a `completedLabel` je sad „Done".
+  Bez izmena na serveru — statusi i dalje dolaze iz `StudentAvailability`.
+- **Ostaje za narednu rundu:** test u toku (`/student/tests/:testId`) — sat, lepljiva traka, predaja.
+
+---
+
+## ADR-0049 — Redosled testova je pravilo TAKMIČENJA; sample je otvoren ceo (sužava ADR-0017/0021)
+
+- **Status:** Prihvaćeno (2026-08-25); vlasnik proizvoda. **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik, 2026-08-25: *„sample testovi su svi odmah dostupni. Nema potrebe za
+  otključavanjem. To se koristi samo za competition."* Do sada su ADR-0017 (strogo redom) i ADR-0021
+  (sledeći čeka objavu) važili za **sve** kvizove, pa je i vežba bila red čekanja.
+- **Odluka:** `StudentAvailability::testStatuses()` nosi „front" sekvence **samo kroz competition kviz**.
+  U sample kvizu je svaki nezavršen test `next`. Obrazloženje: vežba ne štiti ništa time što se polaže
+  redom, a sample rezultati se objavljuju sami (ADR-0019), pa nema ni odobrenja koje bi se čekalo.
+  - **Jedan pokušaj po testu i dalje važi** (ADR-0016): završen sample test ostaje završen.
+  - Ista funkcija hrani i prikaz i `startableQuizId`, pa se server-side provera menja **u istoj liniji**
+    kao i ono što takmičar vidi — ne postoje dva pravila koja mogu da se raziđu.
+- 🪤 **Testovi koji su dokazivali sekvencu gradili su SAMPLE kviz** (`twoTestChain`, `quizWithTests`
+  podrazumevano `sample`), pa bi posle ove izmene prolazili iz pogrešnog razloga. Prebačeni su na
+  `competition`, a helper-i nose komentar zašto tip nije svejedno.
+- **Posledica:** dva nova testa (`StudentAvailabilityTest` 12 → 14) i jedan ispravljen u `AttemptTest`;
+  na ekranu „My tests" napomene o redosledu i čekanju objave prikazuju se **samo za competition kviz** —
+  u sample kvizu bi bile netačne.
+
+---
+
+## ADR-0050 — Test u toku: sat i „Hand in" se ne pomeraju; poena nema nigde
+
+- **Status:** Prihvaćeno (2026-08-25); vlasnik proizvoda. **IMPLEMENTIRANO** za `/student/tests/:testId`.
+- **Kontekst:** Poslednji ekran runde i najosetljiviji. Nacrti: `05 · Test running` (mobilni i desktop),
+  `05b · Hand in`, `05c · Handed in`.
+- **Odluke:**
+  - **Dve stvari nikad ne odlaze sa ekrana, i to je ceo raspored:** **sat**, u koji takmičar gleda stalno,
+    i **„Hand in"**, do kojeg mora da stigne bez skrolovanja preko dvadeset pitanja. Na desktopu je Hand in
+    u desnoj traci uz mapu pitanja, na telefonu na donjoj ivici. Sve ostalo je između njih.
+  - **Poena nema nigde na ekranu** (vlasnik, 2026-08-25: *„student ne treba da zna koliko poena nosi koje
+    pitanje"*). Ranije je svako pitanje nosilo čip `{n} pts`. Bod po testu se vidi tek posle objave, na
+    spisku testova.
+  - **Ekran uzima ceo prozor** (`meta.bare`): studentski omotač sklanja zaglavlje i kontejner. Dugme za
+    odjavu pored sata koji otkucava je poziv da se ispit izgubi pogrešnim dodirom.
+  - **Predaja prekida, jednom.** List se podiže sa iste ivice na kojoj stoji dugme, kaže da povratka nema,
+    koliko je ostalo na satu i — ako ih ima — **koja pitanja su bez odgovora**, po brojevima. To je jedina
+    činjenica vredna prekida.
+  - **Mapa pitanja u desnoj traci**: popunjen kvadrat = odgovoreno, prazan = prazno, **prsten** = pitanje
+    koje se trenutno čita. Prsten a ne druga boja, da „gde sam" ne prebriše „da li sam odgovorio".
+    Trenutno pitanje prati `IntersectionObserver`, ne scroll handler.
+  - **Predato = drugačija boja ekrana** (navy), da nema sumnje da je gotovo: šta je predato, koliko
+    odgovoreno i u koliko sati. Rečenica o sledećem testu stoji **samo u takmičarskom toku** (ADR-0049).
+- ⚡ **Otpala je računica širine.** Stari sticky header se lepio uz `--vw` mereno `ResizeObserver`-om, jer
+  je `100vw` brojao skrol traku. Sa `meta.bare` traka je obično dete omotača i široka koliko i prozor —
+  nema šta da se meri ni održava.
+- 🪤 **`|` u i18n stringu preseca poruku.** vue-i18n čita uspravnu crtu kao razdvajač množine i renderuje
+  samo granu pre nje; `question.gapHint` je zato mesecima završavao na „separated by". Literal je
+  `{'|'}` — ista porodica zamke kao `@` (ADR-0046). Nađeno pri uvođenju množine za „N questions have no answer".
+- 🪤 **Skok na pitanje mora da preskoči traku.** `scrollIntoView({block:'start'})` stavlja vrh elementa na
+  vrh prozora — a tamo stoji lepljiva traka sa satom, pa je „Question 04" završavalo ispod nje i takmičar
+  se zaticao na prvom ponuđenom odgovoru. Rešenje je `scroll-margin-top` **izmeren sa trake**, ne ukucan:
+  traka je jedne visine na telefonu a druge na desktopu.
+- 🪤 **Mereno je pre nego što je bilo šta iscrtano.** `watchQuestions()` i merenje trake stajali su u `try`
+  bloku, a `loading` se gasi tek u `finally` — dok je `loading` true šablon crta jednu liniju, pa je
+  `querySelectorAll('[data-question]')` vraćao prazno i prsten je zauvek ostajao na prvom pitanju.
+  Podešavanje ide **posle** `finally`, uz `nextTick()`.
+- ℹ️ **U automatizovanom Chrome-u tab je `hidden`, pa rAF ne radi** — a od njega zavise i `behavior:'smooth'`
+  i isporuka `IntersectionObserver`-a. Oba u toj proveri ćute; to je okruženje, ne kod. Pozicija skoka se
+  proverava i bez njih (`behavior:'auto'`), prsten se proverava u običnom prozoru.
+- **Posledica:** `StudentTestPage` prepisan; `meta.bare` u ruteru i u `StudentLayout`; `student.test` u
+  `en.ts` prepisan (bez `points`), sa množinom za nedostajuće odgovore; `.test-gap` stil je globalan jer
+  se rečenica sa prazninama iscrtava kroz `v-html`, kuda scoped stil ne dopire.
+- ⚠️ **Nađeno, nije popravljeno:** **210 gap-filling pitanja u aktivnom sadržaju nema `[answer]` marker**
+  (legacy tekst nosi crte: `_ a _ _ _ r`). Takva pitanja se iscrtavaju **bez ijednog polja za odgovor**,
+  pa su za takmičara neodgovoriva. Zatečeno stanje, ne posledica ovog ekrana; ide u backlog kao migraciona
+  stavka.
+
+---
+
+## ADR-0051 — CP850 detektor je znao samo jedan od dva potpisa (ispravlja ADR uz `LegacyText`)
+
+- **Status:** Prihvaćeno (2026-08-25). **IMPLEMENTIRANO**; `legacy:fix-encoding` pušten na dev-u.
+- **Kontekst:** U pitanjima i odgovorima je i posle `legacy:fix-encoding` stajalo «heÔÇÿd gone off»,
+  «the text ÔÇô a, b, c», «Centre ÔÇ£LeaderÔÇØ». Vlasnik: *„sredi ovo."*
+- **Nalaz:** Reverzija je oduvek bila ispravna — **detektor** je bio preuzak. `looksCorrupted()` je tražio
+  samo box-drawing glifove (U+2500–U+259F), a njih ostavljaju **dvobajtni** originali (ć, ž, ō, é: vodeći
+  bajt C2–DF, koji CP850 crta kao okvire). Tipografska interpunkcija — polunavodnici, crte, tri tačke —
+  je **trobajtna** (vodeći bajt E2), a E2 se u CP850 crta kao obično «Ô». Ništa u «ÔÇÿ» ne izgleda
+  polomljeno kao okvir, pa je ta porodica prolazila neopaženo kroz svaki dosadašnji uvoz.
+- **Odluka:** Drugi test **ne nabraja glifove nego postavlja pitanje direktno**: vrati string u CP850 bajtove
+  i pogledaj da li iz njega ispada **kompletna trobajtna UTF-8 sekvenca** (`\xE2[\x80-\xBF]{2}`). Ispravan
+  tekst to ne preživljava — jedno akcentovano slovo daje zalutali continuation bajt, ne sekvencu — a `fix()`
+  i dalje odbija svaku reverziju koja završi na nevalidnom UTF-8 ili na novom mojibake-u.
+- **Posledica:** `LegacyText::looksCorrupted()` proširen; `LegacyTextTest` 18 → 25 (tri nova uzorka i četiri
+  nova „čista" slučaja, uključujući «Hôtel de la Côte» — «Ô» samo za sebe nije potpis). Komanda je
+  nepromenjena i i dalje idempotentna; na dev-u je popravila **233 polja u 230 redova** (27 škola,
+  33 pitanja, 170 odgovora), a ponovno pokretanje ne menja ništa.
+
+---
+
+## ADR-0052 — Takmičarski API ne jaše na web sesiji, pa ga ne čuva ni njen CSRF token
+
+- **Status:** Prihvaćeno (2026-08-25). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik, 2026-08-25, sa ekrana testa: *„ako osvežim stranicu dobijem «CSRF token
+  mismatch»"* i *„sesija je istekla."* Takmičar usred takmičenja je ostajao bez testa zbog sesije koju
+  nikad nije ni koristio.
+- **Nalaz:** `statefulApi()` stavlja **svaki** `/api/*` poziv sa ovog domena iza web sesije i njene CSRF
+  provere. Za osoblje je to tačno — ono se autentifikuje kolačićem. **Takmičar se ne autentifikuje
+  kolačićem:** `EnsureStudentSession` čita isključivo `Authorization: Bearer` i ništa drugo. Kad
+  `SESSION_LIFETIME` istekne, `XSRF-TOKEN` prestane da se poklapa i `POST /api/student/tests/{id}/start`
+  vrati **419** — a poruka koju takmičar vidi je sirovo „CSRF token mismatch".
+- **Odluka:** `validateCsrfTokens(except: ['api/student/*'])`. CSRF štiti zahteve koji nose identitet u
+  kolačiću; ovde ga nema šta da štiti — falsifikovan zahtev sa druge strane stiže bez bearer token-a i
+  `student.session` ga odbija sa 401 svejedno.
+  - **`identify` je izuzet i to je bezbedno:** nije autentifikovan kolačićem, pozivalac mora unapred da
+    zna sva tri podatka koja se proveravaju, a bearer token iz odgovora se ne može pročitati sa druge
+    strane (nema popustljivog CORS-a). Napadač koji zna ta tri podatka se ionako prijavi sa svoje mašine.
+- 🪤 **Jednina je namerna.** Administratorski spisak je `api/registrations/*`; obrazac `api/student/*` ne
+  hvata nijednu rutu osoblja (ni `api/students/…` — granica segmenta je deo obrasca).
+- **Provereno uživo, u oba smera:** ceo takmičarski put **bez ijednog CSRF header-a** — identify 200,
+  start 201, submit 200, logout 204; a `POST /api/auth/login` bez token-a i dalje **419**. Testovima
+  se CSRF ne izvršava (`runningUnitTests`), pa je izuzeće zakucano tamo gde se i konfiguriše
+  (`StudentIdentifyTest` 8 → 9).
+- **Druga polovina istog problema, razrešena isti dan:** studentska bearer sesija je trajala **180 minuta
+  od identifikacije i nije se produžavala**, pa je takmičar koji se identifikuje čim se sala otvori mogao
+  da je pređe usred testa. Vlasnik: *„uvedi klizno produžavanje."* Sada **svaki autentifikovan poziv vraća
+  horizont na pun vek** (`EnsureStudentSession`), pa horizont meri ono što treba — koliko je prošlo otkad
+  je takmičar poslednji put nešto uradio, a ne otkad se identifikovao.
+  - ⚠️ **Sat testa se NE pomera.** Test i dalje ističe kad istekne njegovo trajanje (ADR-0018); kliza samo
+    pravo da se uopšte bude tu.
+  - ⚡ **Upis najviše jednom u minuti po sesiji.** Ovo se izvršava na svakom zahtevu takmičara; ponovo
+    žigosati horizont koji je ionako skoro pun ne kupuje ništa osim upisa.
+  - **Istekla sesija se ne oživljava:** produžava se samo ono što je `active()` već našao.
+  - Provereno i uživo: sesiji je horizont spušten na 10 minuta, jedan `GET /api/student/me` ga je vratio
+    na 180. Testovi: `StudentIdentifyTest` 9 → 12.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
