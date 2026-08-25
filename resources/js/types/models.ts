@@ -679,7 +679,7 @@ export interface PublicBlock {
  */
 export interface LayoutField {
     key: string;
-    kind: 'text' | 'textarea' | 'rich' | 'number' | 'enum' | 'list' | 'button' | 'buttons';
+    kind: 'text' | 'textarea' | 'rich' | 'number' | 'enum' | 'list' | 'button' | 'buttons' | 'menu';
     label: string;
     max?: number;
     min?: number;
@@ -700,6 +700,8 @@ export interface LayoutZoneInfo {
     key: string;
     label: string;
     description: string;
+    /** True when the zone holds one settings record, not a list of sections. */
+    is_chrome: boolean;
     types: LayoutTypeInfo[];
 }
 
@@ -708,6 +710,8 @@ export interface LayoutRegistry {
     button_styles: string[];
     target_types: string[];
     gates: string[];
+    /** Options for every `menu` field, shipped with the registry. */
+    menus: { id: number; name: string; slug: string }[];
 }
 
 /** A button as the editor holds it, before the server decides who sees it. */

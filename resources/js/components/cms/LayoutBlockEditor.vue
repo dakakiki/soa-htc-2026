@@ -21,6 +21,13 @@ const props = defineProps<{
     block: CmsLayoutBlock;
     type: LayoutTypeInfo;
     registry: LayoutRegistry;
+    /**
+     * Render inside the page instead of over it. A section of the front page is
+     * one of many, so it is edited in a modal you come back from; the header and
+     * the footer are the whole tab, and a modal over a page with nothing else on
+     * it is a door for the sake of having one.
+     */
+    inline?: boolean;
 }>();
 
 const emit = defineEmits<{ close: []; saved: [CmsLayoutBlock] }>();
@@ -58,7 +65,15 @@ function emptyButton(): LayoutButtonValue {
 function emptyRow(item: LayoutField[]): Record<string, unknown> {
     const row: Record<string, unknown> = {};
     item.forEach((sub) => {
-        row[sub.key] = sub.kind === 'button' ? emptyButton() : '';
+        if (sub.kind === 'button') {
+            row[sub.key] = emptyButton();
+        } else if (sub.kind === 'menu') {
+            // A foreign key, so the blank value is null — an empty string would
+            // reach the server as something an integer rule has to reject.
+            row[sub.key] = null;
+        } else {
+            row[sub.key] = '';
+        }
     });
     return row;
 }
@@ -116,14 +131,16 @@ const title = computed(() => props.type.label);
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="emit('close')">
-        <div class="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl">
-            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+    <div :class="inline ? '' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4'"
+        @click.self="inline ? null : emit('close')">
+        <div class="flex w-full flex-col rounded-lg bg-white"
+            :class="inline ? 'border border-gray-200' : 'max-h-[85vh] max-w-3xl shadow-xl'">
+            <div v-if="!inline" class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
                 <h2 class="text-lg font-semibold tracking-tight">{{ title }}</h2>
                 <span class="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-500">{{ block.type }}</span>
             </div>
 
-            <div class="flex flex-col gap-6 overflow-auto px-6 py-5">
+            <div class="flex flex-col gap-6 px-6 py-5" :class="inline ? '' : 'overflow-auto'">
                 <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
                 <div v-if="type.uses_image">
@@ -168,6 +185,19 @@ const title = computed(() => props.type.label);
                         <select v-model="content[f.key] as string" :class="field">
                             <option v-for="option in f.options" :key="option" :value="option">{{ option }}</option>
                         </select>
+                    </label>
+
+                    <!-- A reference to a CMS menu, not a copy of its links: renaming
+                         the menu or reordering it moves the navigation with it. -->
+                    <label v-else-if="f.kind === 'menu'" class="block max-w-[20rem]">
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ f.label }}</span>
+                        <select v-model="content[f.key] as number | null" :class="field">
+                            <option :value="null">{{ $t('layout.noMenu') }}</option>
+                            <option v-for="m in registry.menus" :key="m.id" :value="m.id">{{ m.name }}</option>
+                        </select>
+                        <span v-if="!registry.menus.length" class="mt-1 block text-xs text-amber-600">
+                            {{ $t('layout.noMenusYet') }}
+                        </span>
                     </label>
 
                     <div v-else-if="f.kind === 'button'">
@@ -232,6 +262,13 @@ const title = computed(() => props.type.label);
                                                 <option v-for="option in sub.options" :key="option" :value="option">{{ option }}</option>
                                             </select>
                                         </label>
+                                        <label v-else-if="sub.kind === 'menu'" class="block">
+                                            <span class="mb-1 block text-sm font-medium text-gray-700">{{ sub.label }}</span>
+                                            <select v-model="rows(f.key)[i][sub.key] as number | null" :class="field">
+                                                <option :value="null">{{ $t('layout.noMenu') }}</option>
+                                                <option v-for="m in registry.menus" :key="m.id" :value="m.id">{{ m.name }}</option>
+                                            </select>
+                                        </label>
                                         <label v-else class="block">
                                             <span class="mb-1 block text-sm font-medium text-gray-700">{{ sub.label }}</span>
                                             <input v-model="rows(f.key)[i][sub.key] as string" type="text" :maxlength="sub.max" :class="field" />
@@ -245,10 +282,13 @@ const title = computed(() => props.type.label);
             </div>
 
             <div class="flex items-center justify-between border-t border-gray-200 px-6 py-4">
-                <button type="button" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
+                <button v-if="!inline" type="button" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
                     @click="emit('close')">
                     {{ $t('common.cancel') }}
                 </button>
+                <!-- Inline there is nothing to cancel back to, so the row keeps
+                     only Save and pushes it to the right. -->
+                <span v-else />
                 <button type="button" :disabled="saving"
                     class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
                     @click="save">

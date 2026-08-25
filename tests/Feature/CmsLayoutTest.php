@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Cms\Enums\BlockType;
+use App\Domain\Cms\Enums\PublicationStatus;
 use App\Domain\Cms\Models\LayoutBlock;
+use App\Domain\Cms\Models\Menu;
+use App\Domain\Cms\Models\Page;
 use App\Domain\Cms\Support\LayoutZones;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -216,6 +219,128 @@ class CmsLayoutTest extends TestCase
 
         $this->assertSame('Start practice', $columns[0]['button']['label']);
         $this->assertNull($columns[1]['button']);
+    }
+
+    /*
+     * Chrome zones (ADR-0045). The header and the footer are one record each, and
+     * what they carry is a REFERENCE to a menu — so renaming or reordering the
+     * menu moves the navigation with it, and the shell no longer names a handle.
+     */
+
+    private function menuWithItem(string $slug, string $label): int
+    {
+        $menu = Menu::create(['slug' => $slug, 'name' => ucfirst($slug)]);
+        $menu->items()->create(['type' => 'custom', 'url' => '/somewhere', 'label' => $label, 'position' => 0]);
+
+        return $menu->id;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function chrome(string $zone, BlockType $type, array $data): LayoutBlock
+    {
+        return LayoutBlock::create([
+            'zone' => $zone,
+            'type' => $type,
+            'position' => 1,
+            'status' => true,
+            'data' => $data,
+        ]);
+    }
+
+    public function test_the_registry_offers_the_chrome_zones_and_the_menus_to_choose_from(): void
+    {
+        $this->menuWithItem('main-nav', 'Home');
+
+        $registry = $this->actingAs($this->admin())->getJson('/api/cms/layout/zones')->assertOk();
+
+        $zones = collect($registry->json('data.zones'))->keyBy('key');
+
+        $this->assertTrue($zones->has(LayoutZones::PUBLIC_HEADER));
+        $this->assertTrue($zones->has(LayoutZones::PUBLIC_FOOTER));
+        // The front page is a list of sections; the chrome zones are forms, and the
+        // editor branches on this rather than on a hard-coded list of zone names.
+        $this->assertFalse($zones[LayoutZones::PUBLIC_HOME]['is_chrome']);
+        $this->assertTrue($zones[LayoutZones::PUBLIC_HEADER]['is_chrome']);
+
+        // The menu field's options ship with the registry, so the form needs no
+        // second request to know what it may offer.
+        $this->assertContains('main-nav', array_column($registry->json('data.menus'), 'slug'));
+    }
+
+    public function test_the_header_publishes_the_chosen_menu_resolved(): void
+    {
+        $menuId = $this->menuWithItem('chosen', 'Start Quiz');
+        $this->chrome(LayoutZones::PUBLIC_HEADER, BlockType::Header, ['menu' => $menuId]);
+
+        $content = $this->getJson('/api/public/layout/'.LayoutZones::PUBLIC_HEADER)
+            ->assertOk()->json('data.blocks.0.content');
+
+        $this->assertSame('chosen', $content['menu']['slug']);
+        $this->assertSame('Start Quiz', $content['menu']['items'][0]['label']);
+        $this->assertSame('/somewhere', $content['menu']['items'][0]['href']);
+    }
+
+    public function test_the_footer_carries_its_text_and_a_menu_per_column(): void
+    {
+        $first = $this->menuWithItem('col-one', 'Privacy Policy');
+        $second = $this->menuWithItem('col-two', 'DPA');
+
+        $this->chrome(LayoutZones::PUBLIC_FOOTER, BlockType::Footer, [
+            'text' => '<p>The contest, in one line.</p>',
+            'columns' => [
+                ['title' => 'Privacy centre', 'menu' => $first],
+                ['title' => 'Legal', 'menu' => $second],
+                // A column an admin added but never pointed anywhere.
+                ['title' => 'Unfinished', 'menu' => null],
+            ],
+        ]);
+
+        $content = $this->getJson('/api/public/layout/'.LayoutZones::PUBLIC_FOOTER)
+            ->assertOk()->json('data.blocks.0.content');
+
+        $this->assertSame('<p>The contest, in one line.</p>', $content['text']);
+        $this->assertSame('Privacy centre', $content['columns'][0]['title']);
+        $this->assertSame('Privacy Policy', $content['columns'][0]['menu']['items'][0]['label']);
+        $this->assertSame('DPA', $content['columns'][1]['menu']['items'][0]['label']);
+        // An unset reference resolves to nothing rather than to an empty shell, so
+        // the shell can tell "no menu chosen" from "menu chosen but empty".
+        $this->assertNull($content['columns'][2]['menu']);
+    }
+
+    public function test_an_unpublished_target_is_dropped_from_a_chrome_menu_too(): void
+    {
+        $menu = Menu::create(['slug' => 'mixed', 'name' => 'Mixed']);
+        $draft = Page::create(['title' => 'Draft', 'slug' => 'draft-page', 'status' => PublicationStatus::Draft]);
+        $menu->items()->create(['type' => 'custom', 'url' => '/live', 'label' => 'Live', 'position' => 0]);
+        $menu->items()->create(['type' => 'page', 'page_id' => $draft->id, 'label' => 'Draft', 'position' => 1]);
+
+        $this->chrome(LayoutZones::PUBLIC_HEADER, BlockType::Header, ['menu' => $menu->id]);
+
+        $items = $this->getJson('/api/public/layout/'.LayoutZones::PUBLIC_HEADER)
+            ->assertOk()->json('data.blocks.0.content.menu.items');
+
+        // One rule about what a menu may show, shared by the menu endpoint and the
+        // layout zones — a second copy is how the two would come to disagree.
+        $this->assertSame(['Live'], array_column($items, 'label'));
+    }
+
+    public function test_a_menu_reference_must_point_at_a_menu_that_exists(): void
+    {
+        $block = $this->chrome(LayoutZones::PUBLIC_HEADER, BlockType::Header, ['menu' => null]);
+
+        $this->actingAs($this->admin())
+            ->putJson('/api/cms/layout-blocks/'.$block->id, ['status' => true, 'content' => ['menu' => 99999]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['content.menu']);
+    }
+
+    public function test_a_chrome_zone_refuses_a_second_record(): void
+    {
+        $this->chrome(LayoutZones::PUBLIC_HEADER, BlockType::Header, ['menu' => null]);
+
+        $this->actingAs($this->admin())
+            ->postJson('/api/cms/layout/'.LayoutZones::PUBLIC_HEADER.'/blocks', ['type' => BlockType::Header->value])
+            ->assertStatus(422);
     }
 
     /** @return list<string> */

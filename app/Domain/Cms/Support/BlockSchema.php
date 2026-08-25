@@ -47,6 +47,8 @@ final class BlockSchema
         return match ($type) {
             // Three hero sections are not a choice, they are a mistake.
             BlockType::Hero, BlockType::Contact, BlockType::News => 1,
+            // Chrome: one record per zone, always.
+            BlockType::Header, BlockType::Footer => 1,
             default => null,
         };
     }
@@ -128,6 +130,22 @@ final class BlockSchema
                 self::text('caption_label', 'Caption label', 40),
                 self::text('caption', 'Caption', 200),
             ],
+            // The header's only setting. The logo comes from Theme, and the
+            // sign-in button is not offered: what it says depends on whether the
+            // visitor is signed in, so it is not a value an admin can set.
+            BlockType::Header => [
+                self::menu('menu', 'Navigation menu'),
+            ],
+            // The footer is a paragraph and however many link columns the site
+            // needs. Columns are a list rather than two fixed slots because the
+            // owner expects the count to grow.
+            BlockType::Footer => [
+                self::rich('text', 'Text under the logo', 1600),
+                self::list('columns', 'Link columns', [
+                    self::text('title', 'Column heading', 60),
+                    self::menu('menu', 'Menu'),
+                ], 4),
+            ],
         };
     }
 
@@ -177,6 +195,10 @@ final class BlockSchema
             'textarea', 'rich' => [$path => ['nullable', 'string', 'max:'.$field['max']]],
             'number' => [$path => ['nullable', 'integer', 'min:'.$field['min'], 'max:'.$field['max']]],
             'enum' => [$path => ['nullable', Rule::in($field['options'])]],
+            // A foreign key, like a menu item's target (ADR-0042): renaming the
+            // menu moves the reference with it, and a deleted menu leaves a
+            // reference that resolves to nothing rather than to a stale copy.
+            'menu' => [$path => ['nullable', 'integer', Rule::exists('cms_menus', 'id')]],
             'button' => self::buttonRules($path),
             'buttons' => [$path => ['sometimes', 'array', 'max:3']]
                 + self::buttonRules($path.'.*'),
@@ -240,6 +262,13 @@ final class BlockSchema
     private static function enum(string $key, string $label, array $options): array
     {
         return ['key' => $key, 'kind' => 'enum', 'label' => $label, 'options' => $options];
+    }
+
+    /** A reference to a CMS menu; the editor offers the menus that exist. */
+    /** @return array<string, mixed> */
+    private static function menu(string $key, string $label): array
+    {
+        return ['key' => $key, 'kind' => 'menu', 'label' => $label];
     }
 
     /**

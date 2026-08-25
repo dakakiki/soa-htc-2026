@@ -22,6 +22,10 @@ enum BlockType: string
     case Contact = 'contact';
     case News = 'news';
     case ImageBand = 'image_band';
+    // Chrome. Not sections of a page but the shell around every one of them, so
+    // each is a singleton in its own zone and carries settings rather than copy.
+    case Header = 'header';
+    case Footer = 'footer';
 
     public function label(): string
     {
@@ -34,6 +38,18 @@ enum BlockType: string
             self::Contact => 'Contact',
             self::News => 'Latest news',
             self::ImageBand => 'Image band',
+            self::Header => 'Header',
+            self::Footer => 'Footer',
         };
+    }
+
+    /**
+     * Whether the type is the single settings record of its zone rather than one
+     * section among several. The editor shows these as a form, not as a list with
+     * an "Add section" button — there is nothing to add or reorder.
+     */
+    public function isChrome(): bool
+    {
+        return in_array($this, [self::Header, self::Footer], true);
     }
 }

@@ -166,6 +166,52 @@ class MasterDataSeeder extends Seeder
 
         $this->seedMenus();
         $this->seedHomeLayout();
+        $this->seedChromeLayout();
+    }
+
+    /**
+     * The header and the footer as records (ADR-0045).
+     *
+     * Before this the header drew `public-header` and the footer drew both menus
+     * by handle, hard-coded in the shell, with its paragraph and both column
+     * headings sitting in `en.ts`. Now the choice is data, and the seeder makes
+     * the same choice the code used to make — so a fresh local site looks exactly
+     * as it did, and an admin can change it without a commit.
+     *
+     * Each zone holds one block, filled only when it is empty: a header an admin
+     * has already pointed somewhere else is not the seeder's to correct.
+     */
+    private function seedChromeLayout(): void
+    {
+        $headerMenu = Menu::query()->where('slug', 'public-header')->value('id');
+        $footerMenu = Menu::query()->where('slug', 'public-footer')->value('id');
+
+        if (! LayoutBlock::query()->where('zone', LayoutZones::PUBLIC_HEADER)->exists()) {
+            LayoutBlock::query()->create([
+                'zone' => LayoutZones::PUBLIC_HEADER,
+                'type' => BlockType::Header,
+                'status' => true,
+                'position' => 1,
+                'data' => ['menu' => $headerMenu],
+            ]);
+        }
+
+        if (! LayoutBlock::query()->where('zone', LayoutZones::PUBLIC_FOOTER)->exists()) {
+            LayoutBlock::query()->create([
+                'zone' => LayoutZones::PUBLIC_FOOTER,
+                'type' => BlockType::Footer,
+                'status' => true,
+                'position' => 1,
+                'data' => [
+                    'text' => '<p>The English language contest for school students,'
+                        .' run with local venues and coordinators.</p>',
+                    'columns' => [
+                        ['title' => 'User services', 'menu' => $headerMenu],
+                        ['title' => 'Privacy centre', 'menu' => $footerMenu],
+                    ],
+                ],
+            ]);
+        }
     }
 
     /**

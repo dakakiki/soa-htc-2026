@@ -4,26 +4,38 @@ import { RouterLink, useRoute } from 'vue-router';
 import { IconArrowLeft, IconChevronDown, IconMenu2, IconX } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
-import { getPublicMenu, getSiteStatus } from '@/api/publicContent';
+import { getPublicLayout, getSiteStatus } from '@/api/publicContent';
 import PublicMenuLink from '@/components/PublicMenuLink.vue';
 import type { PublicMenu, SiteStatus } from '@/types/models';
+
+/** One link column of the footer, as the footer block stores it. */
+interface FooterColumn {
+    title: string | null;
+    menu: PublicMenu | null;
+}
 
 /**
  * Public website shell (ADR-0014, §8.6): status strip → header → content →
  * footer. Never renders admin chrome, even when an admin is signed in — the only
  * admin affordance is a discreet "Back to dashboard" link.
  *
- * The menus come from the CMS (ADR-0042) by the handles `public-header` and
- * `public-footer`. There is deliberately no hard-coded fallback: an empty
- * navigation is a visible problem the admin can fix, where a hidden copy of the
- * old links would quietly ignore whatever they change.
+ * Header and footer are layout zones (ADR-0045), each holding one record. Which
+ * menu the header draws, the footer's paragraph and every one of its link columns
+ * come from there — none of it is chosen here any more. Before, this file named
+ * the handles `public-header` and `public-footer` itself and kept both column
+ * headings in `en.ts`, so changing either meant a commit.
+ *
+ * There is deliberately no hard-coded fallback: an empty navigation is a visible
+ * problem the admin can fix, where a hidden copy of the old links would quietly
+ * ignore whatever they change.
  */
 const route = useRoute();
 const session = useSessionStore();
 const themeStore = useThemeStore();
 
 const header = ref<PublicMenu | null>(null);
-const footer = ref<PublicMenu | null>(null);
+const footerText = ref<string>('');
+const footerColumns = ref<FooterColumn[]>([]);
 const site = ref<SiteStatus | null>(null);
 
 const openSub = ref<number | null>(null);
@@ -42,10 +54,15 @@ const fullBleed = computed(() => route.meta.fullBleed === true);
  */
 const headerLogo = computed(() => themeStore.theme?.logo_dark_url ?? null);
 
-async function loadMenu(slug: string): Promise<PublicMenu | null> {
+/**
+ * The single record of a chrome zone. A zone with nothing in it, or a request
+ * that fails, leaves the shell bare rather than falling back to something the
+ * admin cannot see or change.
+ */
+async function loadChrome(zone: string): Promise<Record<string, unknown> | null> {
     try {
-        const { data } = await getPublicMenu(slug);
-        return data.data;
+        const { data } = await getPublicLayout(zone);
+        return data.data.blocks[0]?.content ?? null;
     } catch {
         return null;
     }
@@ -111,9 +128,17 @@ onMounted(async () => {
     document.addEventListener('click', onClickOutside);
     watchSections();
 
-    const [headerMenu, footerMenu] = await Promise.all([loadMenu('public-header'), loadMenu('public-footer')]);
-    header.value = headerMenu;
-    footer.value = footerMenu;
+    const [headerBlock, footerBlock] = await Promise.all([
+        loadChrome('public.header'),
+        loadChrome('public.footer'),
+    ]);
+
+    header.value = (headerBlock?.menu as PublicMenu | null) ?? null;
+    footerText.value = (footerBlock?.text as string | undefined) ?? '';
+    // Columns whose menu is unset or resolved to nothing are dropped: a heading
+    // with no links under it reads as a broken column, not as an empty one.
+    footerColumns.value = ((footerBlock?.columns as FooterColumn[] | undefined) ?? [])
+        .filter((column) => (column.menu?.items.length ?? 0) > 0);
 
     try {
         const { data } = await getSiteStatus();
@@ -243,27 +268,21 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
                             <img v-if="themeStore.theme?.logo_url" :src="themeStore.theme.logo_url" :alt="$t('app.name')" class="h-8 max-w-[12rem] object-contain" />
                             <span v-else>{{ $t('app.name') }}</span>
                         </RouterLink>
-                        <p class="mt-4 max-w-[300px] text-sm leading-relaxed text-white/50">{{ $t('public.footer.tagline') }}</p>
+                        <!-- Admin-authored markup from the footer block, rendered
+                             through `.rich-text` like every other paragraph the
+                             editor produces. -->
+                        <div v-if="footerText" class="rich-text mt-4 max-w-[300px] text-sm leading-relaxed text-white/50"
+                            v-html="footerText" />
                     </div>
 
-                    <!-- Both columns are the CMS menus, so the admin edits them in one place. -->
-                    <div v-if="header?.items.length">
-                        <h2 class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-1">
-                            {{ $t('public.footer.services') }}
+                    <!-- However many columns the footer block declares; each is a
+                         heading and a menu the admin chose. -->
+                    <div v-for="(column, c) in footerColumns" :key="c">
+                        <h2 v-if="column.title" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-1">
+                            {{ column.title }}
                         </h2>
                         <ul class="mt-4 space-y-2.5">
-                            <li v-for="(item, i) in header.items" :key="i">
-                                <PublicMenuLink :item="item" :link-class="footerLink" />
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div v-if="footer?.items.length">
-                        <h2 class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-1">
-                            {{ $t('public.footer.privacy') }}
-                        </h2>
-                        <ul class="mt-4 space-y-2.5">
-                            <li v-for="(item, i) in footer.items" :key="i">
+                            <li v-for="(item, i) in column.menu?.items ?? []" :key="i">
                                 <PublicMenuLink :item="item" :link-class="footerLink" />
                             </li>
                         </ul>

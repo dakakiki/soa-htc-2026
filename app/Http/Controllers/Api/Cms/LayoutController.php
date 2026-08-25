@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\Cms;
 
 use App\Domain\Cms\Enums\BlockType;
 use App\Domain\Cms\Models\LayoutBlock;
+use App\Domain\Cms\Models\Menu;
 use App\Domain\Cms\Support\BlockSchema;
 use App\Domain\Cms\Support\LayoutZones;
 use App\Http\Controllers\Controller;
@@ -44,6 +45,9 @@ class LayoutController extends Controller
                 'key' => $key,
                 'label' => $zone['label'],
                 'description' => $zone['description'],
+                // A zone whose single type is chrome is edited as a form, not as a
+                // list of sections; the editor needs to know which it is looking at.
+                'is_chrome' => LayoutZones::isChrome($key),
                 'types' => array_map(static fn (BlockType $type): array => [
                     'key' => $type->value,
                     'label' => $type->label(),
@@ -60,6 +64,17 @@ class LayoutController extends Controller
                 'button_styles' => BlockSchema::BUTTON_STYLES,
                 'target_types' => BlockSchema::TARGET_TYPES,
                 'gates' => BlockSchema::GATES,
+                // Options for every `menu` field, shipped with the registry so the
+                // form does not need a second request to know what it may offer.
+                'menus' => Menu::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug'])
+                    ->map(fn (Menu $menu): array => [
+                        'id' => $menu->id,
+                        'name' => $menu->name,
+                        'slug' => $menu->slug,
+                    ])
+                    ->all(),
             ],
         ];
     }

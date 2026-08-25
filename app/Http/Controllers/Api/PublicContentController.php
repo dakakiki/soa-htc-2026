@@ -5,22 +5,20 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Support\EntryWindow;
-use App\Domain\Cms\Enums\MenuItemType;
 use App\Domain\Cms\Models\Category;
 use App\Domain\Cms\Models\LayoutBlock;
 use App\Domain\Cms\Models\Menu;
-use App\Domain\Cms\Models\MenuItem;
 use App\Domain\Cms\Models\Page;
 use App\Domain\Cms\Models\Post;
 use App\Domain\Cms\Support\LayoutButtons;
 use App\Domain\Cms\Support\LayoutZones;
+use App\Domain\Cms\Support\PublicMenus;
 use App\Domain\Cms\Support\PublicPaths;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PublicPostResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Collection;
 
 /**
  * What the website itself reads. No authentication and no permission: every
@@ -92,45 +90,7 @@ class PublicContentController extends Controller
     {
         $menu = Menu::query()->where('slug', $slug)->firstOrFail();
 
-        $menu->load([
-            'rootItems.page', 'rootItems.post', 'rootItems.category',
-            'rootItems.children.page', 'rootItems.children.post', 'rootItems.children.category',
-        ]);
-
-        return ['data' => [
-            'name' => $menu->name,
-            'slug' => $menu->slug,
-            'items' => $this->visibleItems($menu->rootItems),
-        ]];
-    }
-
-    /**
-     * @param  Collection<int, MenuItem>  $items
-     * @return list<array<string, mixed>>
-     */
-    private function visibleItems($items): array
-    {
-        return $items
-            ->filter(fn (MenuItem $item): bool => $this->isVisible($item))
-            ->map(fn (MenuItem $item): array => [
-                'label' => $item->resolvedLabel(),
-                'href' => $item->resolvedHref(),
-                'target' => $item->link_target,
-                'children' => $item->relationLoaded('children') ? $this->visibleItems($item->children) : [],
-            ])
-            ->values()
-            ->all();
-    }
-
-    /** A link is only worth showing when there is something published behind it. */
-    private function isVisible(MenuItem $item): bool
-    {
-        return match ($item->type) {
-            MenuItemType::Page => $item->page !== null && $item->page->newQuery()->live()->whereKey($item->page_id)->exists(),
-            MenuItemType::Post => $item->post !== null && $item->post->newQuery()->live()->whereKey($item->post_id)->exists(),
-            MenuItemType::Category => $item->category !== null && $item->category->status === 'active',
-            MenuItemType::Custom => $item->url !== null && $item->url !== '',
-        };
+        return ['data' => PublicMenus::resolve($menu)];
     }
 
     /**
@@ -201,7 +161,10 @@ class PublicContentController extends Controller
             ->get()
             ->map(fn (LayoutBlock $block): array => [
                 'type' => $block->type->value,
-                'content' => LayoutButtons::resolvePayload($block->data ?? []),
+                // Two walks over the same payload, each resolving what it owns:
+                // buttons carry the season gate, menu references carry the
+                // published-target rule. Neither belongs in the other's class.
+                'content' => PublicMenus::resolvePayload(LayoutButtons::resolvePayload($block->data ?? [])),
                 'image' => $block->image === null ? null : [
                     'url' => $block->image->url(),
                     'alt' => $block->image->alt,

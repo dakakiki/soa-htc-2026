@@ -364,9 +364,8 @@ export default {
         backToDashboard: 'Back to dashboard',
         footer: {
             copyright: '© {year} {name}',
-            tagline: 'The English language contest for school students, run with local venues and coordinators.',
-            services: 'User services',
-            privacy: 'Privacy centre',
+            // The tagline and both column headings moved into the footer layout
+            // block (ADR-0045) — they are content now, not translations.
         },
     },
     student: {
@@ -448,7 +447,8 @@ export default {
     },
     layout: {
         title: 'Layout',
-        zone: 'Zone',
+        noMenu: '— no menu —',
+        noMenusYet: 'No menus exist yet. Create one under Website → Menus.',
         empty: 'This zone has no sections yet.',
         addSection: 'Add section',
         addRow: 'Add',

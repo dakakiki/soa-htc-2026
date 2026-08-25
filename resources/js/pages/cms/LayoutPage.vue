@@ -51,6 +51,14 @@ const used = (key: string): number => blocks.value.filter((b) => b.type === key)
 
 const isFull = (type: LayoutTypeInfo): boolean => type.max !== null && used(type.key) >= type.max;
 
+/**
+ * Header and footer are settings, not a list of sections: one record, edited as
+ * a form. The zone itself says which it is, so the page does not have to keep a
+ * list of zone names in sync with the server's.
+ */
+const isChrome = computed(() => currentZone.value?.is_chrome === true);
+const chromeBlock = computed<CmsLayoutBlock | null>(() => (isChrome.value ? blocks.value[0] ?? null : null));
+
 /** Same icon chip the row actions use everywhere else in the admin. */
 const chip = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200';
 
@@ -72,6 +80,20 @@ async function load(): Promise<void> {
         if (zone.value !== '') {
             const { data } = await listLayoutBlocks(zone.value);
             blocks.value = data.data;
+
+            /*
+             * A chrome zone always has exactly one record; on a site seeded before
+             * these zones existed it has none yet. Creating it here — on the admin
+             * opening the tab, not on a page load — means the tab is a form from
+             * the first visit instead of an empty list with one thing to add.
+             */
+            if (isChrome.value && blocks.value.length === 0) {
+                const type = currentZone.value?.types[0];
+                if (type) {
+                    const created = await createLayoutBlock(zone.value, { type: type.key });
+                    blocks.value = [created.data.data];
+                }
+            }
         }
     } catch (e) {
         error.value = apiErrorMessage(e, t('layout.loadFailed'));
@@ -148,7 +170,8 @@ onMounted(load);
                 <p v-if="currentZone" class="mt-1 text-sm text-gray-500">{{ currentZone.description }}</p>
             </div>
 
-            <div class="relative">
+            <!-- Nothing to add to a zone that holds exactly one record. -->
+            <div v-if="!isChrome" class="relative">
                 <button type="button"
                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                     @click="adding = !adding">
@@ -173,16 +196,33 @@ onMounted(load);
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
-        <!-- More than one zone only appears when the shell grows one; with a
-             single zone a picker would be furniture. -->
-        <label v-if="zones.length > 1" class="block max-w-xs">
-            <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('layout.zone') }}</span>
-            <select v-model="zone" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" @change="load">
-                <option v-for="z in zones" :key="z.key" :value="z.key">{{ z.label }}</option>
-            </select>
-        </label>
+        <!-- One tab per zone, in the order the shell draws them: the page, then
+             the chrome around it. With a single zone a tab strip would be
+             furniture, so it only appears once there is somewhere to go. -->
+        <nav v-if="zones.length > 1" class="flex gap-1 border-b border-gray-200">
+            <button v-for="z in zones" :key="z.key" type="button"
+                class="-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+                :class="z.key === zone
+                    ? 'border-brand-primary text-brand-primary'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                @click="zone = z.key; load()">
+                {{ z.label }}
+            </button>
+        </nav>
 
-        <div class="relative min-h-[8rem] rounded-lg border border-gray-200 bg-white p-4">
+        <!-- Chrome: one record, edited as a form right here. -->
+        <div v-if="isChrome" class="relative min-h-[8rem]">
+            <LoadingOverlay v-if="loading" />
+            <LayoutBlockEditor v-if="chromeBlock && registry && typeOf(chromeBlock.type)"
+                :key="chromeBlock.id"
+                inline
+                :block="chromeBlock"
+                :type="typeOf(chromeBlock.type) as LayoutTypeInfo"
+                :registry="registry"
+                @saved="onSaved" />
+        </div>
+
+        <div v-else class="relative min-h-[8rem] rounded-lg border border-gray-200 bg-white p-4">
             <LoadingOverlay v-if="loading" />
 
             <!-- `removable` stays off: dropping a section from the list is not the
