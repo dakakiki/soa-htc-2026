@@ -277,6 +277,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'settings.manage' },
     },
     {
+        path: '/settings/season',
+        name: 'settings.season',
+        component: () => import('@/pages/settings/SeasonSettingsPage.vue'),
+        meta: { requiresAuth: true, permission: 'settings.manage' },
+    },
+    {
         path: '/roles',
         name: 'roles',
         component: () => import('@/pages/roles/RolesListPage.vue'),

@@ -740,6 +740,35 @@ export interface SiteStatus {
     sample_open: boolean;
 }
 
+/** A contest season: the round its competitor numbers carry, and its school year. */
+export interface Season {
+    id: number;
+    name: string;
+    year: number;
+    round_number: number;
+    status: string;
+    starts_at: string | null;
+    ends_at: string | null;
+}
+
+/** What starting the next season would archive, wipe and change, in row counts. */
+export interface SeasonRolloverPlan {
+    archive: { registrations: number; results: number; qualifications: number };
+    /** Table name → rows to delete, in the order they are deleted. */
+    wipe: Record<string, number>;
+    accounts: {
+        coordinators_deleted: number;
+        users_deactivated: number;
+        schools_deactivated: number;
+    };
+}
+
+export interface SeasonSettings {
+    active: Season | null;
+    plan: SeasonRolloverPlan;
+    suggested: { round_number: number; year: number };
+}
+
 export interface Paginated<T> {
     data: T[];
     meta: {

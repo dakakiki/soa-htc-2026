@@ -14,6 +14,7 @@ import {
     IconShieldLock,
     IconWorld,
     IconPalette,
+    IconCalendarEvent,
     IconCertificate,
     IconStairs,
     IconListCheck,
@@ -152,6 +153,7 @@ const nav: NavNode[] = [
         label: t('nav.settings'),
         icon: IconSettings,
         children: [
+            { label: t('nav.season'), icon: IconCalendarEvent, to: 'settings.season', prefix: 'settings.season', perm: 'settings.manage' },
             { label: t('nav.locations'), icon: IconWorld, to: 'locations', prefix: 'locations', perm: 'locations.manage' },
             { label: t('nav.certificate'), icon: IconCertificate, to: 'settings.certificate', prefix: 'settings.certificate', perm: 'settings.manage' },
             { label: t('nav.theme'), icon: IconPalette, to: 'settings.theme', prefix: 'settings.theme', perm: 'settings.manage' },

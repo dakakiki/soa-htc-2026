@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\ResultsController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SchoolController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\SeasonController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StudentAuthController;
 use App\Http\Controllers\Api\StudentAvailabilityController;
@@ -253,6 +254,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // PUT so the SPA can send multipart via POST + _method spoofing (like schools).
     Route::put('settings/theme', [SettingsController::class, 'updateTheme']);
     Route::delete('settings/theme/assets/{asset}', [SettingsController::class, 'deleteThemeAsset']);
+    // Season admin: the active round + what starting the next one would clear.
+    // POST archives, wipes and opens the new round in one transaction.
+    Route::get('settings/season', [SeasonController::class, 'show']);
+    Route::post('settings/season', [SeasonController::class, 'store']);
     // Certificate content admin (body template + logo/signature/QR uploads).
     Route::get('settings/certificate', [SettingsController::class, 'certificate']);
     Route::put('settings/certificate', [SettingsController::class, 'updateCertificate']);
