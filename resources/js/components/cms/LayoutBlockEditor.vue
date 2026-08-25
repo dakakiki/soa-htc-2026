@@ -160,6 +160,7 @@ const title = computed(() => props.type.label);
                     <label v-if="f.kind === 'text'" class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700">{{ f.label }}</span>
                         <input v-model="content[f.key] as string" type="text" :maxlength="f.max" :class="field" />
+                        <span v-if="f.hint" class="mt-1 block text-xs text-gray-400">{{ f.hint }}</span>
                     </label>
 
                     <!-- Paragraphs go through the editor: this copy carries bold,

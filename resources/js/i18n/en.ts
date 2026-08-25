@@ -360,13 +360,11 @@ export default {
             missing: 'This article is not available.',
             latest: 'Latest news',
             readAll: 'All news',
+            readMore: 'Read more…',
         },
         backToDashboard: 'Back to dashboard',
-        footer: {
-            copyright: '© {year} {name}',
-            // The tagline and both column headings moved into the footer layout
-            // block (ADR-0045) — they are content now, not translations.
-        },
+        // The tagline, both column headings and the copyright line moved into the
+        // footer layout block (ADR-0045) — they are content now, not translations.
     },
     student: {
         nav: {

@@ -36,6 +36,7 @@ const themeStore = useThemeStore();
 const header = ref<PublicMenu | null>(null);
 const footerText = ref<string>('');
 const footerColumns = ref<FooterColumn[]>([]);
+const footerCopyright = ref<string>('');
 const site = ref<SiteStatus | null>(null);
 
 const openSub = ref<number | null>(null);
@@ -139,6 +140,10 @@ onMounted(async () => {
     // with no links under it reads as a broken column, not as an empty one.
     footerColumns.value = ((footerBlock?.columns as FooterColumn[] | undefined) ?? [])
         .filter((column) => (column.menu?.items.length ?? 0) > 0);
+    // `{year}` is substituted when the page is drawn rather than stored, so the
+    // line cannot go stale on the first of January and stay wrong for months.
+    footerCopyright.value = ((footerBlock?.copyright as string | undefined) ?? '')
+        .replaceAll('{year}', String(year));
 
     try {
         const { data } = await getSiteStatus();
@@ -290,8 +295,8 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
                 </div>
 
                 <div class="flex flex-wrap items-center gap-4 border-t border-white/12 pt-5">
-                    <span class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/35">
-                        {{ $t('public.footer.copyright', { year, name: $t('app.name') }) }}
+                    <span v-if="footerCopyright" class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/35">
+                        {{ footerCopyright }}
                     </span>
                     <span v-if="site?.round" class="ml-auto font-mono text-[11px] uppercase tracking-[0.16em] text-white/35">
                         {{ $t('public.status.round', { round: site.round, year: site.year }) }}

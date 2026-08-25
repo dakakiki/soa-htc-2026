@@ -209,6 +209,7 @@ class MasterDataSeeder extends Seeder
                         ['title' => 'User services', 'menu' => $headerMenu],
                         ['title' => 'Privacy centre', 'menu' => $footerMenu],
                     ],
+                    'copyright' => '© {year} SOA HTC',
                 ],
             ]);
         }

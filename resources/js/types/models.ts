@@ -681,6 +681,8 @@ export interface LayoutField {
     key: string;
     kind: 'text' | 'textarea' | 'rich' | 'number' | 'enum' | 'list' | 'button' | 'buttons' | 'menu';
     label: string;
+    /** Shown under the input when the label cannot carry the whole rule. */
+    hint?: string;
     max?: number;
     min?: number;
     options?: string[];

@@ -64,6 +64,14 @@ onMounted(async () => {
                     <span v-if="posts[0].excerpt" class="max-w-[540px] text-[17px] leading-relaxed text-brand-palette-4/65">
                         {{ posts[0].excerpt }}
                     </span>
+
+                    <!-- The card is one link, and an image with a heading beside it
+                         reads as editorial decoration rather than as something to
+                         click. This is the affordance; a span, not a second link,
+                         because it already sits inside one. -->
+                    <span class="mt-1 self-start text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] group-hover:text-brand-palette-2">
+                        {{ $t('public.news.readMore') }}
+                    </span>
                 </span>
             </RouterLink>
 

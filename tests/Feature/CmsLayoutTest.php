@@ -287,6 +287,7 @@ class CmsLayoutTest extends TestCase
 
         $this->chrome(LayoutZones::PUBLIC_FOOTER, BlockType::Footer, [
             'text' => '<p>The contest, in one line.</p>',
+            'copyright' => '© {year} SOA HTC',
             'columns' => [
                 ['title' => 'Privacy centre', 'menu' => $first],
                 ['title' => 'Legal', 'menu' => $second],
@@ -299,6 +300,9 @@ class CmsLayoutTest extends TestCase
             ->assertOk()->json('data.blocks.0.content');
 
         $this->assertSame('<p>The contest, in one line.</p>', $content['text']);
+        // The token is stored, not the year: the shell substitutes it when it
+        // draws, so the line cannot go stale on the first of January.
+        $this->assertSame('© {year} SOA HTC', $content['copyright']);
         $this->assertSame('Privacy centre', $content['columns'][0]['title']);
         $this->assertSame('Privacy Policy', $content['columns'][0]['menu']['items'][0]['label']);
         $this->assertSame('DPA', $content['columns'][1]['menu']['items'][0]['label']);

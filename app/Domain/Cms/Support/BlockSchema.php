@@ -145,6 +145,10 @@ final class BlockSchema
                     self::text('title', 'Column heading', 60),
                     self::menu('menu', 'Menu'),
                 ], 4),
+                // The whole line is the admin's, © included; only the year is not.
+                // A typed year would be wrong every January and nobody would notice
+                // for months, so it is a token the page fills in.
+                self::text('copyright', 'Copyright line', 160, 'Write {year} where the current year should appear — for example: © {year} SOA HTC'),
             ],
         };
     }
@@ -230,10 +234,19 @@ final class BlockSchema
         ];
     }
 
-    /** @return array<string, mixed> */
-    private static function text(string $key, string $label, int $max): array
+    /**
+     * A single-line field. `$hint` is shown under the input for a field whose
+     * label cannot carry the whole rule — a token the admin has to know about,
+     * for instance.
+     *
+     * @return array<string, mixed>
+     */
+    private static function text(string $key, string $label, int $max, ?string $hint = null): array
     {
-        return ['key' => $key, 'kind' => 'text', 'label' => $label, 'max' => $max];
+        return array_filter(
+            ['key' => $key, 'kind' => 'text', 'label' => $label, 'max' => $max, 'hint' => $hint],
+            static fn (mixed $value): bool => $value !== null,
+        );
     }
 
     /** @return array<string, mixed> */
