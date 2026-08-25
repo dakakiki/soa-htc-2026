@@ -18,9 +18,16 @@ use App\Domain\Cms\Enums\BlockType;
  *
  *  - The front page is a LIST. Sections are added, reordered and switched off,
  *    and the order is the page.
- *  - The header and the footer are SETTINGS. Their shape is fixed by the design;
- *    what changes is which menu they show and what they say. Each holds exactly
- *    one block, so the editor shows a form instead of a list with nothing to add.
+ *  - Everything else holds ONE record, edited as a form: the chrome (header,
+ *    footer), whose shape the design fixes and whose values change; and the copy
+ *    of a screen the application draws itself (sign-in), which is a form with a
+ *    heading and a paragraph above it.
+ *
+ * The owner's rule (2026-08-25): every screen that carries a heading and a
+ * paragraph gets an admin for them. Screens join as zones rather than through a
+ * second mechanism, so there stays one place text is edited and one place it is
+ * validated. Field labels and buttons do NOT join — those are interface, and an
+ * admin renaming "E-mail" breaks a form rather than improving a page.
  *
  * ADR-0043 left the chrome out of the builder entirely, on the reasoning that its
  * values already lived in the theme settings and the CMS menus. That was true of
@@ -43,6 +50,9 @@ final class LayoutZones
 
     /** The public footer: one settings record. */
     public const PUBLIC_FOOTER = 'public.footer';
+
+    /** The sign-in screen's copy: one record. */
+    public const PUBLIC_LOGIN = 'public.login';
 
     /**
      * Zone key => what it is, and which block types it accepts.
@@ -76,18 +86,23 @@ final class LayoutZones
                 'description' => 'The text and the link columns at the foot of every public page.',
                 'types' => [BlockType::Footer],
             ],
+            self::PUBLIC_LOGIN => [
+                'label' => 'Sign in',
+                'description' => 'The heading and the paragraph on the staff sign-in screen. The fields and the button are interface, not content.',
+                'types' => [BlockType::Login],
+            ],
         ];
     }
 
     /**
-     * Whether the zone holds a single settings record rather than a list of
-     * sections. The editor branches on this, and so does the seeder.
+     * Whether the zone holds a single record rather than a list of sections. The
+     * editor branches on this, and so does the seeder.
      */
-    public static function isChrome(string $zone): bool
+    public static function isSingle(string $zone): bool
     {
         $types = self::types($zone);
 
-        return count($types) === 1 && $types[0]->isChrome();
+        return count($types) === 1 && $types[0]->isSingle();
     }
 
     public static function exists(string $zone): bool

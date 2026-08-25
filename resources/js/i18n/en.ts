@@ -330,14 +330,22 @@ export default {
         colorPalette4: 'Palette 4',
     },
     login: {
-        title: 'Sign in',
-        subtitle: 'Admin / coordinator access',
-        email: 'Email',
+        // The heading, the label above it and the paragraph are CONTENT and live
+        // in the `public.login` layout zone (ADR-0046) — every screen that carries
+        // a heading and a paragraph is editable from the admin. What stays here is
+        // interface: field labels, button text, error messages.
+        email: 'E-mail',
+        // 🪤 `@` starts a linked message in vue-i18n; written plainly this string
+        // fails to compile and takes the whole screen down with it. `{'@'}` is the
+        // literal form.
+        emailPlaceholder: "you{'@'}school.org",
         password: 'Password',
+        showPassword: 'Show password',
+        hidePassword: 'Hide password',
         submit: 'Sign in',
         submitting: 'Signing in…',
         failed: 'Sign in failed.',
-        remember: 'Remember me',
+        remember: 'Keep me signed in',
     },
     public: {
         nav: {

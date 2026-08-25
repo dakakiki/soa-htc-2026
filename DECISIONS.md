@@ -926,6 +926,27 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0046 — Svaki ekran sa naslovom i tekstom ima administraciju; javne forme su jedan raspored u kontejneru sajta
+
+- **Status:** Prihvaćeno (2026-08-25); vlasnik proizvoda. **IMPLEMENTIRANO** za `/login`; isti obrazac važi za ekrane koji slede (identifikacija, registracija).
+- **Kontekst:** Krenulo se od redizajna prijave u jezik javnog dela (pravac „B Editorial", ADR-0043). Usred rada vlasnik je postavio pravilo koje menja obim svih narednih ekrana: *„svaka stranica koja ima naslov, tekst mora da ima i administraciju."*
+- **Odluke:**
+  - **Naslovi i pasusi su SADRŽAJ, labele polja i dugmad su INTERFEJS.** Granica je namerna i uska: `E-mail`, `Password`, `Sign in` ostaju u `en.ts`, jer admin koji preimenuje „E-mail" nije uredio stranu nego pokvario formu. Sve iznad forme — nadnaslov, naslov, pasus — ide u sadržaj.
+  - **Ekran ulazi kao ZONA, ne kao treći mehanizam.** `public.login` je zona sa jednim zapisom tipa `login` (nadnaslov, naslov, rich pasus), uređena u `Website → Layout` kao četvrti tab. Time ostaje jedno mesto gde se tekst čuva, jedno gde se validira i jedan javni endpoint; alternativa (kolone u `settings` ili nova tabela) bila bi treći način da se čuva ista stvar.
+  - **`isChrome()` → `isSingle()`.** Ime je nastalo dan ranije (ADR-0045) kad su jedine takve zone bile zaglavlje i podnožje. Sada se isto ponaša i tekst ekrana koji nije chrome, pa bi staro ime lagalo. Ključ u registru je `is_single`.
+  - **Bez skrivenog fallback-a** (nepromenjeno iz ADR-0042/0045): prazna zona ostavlja stranu bez naslova. Forma je i dalje upotrebljiva; seeder puni zonu tačno onim tekstom koji je kod dotad imao, pa se lokalni sajt ne menja.
+- **Raspored javne forme — tri pokušaja, dva odbačena isti dan:**
+  1. **Panel u boji do desne ivice** (po nacrtu). Odbačen: *„i kada razmislim, slike desno treba izbaciti."*
+  2. **Jedna kolona na full-bleed strani.** Odbačen: *„to je višak"* — pola ekrana prazno.
+  3. **Usvojeno:** *„title, text levo, forma desno, i sve kao content sajta centrirano."* Izdvojeno u `PublicFormPage` sa dva **imenovana slota**, da ekran ne može slučajno da stavi formu levo a naslov desno.
+  - ⚡ **Time je otpala sva računica poravnanja.** Dok je strana bila full-bleed, sadržajnu liniju je trebalo izračunati (`calc(85.7142% − 596px)` preko mreže od 12 kolona, pa `50% − 596px` bez nje) — procentima a ne `vw`, jer `100vw` broji skrol traku pa naslov promaši zaglavlje za sedam piksela na svakoj strani koja se skroluje. Čim strana ide u standardni kontejner, poravnanje dolazi **po konstrukciji** i nema šta da se održava.
+- 🪤 **Ostrvo podnožja je imalo SVOJ razmak od ivica** (`px-4 sm:px-8`), umesto kontejnera sajta. Posledica je bila da plava ivica i sadržaj beže jedno od drugog različito u tri opsega: ispod 640 ivica je 8px izvan sadržaja, između 640 i 1240 sadržaj je 8px izvan ivice, iznad 1304 razlika je 24px. Ostrvo je premešteno u isti `max-w-[1240px] px-6` kontejner, pa sada zaglavlje, sadržaj i plava ivica imaju **identično izračunat stil** i ne mogu se raziči ni na jednoj širini. Izmereno posle izmene: 24 → 1164 za sve troje.
+- 🪤 **`@` u i18n stringu obara ceo ekran.** vue-i18n čita `@` kao početak povezane poruke; `you@school.org` kao placeholder ne kompajlira, poruka pukne i strana ostane prazna — zaglavlje i podnožje se iscrtaju, sadržaja nema, a greška u konzoli je `SyntaxError: 10` bez pomena stringa. Literal je `"you{'@'}school.org"`. Vredi proveriti pri svakom novom stringu sa adresom.
+- **Posledica:** `BlockType::Login` + `isSingle()`; `LayoutZones::PUBLIC_LOGIN`; polja `eyebrow/title/lead` u `BlockSchema`; `is_single` u registru; `PublicFormPage`; `LoginPage` čita `public.login`; `MasterDataSeeder::seedChromeLayout()` seeduje i taj zapis; ostrvo podnožja u kontejneru sajta (`PublicLayout`, važi za sve javne strane). Testovi: `CmsLayoutTest` 20.
+- **Ostaje za naredne ekrane:** identifikacija takmičara, spisak testova i test u toku — svaki sa svojom zonom čim nosi naslov i pasus. Registracija koordinatora ide u zasebnu rundu, jer nije redizajn nego nova funkcija (ADR se piše tada).
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

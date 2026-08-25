@@ -45,9 +45,9 @@ class LayoutController extends Controller
                 'key' => $key,
                 'label' => $zone['label'],
                 'description' => $zone['description'],
-                // A zone whose single type is chrome is edited as a form, not as a
-                // list of sections; the editor needs to know which it is looking at.
-                'is_chrome' => LayoutZones::isChrome($key),
+                // A zone that holds one record is edited as a form, not as a list
+                // of sections; the editor needs to know which it is looking at.
+                'is_single' => LayoutZones::isSingle($key),
                 'types' => array_map(static fn (BlockType $type): array => [
                     'key' => $type->value,
                     'label' => $type->label(),

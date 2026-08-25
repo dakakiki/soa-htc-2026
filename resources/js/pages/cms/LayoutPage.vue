@@ -52,12 +52,12 @@ const used = (key: string): number => blocks.value.filter((b) => b.type === key)
 const isFull = (type: LayoutTypeInfo): boolean => type.max !== null && used(type.key) >= type.max;
 
 /**
- * Header and footer are settings, not a list of sections: one record, edited as
- * a form. The zone itself says which it is, so the page does not have to keep a
- * list of zone names in sync with the server's.
+ * Some zones are one record edited as a form — the chrome, and the copy of a
+ * screen the application draws itself. The zone itself says which it is, so the
+ * page does not have to keep a list of zone names in sync with the server's.
  */
-const isChrome = computed(() => currentZone.value?.is_chrome === true);
-const chromeBlock = computed<CmsLayoutBlock | null>(() => (isChrome.value ? blocks.value[0] ?? null : null));
+const isSingle = computed(() => currentZone.value?.is_single === true);
+const singleBlock = computed<CmsLayoutBlock | null>(() => (isSingle.value ? blocks.value[0] ?? null : null));
 
 /** Same icon chip the row actions use everywhere else in the admin. */
 const chip = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-gray-100 hover:bg-gray-200';
@@ -82,12 +82,12 @@ async function load(): Promise<void> {
             blocks.value = data.data;
 
             /*
-             * A chrome zone always has exactly one record; on a site seeded before
-             * these zones existed it has none yet. Creating it here — on the admin
+             * A single-record zone always has exactly one; on a site seeded before
+             * the zone existed it has none yet. Creating it here — on the admin
              * opening the tab, not on a page load — means the tab is a form from
              * the first visit instead of an empty list with one thing to add.
              */
-            if (isChrome.value && blocks.value.length === 0) {
+            if (isSingle.value && blocks.value.length === 0) {
                 const type = currentZone.value?.types[0];
                 if (type) {
                     const created = await createLayoutBlock(zone.value, { type: type.key });
@@ -171,7 +171,7 @@ onMounted(load);
             </div>
 
             <!-- Nothing to add to a zone that holds exactly one record. -->
-            <div v-if="!isChrome" class="relative">
+            <div v-if="!isSingle" class="relative">
                 <button type="button"
                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover"
                     @click="adding = !adding">
@@ -210,14 +210,14 @@ onMounted(load);
             </button>
         </nav>
 
-        <!-- Chrome: one record, edited as a form right here. -->
-        <div v-if="isChrome" class="relative min-h-[8rem]">
+        <!-- One record, edited as a form right here. -->
+        <div v-if="isSingle" class="relative min-h-[8rem]">
             <LoadingOverlay v-if="loading" />
-            <LayoutBlockEditor v-if="chromeBlock && registry && typeOf(chromeBlock.type)"
-                :key="chromeBlock.id"
+            <LayoutBlockEditor v-if="singleBlock && registry && typeOf(singleBlock.type)"
+                :key="singleBlock.id"
                 inline
-                :block="chromeBlock"
-                :type="typeOf(chromeBlock.type) as LayoutTypeInfo"
+                :block="singleBlock"
+                :type="typeOf(singleBlock.type) as LayoutTypeInfo"
                 :registry="registry"
                 @saved="onSaved" />
         </div>

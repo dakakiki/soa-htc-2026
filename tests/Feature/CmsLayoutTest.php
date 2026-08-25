@@ -257,10 +257,13 @@ class CmsLayoutTest extends TestCase
 
         $this->assertTrue($zones->has(LayoutZones::PUBLIC_HEADER));
         $this->assertTrue($zones->has(LayoutZones::PUBLIC_FOOTER));
-        // The front page is a list of sections; the chrome zones are forms, and the
-        // editor branches on this rather than on a hard-coded list of zone names.
-        $this->assertFalse($zones[LayoutZones::PUBLIC_HOME]['is_chrome']);
-        $this->assertTrue($zones[LayoutZones::PUBLIC_HEADER]['is_chrome']);
+        $this->assertTrue($zones->has(LayoutZones::PUBLIC_LOGIN));
+        // The front page is a list of sections; the rest are one record edited as
+        // a form, and the editor branches on this rather than on a hard-coded list
+        // of zone names.
+        $this->assertFalse($zones[LayoutZones::PUBLIC_HOME]['is_single']);
+        $this->assertTrue($zones[LayoutZones::PUBLIC_HEADER]['is_single']);
+        $this->assertTrue($zones[LayoutZones::PUBLIC_LOGIN]['is_single']);
 
         // The menu field's options ship with the registry, so the form needs no
         // second request to know what it may offer.
@@ -326,6 +329,22 @@ class CmsLayoutTest extends TestCase
         // One rule about what a menu may show, shared by the menu endpoint and the
         // layout zones — a second copy is how the two would come to disagree.
         $this->assertSame(['Live'], array_column($items, 'label'));
+    }
+
+    public function test_the_sign_in_screen_publishes_its_own_words(): void
+    {
+        $this->chrome(LayoutZones::PUBLIC_LOGIN, BlockType::Login, [
+            'eyebrow' => 'Staff access',
+            'title' => 'Sign in',
+            'lead' => '<p>Competitors do not sign in.</p>',
+        ]);
+
+        $content = $this->getJson('/api/public/layout/'.LayoutZones::PUBLIC_LOGIN)
+            ->assertOk()->json('data.blocks.0.content');
+
+        $this->assertSame('Staff access', $content['eyebrow']);
+        $this->assertSame('Sign in', $content['title']);
+        $this->assertSame('<p>Competitors do not sign in.</p>', $content['lead']);
     }
 
     public function test_a_menu_reference_must_point_at_a_menu_that_exists(): void

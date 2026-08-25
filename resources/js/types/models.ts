@@ -702,8 +702,8 @@ export interface LayoutZoneInfo {
     key: string;
     label: string;
     description: string;
-    /** True when the zone holds one settings record, not a list of sections. */
-    is_chrome: boolean;
+    /** True when the zone holds one record, edited as a form, not a list of sections. */
+    is_single: boolean;
     types: LayoutTypeInfo[];
 }
 

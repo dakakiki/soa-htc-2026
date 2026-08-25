@@ -183,6 +183,21 @@ class MasterDataSeeder extends Seeder
      */
     private function seedChromeLayout(): void
     {
+        if (! LayoutBlock::query()->where('zone', LayoutZones::PUBLIC_LOGIN)->exists()) {
+            LayoutBlock::query()->create([
+                'zone' => LayoutZones::PUBLIC_LOGIN,
+                'type' => BlockType::Login,
+                'status' => true,
+                'position' => 1,
+                'data' => [
+                    'eyebrow' => 'Staff access',
+                    'title' => 'Sign in',
+                    'lead' => '<p>For administrators and coordinators. Competitors do not sign in —'
+                        .' they enter with their candidate number.</p>',
+                ],
+            ]);
+        }
+
         $headerMenu = Menu::query()->where('slug', 'public-header')->value('id');
         $footerMenu = Menu::query()->where('slug', 'public-footer')->value('id');
 

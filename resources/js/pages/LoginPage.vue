@@ -1,22 +1,59 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { IconEye, IconEyeOff } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
-import { useThemeStore } from '@/stores/theme';
+import { getPublicLayout } from '@/api/publicContent';
 import { apiErrorMessage } from '@/api/http';
+import PublicFormPage from '@/components/public/PublicFormPage.vue';
 
+/**
+ * Staff sign-in, in the public site's own language (ADR-0046): the display
+ * heading, the mono label, the rule-under-the-field inputs. Words on the left,
+ * form on the right — the two-column shape belongs to {@see PublicFormPage} and
+ * is shared with the screens that follow.
+ *
+ * The words above the form are CONTENT, not translations: they come from the
+ * `public.login` zone and are edited in Website → Layout. The owner's rule is
+ * that every screen carrying a heading and a paragraph gets an admin for them.
+ * The field labels and the button stay in `en.ts` — renaming "E-mail" is not
+ * editing a page, it is breaking a form.
+ */
 const session = useSessionStore();
-const themeStore = useThemeStore();
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
 
+const eyebrow = ref('');
+const heading = ref('');
+const lead = ref('');
+
+onMounted(async () => {
+    try {
+        const { data } = await getPublicLayout('public.login');
+        const content = (data.data.blocks[0]?.content ?? {}) as Record<string, string>;
+        eyebrow.value = content.eyebrow ?? '';
+        heading.value = content.title ?? '';
+        lead.value = content.lead ?? '';
+    } catch {
+        // The form is the page; it stands without its heading rather than
+        // falling back to a copy nobody can see or change.
+    }
+});
+
 const email = ref('admin@soahtc.test');
 const password = ref('');
 const remember = ref(false);
+const revealed = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
+
+/** A field's rule: hairline at rest, full strength once it holds something. */
+const field = 'h-[52px] w-full border-0 border-b bg-transparent px-0 text-lg text-brand-palette-4 '
+    + 'placeholder:text-brand-palette-4/30 focus:outline-none focus:ring-0';
+
+const label = 'block font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/45';
 
 async function submit(): Promise<void> {
     loading.value = true;
@@ -38,56 +75,80 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-    <div class="mx-auto max-w-sm">
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <img v-if="themeStore.theme?.logo_url" :src="themeStore.theme.logo_url" :alt="$t('app.name')"
-                class="mb-4 h-12 max-w-[16rem] object-contain" />
-            <h1 class="text-lg font-semibold">{{ $t('login.title') }}</h1>
-            <p class="mt-1 text-sm text-gray-500">{{ $t('login.subtitle') }}</p>
+    <PublicFormPage>
+        <template #intro>
+            <p v-if="eyebrow" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/40">
+                {{ eyebrow }}
+            </p>
+            <h1 v-if="heading" class="mt-3 text-[clamp(2.75rem,7vw,4.75rem)] font-semibold leading-[0.96] tracking-[-0.05em] text-brand-palette-4">
+                {{ heading }}
+            </h1>
+            <!-- Admin-authored markup, rendered like every other paragraph the
+                 editor produces. -->
+            <div v-if="lead" class="rich-text mt-4 max-w-[400px] text-[17px] leading-relaxed text-brand-palette-4/62" v-html="lead"></div>
+        </template>
 
-            <form class="mt-5 space-y-4" @submit.prevent="submit">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700" for="email">{{ $t('login.email') }}</label>
+        <form @submit.prevent="submit">
+            <div class="grid gap-7">
+                <label class="block">
+                    <span :class="label">{{ $t('login.email') }}</span>
                     <input
-                        id="email"
                         v-model="email"
                         type="email"
                         autocomplete="username"
                         required
-                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        :placeholder="$t('login.emailPlaceholder')"
+                        class="mt-2 border-brand-palette-4/20 focus:border-brand-palette-4"
+                        :class="field"
                     />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700" for="password">{{ $t('login.password') }}</label>
-                    <input
-                        id="password"
-                        v-model="password"
-                        type="password"
-                        autocomplete="current-password"
-                        required
-                        class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                    />
-                </div>
-
-                <label class="flex items-center gap-2 text-sm text-gray-700 select-none">
-                    <input
-                        v-model="remember"
-                        type="checkbox"
-                        class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
-                    />
-                    {{ $t('login.remember') }}
                 </label>
 
-                <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+                <label class="block">
+                    <span :class="label">{{ $t('login.password') }}</span>
+                    <span class="relative mt-2 block">
+                        <input
+                            v-model="password"
+                            :type="revealed ? 'text' : 'password'"
+                            autocomplete="current-password"
+                            required
+                            class="border-brand-palette-4/20 pr-10 tracking-[0.22em] focus:border-brand-palette-4"
+                            :class="field"
+                        />
+                        <button
+                            type="button"
+                            :aria-label="revealed ? $t('login.hidePassword') : $t('login.showPassword')"
+                            class="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center text-brand-palette-4/45 hover:text-brand-palette-4"
+                            @click="revealed = !revealed"
+                        >
+                            <IconEyeOff v-if="revealed" :size="20" />
+                            <IconEye v-else :size="20" />
+                        </button>
+                    </span>
+                </label>
+            </div>
 
+            <p v-if="error" class="mt-6 text-sm text-red-600">{{ error }}</p>
+
+            <!-- The action and the switch share a line on wide screens; on a
+                 phone the button takes the full width and leads. -->
+            <div class="mt-9 flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
                 <button
                     type="submit"
                     :disabled="loading"
-                    class="w-full rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
+                    class="h-[52px] w-full shrink-0 rounded-full bg-brand-palette-4 text-base font-medium text-white transition hover:brightness-125 disabled:opacity-50 sm:w-auto sm:px-10"
                 >
                     {{ loading ? $t('login.submitting') : $t('login.submit') }}
                 </button>
-            </form>
-        </div>
-    </div>
+
+                <label class="flex min-h-11 select-none items-center gap-3">
+                    <input
+                        v-model="remember"
+                        type="checkbox"
+                        class="h-[22px] w-[22px] rounded-md border-[1.5px] border-brand-palette-4/40 accent-brand-palette-4"
+                    />
+                    <span class="text-[15px] text-brand-palette-4/70">{{ $t('login.remember') }}</span>
+                </label>
+            </div>
+        </form>
+    </PublicFormPage>
 </template>

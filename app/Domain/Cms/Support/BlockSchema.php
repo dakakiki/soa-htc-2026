@@ -47,8 +47,8 @@ final class BlockSchema
         return match ($type) {
             // Three hero sections are not a choice, they are a mistake.
             BlockType::Hero, BlockType::Contact, BlockType::News => 1,
-            // Chrome: one record per zone, always.
-            BlockType::Header, BlockType::Footer => 1,
+            // Chrome and screen copy: one record per zone, always.
+            BlockType::Header, BlockType::Footer, BlockType::Login => 1,
             default => null,
         };
     }
@@ -149,6 +149,14 @@ final class BlockSchema
                 // A typed year would be wrong every January and nobody would notice
                 // for months, so it is a token the page fills in.
                 self::text('copyright', 'Copyright line', 160, 'Write {year} where the current year should appear — for example: © {year} SOA HTC'),
+            ],
+            // The sign-in screen's words. Field labels and the button are NOT here:
+            // they are interface, and an admin editing "E-mail" into something else
+            // breaks the form rather than improving the page.
+            BlockType::Login => [
+                self::text('eyebrow', 'Label above the heading', 60),
+                self::text('title', 'Heading', 120),
+                self::rich('lead', 'Paragraph', 1600),
             ],
         };
     }

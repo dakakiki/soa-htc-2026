@@ -26,6 +26,10 @@ enum BlockType: string
     // each is a singleton in its own zone and carries settings rather than copy.
     case Header = 'header';
     case Footer = 'footer';
+    // Screen copy. A screen the application draws itself — a form, not something
+    // assembled from sections — but whose heading and paragraph are still words
+    // somebody has to be able to change without a commit.
+    case Login = 'login';
 
     public function label(): string
     {
@@ -40,16 +44,21 @@ enum BlockType: string
             self::ImageBand => 'Image band',
             self::Header => 'Header',
             self::Footer => 'Footer',
+            self::Login => 'Sign in',
         };
     }
 
     /**
-     * Whether the type is the single settings record of its zone rather than one
-     * section among several. The editor shows these as a form, not as a list with
-     * an "Add section" button — there is nothing to add or reorder.
+     * Whether the type is the single record of its zone rather than one section
+     * among several. The editor shows these as a form, not as a list with an "Add
+     * section" button — there is nothing to add or reorder.
+     *
+     * Covers two kinds: the chrome (header, footer) and the copy of a screen the
+     * application draws itself (sign-in). Both are one record edited as fields;
+     * only the front page is a list.
      */
-    public function isChrome(): bool
+    public function isSingle(): bool
     {
-        return in_array($this, [self::Header, self::Footer], true);
+        return in_array($this, [self::Header, self::Footer, self::Login], true);
     }
 }

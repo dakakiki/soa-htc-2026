@@ -264,9 +264,15 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
         </main>
 
         <!-- The footer is an island: inset from the page edges and rounded, so
-             the navy reads as a block on the paper rather than a bleeding band. -->
-        <footer class="px-4 pb-6 sm:px-8">
-            <div class="mx-auto w-full max-w-[1240px] rounded-[28px] bg-brand-palette-4 px-8 py-11 text-white sm:px-12">
+             the navy reads as a block on the paper rather than a bleeding band.
+             It sits in the SAME container as the header and the page, so its edge
+             falls on the site's content line at every width. It used to carry its
+             own `px-4 sm:px-8`, which put the blue edge 8px outside the content
+             between 640 and 1240 and 8px inside it below that — the kind of
+             misalignment that only shows up at the widths nobody screenshots. -->
+        <footer class="pb-6">
+          <div class="mx-auto w-full max-w-[1240px] px-6">
+            <div class="rounded-[28px] bg-brand-palette-4 px-8 py-11 text-white sm:px-12">
                 <div class="grid gap-10 pb-9 sm:grid-cols-2 lg:grid-cols-4">
                     <div class="lg:col-span-2">
                         <RouterLink :to="{ name: 'home' }" class="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight">
@@ -303,6 +309,7 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
                     </span>
                 </div>
             </div>
+          </div>
         </footer>
     </div>
 </template>
