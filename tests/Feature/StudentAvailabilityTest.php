@@ -208,7 +208,7 @@ class StudentAvailabilityTest extends TestCase
 
     public function test_next_test_stays_locked_while_the_previous_is_completed_but_unpublished(): void
     {
-        $chain = $this->twoTestChain('H2');
+        $chain = $this->twoTestChain('H2', 'competition');
         $token = $this->tokenFor('H2');
         $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: false);
 
@@ -221,7 +221,7 @@ class StudentAvailabilityTest extends TestCase
 
     public function test_publishing_the_previous_test_unlocks_the_next(): void
     {
-        $chain = $this->twoTestChain('H2');
+        $chain = $this->twoTestChain('H2', 'competition');
         $token = $this->tokenFor('H2');
         $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: true);
 
@@ -231,15 +231,45 @@ class StudentAvailabilityTest extends TestCase
     }
 
     /**
-     * A sample quiz whose single exam holds two ordered tests at $levelShort.
+     * Practice is not a queue (owner, 2026-08-25): "sample tests are all
+     * available straight away, there is nothing to unlock — that is only for the
+     * competition."
+     */
+    public function test_every_sample_test_is_open_from_the_start(): void
+    {
+        $this->twoTestChain('H2', 'sample');
+        $token = $this->tokenFor('H2');
+
+        $this->withToken($token)->getJson('/api/student/availability')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'next')
+            ->assertJsonPath('quizzes.0.exams.0.tests.1.status', 'next');
+    }
+
+    public function test_an_unpublished_sample_result_does_not_hold_up_the_rest(): void
+    {
+        $chain = $this->twoTestChain('H2', 'sample');
+        $token = $this->tokenFor('H2');
+        $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: false);
+
+        // The finished one stays finished (one attempt per test, ADR-0016), and
+        // the other is open regardless — there is no approval to wait for.
+        $this->withToken($token)->getJson('/api/student/availability')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'completed')
+            ->assertJsonPath('quizzes.0.exams.0.tests.1.status', 'next');
+    }
+
+    /**
+     * A quiz whose single exam holds two ordered tests at $levelShort. The type
+     * matters: the order is enforced for `competition` only, so a test about the
+     * sequence must not build a sample quiz.
      *
      * @return array{quiz: Quiz, exam: Exam, tests: array{0: Test, 1: Test}}
      */
-    private function twoTestChain(string $levelShort = 'H2'): array
+    private function twoTestChain(string $levelShort = 'H2', string $type = 'sample'): array
     {
         $level = DifficultyLevel::where('level_short', $levelShort)->firstOrFail();
 
-        $quiz = Quiz::create(['title' => 'Two-test', 'quiz_type' => 'sample', 'status' => 'active']);
+        $quiz = Quiz::create(['title' => 'Two-test', 'quiz_type' => $type, 'status' => 'active']);
         $quiz->levels()->attach($level->id);
 
         $exam = Exam::create(['title' => 'Exam', 'status' => 'active']);

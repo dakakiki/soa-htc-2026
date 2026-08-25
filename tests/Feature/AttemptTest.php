@@ -71,6 +71,8 @@ class AttemptTest extends TestCase
 
     /**
      * A quiz with one exam and $count ordered tests (each with one MC question).
+     * The default type is `sample`, which is UNGATED: tests about the order or
+     * the publish gate must pass `competition`.
      *
      * @return array{quiz: Quiz, tests: list<Test>}
      */
@@ -122,7 +124,9 @@ class AttemptTest extends TestCase
 
     public function test_next_test_unlocks_only_after_an_admin_publishes_the_previous(): void
     {
-        $c = $this->quizWithTests('H2', 2);
+        // A COMPETITION quiz: the order and the publish gate are its rules alone,
+        // and a sample quiz opens every test at once (owner, 2026-08-25).
+        $c = $this->quizWithTests('H2', 2, 'competition');
         $token = $this->tokenFor('H2');
 
         $this->withToken($token)->getJson('/api/student/availability')

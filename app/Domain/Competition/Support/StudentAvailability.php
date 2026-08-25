@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Competition\Support;
 
+use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\Exam;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
@@ -22,8 +23,7 @@ use Illuminate\Support\Collection;
  * Test status (ADR-0017 strict sequential, extended by ADR-0021 publish gate):
  *  - `completed`     — the registration has a completed attempt at this test;
  *  - `in_progress`   — it has an open attempt;
- *  - `next`          — the first not-completed test in an open quiz's sequence
- *                      (the only test that may be started right now);
+ *  - `next`          — a test that may be started right now;
  *  - `locked`        — the quiz's password is not cleared, or an earlier test in
  *                      the sequence is not yet completed, or the earlier test is
  *                      completed but its result has not yet been published.
@@ -32,6 +32,12 @@ use Illuminate\Support\Collection;
  * published its result (5d), so the next round stays closed until the previous
  * one is approved. Grading/publication statuses stay in the results layer
  * (Faza 5, ADR-0013).
+ *
+ * **All of that applies to COMPETITION quizzes only.** A sample quiz has every
+ * test `next` from the start (owner, 2026-08-25): practice protects nothing by
+ * being taken in order, and its results publish themselves, so there is no
+ * approval for the front to wait on. One attempt per test still holds
+ * (ADR-0016) — a finished sample test stays finished.
  */
 final class StudentAvailability
 {
@@ -147,6 +153,14 @@ final class StudentAvailability
         $statuses = [];
         $reachedFront = false;
 
+        // The order is a COMPETITION rule (owner, 2026-08-25): "sample tests are
+        // all available straight away, there is nothing to unlock — that is only
+        // for the competition." In practice mode nothing is protected by making a
+        // competitor finish one test before they may see the next, and nothing is
+        // waiting to be approved: sample results publish themselves. So the front
+        // is only carried through a competition quiz.
+        $sequenced = $quiz->quiz_type === QuizType::Competition;
+
         foreach (self::orderedTests($quiz) as $test) {
             $status = $attempts[$test->id]['status'] ?? null;
 
@@ -174,7 +188,7 @@ final class StudentAvailability
 
                 continue;
             }
-            $statuses[$test->id] = $reachedFront ? 'locked' : 'next';
+            $statuses[$test->id] = $sequenced && $reachedFront ? 'locked' : 'next';
             $reachedFront = true;
         }
 
