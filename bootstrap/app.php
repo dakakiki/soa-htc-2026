@@ -18,6 +18,31 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         // Competitor (student) auth: bearer token from web identification.
         $middleware->alias(['student.session' => EnsureStudentSession::class]);
+
+        /*
+         * The competitor API does NOT ride on the web session, so it must not be
+         * gated by the web session's CSRF token.
+         *
+         * `statefulApi()` puts every `/api/*` call from this domain behind the
+         * session and its CSRF check. For the staff SPA that is exactly right —
+         * it authenticates by cookie. The competitor does not: `student.session`
+         * reads a bearer token and nothing else, so a forged cross-site request
+         * arrives without the header and is refused with 401 either way. There is
+         * nothing for CSRF to protect here, and one thing for it to break: when
+         * the web session ages out (SESSION_LIFETIME), the XSRF cookie stops
+         * matching and a competitor in the middle of a contest gets «CSRF token
+         * mismatch» on starting or handing in a test — over a session they never
+         * had a use for. Reported from the exam screen on 2026-08-25.
+         *
+         * `identify` is exempt too, and safely: it is not authenticated by a
+         * cookie, a caller must already know the three factors it checks, and the
+         * bearer token it answers with cannot be read cross-origin.
+         *
+         * 🪤 Singular on purpose. The admin roster lives under `api/registrations/*`;
+         * `api/student/*` matches no staff route (`api/students/…` would not match
+         * this pattern either — the segment boundary is part of it).
+         */
+        $middleware->validateCsrfTokens(except: ['api/student/*']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

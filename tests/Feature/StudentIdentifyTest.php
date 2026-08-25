@@ -7,6 +7,7 @@ use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Models\StudentSession;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -125,6 +126,70 @@ class StudentIdentifyTest extends TestCase
         $r = $this->registration();
         $token = $this->postJson('/api/student/identify', $this->payload($r))->json('token');
         StudentSession::query()->update(['expires_at' => now()->subMinute()]);
+
+        $this->withToken($token)->getJson('/api/student/me')->assertUnauthorized();
+    }
+
+    /**
+     * The competitor API authenticates by bearer token alone, so the web
+     * session's CSRF check protects nothing there and breaks something real: when
+     * the session ages out, a competitor mid-contest is told «CSRF token mismatch»
+     * on starting or handing in a test. CSRF is not enforced in the test
+     * environment, so the exemption is asserted where it is configured.
+     */
+    public function test_the_competitor_api_is_exempt_from_the_web_session_csrf_check(): void
+    {
+        $excluded = app(PreventRequestForgery::class)->getExcludedPaths();
+
+        $this->assertContains('api/student/*', $excluded);
+        // Staff routes must stay protected — they DO authenticate by cookie.
+        $this->assertNotContains('api/*', $excluded);
+        $this->assertNotContains('api/registrations/*', $excluded);
+    }
+
+    /*
+     * Sliding expiry (ADR-0052). The horizon measures how long since the
+     * competitor last did anything, not how long since identification.
+     */
+
+    public function test_an_authenticated_call_slides_the_session_horizon_out(): void
+    {
+        $r = $this->registration();
+        $token = $this->postJson('/api/student/identify', $this->payload($r))->json('token');
+
+        // Identified when the room opened; the exam starts two hours later.
+        $this->travel(2)->hours();
+        $this->withToken($token)->getJson('/api/student/me')->assertOk();
+
+        $session = StudentSession::firstOrFail();
+        $this->assertTrue(
+            $session->expires_at->greaterThan(now()->addMinutes(StudentSession::LIFETIME_MINUTES - 1)),
+            'The call should have pushed the horizon back to a full lifetime.',
+        );
+    }
+
+    public function test_a_call_within_the_minute_leaves_the_horizon_alone(): void
+    {
+        $r = $this->registration();
+        $token = $this->postJson('/api/student/identify', $this->payload($r))->json('token');
+
+        $this->withToken($token)->getJson('/api/student/me')->assertOk();
+        $first = StudentSession::firstOrFail()->expires_at;
+
+        // A competitor answering questions makes calls in bursts; re-stamping an
+        // all-but-full horizon on each one buys nothing but a write.
+        $this->withToken($token)->getJson('/api/student/me')->assertOk();
+
+        $this->assertTrue($first->equalTo(StudentSession::firstOrFail()->expires_at));
+    }
+
+    public function test_a_session_left_alone_past_its_lifetime_is_not_revived(): void
+    {
+        $r = $this->registration();
+        $token = $this->postJson('/api/student/identify', $this->payload($r))->json('token');
+
+        // Sliding must not resurrect what has already run out.
+        $this->travel(StudentSession::LIFETIME_MINUTES + 1)->minutes();
 
         $this->withToken($token)->getJson('/api/student/me')->assertUnauthorized();
     }
