@@ -42,10 +42,37 @@ final class LegacyText
         return $bytes;
     }
 
-    /** True when the string carries the box-drawing / block glyphs the corruption produces. */
+    /**
+     * True when the string carries the marks the corruption leaves behind.
+     *
+     * Two signatures, because the corruption looks different depending on how long
+     * the original character's UTF-8 was:
+     *
+     *  - **Two bytes** (ć, ž, ō, é) start C2–DF, and CP850 draws that whole range
+     *    as box-drawing and block glyphs — «─ç», «┼¥». That is the tell-tale sign
+     *    this class was written for.
+     *  - **Three bytes** — which is where typographic punctuation lives: the curly
+     *    quotes, the en and em dash, the ellipsis — start E2, and CP850 draws E2 as
+     *    a plain «Ô». Nothing about «ÔÇÿ» looks broken to the eye the way a box
+     *    glyph does, so those slipped through the first test and sat in the
+     *    imported questions: «heÔÇÿd gone off», «the text ÔÇô a, b, c».
+     *
+     * The second test asks the question directly rather than listing glyphs: turn
+     * the string back into CP850 bytes and see whether a COMPLETE three-byte UTF-8
+     * sequence falls out. Text that was already correct does not survive that — an
+     * accented letter recovers a stray continuation byte, not a sequence — and
+     * {@see fix()} still refuses any reversal landing on invalid UTF-8 or on more
+     * mojibake.
+     */
     private static function looksCorrupted(string $value): bool
     {
-        return preg_match('/[\x{2500}-\x{259F}]/u', $value) === 1;
+        if (preg_match('/[\x{2500}-\x{259F}]/u', $value) === 1) {
+            return true;
+        }
+
+        $bytes = @iconv('UTF-8', 'CP850', $value);
+
+        return $bytes !== false && preg_match('/\xE2[\x80-\xBF]{2}/', $bytes) === 1;
     }
 
     private static function isValidUtf8(string $value): bool

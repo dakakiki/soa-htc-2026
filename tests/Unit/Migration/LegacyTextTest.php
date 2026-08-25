@@ -28,6 +28,14 @@ class LegacyTextTest extends TestCase
             'o-macron' => ["Kant\u{253C}\u{00EC}", "Kant\u{014D}"],
             // «Lyc├®e» → é (U+00E9): CP850-only (® at 0xA9), fails under CP437.
             'e-acute' => ["Lyc\u{251C}\u{00AE}e", "Lyc\u{00E9}e"],
+            // Three-byte originals draw no box glyph at all — «Ô» is just a letter —
+            // so these sat in the imported questions until the second test was added.
+            // «ÔÇÿ» → ‘ (U+2018), the quote in «he’d gone off».
+            'left quote' => ["he\u{00D4}\u{00C7}\u{00FF}d gone off", "he\u{2018}d gone off"],
+            // «ÔÇô» → – (U+2013), the dash in «the text – a, b, c or d».
+            'en dash' => ["the text \u{00D4}\u{00C7}\u{00F4} a, b", "the text \u{2013} a, b"],
+            // «ÔÇÖ» → ’ (U+2019) and «ÔÇ¥» → … (U+2026).
+            'apostrophe' => ["hedgehog\u{00D4}\u{00C7}\u{00D6}s", "hedgehog\u{2019}s"],
         ];
     }
 
@@ -57,6 +65,13 @@ class LegacyTextTest extends TestCase
             'already-fixed z-caron' => ["Kri\u{017E}evci"],
             'latin-1 e-acute' => ["Lyc\u{00E9}e"],       // é lives in CP850 — must still be left alone
             'turkish' => ["\u{0130}stanbul \u{00DC}niversitesi"],
+            // Already-correct punctuation: the reversal must not run twice.
+            'already-fixed quote' => ["he\u{2018}d gone off"],
+            'already-fixed dash' => ["a \u{2013} b"],
+            // «Ô» on its own is a letter, not a signature: one accented character
+            // recovers a stray byte, never a whole UTF-8 sequence.
+            'lone o-circumflex' => ["H\u{00F4}tel de la C\u{00F4}te"],
+            'accented run' => ["\u{00E9}\u{00E8}\u{00EA} caf\u{00E9}"],
             'empty' => [''],
             'null' => [null],
         ];
