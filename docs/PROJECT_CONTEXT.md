@@ -388,6 +388,12 @@ Navigacija je poseban domen i ne treba je hardkodovati u Vue komponentama:
 | `admin.top` | top navigacija admin/coordinator panela | stavke se filtriraju prema ulozi i permissions; skrivanje linka ne zamenjuje backend autorizaciju |
 | `admin.right_sidebar` | navigacija i kontekstualni moduli u desnom sidebaru admin panela | sadržaj i stavke zavise od aktivne stranice, uloge i permissions |
 
+> **Kako je ovo na kraju rešeno:** predlog iznad je iz pripreme; sprovedene odluke su u `DECISIONS.md`
+> — **ADR-0043** (zone su registar u kodu, sekcije su tipizovani blokovi), **ADR-0045** (`public.header`
+> i `public.footer` su zone sa jednim zapisom, tabovi u `Website → Layout`) i **ADR-0046** (svaki ekran
+> koji nosi naslov i pasus dobija zonu; labele polja i dugmad ostaju interfejs). `admin.top` i
+> `admin.right_sidebar` iz tabele ispod **još nisu urađeni** — admin sidebar je i dalje data-driven u kodu.
+
 `Navigation` ima stabilni ključ/lokaciju, a uređene hijerarhijske `NavigationItem` stavke podržavaju roditelja, redosled, naziv, aktivnost i cilj. Cilj treba prvenstveno da bude interna `Page`, `Post`, kategorija ili imenovana aplikaciona ruta; spoljašnji URL je dozvoljen samo kao eksplicitno označen tip sa validacijom protokola. Admin navigacija sme da referencira sistemske rute, ali njena izmena ne može dodeliti novu permission niti zaobići policy proveru.
 
 Potvrđeni osnovni page shell-ovi su:
