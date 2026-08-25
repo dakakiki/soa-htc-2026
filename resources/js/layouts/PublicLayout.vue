@@ -6,6 +6,7 @@ import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
 import { getPublicLayout, getSiteStatus } from '@/api/publicContent';
 import PublicMenuLink from '@/components/PublicMenuLink.vue';
+import SiteStatusStrip from '@/components/public/SiteStatusStrip.vue';
 import type { PublicMenu, SiteStatus } from '@/types/models';
 
 /** One link column of the footer, as the footer block stores it. */
@@ -174,28 +175,9 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
 
 <template>
     <div class="flex min-h-screen flex-col bg-[#fbfaf8] text-brand-palette-4">
-        <!-- Status strip: which round, and whether it can be entered. Both come
-             from the server; nobody types the state by hand. -->
-        <div v-if="site" class="bg-brand-palette-4 text-white">
-            <div class="mx-auto flex h-[38px] w-full max-w-[1240px] items-center gap-4 px-6">
-                <span v-if="site.round" class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/85">
-                    {{ $t('public.status.round', { round: site.round, year: site.year }) }}
-                </span>
-                <span class="ml-auto inline-flex items-center gap-2 sm:ml-0">
-                    <span class="h-1.5 w-1.5 rounded-full"
-                        :class="site.competition_open
-                            ? 'bg-brand-palette-1 shadow-[0_0_0_3px_rgba(251,186,0,0.25)]'
-                            : 'bg-white/40'" />
-                    <span class="font-mono text-[11px] uppercase tracking-[0.16em]"
-                        :class="site.competition_open ? 'text-brand-palette-1' : 'text-white/60'">
-                        {{ site.competition_open ? $t('public.status.open') : $t('public.status.closed') }}
-                    </span>
-                </span>
-                <span v-if="site.season" class="ml-auto hidden font-mono text-[11px] uppercase tracking-[0.16em] text-white/50 sm:block">
-                    {{ site.season }}
-                </span>
-            </div>
-        </div>
+        <!-- Which round, and whether it can be entered. Shared with the
+             competitor shell, which shows the same strip over the same data. -->
+        <SiteStatusStrip :site="site" />
 
         <header class="border-b border-brand-palette-4/12">
             <div class="mx-auto flex h-[78px] w-full max-w-[1240px] items-center gap-10 px-6">

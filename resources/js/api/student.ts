@@ -42,6 +42,13 @@ export function availability(token: string) {
     return http.get<{ quizzes: AvailabilityQuiz[] }>('/api/student/availability', auth(token));
 }
 
+/**
+ * Clear a competition quiz's exam password. Called from ONE place — the entry
+ * form's competition stream ({@see useStudentSessionStore.enterCompetition}) —
+ * because the password is read out in the room once and given once. The tests
+ * screen used to ask for it a second time; the owner's rule (2026-08-25) is that
+ * "that option does not exist", so do not put a form for this on a screen again.
+ */
 export function unlockQuiz(token: string, quizId: number, password: string) {
     return http.post<{ unlocked: boolean }>(`/api/student/quizzes/${quizId}/unlock`, { password }, auth(token));
 }
