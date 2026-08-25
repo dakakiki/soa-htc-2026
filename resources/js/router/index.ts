@@ -21,6 +21,13 @@ declare module 'vue-router' {
          * page that paints its own edge-to-edge sections (the front page).
          */
         fullBleed?: boolean;
+        /**
+         * The screen replaces the shell's chrome with its own: no header, no
+         * container, nothing around it. A test in progress is the whole window
+         * — a sign-out button beside a running clock is an invitation to lose
+         * an exam by mis-tapping.
+         */
+        bare?: boolean;
     }
 }
 
@@ -65,7 +72,7 @@ const routes: RouteRecordRaw[] = [
         path: '/student/tests/:testId',
         name: 'student.test',
         component: () => import('@/pages/student/StudentTestPage.vue'),
-        meta: { zone: 'student' },
+        meta: { zone: 'student', bare: true },
     },
     {
         path: '/dashboard',
