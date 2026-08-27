@@ -199,7 +199,7 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
 
                 <div class="ml-auto flex items-center gap-2">
                     <RouterLink v-if="session.isAuthenticated" :to="{ name: 'dashboard' }"
-                        class="inline-flex items-center gap-1.5 rounded-full border border-brand-palette-4/20 px-4 py-2.5 text-sm font-medium text-brand-palette-4/80 transition-colors hover:bg-brand-palette-4/5">
+                        class="inline-flex items-center gap-1.5 rounded-full border border-brand-palette-4/20 px-4 py-2.5 text-sm font-medium uppercase tracking-[0.08em] text-brand-palette-4/80 transition-colors hover:bg-brand-palette-4/5">
                         {{ $t('public.dashboard') }}
                     </RouterLink>
                     <RouterLink v-else :to="{ name: 'login' }"
