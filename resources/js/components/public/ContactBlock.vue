@@ -60,10 +60,10 @@ const external = (link: ContactLink): boolean => /^https?:/i.test((link.url ?? '
                         {{ link.label }}
                     </span>
                     <span class="text-lg font-medium tracking-[-0.015em] text-brand-palette-4 sm:text-xl"
-                        :class="href(link) ? 'group-hover:text-brand-palette-2' : ''">
+                        :class="href(link) ? 'group-hover:text-brand-ink-accent' : ''">
                         {{ link.value }}
                     </span>
-                    <svg v-if="external(link)" class="ml-auto h-4 w-4 text-brand-palette-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg v-if="external(link)" class="ml-auto h-4 w-4 text-brand-ink-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M7 17L17 7" /><path d="M9 7h8v8" />
                     </svg>
                 </component>

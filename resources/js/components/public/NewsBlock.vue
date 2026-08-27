@@ -35,7 +35,7 @@ onMounted(async () => {
             <div class="flex items-baseline justify-between pb-8">
                 <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/40">{{ c.title }}</p>
                 <RouterLink :to="{ name: 'news' }"
-                    class="inline-flex items-center gap-2 text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] hover:text-brand-palette-2">
+                    class="inline-flex items-center gap-2 text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] hover:text-brand-ink-accent">
                     {{ $t('public.news.readAll') }}
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14" /><path d="M13 6l6 6-6 6" />
@@ -51,14 +51,14 @@ onMounted(async () => {
                     :style="{ backgroundImage: `url(${posts[0].image_url})` }" />
                 <span class="flex flex-col gap-4">
                     <span class="flex items-center gap-4">
-                        <span v-if="posts[0].categories?.length" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-2">
+                        <span v-if="posts[0].categories?.length" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-ink-accent">
                             {{ posts[0].categories[0].name }}
                         </span>
                         <span class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/35">
                             {{ formatDate(posts[0].published_at) }}
                         </span>
                     </span>
-                    <span class="text-[clamp(1.5rem,3vw,2.5rem)] font-semibold leading-tight tracking-[-0.035em] text-brand-palette-4 group-hover:text-brand-palette-2">
+                    <span class="text-[clamp(1.5rem,3vw,2.5rem)] font-semibold leading-tight tracking-[-0.035em] text-brand-palette-4 group-hover:text-brand-ink-accent">
                         {{ posts[0].title }}
                     </span>
                     <span v-if="posts[0].excerpt" class="max-w-[540px] text-[17px] leading-relaxed text-brand-palette-4/65">
@@ -69,7 +69,7 @@ onMounted(async () => {
                          reads as editorial decoration rather than as something to
                          click. This is the affordance; a span, not a second link,
                          because it already sits inside one. -->
-                    <span class="mt-1 self-start text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] group-hover:text-brand-palette-2">
+                    <span class="mt-1 self-start text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] group-hover:text-brand-ink-accent">
                         {{ $t('public.news.readMore') }}
                     </span>
                 </span>
@@ -81,7 +81,7 @@ onMounted(async () => {
                     <span class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/35">
                         {{ formatDate(post.published_at) }}
                     </span>
-                    <span class="text-xl font-semibold leading-snug tracking-[-0.02em] text-brand-palette-4 group-hover:text-brand-palette-2">
+                    <span class="text-xl font-semibold leading-snug tracking-[-0.02em] text-brand-palette-4 group-hover:text-brand-ink-accent">
                         {{ post.title }}
                     </span>
                 </RouterLink>

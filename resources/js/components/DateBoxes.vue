@@ -66,7 +66,7 @@ watch(
             <!-- The D/M/Y letters are labels, so they carry the label's colour
                  whether the box under them is filled or not (owner, 2026-08-27);
                  a filled box still turns its own letter amber. -->
-            <span class="font-mono text-[10px]" :class="digits[i] === '' ? 'text-brand-palette-4' : 'text-brand-palette-2'">{{ label }}</span>
+            <span class="font-mono text-[10px]" :class="digits[i] === '' ? 'text-brand-palette-4' : 'text-brand-ink-accent'">{{ label }}</span>
             <input
                 :ref="(el) => setRef(el as Element | null, i)"
                 :value="digits[i]"

@@ -178,7 +178,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
                     <Tooltip v-if="clearable && selected && !disabled" :text="t('common.clear')">
                     <span
                         class="cursor-pointer"
-                        :class="underlined ? 'text-brand-palette-4 hover:text-brand-palette-2' : 'text-gray-400 hover:text-gray-700'"
+                        :class="underlined ? 'text-brand-palette-4 hover:text-brand-ink-accent' : 'text-gray-400 hover:text-gray-700'"
                         role="button"
                         :aria-label="t('common.clear')"
                         @click.stop="clear"

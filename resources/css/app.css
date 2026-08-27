@@ -29,6 +29,22 @@
     --color-brand-palette-2: #f39200;
     --color-brand-palette-3: #97bddd;
     --color-brand-palette-4: #003758;
+
+    /*
+     * The accent, dark enough to carry text on the page ground.
+     *
+     * `--color-brand-palette-2` is the brand's orange and stays that way for
+     * fills, rules and anything sitting on the navy - but on the paper ground
+     * it is 2.26:1, which fails WCAG AA at every size, large text included. It
+     * is also the slot that marks a category, the exam password and an open
+     * round, so it could not just be swapped for navy without losing what it
+     * says. Lightness is spent instead, in OKLCh, so the hue survives.
+     *
+     * This value is the shipped palette's answer (4.92:1) and only holds until
+     * the theme store boots: `applyColors` recomputes it from whatever orange
+     * the administrator has chosen. Change the palette, not this.
+     */
+    --color-brand-ink-accent: #af5400;
 }
 
 @layer base {
@@ -149,7 +165,7 @@
     text-underline-offset: 3px;
 }
 .cms-content a:hover {
-    color: var(--color-brand-palette-2, #f39200);
+    color: var(--color-brand-ink-accent, #af5400);
 }
 .cms-content blockquote {
     border-left: 2px solid var(--color-brand-palette-2, #f39200);

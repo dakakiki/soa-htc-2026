@@ -143,14 +143,14 @@ const filterOff = `${mono} py-[17px] text-brand-palette-4/45 transition hover:te
             </p>
             <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <RouterLink to="/student/access/sample"
-                    class="inline-flex items-center gap-2 rounded-full bg-brand-palette-2 px-7 py-3.5 text-sm font-semibold text-white transition hover:brightness-95">
+                    class="inline-flex items-center gap-2 rounded-full bg-brand-palette-2 px-7 py-3.5 text-sm font-semibold text-brand-palette-4 transition hover:brightness-95">
                     {{ $t('student.access.shutTrySample') }}
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14" /><path d="M13 6l6 6-6 6" />
                     </svg>
                 </RouterLink>
                 <RouterLink to="/student/access/results"
-                    class="text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] transition hover:text-brand-palette-2">
+                    class="text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] transition hover:text-brand-ink-accent">
                     {{ $t('student.access.shutCheckResults') }}
                 </RouterLink>
             </div>
@@ -162,7 +162,7 @@ const filterOff = `${mono} py-[17px] text-brand-palette-4/45 transition hover:te
                 class="mt-16 grid items-start gap-10 md:grid-cols-12 md:gap-12">
                 <div class="md:col-span-7">
                     <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                        <span v-for="c in lead.categories" :key="c.slug" :class="mono" class="text-brand-palette-2">{{ c.name }}</span>
+                        <span v-for="c in lead.categories" :key="c.slug" :class="mono" class="text-brand-ink-accent">{{ c.name }}</span>
                         <span :class="mono" class="text-brand-palette-4/40">{{ longDate(lead.published_at) }}</span>
                     </div>
                     <h2 class="mt-5 text-[clamp(1.875rem,3.6vw,2.875rem)] font-semibold leading-[1.02] tracking-[-0.038em] text-brand-palette-4">
@@ -193,7 +193,7 @@ const filterOff = `${mono} py-[17px] text-brand-palette-4/45 transition hover:te
                     class="grid items-start gap-x-10 gap-y-3 border-t border-brand-palette-4/15 py-8 md:grid-cols-12">
                     <div class="flex flex-wrap items-baseline gap-x-4 md:col-span-2 md:flex-col md:items-start md:gap-y-1.5">
                         <span :class="mono" class="text-brand-palette-4/40">{{ shortDate(post.published_at) }}</span>
-                        <span v-for="c in post.categories" :key="c.slug" :class="mono" class="text-brand-palette-2">{{ c.name }}</span>
+                        <span v-for="c in post.categories" :key="c.slug" :class="mono" class="text-brand-ink-accent">{{ c.name }}</span>
                     </div>
                     <div :class="post.image_url ? 'md:col-span-7' : 'md:col-span-10'">
                         <h2 class="text-[clamp(1.25rem,2.2vw,1.6875rem)] font-semibold leading-[1.15] tracking-[-0.028em] text-brand-palette-4">

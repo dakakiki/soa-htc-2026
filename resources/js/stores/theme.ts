@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { getTheme } from '@/api/theme';
+import { PAPER, readableOn } from '@/utils/readableColor';
 import type { Theme, ThemeColorKey } from '@/types/models';
 
 const DEFAULT_COLORS: Record<ThemeColorKey, string> = {
@@ -24,6 +25,20 @@ function applyColors(colors: Record<ThemeColorKey, string>): void {
     (Object.entries(colors) as [ThemeColorKey, string][]).forEach(([key, value]) => {
         root.style.setProperty(`--color-brand-${key.replace(/_/g, '-')}`, value);
     });
+
+    /*
+     * One derived colour: the accent, darkened until it can carry text on the
+     * page ground ({@see readableOn}). The brand orange is 2.26:1 on paper and
+     * fails AA at every size, so nothing written in it was readable - and it is
+     * the palette slot that marks a category, the exam password and an open
+     * round, so it could not simply be replaced with navy.
+     *
+     * Derived here rather than written into the palette because an
+     * administrator chooses these four colours in Theme settings: a second
+     * stored hex would go stale the first time they changed one, and silently,
+     * since nothing on the page reports a contrast failure.
+     */
+    root.style.setProperty('--color-brand-ink-accent', readableOn(colors.palette_2, PAPER));
 }
 
 /** Point the browser favicon at the uploaded icon (or full logo) when present. */

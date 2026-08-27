@@ -49,7 +49,7 @@ onMounted(load);
 
 const mono = 'font-mono text-[11px] uppercase tracking-[0.16em]';
 const backLink = `${mono} inline-flex items-center gap-2 text-brand-palette-4/45 transition hover:text-brand-palette-4`;
-const footLink = `${mono} text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] transition hover:text-brand-palette-2`;
+const footLink = `${mono} text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] transition hover:text-brand-ink-accent`;
 </script>
 
 <template>
@@ -64,7 +64,7 @@ const footLink = `${mono} text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,
         <header class="max-w-[900px] pt-10">
             <div v-if="post.categories?.length" class="flex flex-wrap gap-x-4 gap-y-1">
                 <RouterLink v-for="c in post.categories" :key="c.slug" :to="{ name: 'news', query: { category: c.slug } }"
-                    :class="mono" class="text-brand-palette-2 transition hover:text-brand-palette-4">
+                    :class="mono" class="text-brand-ink-accent transition hover:text-brand-palette-4">
                     {{ c.name }}
                 </RouterLink>
             </div>

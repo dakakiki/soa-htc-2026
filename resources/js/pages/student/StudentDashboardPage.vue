@@ -117,12 +117,12 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                              where it was the least readable thing on a screen
                              whose whole structure is rounds. -->
                         <p v-if="exam.round" class="mb-2.5 font-semibold"
-                            :class="[mono, 'text-[13px]', exam.tests.some(isOpen) ? 'text-brand-palette-2' : 'text-brand-palette-4/60']">
+                            :class="[mono, 'text-[13px]', exam.tests.some(isOpen) ? 'text-brand-ink-accent' : 'text-brand-palette-4/60']">
                             {{ exam.round }}
                         </p>
 
                         <div class="flex items-baseline gap-3 border-b-2 border-brand-palette-4/25 pb-3">
-                            <span :class="[mono, 'text-[13px]', exam.tests.some(isOpen) ? 'text-brand-palette-2' : 'text-brand-palette-4/45']">
+                            <span :class="[mono, 'text-[13px]', exam.tests.some(isOpen) ? 'text-brand-ink-accent' : 'text-brand-palette-4/45']">
                                 {{ number }}
                             </span>
                             <span class="text-[19px] font-medium lg:text-[22px]" :class="isAhead(exam) ? 'text-brand-palette-4/55' : ''">
@@ -188,7 +188,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                                          that says a test is behind you, and at 9px
                                          in the corner it was the least visible mark
                                          on the row (owner, 2026-08-27). -->
-                                    <p class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palette-2 px-3 py-1 text-white"
+                                    <p class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palette-2 px-3 py-1 text-brand-palette-4"
                                         :class="[mono, 'text-[11px]']">
                                         <IconCheck :size="13" stroke-width="3" />
                                         {{ $t('student.dashboard.completedLabel') }}
