@@ -52,9 +52,16 @@ return [
 
     'channels' => [
 
+        /*
+         * Daily rather than `single` (2026-08-27). One file forever is how
+         * `laravel.log` reached 103 MB on the development machine — big enough
+         * that opening it to read the last error is its own chore, and nothing
+         * ever cleaned it up. Rotating keeps a day per file and drops anything
+         * older than `LOG_DAILY_DAYS`.
+         */
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            'channels' => explode(',', (string) env('LOG_STACK', 'daily')),
             'ignore_exceptions' => false,
         ],
 

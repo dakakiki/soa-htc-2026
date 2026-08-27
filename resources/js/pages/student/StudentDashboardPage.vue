@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IconLock, IconPlayerPlayFilled } from '@tabler/icons-vue';
+import { IconCheck, IconLock, IconPlayerPlayFilled, IconRefresh } from '@tabler/icons-vue';
 import { availability } from '@/api/student';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import type { AvailabilityExam, AvailabilityQuiz, AvailabilityTest } from '@/types/models';
@@ -48,18 +48,26 @@ function isAhead(exam: AvailabilityExam): boolean {
     return exam.tests.length > 0 && exam.tests.every((test) => test.status === 'locked');
 }
 
-/**
- * The round in play gets the wider column; the rest take the narrower one and
- * flow after it. With the two rounds of a season that is the 7/5 split of the
- * design, and with more it stays a grid rather than becoming a special case.
- */
-function span(exam: AvailabilityExam): string {
-    return exam.tests.some(isOpen) ? 'lg:col-span-7' : 'lg:col-span-5';
-}
-
 /** Two-digit round number, taken from the position — never from the title. */
 function ordinal(index: number): string {
     return String(index + 1).padStart(2, '0');
+}
+
+/**
+ * The rounds, latest first, each one under the last (owner, 2026-08-27).
+ *
+ * They used to sit side by side, which made the page a race between two columns
+ * and left the round label squeezed into whatever space was left. Stacked, each
+ * round is a band of its own and can say plainly which round it is.
+ *
+ * 🪤 The NUMBER is not the position in this list. It is the round's real place
+ * in the contest, so reversing the order must not turn Preliminary into 02 —
+ * hence the index is captured before the reverse, not after.
+ */
+function roundsLatestFirst(quiz: AvailabilityQuiz): { exam: AvailabilityExam; ordinal: string }[] {
+    return quiz.exams
+        .map((exam, index) => ({ exam, ordinal: ordinal(index) }))
+        .reverse();
 }
 
 async function load(): Promise<void> {
@@ -102,16 +110,24 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     {{ quiz.title }}
                 </h1>
 
-                <div class="mt-9 grid gap-11 lg:mt-11 lg:grid-cols-12 lg:gap-14">
-                    <section v-for="(exam, index) in quiz.exams" :key="exam.id" :class="span(exam)">
-                        <div class="flex items-baseline gap-3 border-b border-brand-palette-4/16 pb-3">
-                            <span :class="[mono, 'text-[11px]', exam.tests.some(isOpen) ? 'text-brand-palette-2' : 'text-brand-palette-4/35']">
-                                {{ ordinal(index) }}
+                <div class="mt-9 flex flex-col gap-14 lg:mt-11 lg:gap-16">
+                    <section v-for="{ exam, ordinal: number } in roundsLatestFirst(quiz)" :key="exam.id">
+                        <!-- Which round this is, said first and said loudly. It
+                             used to be a 10px whisper pushed to the far right,
+                             where it was the least readable thing on a screen
+                             whose whole structure is rounds. -->
+                        <p v-if="exam.round" class="mb-2.5 font-semibold"
+                            :class="[mono, 'text-[13px]', exam.tests.some(isOpen) ? 'text-brand-palette-2' : 'text-brand-palette-4/60']">
+                            {{ exam.round }}
+                        </p>
+
+                        <div class="flex items-baseline gap-3 border-b-2 border-brand-palette-4/25 pb-3">
+                            <span :class="[mono, 'text-[13px]', exam.tests.some(isOpen) ? 'text-brand-palette-2' : 'text-brand-palette-4/45']">
+                                {{ number }}
                             </span>
-                            <span class="text-[17px] font-medium lg:text-[19px]" :class="isAhead(exam) ? 'text-brand-palette-4/55' : ''">
+                            <span class="text-[19px] font-medium lg:text-[22px]" :class="isAhead(exam) ? 'text-brand-palette-4/55' : ''">
                                 {{ exam.title }}
                             </span>
-                            <span v-if="exam.round" :class="[mono, 'text-[10px]']" class="ml-auto shrink-0 text-brand-palette-4/40">{{ exam.round }}</span>
                         </div>
 
                         <p v-if="exam.tests.length === 0" class="pt-4 text-sm text-brand-palette-4/45">
@@ -131,9 +147,13 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                             ]"
                         >
                             <div class="min-w-0 flex-1">
+                                <!-- What kind of test it is and how long it runs:
+                                     the two things a candidate checks before
+                                     pressing Start, so they are set to be read,
+                                     not to be found (owner, 2026-08-27). -->
                                 <div class="flex items-baseline gap-2.5">
-                                    <span v-if="test.type" :class="[mono, 'text-[10px]']" class="text-brand-palette-4/45">{{ test.type }}</span>
-                                    <span v-if="test.duration" :class="[mono, 'text-[10px]']" class="text-brand-palette-4/45">
+                                    <span v-if="test.type" :class="[mono, 'text-[12px]']" class="font-semibold text-brand-palette-4">{{ test.type }}</span>
+                                    <span v-if="test.duration" :class="[mono, 'text-[12px]']" class="text-brand-palette-4/70">
                                         · {{ $t('student.dashboard.durationMin', { n: test.duration }) }}
                                     </span>
                                 </div>
@@ -156,11 +176,39 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                                 {{ test.status === 'in_progress' ? $t('student.dashboard.resume') : $t('student.dashboard.start') }}
                             </RouterLink>
 
-                            <div v-else-if="test.status === 'completed'" class="shrink-0 text-right">
-                                <p v-if="test.published && test.score !== null" class="text-[22px] font-semibold tracking-[-0.02em] lg:text-[26px]">
-                                    {{ test.score }}<span class="text-[15px] text-brand-palette-4/45">/{{ test.max_score }}</span>
-                                </p>
-                                <p :class="[mono, 'text-[9px]']" class="mt-0.5 text-brand-palette-2">{{ $t('student.dashboard.completedLabel') }}</p>
+                            <!-- A finished test. In practice it keeps its mark and
+                                 offers another run beside it; in the contest the
+                                 mark is the end of it. -->
+                            <div v-else-if="test.status === 'completed'" class="flex shrink-0 items-center gap-5">
+                                <div class="text-right">
+                                    <p v-if="test.published && test.score !== null" class="text-[22px] font-semibold tracking-[-0.02em] lg:text-[26px]">
+                                        {{ test.score }}<span class="text-[15px] text-brand-palette-4/45">/{{ test.max_score }}</span>
+                                    </p>
+                                    <!-- A chip, not a caption. It is the one thing
+                                         that says a test is behind you, and at 9px
+                                         in the corner it was the least visible mark
+                                         on the row (owner, 2026-08-27). -->
+                                    <p class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palette-2 px-3 py-1 text-white"
+                                        :class="[mono, 'text-[11px]']">
+                                        <IconCheck :size="13" stroke-width="3" />
+                                        {{ $t('student.dashboard.completedLabel') }}
+                                    </p>
+                                    <!-- A finished test with no mark yet: the truth
+                                         is that it is being marked, not that it has
+                                         no score. -->
+                                    <p v-if="!test.published" class="mt-1.5 text-[13px] text-brand-palette-4/60">
+                                        {{ $t('student.dashboard.awaitingResult') }}
+                                    </p>
+                                </div>
+
+                                <RouterLink
+                                    v-if="test.retakeable"
+                                    :to="{ name: 'student.test', params: { testId: test.id } }"
+                                    class="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full border border-brand-palette-4/30 px-6 text-[15px] font-medium text-brand-palette-4 transition hover:bg-brand-palette-4/5"
+                                >
+                                    <IconRefresh :size="16" />
+                                    {{ $t('student.dashboard.retake') }}
+                                </RouterLink>
                             </div>
 
                             <IconLock

@@ -48,7 +48,8 @@ final class BlockSchema
             // Three hero sections are not a choice, they are a mistake.
             BlockType::Hero, BlockType::Contact, BlockType::News => 1,
             // Chrome and screen copy: one record per zone, always.
-            BlockType::Header, BlockType::Footer, BlockType::Login, BlockType::Identify => 1,
+            BlockType::Header, BlockType::Footer, BlockType::Login,
+            BlockType::Identify, BlockType::Register => 1,
             default => null,
         };
     }
@@ -157,6 +158,13 @@ final class BlockSchema
                 self::text('eyebrow', 'Label above the heading', 60),
                 self::text('title', 'Heading', 120),
                 self::rich('lead', 'Paragraph', 1600),
+                // The line under the form. Legacy carried two sentences there —
+                // who the screen is for ("For registered venues only.") and the
+                // way out for everyone else ("Not registered? Create an
+                // account") — and the redesign dropped both, leaving a visitor
+                // with no account at a dead end. Same field and same treatment
+                // as the competitor entry screen's note.
+                self::rich('aside', 'Note under the form', 800),
             ],
             // The competitor entry screen's words, per stream. Same three as the
             // sign-in screen plus the note under them, which is where each stream
@@ -167,6 +175,29 @@ final class BlockSchema
                 self::text('title', 'Heading', 120),
                 self::rich('lead', 'Paragraph', 1600),
                 self::rich('aside', 'Note under the paragraph', 800),
+            ],
+            // The coordinator registration screen's words, both steps of it
+            // (ADR-0053). The field labels, the section headings ("01 — You") and
+            // the button are interface and stay out, as everywhere else.
+            //
+            // The block's one button is the approval form an applicant has to
+            // download, sign and attach. A `file` target resolves to a
+            // media-library document, and a button whose target has been deleted
+            // is dropped rather than published as a dead link (see LayoutButtons)
+            // — so until somebody uploads the form, the download is not offered.
+            //
+            // 🪤 The key must be `button`. LayoutButtons resolves a payload by
+            // KEY (`button` / `buttons`), not by the schema's field kind, so a
+            // single button under any other name is handed to the page raw —
+            // with a `target` and no `href` — and the page renders a dead link.
+            BlockType::Register => [
+                self::text('title', 'Heading', 120),
+                self::rich('lead', 'Paragraph', 1600),
+                self::rich('document_note', 'Venue approval: what to do', 800),
+                self::button('button', 'Venue approval: the form to download'),
+                self::text('sent_title', 'After sending: heading', 120),
+                self::rich('sent_lead', 'After sending: paragraph', 1600),
+                self::rich('sent_note', 'After sending: note at the foot', 800),
             ],
         };
     }

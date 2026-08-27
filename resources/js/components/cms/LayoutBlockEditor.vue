@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconPlus, IconTrash } from '@tabler/icons-vue';
 import { updateLayoutBlock } from '@/api/cmsLayout';
@@ -30,7 +30,13 @@ const props = defineProps<{
     inline?: boolean;
 }>();
 
-const emit = defineEmits<{ close: []; saved: [CmsLayoutBlock] }>();
+const emit = defineEmits<{
+    close: [];
+    saved: [CmsLayoutBlock];
+    /** The form has been changed since it was last saved — the tab drops its
+     *  confirmation, so "Saved" never sits above a form that has moved on. */
+    touched: [];
+}>();
 
 const { t } = useI18n();
 
@@ -42,6 +48,45 @@ const imageUrl = ref<string | null>(props.block.image?.url ?? null);
 const saving = ref(false);
 const error = ref<string | null>(null);
 const pickerOpen = ref(false);
+
+/**
+ * Whether anything has been typed since the last save.
+ *
+ * It answers two questions at once: whether Cancel has anything to undo, and
+ * whether the tab's "Saved" line is still telling the truth. Comparing the
+ * serialised form against a snapshot rather than tracking each field means a
+ * change three levels down — inside a button's target, inside a repeated row —
+ * counts like any other.
+ */
+function snapshot(): string {
+    return JSON.stringify({ content, imageId: imageId.value });
+}
+
+const savedState = ref(snapshot());
+const dirty = computed(() => snapshot() !== savedState.value);
+
+watch(dirty, (isDirty) => {
+    if (isDirty) {
+        emit('touched');
+    }
+});
+
+/**
+ * Put the form back to the last saved state.
+ *
+ * On a tab there is nothing to close and nowhere to go back to, so Cancel means
+ * "undo what I typed" — the same as Cancel on the Theme settings form, which is
+ * the other one-record form in the admin.
+ */
+function cancel(): void {
+    const saved = JSON.parse(JSON.stringify(props.block.content ?? {})) as Record<string, unknown>;
+    Object.keys(content).forEach((key) => delete content[key]);
+    Object.assign(content, saved);
+    imageId.value = props.block.image_media_id;
+    imageUrl.value = props.block.image?.url ?? null;
+    error.value = null;
+    savedState.value = snapshot();
+}
 
 const field = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none';
 /** The same icon chip the admin's row actions use. */
@@ -119,6 +164,9 @@ async function save(): Promise<void> {
             content: JSON.parse(JSON.stringify(content)),
             image_media_id: props.type.uses_image ? imageId.value : null,
         });
+        // The form is now what the server holds, so Cancel has nothing to undo
+        // and the tab's confirmation is true until the next keystroke.
+        savedState.value = snapshot();
         emit('saved', data.data);
     } catch (e) {
         error.value = apiErrorMessage(e, t('layout.saveFailed'));
@@ -282,14 +330,20 @@ const title = computed(() => props.type.label);
                 </template>
             </div>
 
+            <!-- Cancel left, Save right, on every tab and in the modal alike.
+                 In the modal Cancel closes without writing; on a tab there is
+                 nothing to close, so it puts the form back to what was last
+                 saved — and says so by being dead until something has changed. -->
             <div class="flex items-center justify-between border-t border-gray-200 px-6 py-4">
-                <button v-if="!inline" type="button" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
+                <button v-if="inline" type="button" :disabled="saving || !dirty"
+                    class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    @click="cancel">
+                    {{ $t('common.cancel') }}
+                </button>
+                <button v-else type="button" class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
                     @click="emit('close')">
                     {{ $t('common.cancel') }}
                 </button>
-                <!-- Inline there is nothing to cancel back to, so the row keeps
-                     only Save and pushes it to the right. -->
-                <span v-else />
                 <button type="button" :disabled="saving"
                     class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
                     @click="save">

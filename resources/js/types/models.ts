@@ -51,6 +51,11 @@ export interface AvailabilityTest {
     type: string | null;
     duration: number | null;
     status: TestStatus;
+    /**
+     * A finished test that may be sat again — practice only. The contest allows
+     * one attempt (ADR-0016); a sample test is for repeating.
+     */
+    retakeable: boolean;
     published: boolean;
     score: number | null;
     max_score: number | null;
@@ -428,6 +433,32 @@ export interface Coordinator {
     schools: CoordinatorSchool[];
 }
 
+/**
+ * One application to become a school coordinator (ADR-0053).
+ *
+ * Not a coordinator: no account exists until somebody approves it. The document
+ * is described but never linked — it lives on the private disk and is fetched
+ * through the gated download route.
+ */
+export interface CoordinatorRegistration {
+    id: number;
+    name: string;
+    email: string;
+    phone: string | null;
+    address: string | null;
+    city: string | null;
+    country_id: number;
+    country?: { id: number; name: string };
+    status: 'pending' | 'approved' | 'declined';
+    status_label: string;
+    document: { name: string; mime: string; size: number };
+    decline_reason: string | null;
+    reviewed_at: string | null;
+    reviewer?: { id: number; name: string } | null;
+    account_id: number | null;
+    created_at: string | null;
+}
+
 /** One country on the dashboard map and in the country table. */
 export interface CountryMapRow {
     iso: number;
@@ -520,6 +551,8 @@ export interface CmsMedia {
     url: string;
     original_name: string;
     mime_type: string;
+    /** Images are placed on a page; documents are handed out (ADR-0053). */
+    kind: 'image' | 'document';
     size: number;
     width: number | null;
     height: number | null;
@@ -663,6 +696,12 @@ export interface PublicBlockButton {
     href: string;
     style: 'primary' | 'navy' | 'amber' | 'outline' | 'link';
     download: boolean;
+    /**
+     * For a download, the file's own name — the page adds the day it was taken.
+     * Null for anything that is not a file: the stored name in the URL is a
+     * random key and makes a useless filename.
+     */
+    download_name: string | null;
     external: boolean;
 }
 

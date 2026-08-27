@@ -30,7 +30,11 @@ const router = useRouter();
 const { t } = useI18n();
 const student = useStudentSessionStore();
 
-const mode = computed<EntryMode>(() => (route.params.mode === 'competition' ? 'competition' : 'sample'));
+const mode = computed<EntryMode>(() => {
+    const value = route.params.mode;
+
+    return value === 'competition' || value === 'results' ? value : 'sample';
+});
 
 const eyebrow = ref('');
 const heading = ref('');
@@ -47,22 +51,31 @@ const error = ref<string | null>(null);
 
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name, sub: c.code })));
 
+/**
+ * 🪤 Keyed on `competition`, not on "not sample". The password is asked for by
+ * exactly one stream; written the other way round, every stream added later
+ * silently demands a password it never shows a field for — which is what the
+ * results stream did on its first run (2026-08-27).
+ */
 const canSubmit = computed(
-    () => countryId.value !== null && candidateNo.value.trim() !== '' && dob.value !== '' && (mode.value === 'sample' || password.value !== ''),
+    () => countryId.value !== null
+        && candidateNo.value.trim() !== ''
+        && dob.value !== ''
+        && (mode.value !== 'competition' || password.value !== ''),
 );
 
 /**
- * A field's rule: hairline at rest, full strength once it holds something. The
- * type size is left to each field — the candidate number is set in mono at the
- * size the card prints it, the password is not.
+ * A field's rule, at full strength (owner, 2026-08-27) — see the note on the
+ * sign-in screen. The type size is left to each field: the candidate number is
+ * set in mono at the size the card prints it, the password is not.
  */
-const field = 'h-[52px] w-full border-0 border-b border-brand-palette-4/20 bg-transparent px-0 '
-    + 'text-brand-palette-4 placeholder:text-brand-palette-4/30 focus:border-brand-palette-4 focus:outline-none focus:ring-0';
+const field = 'h-[52px] w-full border-0 border-b border-brand-palette-4 bg-transparent px-0 '
+    + 'text-brand-palette-4 placeholder:text-sm placeholder:text-brand-palette-4/60 focus:border-brand-palette-4 focus:outline-none focus:ring-0';
 
-const label = 'block font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/45';
+const label = 'block font-mono text-[16px] uppercase tracking-[0.16em] text-brand-palette-4';
 
 /** The one thing a competitor is told out loud rather than reading off a card. */
-const labelSpoken = 'block font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-2';
+const labelSpoken = 'block font-mono text-[16px] uppercase tracking-[0.16em] text-brand-palette-2';
 
 /**
  * The two streams are one route with a parameter, so switching between them
@@ -109,6 +122,8 @@ async function submit(): Promise<void> {
     try {
         if (mode.value === 'competition') {
             await student.enterCompetition(payload, password.value);
+        } else if (mode.value === 'results') {
+            await student.enterResults(payload);
         } else {
             await student.enterSample(payload);
         }
@@ -119,12 +134,14 @@ async function submit(): Promise<void> {
         loading.value = false;
     }
 
-    void router.push({ name: 'student.dashboard' });
+    // Looking things up ends on the results page; the exam streams end on the
+    // list of what may be sat.
+    void router.push({ name: mode.value === 'results' ? 'student.results' : 'student.dashboard' });
 }
 </script>
 
 <template>
-    <PublicFormPage wide>
+    <PublicFormPage layout="wide">
         <template #intro>
             <p v-if="eyebrow" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-2">
                 {{ eyebrow }}
@@ -134,12 +151,12 @@ async function submit(): Promise<void> {
             </h1>
             <!-- Admin-authored markup, rendered like every other paragraph the
                  editor produces. -->
-            <div v-if="lead" class="rich-text mt-4 max-w-[400px] text-[17px] leading-relaxed text-brand-palette-4/62" v-html="lead"></div>
+            <div v-if="lead" class="rich-text mt-4 max-w-[400px] text-[17px] leading-relaxed text-brand-palette-4" v-html="lead"></div>
             <!-- The other way in. Under a rule because it is an aside, not part
                  of the offer above it. -->
             <div
                 v-if="aside"
-                class="rich-text mt-8 max-w-[400px] border-t border-brand-palette-4/14 pt-5 text-[15px] leading-relaxed text-brand-palette-4/55 lg:mt-12"
+                class="rich-text mt-8 max-w-[400px] border-t border-brand-palette-4 pt-5 text-[15px] leading-relaxed text-brand-palette-4 lg:mt-12"
                 v-html="aside"
             ></div>
         </template>
@@ -203,7 +220,9 @@ async function submit(): Promise<void> {
                 :disabled="loading || !canSubmit"
                 class="mt-9 h-[52px] w-full shrink-0 rounded-full bg-brand-palette-4 text-base font-medium text-white transition hover:brightness-125 disabled:opacity-50 sm:w-auto sm:px-10"
             >
-                {{ loading ? $t('student.access.starting') : $t('student.access.startQuiz') }}
+                {{ loading
+                    ? $t('student.access.starting')
+                    : mode === 'results' ? $t('student.access.showResults') : $t('student.access.startQuiz') }}
             </button>
         </form>
     </PublicFormPage>

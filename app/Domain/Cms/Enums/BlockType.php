@@ -32,6 +32,12 @@ enum BlockType: string
     // zones, one per entry stream: the same screen, two sets of words.
     case Login = 'login';
     case Identify = 'identify';
+    // The coordinator registration screen (ADR-0053). One record covers both of
+    // its steps — the form and the "sent for approval" panel that replaces it —
+    // because they are one screen with one thing to say, told in two halves. An
+    // admin editing "the registration screen" should not have to find its second
+    // half in another zone.
+    case Register = 'register';
 
     public function label(): string
     {
@@ -48,6 +54,7 @@ enum BlockType: string
             self::Footer => 'Footer',
             self::Login => 'Sign in',
             self::Identify => 'Competitor entry',
+            self::Register => 'Coordinator registration',
         };
     }
 
@@ -62,6 +69,6 @@ enum BlockType: string
      */
     public function isSingle(): bool
     {
-        return in_array($this, [self::Header, self::Footer, self::Login, self::Identify], true);
+        return in_array($this, [self::Header, self::Footer, self::Login, self::Identify, self::Register], true);
     }
 }

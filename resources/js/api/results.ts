@@ -38,7 +38,14 @@ export function overview(scope: PublishScope) {
 export function publish(
     payload: { scope: 'test' | 'exam'; id: number; unpublish?: boolean } & PublishScope
 ) {
-    return http.post<{ action: string; attempts_count: number }>('/api/results/publish', cleanParams(payload));
+    return http.post<{
+        action: string;
+        attempts_count: number;
+        students_count: number;
+        venues_count: number;
+        /** Finished attempts in scope that could NOT be published: marking is not final yet. */
+        waiting_count: number;
+    }>('/api/results/publish', cleanParams(payload));
 }
 
 // --- Bulk attempt reset (CC-11) ---

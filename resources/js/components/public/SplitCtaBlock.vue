@@ -32,8 +32,20 @@ const rule = (accent?: string): string =>
         </p>
 
         <div class="grid gap-12 md:grid-cols-2 md:gap-16">
+            <!--
+                Each column is its own anchor (owner, 2026-08-27). The band as a
+                whole keeps `block_Results` so links made before this still land,
+                but "Sample Exam" and "Check Results" are two menu items and must
+                be able to mark themselves separately — pointing both at the
+                section lit both at once.
+
+                Positional, because the two columns are not interchangeable: the
+                design fixes practice on the left and results on the right, and
+                the type caps this block at two.
+            -->
             <div v-for="(column, i) in columns" :key="i"
-                class="flex flex-col gap-4 border-t-[3px] pt-6"
+                :id="i === 0 ? 'block_Sample' : 'block_CheckResults'"
+                class="flex scroll-mt-20 flex-col gap-4 border-t-[3px] pt-6"
                 :class="rule(column.accent)">
                 <h2 class="text-[clamp(1.75rem,3.5vw,2.625rem)] font-semibold leading-tight tracking-[-0.035em] text-brand-palette-4">
                     {{ column.title }}

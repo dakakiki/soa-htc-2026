@@ -23,7 +23,9 @@ class Attempt extends Model
     public const SUBMIT_GRACE_SECONDS = 60;
 
     protected $fillable = [
-        'registration_id', 'test_id', 'quiz_id', 'status',
+        // `is_practice` is stamped at creation and never changes: it is what
+        // keeps a repeatable sample run out of the contest's one-attempt unique.
+        'registration_id', 'test_id', 'quiz_id', 'is_practice', 'status',
         'score', 'max_score', 'grading_status', 'published_at', 'published_by',
         'started_at', 'expires_at', 'submitted_at', 'channel',
     ];
@@ -34,6 +36,7 @@ class Attempt extends Model
             'registration_id' => 'integer',
             'test_id' => 'integer',
             'quiz_id' => 'integer',
+            'is_practice' => 'boolean',
             'status' => AttemptStatus::class,
             'score' => 'decimal:2',
             'max_score' => 'decimal:2',

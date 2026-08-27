@@ -14,6 +14,7 @@ export default {
         users: 'Users',
         students: 'Students',
         coordinators: 'Coordinators',
+        registrationQueue: 'Registrations',
         locations: 'Countries & Regions',
         difficulty: 'Difficulty levels',
         quizzes: 'Quizzes',
@@ -347,6 +348,55 @@ export default {
         failed: 'Sign in failed.',
         remember: 'Keep me signed in',
     },
+    register: {
+        // Same division as `login` above: the heading, the paragraph and the two
+        // halves of the "sent" panel are CONTENT (the `public.register` zone,
+        // ADR-0053). Everything here is interface — section headings, field
+        // labels, the button, the errors.
+        step1: 'Step 1 of 2',
+        step2: 'Step 2 of 2',
+        sections: {
+            you: '01 — You',
+            where: '02 — Where',
+            approval: '03 — Venue approval',
+            password: '04 — Password',
+        },
+        name: 'Full name',
+        namePlaceholder: 'As it appears on the approval',
+        email: 'E-mail',
+        // 🪤 `@` starts a linked message in vue-i18n; `{'@'}` is the literal form.
+        emailPlaceholder: "you{'@'}school.org",
+        phone: 'Phone',
+        country: 'Country',
+        countryPlaceholder: 'Find your country',
+        city: 'City',
+        address: 'Address',
+        optional: 'Optional',
+        password: 'Choose a password',
+        passwordPlaceholder: 'At least 8 characters',
+        passwordConfirm: 'Repeat it',
+        showPassword: 'Show password',
+        hidePassword: 'Hide password',
+        attach: 'Attach signed approval',
+        attachHint: 'PDF, DOC or XLS · up to 5 MB',
+        attachChange: 'Choose a different file',
+        remove: 'Remove',
+        // `{mark}` is the red asterisk itself, put in by the page — the sentence
+        // has to show the same mark the fields carry, in the same colour.
+        required: 'Fields marked {mark} are required.',
+        submit: 'Send for approval',
+        submitting: 'Sending…',
+        failed: 'The registration could not be sent.',
+        back: 'Back to the site',
+        signInInstead: 'Sign in instead',
+        alreadyRegistered: 'Already registered?',
+        // The three states of the panel that replaces the form.
+        received: 'Registration received',
+        reviewing: 'Being reviewed',
+        reviewingNote: 'Usually within two working days.',
+        opened: 'Account opened',
+        openedNote: 'Then you sign in and get to work.',
+    },
     public: {
         nav: {
             home: 'Home',
@@ -391,6 +441,8 @@ export default {
             examPassword: 'Exam Password',
             examPasswordPlaceholder: 'Read out in the room',
             startQuiz: 'Start quiz',
+            // The results stream opens nothing, so its button does not say start.
+            showResults: 'Show my results',
             starting: 'Starting…',
             error: 'We could not verify your details. Please check and try again.',
         },
@@ -416,8 +468,24 @@ export default {
             start: 'Start',
             resume: 'Continue',
             completedLabel: 'Done',
+            // Practice only — the contest allows one attempt (ADR-0016).
+            retake: 'Try again',
+            // A finished test whose result an admin has not published yet.
+            awaitingResult: 'Result on the way',
             sequence: 'Tests open one after another, in this order.',
             opensLater: 'Opens once the round before it has been marked and published.',
+        },
+        results: {
+            // The look-up screen. Like the dashboard it carries no editable copy:
+            // every word is either data or a statement of a rule.
+            eyebrow: 'Your results',
+            title: 'What you have sat',
+            contest: 'Contest',
+            practice: 'Practice',
+            contestNote: 'You have not sat a contest test yet.',
+            practiceNote: 'You have not sat a practice test yet.',
+            empty: 'You have not sat anything yet — nothing to show.',
+            error: 'Could not load your results.',
         },
         test: {
             // 🪤 No points anywhere on this screen. The owner's rule
@@ -480,6 +548,7 @@ export default {
         changeImage: 'Change image',
         loadFailed: 'The layout could not be loaded.',
         saveFailed: 'The change could not be saved.',
+        saved: 'Saved.',
         deleteTitle: 'Delete section',
         deleteBody: 'Delete “{name}” from this page? Its text and settings go with it.',
         button: {
@@ -660,6 +729,56 @@ export default {
         saved: 'Profile saved.',
         error: 'Could not load your profile.',
         saveFailed: 'Save failed.',
+    },
+    registrationQueue: {
+        // The admin side of ADR-0053. The applicant's own screen is `register`.
+        title: 'Registrations',
+        subtitle: 'Schools asking for a coordinator account.',
+        // Same shape as the Coordinators screen next door, which reads correctly
+        // at one as well as at none.
+        count: 'No. registrations: {count}',
+        waiting: '{count} waiting',
+        search: 'Name or e-mail…',
+        filterStatus: 'Any status',
+        filterCountry: 'Any country',
+        status: {
+            pending: 'Waiting',
+            approved: 'Approved',
+            declined: 'Declined',
+        },
+        name: 'Name',
+        email: 'E-mail',
+        country: 'Country',
+        received: 'Received',
+        decided: 'Decided',
+        reviewer: 'By',
+        document: 'Venue approval',
+        downloadDocument: 'Download the signed approval',
+        downloadFailed: 'The document could not be downloaded.',
+        review: 'Review',
+        empty: 'Nothing is waiting.',
+        error: 'The registrations could not be loaded.',
+        // The review panel.
+        panelTitle: 'Review registration',
+        contact: 'Contact',
+        where: 'Where',
+        approve: 'Approve and open the account',
+        approving: 'Opening the account…',
+        approved: 'The account is open. The coordinator has been told by e-mail.',
+        decline: 'Decline',
+        declining: 'Declining…',
+        declined: 'The registration was declined. The applicant has been told by e-mail.',
+        declineReason: 'Note for the other reviewers',
+        declineReasonHint: 'Not sent to the applicant — their e-mail says the registration was not approved, and nothing more.',
+        confirmApprove: 'Open an account for {name}? They will be able to sign in straight away, and will be told by e-mail.',
+        confirmDecline: 'Decline the registration from {name}? They will be told by e-mail.',
+        actionFailed: 'The decision could not be recorded.',
+        delete: 'Delete this registration',
+        confirmDelete: 'Delete the registration from {name}? The signed document goes with it. Any account it opened stays.',
+        deleteFailed: 'The registration could not be deleted.',
+        // What approval does and does not do — said on the screen, because it is
+        // the one thing a reviewer is likely to assume wrongly.
+        scopeNote: 'Approving opens the account only. Attach the venue afterwards on the Coordinators screen.',
     },
     coordinator: {
         title: 'Coordinators',
@@ -1343,8 +1462,11 @@ export default {
         error: 'Could not load the overview.',
         colTest: 'Test',
         colCompleted: 'Completed',
+        // Finished, marked, and not yet out — what a Publish click would touch.
+        colReady: 'Ready to publish',
         colPublished: 'Published',
         colPending: 'Pending grading',
+        nothingReady: 'Nothing to publish here yet — finished tests appear once marking is final.',
         completed: '{n} completed',
         publishedCount: '{n} published',
         pendingCount: '{n} pending grading',
@@ -1354,8 +1476,12 @@ export default {
         publishExam: 'Publish round',
         unpublishExam: 'Unpublish round',
         working: 'Working…',
-        published: 'Published {n} result(s).',
-        unpublished: 'Unpublished {n} result(s).',
+        published: 'Published {n} result(s) — {students} competitor(s) at {venues} venue(s) can now see their score.',
+        unpublished: 'Withdrew {n} result(s) — {students} competitor(s) at {venues} venue(s) can no longer see their score.',
+        // Nothing was published. Both say why, because a bare "0" sends people
+        // looking for the fault in the wrong place (owner, 2026-08-27).
+        noneWaiting: 'Nothing was published: {n} finished test(s) here are still waiting to be marked. Results can only be published once marking is final.',
+        noneMatched: 'Nothing to publish here — no finished, unpublished results match these filters.',
         failed: 'Action failed.',
     },
     reports: {

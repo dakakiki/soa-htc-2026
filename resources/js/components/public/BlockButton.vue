@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import type { PublicBlockButton } from '@/types/models';
 
@@ -53,13 +53,51 @@ const classes = computed(() => {
 
 /** Anything leaving the site, or offered for download, is a plain anchor. */
 const isAnchor = computed(() => props.button.external || props.button.download);
+
+const anchor = ref<HTMLAnchorElement | null>(null);
+
+/**
+ * Give the download its real name, plus the day it was taken.
+ *
+ * Without this the browser names the file from the URL, and the URL carries the
+ * stored name — a random 40-character key — so "Approval form" arrives as
+ * `BYZiqIJTYIkIBHuhX14NL8ypgINYxl3Oo7obH5bh.doc` (owner, 2026-08-27).
+ *
+ * Stamped on the click rather than bound at render so the date is the day the
+ * visitor took it, not the day the page happened to be opened — a tab left open
+ * overnight would otherwise hand out yesterday.
+ *
+ * ⚠️ The browser honours a `download` filename only for a same-origin address.
+ * Media is served from the app's own `/storage`, so it holds today; move the
+ * library behind a CDN and the browser goes back to naming files itself.
+ */
+function stampFilename(): void {
+    const base = props.button.download_name;
+
+    if (!anchor.value || !props.button.download || !base) {
+        return;
+    }
+
+    const dot = base.lastIndexOf('.');
+    const stem = dot > 0 ? base.slice(0, dot) : base;
+    const extension = dot > 0 ? base.slice(dot) : '';
+    const today = new Date();
+    const day = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0'),
+    ].join('-');
+
+    anchor.value.download = `${stem} ${day}${extension}`;
+}
 </script>
 
 <template>
-    <a v-if="isAnchor" :href="button.href" :class="classes"
+    <a v-if="isAnchor" ref="anchor" :href="button.href" :class="classes"
         :download="button.download ? '' : undefined"
         :target="button.external ? '_blank' : undefined"
-        :rel="button.external ? 'noopener' : undefined">
+        :rel="button.external ? 'noopener' : undefined"
+        @click="stampFilename">
         <svg v-if="button.download" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 4v11" /><path d="M7.5 10.5L12 15l4.5-4.5" /><path d="M5 19h14" />
         </svg>

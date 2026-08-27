@@ -14,6 +14,7 @@ use App\Domain\Cms\Support\LayoutButtons;
 use App\Domain\Cms\Support\LayoutZones;
 use App\Domain\Cms\Support\PublicMenus;
 use App\Domain\Cms\Support\PublicPaths;
+use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PublicPostResource;
@@ -115,6 +116,22 @@ class PublicContentController extends Controller
             'slug' => $c->slug,
             'posts_count' => $c->posts_count,
         ])->all()];
+    }
+
+    /**
+     * The country list, for the one public form that asks for a country — the
+     * coordinator registration (ADR-0053).
+     *
+     * Reference data, unpaginated like every other country endpoint in the app:
+     * a select cannot page. The competitor entry screen has its own copy under
+     * `api/student/*` and keeps it — that prefix is exempt from CSRF for reasons
+     * of its own, and this form is not part of that arrangement.
+     *
+     * @return array<string, mixed>
+     */
+    public function countries(): array
+    {
+        return ['data' => Country::query()->orderBy('name')->get(['id', 'name', 'code'])->all()];
     }
 
     /**

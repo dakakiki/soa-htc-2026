@@ -1158,6 +1158,117 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0053 — Registracija koordinatora: prijava nije nalog, a oba mejla idu koordinatoru
+
+- **Status:** Prihvaćeno (2026-08-26). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik, 2026-08-26: *„možeš da kreneš sa izradom registracije prema legacy ili kako smo
+  se već dogovorili"*, uz sliku legacy Login ekrana sa dve zaokružene rečenice — *„For registered venues
+  only."* i *„Not Registered? Create an account"* — koje redizajn (ADR-0046) nije preneo. Nacrt je
+  postojao unapred: artboardovi `02` i `02b` na platnu iz runde ADR-0046–0050.
+- **Prijava NIJE nalog.** Legacy je podnosioca upisivao pravo u `users` sa `active = 0`. Posledice su
+  bile dve: stranac koji ukuca adresu **oduzima je iz unique indeksa** bez obzira na to da li ga je iko
+  ikad odobrio, a ekran Users se puni ljudima koji nikad nisu pušteni unutra. Ovde prijava živi u
+  `coordinator_registrations`; **nalog nastaje u trenutku odobrenja i ni pre toga**, a odbijena prijava
+  ne ostavlja ništa što blokira sledeću.
+  - `email` u toj tabeli **nije unique** — jedinstvenost pripada `users`. Forma odbija adresu koja već
+    ima nalog **ili** prijavu na čekanju, što je pravilo koje se stvarno misli.
+  - 🪤 Odbija je **jednom porukom za oba slučaja**. Dve različite rečenice bi anonimnom posetiocu rekle
+    u kojoj je od dve tabele adresa, pa bi forma postala način da se pita „da li je ovaj čovek kod vas".
+- **Šta odobrenje radi, a šta ne.** Vlasnik, 2026-08-26: *„po legacy, ovde se koordinator samo
+  registruje. i kada mu admin odobri pristup, onda pristupa dashbordu i dalje radi šta ima."* Odobrenje
+  otvara **nalog** (rola School Coordinator u aktivnoj sezoni, `status = active`) i **ne kači venue** —
+  legacy je pisao `school_hub_id = 0` i ostavljao venue administratoru. Zato je i nacrtana rečenica
+  *„You register your venue after that."* **izmenjena**: taj ekran ne postoji i nije predmet ove runde,
+  a tekst koji obećava korak koji niko nije napravio gori je od teksta koji kaže manje.
+- **Dva mejla, oba koordinatoru — odobreno i odbijeno.** Ovo je ispravka legacy zamke: jedini mejl koji
+  je legacy slao (aktivacioni link) išao je na `venue@hippo-thecontest.org`, dakle **organizaciji, ne
+  koordinatoru**. Administrator bi kliknuo link iz zajedničkog sandučeta, a podnosilac je saznavao tako
+  što pokuša da se prijavi. Sad se odluka javlja onome koga se tiče, u oba ishoda.
+  - 🪤 Mejl o odbijanju **ne nosi `decline_reason`**. To polje je beleška između onih koji odlučuju,
+    pisana sa tim očekivanjem; prosleđena podnosiocu objavila bi internu ocenu o imenovanoj školi i tiho
+    promenila šta recenzent sme da zapiše. Podnosilac dobija odluku i adresu na koju može da piše.
+  - ⚠️ **Administraciji se ne šalje ništa.** Jedini signal da neko čeka je sam red — zato prijave na
+    čekanju idu na vrh liste bez obzira na filter, a broj stoji i u naslovu i kao oznaka u meniju.
+- **Dokument ide na privatni disk.** Potpisano „venue approval" nosi memorandum škole i nečiji potpis, a
+  podnosilac je stranac dok recenzent ne kaže drugačije. `users.file_path` čuva dokumente ljudi koji su
+  već unutra, na `public` disku, gde je URL cela zaštita; ovde to ne važi. Preuzima se kroz rutu
+  zaštićenu istom permisijom koja i odlučuje — gledati dokaz i odlučivati na osnovu njega je jedan posao.
+- **Nova permisija `coordinators.approve`** (19. po redu), odvojena od `coordinators.manage`: voditi
+  koordinatore koje zemlja već ima je rutinski posao koji radi i country coordinator, a pustiti stranca
+  unutra je odluka zbog koje potpisani dokument uopšte postoji. Podrazumevano je ima samo administrator.
+- **Polja su legacy-jeva, nepromenjena** (ime\*, e-mail\*, telefon, adresa, grad, zemlja\*, dokument\*,
+  lozinka\* + potvrda). **Nema imena škole** — identitet škole utvrđuje potpisani dokument, a ime
+  ukucano u javnu formu ne utvrđuje ništa. Jedina izmena pravila: **lozinka min 8**, ne 6, jer to nacrt
+  govori podnosiocu („At least 8 characters") i to ostatak aplikacije već očekuje.
+- **Ekran je jedan, u dva koraka**, pa je i zona jedna (`public.register`, tip bloka `register`): forma i
+  panel koji je zamenjuje posle slanja nisu dva mesta koja posetilac bira, nego jedno koje ga nosi dalje.
+  Login zona dobija `aside` — isto polje i isti tretman kao napomena na takmičarskom ekranu (ADR-0047).
+  - 🪤 **Dugme u bloku mora da se zove `button`.** `LayoutButtons` razrešava payload **po ključu**
+    (`button` / `buttons`), a ne po vrsti polja iz šeme. Prvo je bilo nazvano `document` i javna zona ga je
+    vraćala **sirovog** — sa `target`-om i bez `href`-a — pa bi stranica iscrtala mrtav link. Uhvaćeno
+    proverom odgovora endpointa, ne testom; test je dopisan posle.
+  - 🪤 **Preuzimanje nije odlazak sa sajta.** `Storage::url()` vraća **apsolutan** URL, pa je `file` dugme
+    izlazilo kao `download: true` **i** `external: true` — i stranica je crtala obe oznake, strelicu
+    nadole i strelicu-van-sajta. Niko to nije video jer do sad u biblioteku nije mogao da uđe ne-slikovni
+    fajl, pa `file` target nije imao na šta da pokaže. `external` je sad `! $download && …`.
+- **Media biblioteka od sad prima i dokumente** (`pdf,doc,docx,xls,xlsx`). `file` target dugmeta oduvek
+  je pokazivao na red iz biblioteke, ali se u nju nije mogao staviti nijedan ne-slikovni fajl, pa target
+  nije imao na šta da pokaže. Ovo otključava i **PDF sa kategorijama** sa početne strane, koji je čekao
+  isti nedostatak. Pickeri traže vrstu (`kind`), pa ekrani za sliku i dalje nude samo slike. **SVG i
+  dalje ne ulazi** — prima se samo kao Theme logo/ikonica, kroz `SvgSanitizer` (ADR-0035).
+- **Ograničenje pristupa:** javni `POST` je jedini javni endpoint koji **piše red i snima fajl**, pa je
+  ograničen i po IP-u (3/min, 20/dan) i po adresi (3/dan).
+- **Testovi:** `CoordinatorRegistrationTest`, 21 testa — prijava ne pravi nalog, lozinka se hešuje i
+  prenosi bez ponovnog heširanja, dokument ide na privatni disk i nije dostupan anonimno, odbijeni sme
+  ponovo, odobrenje ne kači venue, oba mejla stižu koordinatoru, razlog odbijanja ne izlazi iz kuće,
+  odlučena prijava se ne odlučuje dvaput.
+- **Ostalo otvoreno (backlog):** ekran na kom koordinator sam registruje venue; oznaka u meniju se čita
+  jednom po mount-u, ne uživo.
+
+---
+
+## ADR-0054 — Praksa se ponavlja, rezultati se traže bez lozinke, a ekran mora da kaže šta je uradio
+
+- **Status:** Prihvaćeno (2026-08-27). **IMPLEMENTIRANO.** Runda sitnih ispravki koje su, jedna po jedna,
+  otkrile tri prave greške ispod sebe.
+- **Sample test se ponavlja neograničeno** (vlasnik: *„student može da ga radi neograničeni broj puta"*),
+  takmičarski i dalje jednom. 🪤 ADR-0016 nije bio samo pravilo u kodu nego **tvrda garancija u bazi**:
+  `attempts.active_test_id` je generisana kolona pod `unique(registration_id, active_test_id)`. Zato praksa
+  **izlazi iz indeksa** umesto da se pravilo olabavi svima — `is_practice` se žigoše pri kreiranju pokušaja,
+  kolona za takve redove vraća `NULL`. Takmičenje zadržava garanciju, i dalje je čuva baza. Kolona ostaje
+  **VIRTUAL** (STORED tera table-copy koji MySQL odbija uz FK). Rezultati sample-a su se i ranije objavljivali
+  sami (`AttemptGrader::withSamplePublication`).
+- **„Check results" je treći tok kroz isti ekran za identifikaciju** (`EntryMode::results`, zona
+  `public.identify.results`). Bez lozinke — ništa ne otvara, samo čita. Stranica `/student/results` ima dve
+  kolone: levo takmičenje, desno praksa, i **prikazuje isključivo urađeno**; zaključano i buduće se ne
+  pominje, jer to nije podatak za nekog ko traži ocenu. 🪤 Uslov za dugme je bio „sample ILI ima lozinku",
+  pa je novi tok tiho tražio lozinku koju nigde ne prikazuje — vezano je za `competition`, da svaki sledeći
+  tok ne padne na isto.
+- **Objava rezultata sada odgovara.** Vraća `students_count`, `venues_count` i **`waiting_count`**, a ekran
+  skroluje do poruke i **nulu ne prikazuje kao uspeh**. Povod: vlasnik je objavio rundu i dobio tišinu —
+  akcija je pogodila nula pokušaja jer je **svaki bio `queued`**, pošto na dev-u nije radio `queue:work`.
+  Prazan odgovor bez objašnjenja poslao ga je da traži grešku na strani takmičara. Lista je dobila i kolonu
+  **„Ready to publish"** (završeni − objavljeni − neocenjeni), crvenu kad nije nula, a dugme je mrtvo na nuli.
+- **Javne forme nose brend boju u punoj jačini** (linije, X, strelica, labele, tekst pored forme). Izuzeci su
+  namerni i navedeni u [[ui-gotchas]]: placeholder (manji i svetliji — u punoj boji prazno polje izgleda
+  popunjeno) i hover podloga. Labela polja 11px → 16px, zvezdica obaveznog polja crvena, kao zaseban `<span>`.
+- **Sidra u zaglavlju.** Sve stavke menija su sidra u početnu; „Sample Exam" i „Check Results" dobili su
+  **svoja sidra** (`block_Sample` / `block_CheckResults`), jer je deljeno sidro palilo obe stavke. Tri
+  odvojene zamke su rešene i zapisane: sidro mora da **sačeka sekciju** (početna ih crta iz API-ja, a
+  ruterov skrol na nepostojeći cilj ćuti), čekati se mora `setTimeout`-om a **ne `requestAnimationFrame`**-om
+  (u prigušenom tabu frejmovi ne otkucavaju), i **pomeraj se ODUZIMA** (`elRect.top - docRect.top - offset`),
+  pa je vrednost pozitivna — negativna odseca naslov iznad kadra.
+- **Aktivan link u zaglavlju odlučuje `route.hash`, i ništa drugo.** `IntersectionObserver` je izbačen iz te
+  uloge posle tri neuspela pokušaja da mu se sredi ponašanje: isporuči prvu prijavu odmah po kačenju (imenuje
+  sekciju koja se NAPUŠTA), javlja se kroz ceo skrol, i smiruje se na onome što preseca njegovu traku — a to
+  je sledeća sekcija kad je ciljana kraća od pola ekrana. Cena: slobodno skrolovanje ne pomera oznaku.
+- **Log rotira dnevno** (`LOG_STACK=daily`); zatečen `laravel.log` od **103 MB**.
+- ⚠️ **Operativno, ne kod:** na dev-u mora da radi `queue:work`, inače ništa nije ocenjeno i ceo lanac staje.
+  Na produkciji red ostaje `database` uz nadziranog radnika — `sync` bi predaju testa vezao za ocenjivanje
+  i izgubio ponavljanje pri prolaznoj grešci, baš u minutu kad cela sala predaje.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

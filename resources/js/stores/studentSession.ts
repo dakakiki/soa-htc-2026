@@ -7,8 +7,14 @@ import type { StudentRegistrationSummary } from '@/types/models';
 const STORAGE_KEY = 'student-token';
 const MODE_KEY = 'student-mode';
 
-/** Which exam stream the competitor entered through. */
-export type EntryMode = 'sample' | 'competition';
+/**
+ * Which stream the competitor entered through.
+ *
+ * `results` is not an exam stream at all — nothing can be started from it. It is
+ * the same identification, used to look back at what has already been sat, and
+ * it asks for no exam password because it opens no exam (owner, 2026-08-27).
+ */
+export type EntryMode = 'sample' | 'competition' | 'results';
 
 /**
  * The short-lived competitor web session (Slice 3b/3c), kept separate from the
@@ -54,6 +60,18 @@ export const useStudentSessionStore = defineStore('studentSession', () => {
     async function enterSample(payload: IdentifyPayload): Promise<void> {
         await identify(payload);
         setMode('sample');
+    }
+
+    /**
+     * Looking up your own results: identify, and nothing else.
+     *
+     * No password and no unlocking — the screen it leads to can only read what
+     * has already been sat. A competition quiz stays locked throughout; that is
+     * correct, because nothing here starts one.
+     */
+    async function enterResults(payload: IdentifyPayload): Promise<void> {
+        await identify(payload);
+        setMode('results');
     }
 
     /**
@@ -127,5 +145,5 @@ export const useStudentSessionStore = defineStore('studentSession', () => {
         expiresAt.value = null;
     }
 
-    return { token, registration, expiresAt, mode, ready, isIdentified, identify, enterSample, enterCompetition, ensureLoaded, logout };
+    return { token, registration, expiresAt, mode, ready, isIdentified, identify, enterSample, enterCompetition, enterResults, ensureLoaded, logout };
 });

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconPencil, IconPlus, IconTrash } from '@tabler/icons-vue';
+import { IconCheck, IconPencil, IconPlus, IconTrash } from '@tabler/icons-vue';
 import {
     createLayoutBlock,
     deleteLayoutBlock,
@@ -38,6 +38,38 @@ const error = ref<string | null>(null);
 const adding = ref(false);
 const editing = ref<CmsLayoutBlock | null>(null);
 
+/**
+ * Whether the tab is showing "saved".
+ *
+ * Owner, 2026-08-27, from the Register tab: "dodao sam dokument, ali se nigde ne
+ * vidi da sam snimio izmenu." The save had worked — the document was in the
+ * library and the public zone was serving it — but the screen said nothing, so
+ * the only way to find out was to leave and come back.
+ *
+ * It goes away the moment the form is touched again, so it can never sit above
+ * a form that has since changed. Same line, same place and same wording as the
+ * Theme settings form, the admin's other one-record form.
+ */
+const saved = ref(false);
+
+/** The page's own root, so the scroller above it can be found. */
+const root = ref<HTMLElement | null>(null);
+
+/**
+ * Bring the confirmation into view after a save.
+ *
+ * Save sits at the foot of a long form, and the line that answers it is at the
+ * top — on the Register tab that is most of a screen apart, so without this the
+ * confirmation is written somewhere nobody is looking.
+ *
+ * 🪤 NOT `window.scrollTo`. The admin shell is `h-screen overflow-hidden` and it
+ * is the `<main>` inside it that scrolls (AdminLayout), so scrolling the window
+ * moves nothing at all and looks exactly like a bug in the notice.
+ */
+function scrollToNotice(): void {
+    root.value?.closest('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 const zones = computed<LayoutZoneInfo[]>(() => registry.value?.zones ?? []);
 const currentZone = computed<LayoutZoneInfo | null>(
     () => zones.value.find((z) => z.key === zone.value) ?? null,
@@ -71,6 +103,9 @@ function title(block: CmsLayoutBlock): string {
 async function load(): Promise<void> {
     loading.value = true;
     error.value = null;
+    // Switching tabs comes through here, and a confirmation belongs to the form
+    // it was earned on.
+    saved.value = false;
     try {
         if (registry.value === null) {
             const { data } = await getLayoutRegistry();
@@ -105,6 +140,7 @@ async function load(): Promise<void> {
 /** Dropping a section rewrites several positions, so the whole list is saved. */
 async function onReorder(next: CmsLayoutBlock[]): Promise<void> {
     blocks.value = next;
+    saved.value = false;
     try {
         const { data } = await saveLayoutOrder(zone.value, next.map((b) => b.id));
         blocks.value = data.data;
@@ -115,6 +151,7 @@ async function onReorder(next: CmsLayoutBlock[]): Promise<void> {
 }
 
 async function toggle(block: CmsLayoutBlock, status: boolean): Promise<void> {
+    saved.value = false;
     try {
         const { data } = await updateLayoutBlock(block.id, { status });
         Object.assign(block, data.data);
@@ -126,6 +163,7 @@ async function toggle(block: CmsLayoutBlock, status: boolean): Promise<void> {
 async function add(type: LayoutTypeInfo): Promise<void> {
     adding.value = false;
     error.value = null;
+    saved.value = false;
     try {
         const { data } = await createLayoutBlock(zone.value, { type: type.key });
         blocks.value = [...blocks.value, data.data];
@@ -143,6 +181,7 @@ async function remove(block: CmsLayoutBlock): Promise<void> {
     if (!ok) {
         return;
     }
+    saved.value = false;
     try {
         await deleteLayoutBlock(block.id);
         blocks.value = blocks.value.filter((b) => b.id !== block.id);
@@ -157,13 +196,15 @@ function onSaved(block: CmsLayoutBlock): void {
         blocks.value[i] = block;
     }
     editing.value = null;
+    saved.value = true;
+    scrollToNotice();
 }
 
 onMounted(load);
 </script>
 
 <template>
-    <section class="flex flex-col gap-6">
+    <section ref="root" class="flex flex-col gap-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight">{{ $t('layout.title') }}</h1>
@@ -210,6 +251,17 @@ onMounted(load);
             </button>
         </nav>
 
+        <!-- What the tab has to say about itself, above whatever it holds: the
+             failure first, then the confirmation. The confirmation is a tinted
+             band rather than a bare line — it has to be noticed by somebody who
+             has just clicked Save and is looking at the button, not the heading.
+             Same green as the answer chips and the review panel. -->
+        <p v-if="saved"
+            class="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+            <IconCheck :size="16" class="shrink-0" />
+            {{ $t('layout.saved') }}
+        </p>
+
         <!-- One record, edited as a form right here. -->
         <div v-if="isSingle" class="relative min-h-[8rem]">
             <LoadingOverlay v-if="loading" />
@@ -219,7 +271,8 @@ onMounted(load);
                 :block="singleBlock"
                 :type="typeOf(singleBlock.type) as LayoutTypeInfo"
                 :registry="registry"
-                @saved="onSaved" />
+                @saved="onSaved"
+                @touched="saved = false" />
         </div>
 
         <div v-else class="relative min-h-[8rem] rounded-lg border border-gray-200 bg-white p-4">
@@ -249,7 +302,7 @@ onMounted(load);
                 <template #actions="{ item }">
                     <Tooltip :text="$t('common.edit')">
                         <button type="button" :aria-label="$t('common.edit')" :class="[chip, 'text-green-600']"
-                            @click="editing = item">
+                            @click="editing = item; saved = false">
                             <IconPencil :size="16" />
                         </button>
                     </Tooltip>
@@ -268,6 +321,7 @@ onMounted(load);
             :type="typeOf(editing.type) as LayoutTypeInfo"
             :registry="registry"
             @close="editing = null"
-            @saved="onSaved" />
+            @saved="onSaved"
+            @touched="saved = false" />
     </section>
 </template>

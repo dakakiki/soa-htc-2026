@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Cms\MenuController as CmsMenuController;
 use App\Http\Controllers\Api\Cms\PageController as CmsPageController;
 use App\Http\Controllers\Api\Cms\PostController as CmsPostController;
 use App\Http\Controllers\Api\CoordinatorController;
+use App\Http\Controllers\Api\CoordinatorRegistrationController;
 use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DifficultyCategoryController;
@@ -78,6 +79,17 @@ Route::prefix('public')->group(function () {
     // The sections of a layout zone (ADR-0043). Switched-off blocks and buttons
     // are filtered server-side, so the page never has to know they existed.
     Route::get('layout/{zone}', [PublicContentController::class, 'layout']);
+    // The country list the registration form picks from. Reference data, and the
+    // same list the competitor entry screen gets from under its own prefix.
+    Route::get('countries', [PublicContentController::class, 'countries']);
+    /*
+     * Coordinator registration (ADR-0053). The one public endpoint that WRITES:
+     * it stores a row and a file, so it is rate limited harder than the reads
+     * around it. It creates no account and issues no token — the row waits for a
+     * reviewer.
+     */
+    Route::post('coordinator-registrations', [CoordinatorRegistrationController::class, 'store'])
+        ->middleware('throttle:coordinator-registration');
 });
 
 /*
@@ -216,6 +228,25 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('schools', SchoolController::class);
     // Filtered students roster export (.xlsx) + printable attendance register (PDF).
     // Declared before the resource so the static paths aren't caught by {registration}.
+    /*
+     * The coordinator registration queue (ADR-0053). Gated on `coordinators.approve`
+     * inside the controller, the document download included — seeing the signed
+     * venue approval and deciding on it are one job, not two permissions.
+     *
+     * 🪤 `coordinator-registrations`, well clear of `registrations/*` below, which
+     * is the competitor roster and a different thing entirely.
+     */
+    Route::prefix('coordinator-registrations')->group(function () {
+        Route::get('/', [CoordinatorRegistrationController::class, 'index']);
+        // Before the wildcard: `pending-count` is not an id.
+        Route::get('pending-count', [CoordinatorRegistrationController::class, 'pendingCount']);
+        Route::get('{registration}', [CoordinatorRegistrationController::class, 'show'])->whereNumber('registration');
+        Route::get('{registration}/document', [CoordinatorRegistrationController::class, 'document'])->whereNumber('registration');
+        Route::post('{registration}/approve', [CoordinatorRegistrationController::class, 'approve'])->whereNumber('registration');
+        Route::post('{registration}/decline', [CoordinatorRegistrationController::class, 'decline'])->whereNumber('registration');
+        Route::delete('{registration}', [CoordinatorRegistrationController::class, 'destroy'])->whereNumber('registration');
+    });
+
     Route::get('registrations/export', [RegistrationController::class, 'export']);
     Route::get('registrations/attendance-report', [RegistrationController::class, 'attendanceReport']);
     // Bulk student import (.xlsx) — "Upload Students": template, per-country category

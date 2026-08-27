@@ -42,6 +42,16 @@ return [
         'country_outside_actor' => 'You may only manage coordinators in your own country.',
         'school_outside_actor' => 'Select venues from the ones assigned to you.',
     ],
+    'coordinator_registration' => [
+        'already_decided' => 'This registration has already been reviewed.',
+        'email_taken' => 'An account with that e-mail address already exists. The registration cannot be approved.',
+        'no_season' => 'There is no active season to assign the coordinator in. Start a season first.',
+        'no_role' => 'The school coordinator role is missing. Seed the roles before approving registrations.',
+        // Shown on the public form. It deliberately does not say which of the
+        // two it is: telling a stranger "that address already has an account"
+        // turns the form into a way of testing whether somebody is registered.
+        'email_in_use' => 'That e-mail address cannot be used to register. If you already have an account, sign in instead.',
+    ],
     'difficulty' => [
         'countries_required' => 'Select at least one country, or enable "all countries".',
         'category_in_use' => 'This category has levels and cannot be deleted. Delete its levels first.',

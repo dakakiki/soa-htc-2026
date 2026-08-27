@@ -69,6 +69,13 @@ class AppServiceProvider extends ServiceProvider
         // coordinators only, never to a school coordinator.
         Gate::define('students.bulk', fn (User $user): bool => $user->hasPermission('students.bulk'));
 
+        // Deciding public coordinator registrations (ADR-0053). Its own ability
+        // rather than part of `coordinators.manage`: managing the coordinators a
+        // country already has is routine work a country coordinator does, while
+        // letting a stranger in is the decision the signed venue approval exists
+        // for. Whoever holds this also sees the applicants' documents.
+        Gate::define('coordinators.approve', fn (User $user): bool => $user->hasPermission('coordinators.approve'));
+
         // Results area: essay grading (5b), publication (5c) and attempt reset (5e).
         Gate::define('results.manage', fn (User $user): bool => $user->hasPermission('results.manage'));
 
@@ -81,6 +88,17 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('student-identify', fn (Request $request): array => [
             Limit::perMinute(8)->by('ip:'.$request->ip()),
             Limit::perMinutes(60, 10)->by('num:'.(string) $request->input('competitor_number')),
+        ]);
+
+        // Coordinator registration (ADR-0053) is the only public endpoint that
+        // writes a row AND stores a file, so an unattended script gets a disk
+        // bill as well as a queue full of noise. Capped per address as well as
+        // per IP: one school behind one NAT is a normal day, one address applying
+        // repeatedly is not.
+        RateLimiter::for('coordinator-registration', fn (Request $request): array => [
+            Limit::perMinute(3)->by('ip:'.$request->ip()),
+            Limit::perDay(20)->by('ip:'.$request->ip()),
+            Limit::perDay(3)->by('mail:'.mb_strtolower(trim((string) $request->input('email')))),
         ]);
     }
 }

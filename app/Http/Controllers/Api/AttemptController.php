@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Enums\QuestionType;
+use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\Question;
+use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Enums\AttemptStatus;
 use App\Domain\Competition\Enums\GradingStatus;
@@ -42,7 +44,9 @@ class AttemptController extends Controller
         if ($existing !== null) {
             $this->finalizeIfExpired($existing);
 
-            return $this->resumeOrRefuse($existing, $test);
+            if ($this->blocksRestart($existing)) {
+                return $this->resumeOrRefuse($existing, $test);
+            }
         }
 
         // Retry on a transient InnoDB deadlock/lock-wait so a concurrency spike
@@ -55,7 +59,9 @@ class AttemptController extends Controller
             if ($again !== null) {
                 $this->finalizeIfExpired($again);
 
-                return $this->resumeOrRefuse($again, $test);
+                if ($this->blocksRestart($again)) {
+                    return $this->resumeOrRefuse($again, $test);
+                }
             }
 
             $quizId = StudentAvailability::startableQuizId($session, $test);
@@ -68,6 +74,9 @@ class AttemptController extends Controller
                 'registration_id' => $registration->id,
                 'test_id' => $test->id,
                 'quiz_id' => $quizId,
+                // Stamped here, once: it decides whether this row occupies the
+                // contest's one-attempt slot for this test.
+                'is_practice' => Quiz::whereKey($quizId)->value('quiz_type') === QuizType::Sample->value,
                 'status' => AttemptStatus::InProgress,
                 'started_at' => $now,
                 'expires_at' => $now->copy()->addMinutes((int) ($test->duration ?? 0)),
@@ -169,7 +178,22 @@ class AttemptController extends Controller
             ->active()
             ->where('registration_id', $registration->id)
             ->where('test_id', $testId)
+            // Newest first: a practice test may have several finished runs
+            // behind it, and only the last one can still be resumed.
+            ->latest('id')
             ->first();
+    }
+
+    /**
+     * Whether this existing attempt settles the request — resumed, or refused.
+     *
+     * A finished PRACTICE attempt settles nothing: the competitor may simply sit
+     * it again (owner, 2026-08-27), so the caller goes on to make a new one.
+     * A finished CONTEST attempt is the end of it (ADR-0016).
+     */
+    private function blocksRestart(Attempt $attempt): bool
+    {
+        return $attempt->status !== AttemptStatus::Completed || ! $attempt->is_practice;
     }
 
     private function resumeOrRefuse(Attempt $attempt, Test $test): JsonResponse

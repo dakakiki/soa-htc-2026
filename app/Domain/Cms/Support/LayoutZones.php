@@ -66,6 +66,22 @@ final class LayoutZones
     public const PUBLIC_IDENTIFY_SAMPLE = 'public.identify.sample';
 
     /**
+     * The third stream through the same screen: looking up your own results
+     * (owner, 2026-08-27). It asks for no exam password, because it opens no
+     * exam — so it is a different offer to whoever arrives at it, and gets its
+     * own words for the same reason the other two do.
+     */
+    public const PUBLIC_IDENTIFY_RESULTS = 'public.identify.results';
+
+    /**
+     * The coordinator registration screen's copy — one record for both steps
+     * (ADR-0053). Unlike the two entry streams above, there is one of these: a
+     * visitor does not arrive at "the sent screen", they are carried to it by
+     * having sent the form, so its words belong with the words that led there.
+     */
+    public const PUBLIC_REGISTER = 'public.register';
+
+    /**
      * Zone key => what it is, and which block types it accepts.
      *
      * @return array<string, array{label: string, description: string, types: list<BlockType>}>
@@ -99,8 +115,13 @@ final class LayoutZones
             ],
             self::PUBLIC_LOGIN => [
                 'label' => 'Sign in',
-                'description' => 'The heading and the paragraph on the staff sign-in screen. The fields and the button are interface, not content.',
+                'description' => 'The heading, the paragraph and the note under the form on the staff sign-in screen. The fields and the button are interface, not content.',
                 'types' => [BlockType::Login],
+            ],
+            self::PUBLIC_REGISTER => [
+                'label' => 'Register',
+                'description' => 'The words on the coordinator registration screen, and on the panel shown once it has been sent for approval.',
+                'types' => [BlockType::Register],
             ],
             self::PUBLIC_IDENTIFY_COMPETITION => [
                 'label' => 'Start quiz',
@@ -110,6 +131,11 @@ final class LayoutZones
             self::PUBLIC_IDENTIFY_SAMPLE => [
                 'label' => 'Sample exam',
                 'description' => 'The words on the same screen entered in practice mode, where no password is asked for.',
+                'types' => [BlockType::Identify],
+            ],
+            self::PUBLIC_IDENTIFY_RESULTS => [
+                'label' => 'Check results',
+                'description' => 'The words on the same screen entered to look up results. No password is asked for — nothing is opened, only read.',
                 'types' => [BlockType::Identify],
             ],
         ];

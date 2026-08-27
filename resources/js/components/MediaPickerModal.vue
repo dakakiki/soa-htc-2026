@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconUpload, IconSearch } from '@tabler/icons-vue';
+import { IconFile, IconUpload, IconSearch } from '@tabler/icons-vue';
 import { listMedia, uploadMedia } from '@/api/media';
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
@@ -9,9 +9,21 @@ import type { CmsMedia } from '@/types/models';
 
 /**
  * Pick a file from the library, or drop a new one in without leaving the form.
- * Used by the editor's image button and anywhere else a stored image is wanted.
+ * Used by the editor's image button and anywhere else a stored file is wanted.
+ *
+ * The library holds two kinds since ADR-0053 — images to place and documents to
+ * hand out — so a picker says which it is after. The default is `image`: every
+ * caller that existed before documents did wants an image, and none of them
+ * should start offering PDFs because the library learned to store them.
  */
+const props = withDefaults(defineProps<{ kind?: 'image' | 'document' }>(), { kind: 'image' });
+
 const emit = defineEmits<{ (e: 'close'): void; (e: 'select', media: CmsMedia): void }>();
+
+/** What the upload button accepts, so the wrong kind cannot be added from here. */
+const accept = computed(() =>
+    props.kind === 'document' ? '.pdf,.doc,.docx,.xls,.xlsx' : 'image/*',
+);
 
 const { t } = useI18n();
 
@@ -27,7 +39,7 @@ async function load(target = 1): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
-        const { data } = await listMedia({ page: target, per_page: 24, search: search.value || undefined });
+        const { data } = await listMedia({ page: target, per_page: 24, search: search.value || undefined, kind: props.kind });
         items.value = data.data;
         page.value = data.meta.current_page;
         lastPage.value = data.meta.last_page;
@@ -78,7 +90,7 @@ onMounted(() => load(1));
                     <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover">
                         <IconUpload :size="16" />
                         {{ $t('cms.media.upload') }}
-                        <input type="file" accept="image/*" multiple class="hidden" @change="onFiles" />
+                        <input type="file" :accept="accept" multiple class="hidden" @change="onFiles" />
                     </label>
                 </div>
             </div>
@@ -96,7 +108,12 @@ onMounted(() => load(1));
                     <button v-for="item in items" :key="item.id" type="button"
                         class="group overflow-hidden rounded-md border border-gray-200 text-left transition hover:border-brand-primary"
                         @click="emit('select', item)">
-                        <span class="block h-24 w-full bg-gray-100 bg-cover bg-center"
+                        <!-- A document has no thumbnail to show; its icon is the
+                             honest stand-in for one. -->
+                        <span v-if="item.kind === 'document'" class="grid h-24 w-full place-items-center bg-gray-100 text-gray-400">
+                            <IconFile :size="28" />
+                        </span>
+                        <span v-else class="block h-24 w-full bg-gray-100 bg-cover bg-center"
                             :style="{ backgroundImage: `url(${item.url})` }" />
                         <span class="block truncate px-2 py-1 text-xs text-gray-600">{{ item.alt || item.original_name }}</span>
                     </button>

@@ -75,7 +75,9 @@ final class StudentAvailability
             if (! self::isOpen($quiz, $unlocked)) {
                 continue;
             }
-            if ((self::testStatuses($quiz, true, $attempts)[$test->id] ?? null) === 'next') {
+            $status = self::testStatuses($quiz, true, $attempts)[$test->id] ?? null;
+
+            if ($status === 'next' || ($status === 'completed' && self::isRetakeable($quiz))) {
                 return $quiz->id;
             }
         }
@@ -117,6 +119,10 @@ final class StudentAvailability
     {
         return $registration->attempts()
             ->active()
+            // Oldest first, so `keyBy` leaves the NEWEST attempt per test. A
+            // sample test may be sat again and again (owner, 2026-08-27), and
+            // what the screen must show is the last run, not the first.
+            ->orderBy('id')
             ->get(['test_id', 'status', 'published_at', 'score', 'max_score'])
             ->keyBy('test_id')
             ->map(fn ($a) => [
@@ -131,6 +137,20 @@ final class StudentAvailability
     private static function isOpen(Quiz $quiz, array $unlockedIds): bool
     {
         return ! $quiz->requiresPassword() || in_array($quiz->id, $unlockedIds, true);
+    }
+
+    /**
+     * Whether a finished test in this quiz may be sat again.
+     *
+     * Practice only (owner, 2026-08-27: "student može da ga radi neograničeni
+     * broj puta"). ADR-0016 — one attempt, no retakes — is a rule about the
+     * CONTEST, where a second run would be a second chance nobody else got. A
+     * sample test protects nothing: its results publish themselves, they never
+     * reach the results layer, and the whole point of it is repetition.
+     */
+    private static function isRetakeable(Quiz $quiz): bool
+    {
+        return $quiz->quiz_type === QuizType::Sample;
     }
 
     /** @return Collection<int, Test> */
@@ -203,6 +223,7 @@ final class StudentAvailability
     {
         $requiresPassword = $quiz->requiresPassword();
         $statuses = self::testStatuses($quiz, $open, $attempts);
+        $retakeable = self::isRetakeable($quiz);
 
         return [
             'id' => $quiz->id,
@@ -214,16 +235,20 @@ final class StudentAvailability
                 'id' => $exam->id,
                 'title' => $exam->title,
                 'round' => $exam->round?->name,
-                'tests' => $exam->tests->map(function (Test $test) use ($statuses, $attempts) {
+                'tests' => $exam->tests->map(function (Test $test) use ($statuses, $attempts, $retakeable) {
                     $attempt = $attempts[$test->id] ?? null;
                     $published = $attempt['published'] ?? false;
+                    $status = $statuses[$test->id] ?? 'locked';
 
                     return [
                         'id' => $test->id,
                         'title' => $test->title,
                         'type' => $test->type?->name,
                         'duration' => $test->duration,
-                        'status' => $statuses[$test->id] ?? 'locked',
+                        'status' => $status,
+                        // A finished practice test keeps its mark AND offers
+                        // another run; the screen shows both.
+                        'retakeable' => $retakeable && $status === 'completed',
                         'published' => $published,
                         'score' => $published ? $attempt['score'] : null,
                         'max_score' => $published ? $attempt['max_score'] : null,

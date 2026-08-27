@@ -133,25 +133,58 @@ class ResultsController extends Controller
 
         // The attempts update, the Layer B sync and the audit row are one unit: the
         // results table must never drift from the attempts' published state.
-        $count = DB::transaction(function () use ($validated, $unpublish, $testIds, $request) {
-            $query = Attempt::query()
+        $summary = DB::transaction(function () use ($validated, $unpublish, $testIds, $request) {
+            $population = $this->populationRegistrationIds($validated);
+
+            $inScope = fn () => Attempt::query()
                 ->whereIn('test_id', $testIds)
                 ->where('status', AttemptStatus::Completed)
-                ->whereIn('registration_id', $this->populationRegistrationIds($validated));
+                ->whereIn('registration_id', $population);
 
+            /*
+             * The rows are collected before they are written, so the answer can
+             * say WHO was affected — how many competitors, at how many venues —
+             * and not merely how many rows changed.
+             */
             if ($unpublish) {
-                $count = $query->whereNotNull('published_at')->update(['published_at' => null, 'published_by' => null]);
+                $rows = $inScope()->whereNotNull('published_at')->get(['id', 'registration_id']);
+                $waiting = 0;
             } else {
                 // Only publish attempts whose scoring is final — never one still
                 // awaiting essay grading (pending_grading) or the auto-grade job (queued).
-                $count = $query
+                $rows = $inScope()
                     ->whereNull('published_at')
                     ->whereIn('grading_status', ['auto_graded', 'graded'])
-                    ->update(['published_at' => now(), 'published_by' => $request->user()?->id]);
+                    ->get(['id', 'registration_id']);
+
+                /*
+                 * Everything in scope that is finished but NOT yet gradeable. This
+                 * is the number that explains an empty publish: on 2026-08-27 the
+                 * owner published a round and nothing happened, because every
+                 * attempt was still `queued` — no queue worker had ever run, so
+                 * nothing had a final score to publish. A count of zero with no
+                 * explanation sent them looking at the wrong screen.
+                 */
+                $waiting = $inScope()
+                    ->whereNull('published_at')
+                    ->whereNotIn('grading_status', ['auto_graded', 'graded'])
+                    ->count();
             }
 
+            $count = $rows->count();
+
+            if ($count > 0) {
+                Attempt::query()->whereIn('id', $rows->pluck('id'))->update(
+                    $unpublish
+                        ? ['published_at' => null, 'published_by' => null]
+                        : ['published_at' => now(), 'published_by' => $request->user()?->id],
+                );
+            }
+
+            $registrationIds = $rows->pluck('registration_id')->unique();
+
             // Mirror the new published state into the results layer (ADR-0027).
-            ResultLedger::reconcile($this->populationRegistrationIds($validated), $testIds);
+            ResultLedger::reconcile($population, $testIds);
 
             PublicationBatch::create([
                 'scope_type' => $validated['scope'],
@@ -164,10 +197,19 @@ class ResultsController extends Controller
                 'published_by' => $request->user()?->id,
             ]);
 
-            return $count;
+            return [
+                'attempts_count' => $count,
+                'students_count' => $registrationIds->count(),
+                'venues_count' => $registrationIds->isEmpty() ? 0 : Registration::query()
+                    ->whereIn('id', $registrationIds)
+                    ->whereNotNull('school_id')
+                    ->distinct()
+                    ->count('school_id'),
+                'waiting_count' => $waiting,
+            ];
         });
 
-        return response()->json(['action' => $unpublish ? 'unpublish' : 'publish', 'attempts_count' => $count]);
+        return response()->json(['action' => $unpublish ? 'unpublish' : 'publish'] + $summary);
     }
 
     /**

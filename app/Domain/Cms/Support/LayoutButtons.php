@@ -84,9 +84,22 @@ final class LayoutButtons
             return null;
         }
 
+        $target = is_array($button['target'] ?? null) ? $button['target'] : [];
+        $download = ($target['type'] ?? null) === 'file';
+
+        /*
+         * A file target is resolved here rather than in `href()` because the page
+         * needs two things from the same row: where the file is, and what it is
+         * called. `Storage::url()` hands out the stored name — a 40-character
+         * random key — so a visitor who clicks "Approval form" gets
+         * `BYZiqIJTYIkIBHuhX14NL8ypgINYxl3Oo7obH5bh.doc` in their downloads
+         * folder and no idea what it is (owner, 2026-08-27).
+         */
+        $media = $download ? Media::query()->find($target['id'] ?? null) : null;
+
         // 3. Somewhere to go. A target that has been deleted or unpublished
         //    drops the button instead of publishing a dead link.
-        $href = self::href($button['target'] ?? []);
+        $href = $download ? $media?->url() : self::href($target);
 
         if ($href === null) {
             return null;
@@ -96,8 +109,17 @@ final class LayoutButtons
             'label' => (string) ($button['label'] ?? ''),
             'href' => $href,
             'style' => (string) ($button['style'] ?? 'primary'),
-            'download' => ($button['target']['type'] ?? null) === 'file',
-            'external' => str_starts_with($href, 'http'),
+            'download' => $download,
+            // What it should land under. The page adds the day it was taken.
+            'download_name' => $media?->original_name,
+            // 🪤 A download is not a trip off the site, whatever its address says.
+            // `Storage::url()` returns an ABSOLUTE url, so a file button used to
+            // come back `download: true, external: true` — and the page drew both
+            // marks on it, the down-arrow and the leaves-the-site arrow. Nobody
+            // saw it until 2026-08-26, because until then nothing but an image
+            // could be put in the library and a file target had nothing to point
+            // at (ADR-0053).
+            'external' => ! $download && str_starts_with($href, 'http'),
         ];
     }
 
@@ -125,7 +147,9 @@ final class LayoutButtons
             'category' => self::categoryHref($id),
             // A named application route, stored as the path the router knows.
             'route' => str_starts_with($value, '/') ? $value : null,
-            'file' => self::fileHref($id),
+            // `file` never reaches here — resolve() handles it, because it needs
+            // the media row's name as well as its address.
+            'file' => null,
             // The only literal address, and the only one allowed to leave the
             // site — same rule the menu items follow (ADR-0042).
             'url' => preg_match('~^(https?://|/|#|mailto:)~', $value) === 1 ? $value : null,
@@ -164,16 +188,5 @@ final class LayoutButtons
         $category = Category::query()->whereKey($id)->where('status', 'active')->first(['slug']);
 
         return $category === null ? null : '/'.PublicPaths::POST_PREFIX.'?category='.$category->slug;
-    }
-
-    private static function fileHref(?int $id): ?string
-    {
-        if ($id === null) {
-            return null;
-        }
-
-        $media = Media::query()->whereKey($id)->first();
-
-        return $media?->url();
     }
 }

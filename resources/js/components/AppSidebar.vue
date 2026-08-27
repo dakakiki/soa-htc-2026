@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, reactive, ref, type Component } from 'vue';
+import { computed, onMounted, reactive, ref, type Component, type Ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
+import { pendingRegistrationCount } from '@/api/coordinatorRegistrations';
 import {
     IconLayoutDashboard,
     IconBuilding,
     IconUsersGroup,
     IconUsers,
     IconUserStar,
+    IconUserPlus,
     IconSettings,
     IconLock,
     IconShieldLock,
@@ -52,6 +54,12 @@ interface NavItem {
     to: string;
     prefix: string;
     perm?: string;
+    /**
+     * A count shown beside the label. One entry uses it: the coordinator
+     * registration queue (ADR-0053), where nothing else tells anybody that
+     * somebody is waiting — both decision mails go to the applicant.
+     */
+    badge?: Ref<number>;
 }
 interface NavGroup {
     key: string;
@@ -75,6 +83,25 @@ function toggleCollapsed(): void {
     localStorage.setItem(STORAGE_KEY, collapsed.value ? '1' : '0');
 }
 
+/**
+ * How many coordinator registrations are waiting (ADR-0053). Read once per
+ * mount: it is a nudge towards the queue, not a live counter, and the queue
+ * itself shows the real number.
+ */
+const pendingRegistrations = ref(0);
+
+onMounted(async () => {
+    if (!session.can('coordinators.approve')) {
+        return;
+    }
+    try {
+        const { data } = await pendingRegistrationCount();
+        pendingRegistrations.value = data.data.pending;
+    } catch {
+        // The badge is a convenience; the menu item stands without it.
+    }
+});
+
 // One ordered list: Dashboard, Students, Coordinators, Venues, Quizzes,
 // then Results, Access, Settings (last).
 const nav: NavNode[] = [
@@ -89,7 +116,26 @@ const nav: NavNode[] = [
             { label: t('nav.difficulty'), icon: IconStairs, to: 'difficulty', prefix: 'difficulty', perm: 'difficulty.manage' },
         ],
     },
-    { kind: 'item', label: t('nav.coordinators'), icon: IconUserStar, to: 'coordinators', prefix: 'coordinators', perm: 'coordinators.manage' },
+    {
+        kind: 'group',
+        key: 'coordinators',
+        label: t('nav.coordinators'),
+        icon: IconUserStar,
+        children: [
+            { label: t('nav.coordinators'), icon: IconUserStar, to: 'coordinators', prefix: 'coordinators', perm: 'coordinators.manage' },
+            // The public registration queue (ADR-0053). Its own permission, so a
+            // country coordinator sees the people it manages without seeing the
+            // strangers asking to be let in.
+            {
+                label: t('nav.registrationQueue'),
+                icon: IconUserPlus,
+                to: 'registrationQueue',
+                prefix: 'registrationQueue',
+                perm: 'coordinators.approve',
+                badge: pendingRegistrations,
+            },
+        ],
+    },
     { kind: 'item', label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.edit' },
     {
         kind: 'group',
@@ -241,6 +287,11 @@ const railTip =
                         >
                             <component :is="c.icon" :size="18" class="shrink-0" />
                             <span v-show="!collapsed">{{ c.label }}</span>
+                            <span
+                                v-if="c.badge && c.badge.value > 0"
+                                v-show="!collapsed"
+                                class="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                            >{{ c.badge.value }}</span>
                             <span v-if="collapsed" :class="railTip">{{ c.label }}</span>
                         </RouterLink>
                     </div>

@@ -25,6 +25,7 @@ class RolePermissionSeeder extends Seeder
         'students.view' => 'View students within the user scope',
         'students.bulk' => 'Bulk student import and attendance update (file flows)',
         'coordinators.manage' => 'Manage coordinators within the user scope',
+        'coordinators.approve' => 'Review public coordinator registrations and their venue approval documents',
         'seasons.view' => 'View seasons',
         'seasons.manage' => 'Create and manage seasons',
         'users.manage' => 'Manage staff users and season assignments',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { IconArrowLeft, IconChevronDown, IconMenu2, IconX } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
@@ -42,8 +42,23 @@ const site = ref<SiteStatus | null>(null);
 
 const openSub = ref<number | null>(null);
 const mobileOpen = ref(false);
-/** Hash of the section under the reader's eye, for the header's active state. */
-const activeHash = ref('');
+/**
+ * Which section the address names — `/#block_Results` → `#block_Results` — and
+ * therefore which menu item is marked.
+ *
+ * 🪤 Derived from the route and NOTHING ELSE. This used to be a ref that an
+ * IntersectionObserver kept updating as the reader scrolled, and it was wrong
+ * far more often than right: the observer delivers one report the moment it is
+ * attached (naming the section being left, not the one clicked), it reports
+ * again all through the scroll, and it settles on whatever crosses its band —
+ * which is the NEXT section whenever the one jumped to is short. Three separate
+ * ways for a click to end up highlighting something else. Owner, 2026-08-27:
+ * "klik na link add is-active i ima stil koji treba da ima."
+ *
+ * The cost is that free scrolling no longer moves the highlight. That is a
+ * feature nobody asked for, and it can come back as its own thing.
+ */
+const activeHash = computed(() => route.hash);
 
 const year = new Date().getFullYear();
 
@@ -81,35 +96,6 @@ function hashOf(href: string | null | undefined): string {
     return at === -1 ? '' : (href as string).slice(at);
 }
 
-/*
- * Scroll spy. The front page is one long document reached through hash links, so
- * the header only tells the reader where they are if it follows the sections.
- */
-let spy: IntersectionObserver | null = null;
-
-function watchSections(): void {
-    spy?.disconnect();
-    activeHash.value = '';
-
-    const sections = Array.from(document.querySelectorAll<HTMLElement>('main section[id]'));
-    if (!sections.length) {
-        return;
-    }
-
-    spy = new IntersectionObserver(
-        (entries) => {
-            entries
-                .filter((entry) => entry.isIntersecting)
-                .forEach((entry) => {
-                    activeHash.value = `#${entry.target.id}`;
-                });
-        },
-        // A band across the middle: whichever section crosses it wins.
-        { rootMargin: '-45% 0px -50% 0px' },
-    );
-
-    sections.forEach((section) => spy?.observe(section));
-}
 
 const navLink = (href: string | null | undefined): string => {
     const on = activeHash.value !== '' && hashOf(href) === activeHash.value;
@@ -124,11 +110,22 @@ const navLink = (href: string | null | undefined): string => {
 
 const subLink = 'block rounded-md px-3 py-2 text-sm text-brand-palette-4/70 hover:bg-brand-palette-3/20 hover:text-brand-palette-4';
 const mobileLink = 'block border-b border-brand-palette-4/10 py-3.5 text-base font-medium text-brand-palette-4/80 hover:text-brand-palette-4';
-const footerLink = 'text-sm text-white/55 transition-colors hover:text-brand-palette-1';
+/**
+ * The footer carries the same anchors as the header, so it marks the reader's
+ * place the same way (owner, 2026-08-27) — amber on the navy band, where the
+ * header's amber underline would be lost.
+ */
+const footerLink = (href: string | null | undefined): string => {
+    const on = activeHash.value !== '' && hashOf(href) === activeHash.value;
+
+    return [
+        'text-sm transition-colors',
+        on ? 'font-medium text-brand-palette-1' : 'text-white/55 hover:text-brand-palette-1',
+    ].join(' ');
+};
 
 onMounted(async () => {
     document.addEventListener('click', onClickOutside);
-    watchSections();
 
     const [headerBlock, footerBlock] = await Promise.all([
         loadChrome('public.header'),
@@ -156,19 +153,17 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     document.removeEventListener('click', onClickOutside);
-    spy?.disconnect();
     document.body.classList.remove('overflow-hidden');
 });
 
 watch(
     () => route.fullPath,
-    async () => {
+    () => {
         mobileOpen.value = false;
         openSub.value = null;
-        await nextTick();
-        watchSections();
     },
 );
+
 
 watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', open));
 </script>
@@ -276,7 +271,7 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
                         </h2>
                         <ul class="mt-4 space-y-2.5">
                             <li v-for="(item, i) in column.menu?.items ?? []" :key="i">
-                                <PublicMenuLink :item="item" :link-class="footerLink" />
+                                <PublicMenuLink :item="item" :link-class="footerLink(item.href)" />
                             </li>
                         </ul>
                     </div>

@@ -1,7 +1,11 @@
 import { http } from '@/api/http';
 import type { CmsMedia, Paginated } from '@/types/models';
 
-export function listMedia(params: { page?: number; per_page?: number; search?: string } = {}) {
+/**
+ * `kind` narrows the library to one of the two things it holds (ADR-0053).
+ * Omitted, it returns both — which is what the library screen itself wants.
+ */
+export function listMedia(params: { page?: number; per_page?: number; search?: string; kind?: 'image' | 'document' } = {}) {
     return http.get<Paginated<CmsMedia>>('/api/cms/media', { params });
 }
 

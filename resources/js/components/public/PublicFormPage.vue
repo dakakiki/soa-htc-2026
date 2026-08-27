@@ -25,22 +25,36 @@ defineSlots<{
 withDefaults(
     defineProps<{
         /**
-         * A form whose fields sit two to a row rather than one (competitor entry,
-         * with eight date boxes across). It takes the gutter the narrow shape
-         * leaves between the columns; the words give up a column to pay for it.
+         * How much of the twelve the form gets. Each value is a screen that
+         * exists, not a knob:
+         *
+         *  - `half` (6 + 5, a gutter between): sign-in. One field per row, and
+         *    the words carry the screen.
+         *  - `wide` (5 + 7): competitor entry, whose fields sit two to a row and
+         *    which needs the whole eight-box date across. The words give up a
+         *    column to pay for it.
+         *  - `form` (4 + 8): coordinator registration — four sections, three
+         *    fields to a row. Past this the left rail stops being a column of
+         *    text and becomes a margin.
          */
-        wide?: boolean;
+        layout?: 'half' | 'wide' | 'form';
     }>(),
-    { wide: false },
+    { layout: 'half' },
 );
+
+const columns = {
+    half: { intro: 'lg:col-span-6', form: 'lg:col-span-5 lg:col-start-8' },
+    wide: { intro: 'lg:col-span-5', form: 'lg:col-span-7' },
+    form: { intro: 'lg:col-span-4', form: 'lg:col-span-8' },
+} as const;
 </script>
 
 <template>
     <div class="grid gap-10 py-4 lg:grid-cols-12 lg:gap-16 lg:py-12">
-        <div :class="wide ? 'lg:col-span-5' : 'lg:col-span-6'">
+        <div :class="columns[layout].intro">
             <slot name="intro" />
         </div>
-        <div :class="wide ? 'lg:col-span-7' : 'lg:col-span-5 lg:col-start-8'">
+        <div :class="columns[layout].form">
             <slot />
         </div>
     </div>

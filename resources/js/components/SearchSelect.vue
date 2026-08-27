@@ -61,7 +61,10 @@ const search = ref('');
 /** The control's own look; the two variants share nothing but the layout. */
 const trigger = computed(() =>
     props.underlined
-        ? ['h-[52px] border-0 border-b bg-transparent px-0 text-lg', open.value ? 'border-brand-palette-4' : 'border-brand-palette-4/20']
+        // Full strength at rest, not a hairline: on the public forms the rule
+        // under a field IS the field, so a faded one reads as a disabled control
+        // (owner, 2026-08-27). The admin variant below is untouched.
+        ? ['h-[52px] border-0 border-b bg-transparent px-0 text-lg', 'border-brand-palette-4']
         : [
             'rounded-md border border-gray-300 bg-white disabled:bg-gray-50',
             props.large ? 'px-4 py-4 text-lg' : props.dense ? 'px-3 py-1.5 text-sm' : 'mt-1 px-3 py-2 text-sm',
@@ -161,7 +164,11 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
             @click="toggleOpen"
         >
             <span v-if="selected" class="truncate" :class="disabled ? 'text-gray-400' : underlined ? 'text-brand-palette-4' : 'text-gray-900'">{{ selected.label }}</span>
-            <span v-else class="truncate" :class="disabled ? 'text-gray-400' : underlined ? 'text-brand-palette-4/40' : 'text-gray-700'">{{ loading ? t('common.loading') : placeholder }}</span>
+            <!-- The public variant's placeholder is set smaller than the value it
+                 stands in for: at the trigger's own size it towered over the
+                 11px label above it and read as the answer rather than the
+                 prompt (owner, 2026-08-27). -->
+            <span v-else class="truncate" :class="disabled ? 'text-gray-400' : underlined ? 'text-sm text-brand-palette-4/60' : 'text-gray-700'">{{ loading ? t('common.loading') : placeholder }}</span>
             <span class="flex shrink-0 items-center gap-1">
                 <svg v-if="loading" class="h-4 w-4 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -170,13 +177,14 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
                 <template v-else>
                     <Tooltip v-if="clearable && selected && !disabled" :text="t('common.clear')">
                     <span
-                        class="cursor-pointer text-gray-400 hover:text-gray-700"
+                        class="cursor-pointer"
+                        :class="underlined ? 'text-brand-palette-4 hover:text-brand-palette-2' : 'text-gray-400 hover:text-gray-700'"
                         role="button"
                         :aria-label="t('common.clear')"
                         @click.stop="clear"
                     >✕</span>
                     </Tooltip>
-                    <svg class="h-4 w-4" :class="disabled ? 'text-gray-300' : underlined ? 'text-brand-palette-4/50' : 'text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="h-4 w-4" :class="disabled ? 'text-gray-300' : underlined ? 'text-brand-palette-4' : 'text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                 </template>

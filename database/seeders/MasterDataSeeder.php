@@ -195,6 +195,46 @@ class MasterDataSeeder extends Seeder
                     'title' => 'Sign in',
                     'lead' => '<p>For administrators and coordinators. Competitors do not sign in —'
                         .' they enter with their candidate number.</p>',
+                    // Both halves of what legacy said under its form: who the
+                    // screen is for, and where everybody else goes (ADR-0053).
+                    // 🪤 "Register as a coordinator", never "register your school"
+                    // (owner, 2026-08-27). What the form creates is a coordinator
+                    // account; the venue is attached afterwards by an administrator
+                    // (ADR-0053). Copy that says "school" promises a screen that
+                    // does not exist.
+                    'aside' => '<p>For registered venues only. Not registered yet?'
+                        .' <a href="/register">Register as a coordinator</a>.</p>',
+                ],
+            ]);
+        }
+
+        if (! LayoutBlock::query()->where('zone', LayoutZones::PUBLIC_REGISTER)->exists()) {
+            LayoutBlock::query()->create([
+                'zone' => LayoutZones::PUBLIC_REGISTER,
+                'type' => BlockType::Register,
+                'status' => true,
+                'position' => 1,
+                'data' => [
+                    'title' => 'Register as a coordinator',
+                    // 🪤 The approved design ended this with "You register your
+                    // venue after that." There is no such screen and there is not
+                    // going to be one in this round — the owner's rule
+                    // (2026-08-26) is that an administrator attaches the venue,
+                    // exactly as in legacy. Copy that promises a step nobody
+                    // built is worse than copy that says less.
+                    'lead' => '<p>Your registration is sent straight away, but no account is opened'
+                        .' until an administrator has approved it.</p>',
+                    'document_note' => '<p>Download the approval form, have it signed by the venue,'
+                        .' then attach it below.</p>',
+                    // No target yet: the form itself is a document somebody has
+                    // to upload to the media library. Until then LayoutButtons
+                    // drops the button rather than publishing a dead link.
+                    'button' => self::button('Approval form', 'file', 'link'),
+                    'sent_title' => 'With the administrators',
+                    'sent_lead' => '<p>We have your registration and your signed approval. An administrator'
+                        .' reviews it and opens your account — you will get an e-mail either way.</p>',
+                    'sent_note' => '<p>Something wrong with what you sent? Write to'
+                        .' <a href="mailto:venue@hippo-thecontest.org">venue@hippo-thecontest.org</a>.</p>',
                 ],
             ]);
         }
@@ -209,6 +249,13 @@ class MasterDataSeeder extends Seeder
                     .' reads out. No account, no sign-in.</p>',
                 'aside' => '<p>Just practising? <a href="/student/access/sample">Try a sample exam</a>'
                     .' — no password needed.</p>',
+            ],
+            LayoutZones::PUBLIC_IDENTIFY_RESULTS => [
+                'eyebrow' => 'Check results',
+                'title' => 'Look up your marks',
+                'lead' => '<p>The same three things off your candidate card. No password — this only shows'
+                    .' what you have already sat.</p>',
+                'aside' => '<p>A test you have sat but cannot see yet is still with the administrators.</p>',
             ],
             LayoutZones::PUBLIC_IDENTIFY_SAMPLE => [
                 'eyebrow' => 'Sample exam',
@@ -334,23 +381,26 @@ class MasterDataSeeder extends Seeder
                         'note' => 'Open to all candidates',
                         'text' => 'Prepare your candidate number and date of birth. Available results:'
                             .' sample test, Preliminary Round and National Finals.',
-                        'button' => self::button('Check results', 'route', 'navy', value: '/student/access/competition'),
+                        'button' => self::button('Check results', 'route', 'navy', value: '/student/access/results'),
                     ],
                 ],
             ]],
             [BlockType::Coordinators, 'soa-img-3', [
-                'eyebrow' => '04 — For schools',
+                'eyebrow' => '04 — For venues',
                 'title' => 'Coordinator access',
                 'lead' => 'Coordinators sign in with their e-mail and password to enter students, print'
-                    .' attendance registers and follow their venue\'s results. New schools register first.',
+                    .' attendance registers and follow their venue\'s results. New coordinators register first.',
                 'buttons' => [
                     self::button('Coordinator login', 'route', 'amber', value: '/login'),
-                    self::button('Register a new school', 'route', 'link'),
+                    // Seeded without a destination when the home page was built,
+                    // waiting for the screen behind it. It exists now (ADR-0053) —
+                    // and it registers a COORDINATOR, not a school.
+                    self::button('Register as a coordinator', 'route', 'link', value: '/register'),
                 ],
             ]],
             [BlockType::Contact, null, [
                 'title' => 'Have questions?',
-                'lead' => 'Everything about the contest itself lives on the Hippo website. Schools that want'
+                'lead' => 'Everything about the contest itself lives on the Hippo website. Venues that want'
                     .' to host an exam write to us directly.',
                 'links' => [
                     ['label' => 'Contest website', 'value' => 'www.hippo-thecontest.org', 'url' => 'https://www.hippo-thecontest.org'],
@@ -417,13 +467,21 @@ class MasterDataSeeder extends Seeder
 
         $menus = [
             'public-header' => ['Public header', [
-                // The live site sends both of these to anchors on the front page —
-                // it had no entry screens to send them to, and "Sample Exam" shared
-                // its anchor with "Check Results". We do have the screens, and a
-                // menu entry named after one should open it.
-                ['type' => 'custom', 'url' => '/student/access/competition', 'label' => 'Start Quiz'],
-                ['type' => 'custom', 'url' => '/student/access/sample', 'label' => 'Sample Exam'],
-                ['type' => 'custom', 'url' => '/#block_Results', 'label' => 'Check Results'],
+                /*
+                 * Every item is an anchor into the front page, as on the live
+                 * site (owner, 2026-08-27). The entry screens exist, and for a
+                 * while these two opened them directly — but a navigation whose
+                 * items drop a visitor straight into a form skips the part of
+                 * the page that says what the form is for. The forms are reached
+                 * from the section, by somebody who has read it.
+                 *
+                 * "Sample Exam" and "Check Results" are the two columns of one
+                 * band, and each carries its own anchor — sharing the band's
+                 * `block_Results` lit both items at once.
+                 */
+                ['type' => 'custom', 'url' => '/#block_Start', 'label' => 'Start Quiz'],
+                ['type' => 'custom', 'url' => '/#block_Sample', 'label' => 'Sample Exam'],
+                ['type' => 'custom', 'url' => '/#block_CheckResults', 'label' => 'Check Results'],
                 ['type' => 'custom', 'url' => '/#block_Coordinators', 'label' => 'Coordinators'],
                 ['type' => 'custom', 'url' => '/#block_CompetitionRules', 'label' => 'Category check'],
             ]],

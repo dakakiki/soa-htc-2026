@@ -1,5 +1,6 @@
 import { http } from '@/api/http';
 import type {
+    Country,
     Paginated,
     PublicBlock,
     PublicCategory,
@@ -45,4 +46,20 @@ export function getPublicLayout(zone: string) {
 /** Which round is running and whether it is open — both derived server-side. */
 export function getSiteStatus() {
     return http.get<{ data: SiteStatus }>('/api/public/site');
+}
+
+/** The country list the registration form picks from. Reference data, unpaginated. */
+export function listPublicCountries() {
+    return http.get<{ data: Country[] }>('/api/public/countries');
+}
+
+/**
+ * Send a coordinator registration (ADR-0053). Multipart, because the signed
+ * venue approval travels with it.
+ *
+ * Nothing comes back but an acknowledgement: no account exists yet, so there is
+ * no session to start and no token to keep.
+ */
+export function submitCoordinatorRegistration(form: FormData) {
+    return http.post<{ data: { received: boolean } }>('/api/public/coordinator-registrations', form);
 }

@@ -63,7 +63,10 @@ watch(
 <template>
     <div class="flex gap-1.5 sm:gap-2">
         <div v-for="(label, i) in labels" :key="i" class="flex flex-1 flex-col items-center gap-1.5">
-            <span class="font-mono text-[10px]" :class="digits[i] === '' ? 'text-brand-palette-4/35' : 'text-brand-palette-2'">{{ label }}</span>
+            <!-- The D/M/Y letters are labels, so they carry the label's colour
+                 whether the box under them is filled or not (owner, 2026-08-27);
+                 a filled box still turns its own letter amber. -->
+            <span class="font-mono text-[10px]" :class="digits[i] === '' ? 'text-brand-palette-4' : 'text-brand-palette-2'">{{ label }}</span>
             <input
                 :ref="(el) => setRef(el as Element | null, i)"
                 :value="digits[i]"
@@ -71,7 +74,7 @@ watch(
                 inputmode="numeric"
                 maxlength="1"
                 :aria-label="label"
-                class="h-[54px] w-full rounded-[10px] border border-brand-palette-4/20 bg-transparent text-center font-mono text-xl text-brand-palette-4 focus:border-brand-palette-4 focus:outline-none sm:h-16 sm:rounded-xl sm:text-2xl"
+                class="h-[54px] w-full rounded-[10px] border border-brand-palette-4 bg-transparent text-center font-mono text-xl text-brand-palette-4 focus:border-brand-palette-4 focus:outline-none sm:h-16 sm:rounded-xl sm:text-2xl"
                 @input="onInput(i, $event)"
                 @keydown="onKeydown(i, $event)"
             />

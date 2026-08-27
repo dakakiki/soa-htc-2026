@@ -103,6 +103,42 @@ class ResultsTest extends TestCase
         $this->assertEquals(2, $after->json('quizzes.0.exams.0.tests.0.score'));
     }
 
+    /**
+     * The answer has to say what happened, to whom.
+     *
+     * Owner, 2026-08-27: a publish that matched nothing said nothing at all, and
+     * the real cause — every attempt still waiting to be graded — was invisible
+     * from the screen that was supposed to report it.
+     */
+    public function test_publishing_reports_who_it_reached(): void
+    {
+        $c = $this->attempt();
+
+        $this->actingAs($this->admin())->postJson('/api/results/publish', ['scope' => 'test', 'id' => $c['test']])
+            ->assertOk()
+            ->assertJsonPath('attempts_count', 1)
+            ->assertJsonPath('students_count', 1)
+            ->assertJsonPath('venues_count', 1)
+            ->assertJsonPath('waiting_count', 0);
+    }
+
+    public function test_publishing_counts_what_is_still_waiting_to_be_marked(): void
+    {
+        $c = $this->attempt();
+
+        // Put the attempt back where the queue leaves it before a worker runs.
+        Attempt::whereKey($c['attempt'])->update(['grading_status' => 'queued']);
+
+        $this->actingAs($this->admin())->postJson('/api/results/publish', ['scope' => 'test', 'id' => $c['test']])
+            ->assertOk()
+            // Nothing published — and the reason travels with the answer, rather
+            // than leaving a bare zero to be puzzled over.
+            ->assertJsonPath('attempts_count', 0)
+            ->assertJsonPath('waiting_count', 1);
+
+        $this->assertNull(Attempt::findOrFail($c['attempt'])->published_at);
+    }
+
     public function test_publishing_an_exam_publishes_its_attempts(): void
     {
         $c = $this->attempt();

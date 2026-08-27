@@ -137,5 +137,7 @@ const field = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:
         </div>
     </div>
 
-    <MediaPickerModal v-if="pickerOpen" @close="pickerOpen = false" @select="onMediaSelected" />
+    <!-- A `file` target hands something over rather than showing it, so the
+         picker offers documents (ADR-0053). -->
+    <MediaPickerModal v-if="pickerOpen" kind="document" @close="pickerOpen = false" @select="onMediaSelected" />
 </template>

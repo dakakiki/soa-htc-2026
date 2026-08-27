@@ -45,6 +45,17 @@ const routes: RouteRecordRaw[] = [
         meta: { guestOnly: true, zone: 'public' },
     },
     {
+        /*
+         * Coordinator registration (ADR-0053). `guestOnly` like the sign-in
+         * screen: somebody already signed in has an account, and the form would
+         * only be a way of making a second one.
+         */
+        path: '/register',
+        name: 'register',
+        component: () => import('@/pages/RegisterPage.vue'),
+        meta: { guestOnly: true, zone: 'public' },
+    },
+    {
         path: '/news',
         name: 'news',
         component: () => import('@/pages/public/NewsListPage.vue'),
@@ -57,10 +68,21 @@ const routes: RouteRecordRaw[] = [
         meta: { zone: 'public' },
     },
     {
-        path: '/student/access/:mode(sample|competition)',
+        path: '/student/access/:mode(sample|competition|results)',
         name: 'student.access.form',
         component: () => import('@/pages/student/StudentAccessFormPage.vue'),
         meta: { zone: 'public', studentGuestOnly: true },
+    },
+    {
+        /*
+         * Looking up your own results (owner, 2026-08-27). Reached by the same
+         * identification as the exam streams and with no exam password, because
+         * nothing here opens an exam — it only reads what has already been sat.
+         */
+        path: '/student/results',
+        name: 'student.results',
+        component: () => import('@/pages/student/StudentResultsPage.vue'),
+        meta: { zone: 'student' },
     },
     {
         path: '/student',
@@ -153,6 +175,19 @@ const routes: RouteRecordRaw[] = [
         name: 'coordinators',
         component: () => import('@/pages/coordinators/CoordinatorsListPage.vue'),
         meta: { requiresAuth: true, permission: 'coordinators.manage' },
+    },
+    {
+        // The public registration queue (ADR-0053). Its own permission: managing
+        // the coordinators a country already has is routine, letting a stranger
+        // in is not.
+        // 🪤 The name deliberately does NOT start with `coordinators.` — the
+        // sidebar lights an entry when the route name starts with its prefix, so
+        // `coordinators.registrations` would light the Coordinators link as well
+        // as this one.
+        path: '/coordinator-registrations',
+        name: 'registrationQueue',
+        component: () => import('@/pages/coordinators/RegistrationQueuePage.vue'),
+        meta: { requiresAuth: true, permission: 'coordinators.approve' },
     },
     {
         path: '/coordinators/new',
@@ -446,8 +481,72 @@ const routes: RouteRecordRaw[] = [
     },
 ];
 
-/** Clears the sticky public header when an address points at a section. */
-const HEADER_OFFSET = 80;
+/**
+ * How far below the top of the window a section lands when an address points at
+ * it — enough that its rule and its heading are both fully in view, rather than
+ * clipped at the very edge.
+ *
+ * 🪤 POSITIVE. Vue Router computes `elRect.top - docRect.top - offset.top`, so
+ * it SUBTRACTS what you give it: the element ends up exactly `offset` px below
+ * the top of the window. A negative value — which is what "clear the header"
+ * intuition suggests — pushes the section that far ABOVE the fold and cuts its
+ * heading off (owner, 2026-08-27). Matches the `scroll-mt-20` the sections
+ * already carry for native hash jumps, so both routes land in the same place.
+ */
+const ANCHOR_TOP_GAP = 80;
+
+/**
+ * Resolve once the element exists, or give up.
+ *
+ * 🪤 `setTimeout`, NOT `requestAnimationFrame`. A throttled tab stops running
+ * frame callbacks — and this promise gates the scroll, so a wait built on frames
+ * simply never finishes and the page silently stays where it was. (Native smooth
+ * scrolling keeps working in the same tab, which is what makes the frame version
+ * look correct while it is not: the compositor drives that, not the page.)
+ *
+ * A section that never arrives — a block switched off, a stale bookmark — must
+ * not hold the scroll open for ever, hence the ceiling.
+ */
+function waitForElement(selector: string, timeoutMs = 3000, stepMs = 50): Promise<boolean> {
+    return new Promise((resolve) => {
+        const startedAt = Date.now();
+        let lastTop: number | null = null;
+
+        const look = (): void => {
+            const el = document.querySelector(selector);
+            const timedOut = Date.now() - startedAt > timeoutMs;
+
+            if (el === null) {
+                timedOut ? resolve(false) : setTimeout(look, stepMs);
+
+                return;
+            }
+
+            /*
+             * 🪤 Existing is not enough — the position has to have STOPPED MOVING.
+             * The sections appear before the images above them have loaded, so the
+             * document is still short and every block is still sliding down the
+             * page. Scrolling then is worse than useless: the browser clamps the
+             * request to the page's current height, the page grows a moment later,
+             * and the reader is left at the top with the address bar claiming they
+             * are somewhere else. Two identical measurements mean the layout has
+             * settled under the target.
+             */
+            const top = Math.round(el.getBoundingClientRect().top);
+
+            if (lastTop === top || timedOut) {
+                resolve(true);
+
+                return;
+            }
+
+            lastTop = top;
+            setTimeout(look, stepMs);
+        };
+
+        look();
+    });
+}
 
 export const router = createRouter({
     history: createWebHistory(),
@@ -455,16 +554,22 @@ export const router = createRouter({
     /**
      * Hash addresses are real navigation here: the header menu carries
      * `/#block_Start` and friends over from the live site, so those have to land
-     * on the section rather than at the top of the page. The wait for a frame
-     * lets the target page paint before we measure it.
+     * on the section rather than at the top of the page.
+     *
+     * 🪤 One frame is not enough. The front page draws its sections from the
+     * layout API, so for the first few frames after the route resolves the
+     * section named in the address does not exist yet — and the router's scroll
+     * is SILENT when its target is missing. Following "Check Results" from
+     * another page therefore landed at the top of the home page and looked like
+     * a dead menu item (caught 2026-08-27, after every header item became an
+     * anchor). Waiting for the element itself, rather than for a frame, is the
+     * fix; if it never arrives the page simply stays where it was.
      */
     scrollBehavior(to, _from, saved) {
         if (to.hash) {
-            return new Promise((resolve) => {
-                requestAnimationFrame(() =>
-                    resolve({ el: to.hash, top: HEADER_OFFSET, behavior: 'smooth' }),
-                );
-            });
+            return waitForElement(to.hash).then((found) =>
+                found ? { el: to.hash, top: ANCHOR_TOP_GAP, behavior: 'smooth' as const } : { top: 0 },
+            );
         }
 
         return saved ?? { top: 0 };

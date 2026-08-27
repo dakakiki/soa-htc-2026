@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
 use App\Domain\Assessment\Models\Quiz;
@@ -265,6 +266,56 @@ class StudentAvailabilityTest extends TestCase
      *
      * @return array{quiz: Quiz, exam: Exam, tests: array{0: Test, 1: Test}}
      */
+    /**
+     * Practice may be repeated without limit (owner, 2026-08-27): "student može
+     * da ga radi neograničeni broj puta". ADR-0016's single attempt is a CONTEST
+     * rule — a second run there would be a second chance nobody else got.
+     */
+    public function test_a_finished_sample_test_can_be_sat_again(): void
+    {
+        $chain = $this->twoTestChain('H2', 'sample');
+        $token = $this->tokenFor('H2');
+        $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: true);
+
+        // The mark stays — and so does the way back in.
+        $this->withToken($token)->getJson('/api/student/availability')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'completed')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.retakeable', true);
+
+        // And the start endpoint agrees, so the button is not a dead end.
+        $this->withToken($token)
+            ->postJson("/api/student/tests/{$chain['tests'][0]->id}/start")
+            ->assertSuccessful();
+    }
+
+    public function test_a_finished_competition_test_can_not_be_sat_again(): void
+    {
+        $chain = $this->twoTestChain('H2', 'competition');
+        $token = $this->tokenFor('H2');
+        $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: true);
+
+        $this->withToken($token)->getJson('/api/student/availability')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.status', 'completed')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.retakeable', false);
+
+        $this->withToken($token)
+            ->postJson("/api/student/tests/{$chain['tests'][0]->id}/start")
+            ->assertStatus(409);
+    }
+
+    /** The screen shows the LAST run of a repeated test, not the first. */
+    public function test_a_repeated_sample_test_reports_its_newest_attempt(): void
+    {
+        $chain = $this->twoTestChain('H2', 'sample');
+        $token = $this->tokenFor('H2');
+
+        $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: true, score: 3);
+        $this->completeAttempt($chain['quiz'], $chain['tests'][0], published: true, score: 9);
+
+        $this->withToken($token)->getJson('/api/student/availability')
+            ->assertJsonPath('quizzes.0.exams.0.tests.0.score', 9);
+    }
+
     private function twoTestChain(string $levelShort = 'H2', string $type = 'sample'): array
     {
         $level = DifficultyLevel::where('level_short', $levelShort)->firstOrFail();
@@ -288,15 +339,18 @@ class StudentAvailabilityTest extends TestCase
     }
 
     /** Record a completed attempt at $test for the last registration, optionally published. */
-    private function completeAttempt(Quiz $quiz, Test $test, bool $published): void
+    private function completeAttempt(Quiz $quiz, Test $test, bool $published, float $score = 0): void
     {
         Attempt::create([
             'registration_id' => $this->lastRegistration->id,
             'quiz_id' => $quiz->id,
             'test_id' => $test->id,
+            // Stamped exactly as the start endpoint stamps it: practice rows stay
+            // out of the contest's one-attempt unique, so they may pile up.
+            'is_practice' => $quiz->quiz_type === QuizType::Sample,
             'status' => 'completed',
             'grading_status' => 'auto_graded',
-            'score' => 0, 'max_score' => 0,
+            'score' => $score, 'max_score' => 10,
             'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
             'published_at' => $published ? now() : null,
             'channel' => 'web',

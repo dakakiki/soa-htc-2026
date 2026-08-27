@@ -64,6 +64,19 @@ onMounted(async () => {
 });
 
 const chip = 'rounded-full border px-3 py-1 text-sm transition';
+
+/**
+ * The chosen filter, in the palette's orange (owner, 2026-08-27) — the same
+ * accent the public forms use to count their sections, rather than the admin's
+ * blue that had wandered in here.
+ *
+ * Navy on orange, not white: white on `#f39200` is about 2.5:1 and unreadable at
+ * this size. It is also what every other warm-backed control on the site does
+ * (see the `amber` button style).
+ */
+const chipOn = 'border-brand-palette-2 bg-brand-palette-2 font-medium text-brand-palette-4';
+
+const chipOff = 'border-gray-300 text-gray-600 hover:border-gray-400';
 </script>
 
 <template>
@@ -74,10 +87,10 @@ const chip = 'rounded-full border px-3 py-1 text-sm transition';
         </header>
 
         <nav v-if="categories.length" class="flex flex-wrap gap-2">
-            <button type="button" :class="[chip, !route.query.category ? 'border-brand-primary bg-brand-primary text-brand-on-primary' : 'border-gray-300 text-gray-600 hover:border-gray-400']"
+            <button type="button" :class="[chip, !route.query.category ? chipOn : chipOff]"
                 @click="pick(null)">{{ $t('public.news.all') }}</button>
             <button v-for="c in categories" :key="c.slug" type="button"
-                :class="[chip, route.query.category === c.slug ? 'border-brand-primary bg-brand-primary text-brand-on-primary' : 'border-gray-300 text-gray-600 hover:border-gray-400']"
+                :class="[chip, route.query.category === c.slug ? chipOn : chipOff]"
                 @click="pick(c.slug)">{{ c.name }} <span class="text-xs opacity-70">{{ c.posts_count }}</span></button>
         </nav>
 

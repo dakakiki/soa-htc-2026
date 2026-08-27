@@ -21,6 +21,9 @@ class CmsMediaResource extends JsonResource
             'url' => $this->url(),
             'original_name' => $this->original_name,
             'mime_type' => $this->mime_type,
+            // Derived, so a picker can tell a thumbnail from a download without
+            // parsing the mime type itself.
+            'kind' => $this->kind(),
             'size' => $this->size,
             'width' => $this->width,
             'height' => $this->height,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconEye, IconEyeOff } from '@tabler/icons-vue';
+import { IconAlertTriangle, IconCheck, IconEye, IconEyeOff } from '@tabler/icons-vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
@@ -26,8 +26,28 @@ const needsQuiz = ref(true);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const message = ref<string | null>(null);
+/** Whether that message is a nothing-happened one, so it is not dressed as success. */
+const nothingHappened = ref(false);
+/** The page's own root, so the scroller above it can be found. */
+const root = ref<HTMLElement | null>(null);
 // Key of the in-flight publish action, so only that button shows as busy.
 const working = ref<string | null>(null);
+
+/**
+ * How many results this test has waiting to be published right now.
+ *
+ * The three counts the server sends do not answer the question an admin
+ * actually has — "is there anything for me to do here?" — without arithmetic in
+ * the head (owner, 2026-08-27: "kako znam da ima testova za publish?"). Finished,
+ * minus already out, minus still being marked, is what a Publish click would
+ * touch.
+ */
+const readyToPublish = (test: { completed: number; published: number; pending: number }): number =>
+    Math.max(0, test.completed - test.published - test.pending);
+
+/** The same, for a whole round — so its button can say whether it has work. */
+const examReady = (exam: PublishExam): number =>
+    exam.tests.reduce((sum, test) => sum + readyToPublish(test), 0);
 
 const named = (rows: { id: number; name: string }[]): SearchSelectOption[] => rows.map((r) => ({ id: r.id, label: r.name }));
 const titled = (rows: { id: number; title: string }[]): SearchSelectOption[] => rows.map((r) => ({ id: r.id, label: r.title }));
@@ -48,8 +68,14 @@ async function loadOptions(): Promise<void> {
     }
 }
 
-async function loadOverview(): Promise<void> {
-    message.value = null;
+/**
+ * @param keepMessage after an action, whose answer must survive the refresh that
+ *                    follows it; a filter change clears it as before.
+ */
+async function loadOverview(keepMessage = false): Promise<void> {
+    if (!keepMessage) {
+        message.value = null;
+    }
     if (!q.quiz_id) {
         exams.value = [];
         needsQuiz.value = true;
@@ -99,28 +125,64 @@ async function act(scope: 'test' | 'exam', id: number, unpublish: boolean): Prom
             scope, id, unpublish,
             quiz_id: q.quiz_id, country_id: q.country_id, school_id: q.school_id,
         });
-        message.value = unpublish
-            ? t('publishing.unpublished', { n: data.attempts_count })
-            : t('publishing.published', { n: data.attempts_count });
-        await loadOverview();
+        /*
+         * Say what actually happened, to whom, and — when nothing happened —
+         * why. Owner, 2026-08-27: they published a round and got no answer at
+         * all; the action had matched zero attempts because every one of them
+         * was still waiting to be graded, and a silent screen sent them looking
+         * for the fault on the competitor's side.
+         */
+        if (data.attempts_count === 0) {
+            nothingHappened.value = true;
+            message.value = data.waiting_count > 0
+                ? t('publishing.noneWaiting', { n: data.waiting_count })
+                : t('publishing.noneMatched');
+        } else {
+            nothingHappened.value = false;
+            message.value = unpublish
+                ? t('publishing.unpublished', { n: data.attempts_count, students: data.students_count, venues: data.venues_count })
+                : t('publishing.published', { n: data.attempts_count, students: data.students_count, venues: data.venues_count });
+        }
+
+        scrollToMessage();
+        await loadOverview(true);
     } catch {
+        nothingHappened.value = true;
         message.value = t('publishing.failed');
+        scrollToMessage();
     } finally {
         working.value = null;
     }
+}
+
+/**
+ * Bring the answer into view. The buttons are down in the round list and the
+ * message is at the top of the page — on a long quiz that is well past the fold.
+ *
+ * 🪤 NOT `window.scrollTo`: the admin shell is `h-screen overflow-hidden` and it
+ * is the `<main>` inside it that scrolls.
+ */
+function scrollToMessage(): void {
+    root.value?.closest('main')?.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 onMounted(loadOptions);
 </script>
 
 <template>
-    <section class="space-y-6">
+    <section ref="root" class="space-y-6">
         <div>
             <h1 class="text-2xl font-semibold tracking-tight">{{ $t('publishing.title') }}</h1>
             <p class="mt-1 max-w-3xl text-sm text-gray-600">{{ $t('publishing.subtitle') }}</p>
         </div>
 
-        <p v-if="message" class="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+        <!-- Green only when something was actually published; a publish that
+             matched nothing is not a success and must not look like one. -->
+        <p v-if="message" class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium"
+            :class="nothingHappened
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-green-200 bg-green-50 text-green-700'">
+            <component :is="nothingHappened ? IconAlertTriangle : IconCheck" :size="16" class="shrink-0" />
             {{ message }}
         </p>
 
@@ -175,7 +237,7 @@ onMounted(loadOptions);
                     type="button"
                     :disabled="!q.quiz_id || loading"
                     class="rounded-md bg-brand-primary px-4 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
-                    @click="loadOverview"
+                    @click="loadOverview()"
                 >
                     {{ $t('common.filter') }}
                 </button>
@@ -197,10 +259,13 @@ onMounted(loadOptions);
                     <header class="flex flex-wrap items-center gap-3 rounded-t-lg border-b border-gray-200 bg-gray-50 px-4 py-3">
                         <h3 class="text-sm font-semibold text-gray-800">{{ exam.title }}</h3>
                         <div class="ml-auto flex gap-2">
-                            <Tooltip :text="$t('publishing.publishExam')">
+                            <!-- Dead when the round has nothing waiting: a button
+                                 that can only ever report "0 published" is a
+                                 question with one answer. -->
+                            <Tooltip :text="examReady(exam) > 0 ? $t('publishing.publishExam') : $t('publishing.nothingReady')">
                                 <button
                                     type="button"
-                                    :disabled="working !== null"
+                                    :disabled="working !== null || examReady(exam) === 0"
                                     :aria-label="$t('publishing.publishExam')"
                                     class="flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-xs font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
                                     @click="act('exam', exam.id, false)"
@@ -230,6 +295,8 @@ onMounted(loadOptions);
                                 <tr>
                                     <th class="w-full px-4 py-2">{{ $t('publishing.colTest') }}</th>
                                     <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('publishing.colCompleted') }}</th>
+                                    <!-- The one number that says whether there is work here. -->
+                                    <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('publishing.colReady') }}</th>
                                     <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('publishing.colPublished') }}</th>
                                     <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('publishing.colPending') }}</th>
                                     <th class="px-4 py-2"></th>
@@ -239,16 +306,23 @@ onMounted(loadOptions);
                                 <tr v-for="test in exam.tests" :key="test.id" class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft">
                                     <td class="px-4 py-2">{{ test.title }}</td>
                                     <td class="px-4 py-2 text-center tabular-nums text-gray-600">{{ test.completed }}</td>
+                                    <!-- Red whenever it is not zero: this is the
+                                         column that means somebody is waiting for
+                                         a result (owner, 2026-08-27). -->
+                                    <td class="px-4 py-2 text-center tabular-nums"
+                                        :class="readyToPublish(test) > 0 ? 'font-semibold text-red-600' : 'text-gray-400'">
+                                        {{ readyToPublish(test) }}
+                                    </td>
                                     <td class="px-4 py-2 text-center tabular-nums text-green-600">{{ test.published }}</td>
                                     <td class="px-4 py-2 text-center tabular-nums" :class="test.pending > 0 ? 'text-amber-600' : 'text-gray-400'">
                                         {{ test.pending }}
                                     </td>
                                     <td class="px-4 py-2">
                                         <div class="flex justify-end gap-2">
-                                            <Tooltip :text="$t('publishing.publish')">
+                                            <Tooltip :text="readyToPublish(test) > 0 ? $t('publishing.publish') : $t('publishing.nothingReady')">
                                                 <button
                                                     type="button"
-                                                    :disabled="working !== null"
+                                                    :disabled="working !== null || readyToPublish(test) === 0"
                                                     :aria-label="$t('publishing.publish')"
                                                     class="rounded-md bg-brand-primary p-1.5 text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
                                                     @click="act('test', test.id, false)"
