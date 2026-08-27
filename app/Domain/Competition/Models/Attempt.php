@@ -8,6 +8,7 @@ use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Enums\AttemptStatus;
 use App\Domain\Competition\Enums\GradingStatus;
+use App\Domain\Competition\Jobs\GradeAttempt;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -47,6 +48,28 @@ class Attempt extends Model
             'expires_at' => 'datetime',
             'submitted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Close an open attempt as of $at and send it to grading. Two things end an
+     * attempt without the competitor pressing Hand in: the clock running out,
+     * and giving the contest stream up (see StudentAvailabilityController).
+     * Either way what was already answered still counts — what stops is the
+     * chance to answer more. A no-op on an attempt that is not open, so a
+     * repeated call cannot overwrite a submission or grade it twice.
+     */
+    public function complete(\DateTimeInterface $at): void
+    {
+        if ($this->status !== AttemptStatus::InProgress) {
+            return;
+        }
+
+        $this->update([
+            'status' => AttemptStatus::Completed,
+            'submitted_at' => $at,
+            'grading_status' => GradingStatus::Queued,
+        ]);
+        GradeAttempt::dispatch($this);
     }
 
     /** True once the deadline plus the grace window has passed. */

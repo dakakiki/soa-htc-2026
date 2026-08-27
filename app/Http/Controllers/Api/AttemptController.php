@@ -75,8 +75,12 @@ class AttemptController extends Controller
                 'test_id' => $test->id,
                 'quiz_id' => $quizId,
                 // Stamped here, once: it decides whether this row occupies the
-                // contest's one-attempt slot for this test.
-                'is_practice' => Quiz::whereKey($quizId)->value('quiz_type') === QuizType::Sample->value,
+                // contest's one-attempt slot for this test. `value()` reads
+                // through the model's cast and hands back the enum, not the
+                // string behind it — compared against the string this was
+                // always false, and every sample run was being filed as a
+                // contest one.
+                'is_practice' => Quiz::whereKey($quizId)->value('quiz_type') === QuizType::Sample,
                 'status' => AttemptStatus::InProgress,
                 'started_at' => $now,
                 'expires_at' => $now->copy()->addMinutes((int) ($test->duration ?? 0)),
@@ -158,12 +162,7 @@ class AttemptController extends Controller
             return false;
         }
 
-        $attempt->update([
-            'status' => AttemptStatus::Completed,
-            'submitted_at' => $attempt->expires_at,
-            'grading_status' => GradingStatus::Queued,
-        ]);
-        GradeAttempt::dispatch($attempt);
+        $attempt->complete($attempt->expires_at);
 
         return true;
     }

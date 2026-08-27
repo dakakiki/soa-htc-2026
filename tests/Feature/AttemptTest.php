@@ -159,7 +159,9 @@ class AttemptTest extends TestCase
 
     public function test_start_is_idempotent_and_a_completed_test_cannot_be_restarted(): void
     {
-        $c = $this->quizWithTests('H2', 1);
+        // Contest, not practice: one attempt is a rule of the competition
+        // stream, and a sample test may be sat again as often as one likes.
+        $c = $this->quizWithTests('H2', 1, 'competition');
         $token = $this->tokenFor('H2');
         $testId = $c['tests'][0]->id;
 
@@ -242,7 +244,8 @@ class AttemptTest extends TestCase
 
     public function test_resuming_past_the_grace_window_finalizes_the_attempt(): void
     {
-        $c = $this->quizWithTests('H2', 1);
+        // Contest: what the last assertion is about is the one-attempt rule.
+        $c = $this->quizWithTests('H2', 1, 'competition');
         $token = $this->tokenFor('H2');
         $attemptId = $this->withToken($token)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->json('attempt.id');
 
@@ -439,6 +442,80 @@ class AttemptTest extends TestCase
         $this->assertSame('0.00', $attempt->score);
         $this->assertSame('5.00', $attempt->max_score);
         $this->assertDatabaseHas('attempts', ['id' => $attemptId, 'grading_status' => 'pending_grading']);
+    }
+
+    /** A fresh session for a competitor who has already been identified once. */
+    private function identifyAgain(Registration $registration): string
+    {
+        return $this->postJson('/api/student/identify', [
+            'competitor_number' => $registration->competitor_number,
+            'country_id' => $registration->country_id,
+            'date_of_birth' => '2010-05-01',
+        ])->json('token');
+    }
+
+    public function test_a_sample_test_may_be_sat_again(): void
+    {
+        $c = $this->quizWithTests('H2', 1);
+        $token = $this->tokenFor('H2');
+
+        $first = $this->submitAttempt($token, $c['tests'][0], []);
+        $second = $this->withToken($token)
+            ->postJson("/api/student/tests/{$c['tests'][0]->id}/start")
+            ->assertStatus(201)
+            ->json('attempt.id');
+
+        // Practice repeats (owner, 2026-08-27), and it only can because the run
+        // is filed as practice — the flag the contest's one-attempt rule reads.
+        $this->assertNotSame($first, $second);
+        $this->assertTrue(Attempt::findOrFail($first)->is_practice);
+    }
+
+    public function test_coming_back_through_the_competition_form_ends_an_open_contest_attempt(): void
+    {
+        Queue::fake();
+
+        $c = $this->quizWithTests('H2', 1, 'competition', 'secret-code');
+        $token = $this->tokenFor('H2');
+        $registration = Registration::latest('id')->firstOrFail();
+
+        $this->withToken($token)->postJson("/api/student/quizzes/{$c['quiz']->id}/unlock", ['password' => 'secret-code'])->assertOk();
+        $attemptId = $this->withToken($token)
+            ->postJson("/api/student/tests/{$c['tests'][0]->id}/start")
+            ->assertStatus(201)
+            ->json('attempt.id');
+
+        // Walked away, and came back the only way back in: the form, then the
+        // exam password again.
+        $again = $this->identifyAgain($registration);
+        $this->withToken($again)->postJson("/api/student/quizzes/{$c['quiz']->id}/unlock", ['password' => 'secret-code'])->assertOk();
+
+        $attempt = Attempt::findOrFail($attemptId);
+        $this->assertSame(AttemptStatus::Completed, $attempt->status);
+        $this->assertSame(GradingStatus::Queued, $attempt->grading_status);
+        Queue::assertPushed(GradeAttempt::class, fn (GradeAttempt $job) => $job->attempt->id === $attemptId);
+
+        // And there is no second run at it.
+        $this->withToken($again)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->assertStatus(409);
+    }
+
+    public function test_coming_back_leaves_an_open_practice_attempt_alone(): void
+    {
+        $sample = $this->quizWithTests('H2', 1);
+        $contest = $this->quizWithTests('H2', 1, 'competition', 'secret-code');
+        $token = $this->tokenFor('H2');
+        $registration = Registration::latest('id')->firstOrFail();
+
+        $attemptId = $this->withToken($token)
+            ->postJson("/api/student/tests/{$sample['tests'][0]->id}/start")
+            ->assertStatus(201)
+            ->json('attempt.id');
+
+        $again = $this->identifyAgain($registration);
+        $this->withToken($again)->postJson("/api/student/quizzes/{$contest['quiz']->id}/unlock", ['password' => 'secret-code'])->assertOk();
+
+        // Practice settles nothing and costs nothing: the run is still open.
+        $this->assertSame(AttemptStatus::InProgress, Attempt::findOrFail($attemptId)->status);
     }
 
     public function test_submit_completes_the_attempt_but_defers_auto_grading_to_a_queued_job(): void

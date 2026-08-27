@@ -47,7 +47,9 @@ class AttemptResetTest extends TestCase
     private function completedAttempt(bool $essay = false): array
     {
         $level = DifficultyLevel::where('level_short', 'H2')->firstOrFail();
-        $quiz = Quiz::create(['title' => 'Q', 'quiz_type' => 'sample', 'status' => 'active']);
+        // A CONTEST quiz: resetting exists because a contest attempt is the only
+        // one there is. Practice needs no reset — it may simply be sat again.
+        $quiz = Quiz::create(['title' => 'Q', 'quiz_type' => 'competition', 'status' => 'active']);
         $quiz->levels()->attach($level->id);
         $exam = Exam::create(['title' => 'E', 'status' => 'active']);
         $exam->levels()->attach($level->id);
