@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { IconArrowLeft, IconChevronDown, IconMenu2, IconX } from '@tabler/icons-vue';
+import { IconChevronDown, IconMenu2, IconX } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
 import { getPublicLayout, getSiteStatus } from '@/api/publicContent';
@@ -18,7 +18,7 @@ interface FooterColumn {
 /**
  * Public website shell (ADR-0014, §8.6): status strip → header → content →
  * footer. Never renders admin chrome, even when an admin is signed in — the only
- * admin affordance is a discreet "Back to dashboard" link.
+ * admin affordance is a discreet Dashboard link.
  *
  * Header and footer are layout zones (ADR-0045), each holding one record. Which
  * menu the header draws, the footer's paragraph and every one of its link columns
@@ -200,8 +200,7 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
                 <div class="ml-auto flex items-center gap-2">
                     <RouterLink v-if="session.isAuthenticated" :to="{ name: 'dashboard' }"
                         class="inline-flex items-center gap-1.5 rounded-full border border-brand-palette-4/20 px-4 py-2.5 text-sm font-medium text-brand-palette-4/80 transition-colors hover:bg-brand-palette-4/5">
-                        <IconArrowLeft :size="16" />
-                        <span class="hidden sm:inline">{{ $t('public.backToDashboard') }}</span>
+                        {{ $t('public.dashboard') }}
                     </RouterLink>
                     <RouterLink v-else :to="{ name: 'login' }"
                         class="inline-flex items-center gap-2 rounded-full bg-brand-palette-4 px-5 py-2.5 text-sm font-medium text-white transition hover:brightness-125">

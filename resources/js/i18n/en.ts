@@ -420,7 +420,7 @@ export default {
             readAll: 'All news',
             readMore: 'Read more…',
         },
-        backToDashboard: 'Back to dashboard',
+        dashboard: 'Dashboard',
         // The tagline, both column headings and the copyright line moved into the
         // footer layout block (ADR-0045) — they are content now, not translations.
     },
