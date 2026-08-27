@@ -123,7 +123,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
         <div v-else class="mt-10 grid gap-8 lg:mt-12 lg:grid-cols-2 lg:gap-10">
             <div v-for="column in [
                 { key: 'competition', tone: 'stream-contest', panel: 'stream-panel', headingTone: '', heading: $t('student.results.contest'), blocks: competition, note: $t('student.results.contestNote') },
-                { key: 'sample', tone: 'stream-practice', panel: '', headingTone: 'text-brand-palette-2', heading: $t('student.results.practice'), blocks: practice, note: $t('student.results.practiceNote') },
+                { key: 'sample', tone: 'stream-practice', panel: '', headingTone: 'text-brand-ink-accent', heading: $t('student.results.practice'), blocks: practice, note: $t('student.results.practiceNote') },
             ]" :key="column.key" class="rounded-2xl p-6 lg:p-8" :class="[column.tone, column.panel]">
                 <p class="border-b-2 border-current/30 pb-3 font-semibold"
                     :class="[mono, 'text-[16px] lg:text-[18px]', column.headingTone]">
@@ -167,7 +167,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                                     {{ test.score }}<span class="text-[15px] opacity-50">/{{ test.max_score }}</span>
                                 </p>
 
-                                <p class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palette-2 px-3 py-1 text-white"
+                                <p class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palette-2 px-3 py-1 text-brand-palette-4"
                                     :class="[mono, 'text-[11px]']">
                                     <IconCheck :size="13" stroke-width="3" />
                                     {{ $t('student.dashboard.completedLabel') }}

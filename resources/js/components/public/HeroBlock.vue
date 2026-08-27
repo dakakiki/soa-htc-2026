@@ -56,7 +56,7 @@ const promoted = computed(() => shut.value.length > 0 && buttons.value.length > 
                 </p>
 
                 <h1 class="text-[clamp(3rem,8vw,7rem)] font-semibold leading-[0.9] tracking-[-0.052em] text-brand-palette-4">
-                    <span v-if="c.title_accent" class="text-brand-palette-2">{{ c.title_accent }}</span>
+                    <span v-if="c.title_accent" class="text-brand-ink-accent">{{ c.title_accent }}</span>
                     <br v-if="c.title_accent" />
                     {{ c.title }}
                 </h1>

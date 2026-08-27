@@ -139,7 +139,7 @@ async function submit(): Promise<void> {
                         <button
                             type="button"
                             :aria-label="revealed ? $t('login.hidePassword') : $t('login.showPassword')"
-                            class="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center text-brand-palette-4 hover:text-brand-palette-2"
+                            class="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center text-brand-palette-4 hover:text-brand-ink-accent"
                             @click="revealed = !revealed"
                         >
                             <IconEyeOff v-if="revealed" :size="20" />

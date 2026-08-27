@@ -361,7 +361,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                 >
                     <!-- The number comes from the question's place in the test,
                          never from anything typed into its title. -->
-                    <p :class="[mono, 'text-[11px]']" class="text-brand-palette-2">
+                    <p :class="[mono, 'text-[11px]']" class="text-brand-ink-accent">
                         {{ $t('student.test.questionNo', { n: String(qi + 1).padStart(2, '0') }) }}
                     </p>
 
@@ -401,7 +401,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     <div v-else-if="q.question_type === 'gap_filling'" class="mt-5 flex flex-col gap-3">
                         <div v-for="(_, gi) in gaps[q.id] ?? []" :key="gi" class="flex items-center gap-3">
                             <span
-                                :class="[mono, 'text-[11px]', (gaps[q.id][gi] ?? '').trim() !== '' ? 'text-brand-palette-2' : 'text-brand-palette-4/40']"
+                                :class="[mono, 'text-[11px]', (gaps[q.id][gi] ?? '').trim() !== '' ? 'text-brand-ink-accent' : 'text-brand-palette-4/40']"
                                 class="w-4 shrink-0"
                             >{{ gi + 1 }}</span>
                             <input
@@ -447,7 +447,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                                 // The question being read is ringed rather than
                                 // recoloured, so 'where I am' does not overwrite
                                 // 'whether I answered it'.
-                                qi === currentIndex ? 'ring-2 ring-brand-palette-2' : '',
+                                qi === currentIndex ? 'ring-2 ring-brand-ink-accent' : '',
                             ]"
                             @click="goToQuestion(qi)"
                         >{{ qi + 1 }}</button>
@@ -509,8 +509,8 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
             </p>
 
             <!-- The one fact worth interrupting for. -->
-            <div v-if="unanswered.length" class="mt-5 flex items-start gap-3 rounded-2xl border border-brand-palette-2 px-4 py-4">
-                <IconAlertTriangle :size="20" :stroke-width="1.9" class="mt-px shrink-0 text-brand-palette-2" />
+            <div v-if="unanswered.length" class="mt-5 flex items-start gap-3 rounded-2xl border border-brand-ink-accent px-4 py-4">
+                <IconAlertTriangle :size="20" :stroke-width="1.9" class="mt-px shrink-0 text-brand-ink-accent" />
                 <div>
                     <p class="text-[15px] font-medium">{{ $t('student.test.unanswered', { n: unanswered.length }, unanswered.length) }}</p>
                     <p class="mt-0.5 text-sm text-brand-palette-4/60">
@@ -554,7 +554,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
     color: color-mix(in srgb, var(--color-brand-palette-4) 40%, transparent);
 }
 .test-gap.is-filled {
-    border-bottom-color: var(--color-brand-palette-2);
-    color: var(--color-brand-palette-2);
+    border-bottom-color: var(--color-brand-ink-accent);
+    color: var(--color-brand-ink-accent);
 }
 </style>

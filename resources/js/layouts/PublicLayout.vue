@@ -114,7 +114,7 @@ const navLink = (href: string | null | undefined): string => {
         'inline-flex items-center text-sm transition-colors',
         on
             ? 'font-medium text-brand-palette-4 shadow-[inset_0_-6px_0_rgba(251,186,0,0.5)]'
-            : 'text-brand-palette-4/60 hover:text-brand-palette-2',
+            : 'text-brand-palette-4/60 hover:text-brand-ink-accent',
     ].join(' ');
 };
 
@@ -234,7 +234,7 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
                 <nav class="mx-auto w-full max-w-[1240px] px-6 pb-4">
                     <template v-for="(item, i) in header?.items ?? []" :key="i">
                         <div v-if="item.children.length" class="border-b border-brand-palette-4/10 py-3">
-                            <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-2">{{ item.label }}</p>
+                            <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-ink-accent">{{ item.label }}</p>
                             <PublicMenuLink v-for="(child, j) in item.children" :key="j" :item="child"
                                 link-class="mt-2 block text-base text-brand-palette-4/80 hover:text-brand-palette-4"
                                 @click="mobileOpen = false" />

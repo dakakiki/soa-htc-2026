@@ -79,7 +79,7 @@ const field = 'h-[52px] w-full border-0 border-b border-brand-palette-4 bg-trans
 const label = 'block font-mono text-[16px] uppercase tracking-[0.16em] text-brand-palette-4';
 
 /** A section marker. Amber, because it counts the steps through the form. */
-const section = 'font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-2';
+const section = 'font-mono text-[11px] uppercase tracking-[0.16em] text-brand-ink-accent';
 
 /**
  * The required marker (owner, 2026-08-27). Its own span rather than a character
@@ -210,7 +210,7 @@ async function submit(): Promise<void> {
                 </p>
                 <RouterLink
                     to="/login"
-                    class="mt-2 inline-block text-base font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] hover:text-brand-palette-2"
+                    class="mt-2 inline-block text-base font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] hover:text-brand-ink-accent"
                 >
                     {{ $t('register.signInInstead') }}
                 </RouterLink>
@@ -234,7 +234,7 @@ async function submit(): Promise<void> {
                 </li>
                 <li class="flex gap-4">
                     <div class="flex w-[22px] shrink-0 flex-col items-center">
-                        <span class="h-[22px] w-[22px] rounded-full border-2 border-brand-palette-2"></span>
+                        <span class="h-[22px] w-[22px] rounded-full border-2 border-brand-ink-accent"></span>
                         <span class="my-1.5 w-px flex-1 bg-brand-palette-4"></span>
                     </div>
                     <div class="pb-6">
@@ -333,7 +333,7 @@ async function submit(): Promise<void> {
                             <p class="mt-0.5 text-[13px] text-brand-palette-4">{{ approvalSize }}</p>
                         </div>
                         <button type="button" :aria-label="$t('register.remove')"
-                            class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-brand-palette-4 hover:bg-brand-palette-4/5 hover:text-brand-palette-2"
+                            class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-brand-palette-4 hover:bg-brand-palette-4/5 hover:text-brand-ink-accent"
                             @click="clearFile">
                             <IconX :size="20" />
                         </button>
@@ -361,7 +361,7 @@ async function submit(): Promise<void> {
                             :class="[field, 'pr-10']" />
                         <button type="button"
                             :aria-label="revealed ? $t('register.hidePassword') : $t('register.showPassword')"
-                            class="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center text-brand-palette-4 hover:text-brand-palette-2"
+                            class="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center text-brand-palette-4 hover:text-brand-ink-accent"
                             @click="revealed = !revealed">
                             <IconEyeOff v-if="revealed" :size="20" />
                             <IconEye v-else :size="20" />

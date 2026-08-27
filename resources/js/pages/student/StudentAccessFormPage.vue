@@ -94,7 +94,7 @@ const field = 'h-[52px] w-full border-0 border-b border-brand-palette-4 bg-trans
 const label = 'block font-mono text-[16px] uppercase tracking-[0.16em] text-brand-palette-4';
 
 /** The one thing a competitor is told out loud rather than reading off a card. */
-const labelSpoken = 'block font-mono text-[16px] uppercase tracking-[0.16em] text-brand-palette-2';
+const labelSpoken = 'block font-mono text-[16px] uppercase tracking-[0.16em] text-brand-ink-accent';
 
 /**
  * The two streams are one route with a parameter, so switching between them
@@ -193,7 +193,7 @@ async function submit(): Promise<void> {
 <template>
     <PublicFormPage layout="wide">
         <template #intro>
-            <p v-if="eyebrow" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-2">
+            <p v-if="eyebrow" class="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-ink-accent">
                 {{ eyebrow }}
             </p>
             <h1 v-if="heading" class="mt-3 text-[clamp(2.5rem,7vw,4.75rem)] font-semibold leading-[0.96] tracking-[-0.05em] text-brand-palette-4">
@@ -226,13 +226,13 @@ async function submit(): Promise<void> {
                 <RouterLink
                     v-if="mode === 'competition'"
                     to="/student/access/sample"
-                    class="inline-flex items-center gap-2 rounded-full bg-brand-palette-2 px-7 py-3.5 text-sm font-semibold text-white transition hover:brightness-95"
+                    class="inline-flex items-center gap-2 rounded-full bg-brand-palette-2 px-7 py-3.5 text-sm font-semibold text-brand-palette-4 transition hover:brightness-95"
                 >
                     {{ $t('student.access.shutTrySample') }}
                 </RouterLink>
                 <RouterLink
                     to="/student/access/results"
-                    class="inline-flex items-center gap-2 text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] transition hover:text-brand-palette-2"
+                    class="inline-flex items-center gap-2 text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] transition hover:text-brand-ink-accent"
                 >
                     {{ $t('student.access.shutCheckResults') }}
                 </RouterLink>

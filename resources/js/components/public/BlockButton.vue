@@ -36,7 +36,7 @@ const classes = computed(() => {
 
     switch (props.styleAs ?? props.button.style) {
         case 'primary':
-            return `${base} ${pill} ${width} bg-brand-palette-2 font-semibold text-white hover:brightness-95`;
+            return `${base} ${pill} ${width} bg-brand-palette-2 font-semibold text-brand-palette-4 hover:brightness-95`;
         case 'navy':
             return `${base} ${pill} ${width} bg-brand-palette-4 text-white hover:brightness-125`;
         case 'amber':
@@ -53,7 +53,7 @@ const classes = computed(() => {
             return `${base} ${width} ${
                 props.onDark
                     ? 'text-white shadow-[inset_0_-1px_0_rgba(255,255,255,0.45)] hover:text-brand-palette-1'
-                    : 'text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] hover:text-brand-palette-2'
+                    : 'text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] hover:text-brand-ink-accent'
             }`;
     }
 });
