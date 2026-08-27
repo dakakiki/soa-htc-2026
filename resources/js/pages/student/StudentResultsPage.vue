@@ -104,14 +104,17 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
         </p>
 
         <!-- Contest left, practice right. They are two different things — one
-             counts, one does not — so they never share a list, and each column
+             counts, one does not — so they never share a list. Each column
              carries its own blue (`stream-contest` / `stream-practice`) that
-             everything inside it inherits. -->
-        <div v-else class="mt-10 grid gap-12 lg:mt-12 lg:grid-cols-2 lg:gap-16">
+             everything inside it inherits, and the contest sits on a grey panel
+             (`stream-panel`): colour alone was not enough of a border between
+             the marks that count and the ones that do not. Both columns take
+             the same padding so their headings still line up. -->
+        <div v-else class="mt-10 grid gap-8 lg:mt-12 lg:grid-cols-2 lg:gap-10">
             <div v-for="column in [
-                { key: 'competition', tone: 'stream-contest', heading: $t('student.results.contest'), blocks: competition, note: $t('student.results.contestNote') },
-                { key: 'sample', tone: 'stream-practice', heading: $t('student.results.practice'), blocks: practice, note: $t('student.results.practiceNote') },
-            ]" :key="column.key" :class="column.tone">
+                { key: 'competition', tone: 'stream-contest', panel: 'stream-panel', heading: $t('student.results.contest'), blocks: competition, note: $t('student.results.contestNote') },
+                { key: 'sample', tone: 'stream-practice', panel: '', heading: $t('student.results.practice'), blocks: practice, note: $t('student.results.practiceNote') },
+            ]" :key="column.key" class="rounded-2xl p-6 lg:p-8" :class="[column.tone, column.panel]">
                 <p class="border-b-2 border-current/30 pb-3 font-semibold" :class="[mono, 'text-[16px] lg:text-[18px]']">
                     {{ column.heading }}
                 </p>

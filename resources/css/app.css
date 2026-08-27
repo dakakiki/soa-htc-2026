@@ -176,3 +176,6 @@
 .stream-practice {
     color: color-mix(in oklab, var(--color-brand-palette-4, #003758) 60%, var(--color-brand-palette-3, #97bddd));
 }
+.stream-panel {
+    background: color-mix(in oklab, var(--color-brand-palette-4, #003758) 7%, #ffffff);
+}
