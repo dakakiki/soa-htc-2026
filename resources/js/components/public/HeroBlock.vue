@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import BlockButton from '@/components/public/BlockButton.vue';
-import type { PublicBlock, PublicBlockButton } from '@/types/models';
+import ShutNote from '@/components/public/ShutNote.vue';
+import { isShut, type PublicBlock, type PublicBlockButton, type PublicBlockSlot } from '@/types/models';
 
 /**
  * The front page's opening section (`block_Start`).
@@ -14,7 +15,27 @@ import type { PublicBlock, PublicBlockButton } from '@/types/models';
 const props = defineProps<{ block: PublicBlock }>();
 
 const c = computed(() => props.block.content as Record<string, string>);
-const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBlockButton[]);
+
+/**
+ * The row holds two kinds of thing: actions that survived the season, and the
+ * lines left behind by the ones that did not ({@see LayoutButtons::shut}).
+ */
+const slots = computed(() => (props.block.content.buttons ?? []) as PublicBlockSlot[]);
+const buttons = computed(() => slots.value.filter((slot): slot is PublicBlockButton => !isShut(slot)));
+const shut = computed(() => slots.value.filter(isShut));
+
+/**
+ * Out of season the live entry is deleted on the server and the sample takes its
+ * place — the owner's decision of 2026-08-24, of which only the deleting was
+ * ever built. Without this the front page answered the closed round with a text
+ * link: the weakest thing it can offer at the moment it has least to offer.
+ *
+ * Keyed on there being a note rather than on the count, so the promotion and the
+ * explanation arrive together. A button dropped for any other reason — switched
+ * off, target deleted — leaves no note and reshuffles nothing, because there is
+ * nothing to tell the visitor about it.
+ */
+const promoted = computed(() => shut.value.length > 0 && buttons.value.length > 0);
 </script>
 
 <template>
@@ -45,8 +66,14 @@ const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBloc
                 <div v-if="c.lead" class="rich-text max-w-[520px] text-lg leading-relaxed text-brand-palette-4/70"
                     v-html="c.lead"></div>
 
-                <div v-if="buttons.length" class="flex flex-wrap items-center gap-5 pt-1">
-                    <BlockButton v-for="(button, i) in buttons" :key="i" :button="button" />
+                <div v-if="slots.length" class="flex flex-wrap items-center gap-x-6 gap-y-4 pt-1">
+                    <BlockButton
+                        v-for="(button, i) in buttons"
+                        :key="`b${i}`"
+                        :button="button"
+                        :style-as="promoted && i === 0 ? 'primary' : undefined"
+                    />
+                    <ShutNote v-for="(slot, i) in shut" :key="`s${i}`" :note="slot.note" />
                 </div>
             </div>
         </div>

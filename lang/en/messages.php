@@ -63,9 +63,20 @@ return [
         'slug_reserved' => 'This address is used by the application. Choose another slug.',
         'category_in_use' => 'This category still has posts. Move or delete them first.',
     ],
+    /*
+     * What a competitor is told when the door they chose is shut. Never
+     * "check your details": the details may be perfect and usually are, and
+     * sending somebody back to re-read a correct candidate number is the exact
+     * failure this replaced (2026-08-27).
+     */
+    'student' => [
+        'competition_shut' => 'Live exams are not open right now.',
+        'sample_shut' => 'No sample test is published just now.',
+    ],
     'layout' => [
         'type_not_allowed' => 'That section cannot be placed in this zone.',
         'type_limit' => 'This zone already holds its :type section. There can be :max.',
         'order_mismatch' => 'The order must list every section in this zone, and only those.',
+        'unknown_route' => ':path is not a screen on this site. Choose one from the list.',
     ],
 ];

@@ -48,8 +48,8 @@ export const useStudentSessionStore = defineStore('studentSession', () => {
         }
     }
 
-    async function identify(payload: IdentifyPayload): Promise<void> {
-        const { data } = await studentApi.identify(payload);
+    async function identify(payload: IdentifyPayload, entryMode?: EntryMode): Promise<void> {
+        const { data } = await studentApi.identify(payload, entryMode);
         setToken(data.token);
         registration.value = data.registration;
         expiresAt.value = data.expires_at;
@@ -58,7 +58,7 @@ export const useStudentSessionStore = defineStore('studentSession', () => {
 
     /** Sample stream: identify only, no password. */
     async function enterSample(payload: IdentifyPayload): Promise<void> {
-        await identify(payload);
+        await identify(payload, 'sample');
         setMode('sample');
     }
 
@@ -70,19 +70,32 @@ export const useStudentSessionStore = defineStore('studentSession', () => {
      * correct, because nothing here starts one.
      */
     async function enterResults(payload: IdentifyPayload): Promise<void> {
-        await identify(payload);
+        await identify(payload, 'results');
         setMode('results');
     }
 
     /**
      * Competition stream: identify, then clear the exam password on the level's
-     * competition quiz(es). Any failure (wrong details OR wrong password) rolls
-     * the session back and throws uniformly, so nothing leaks that the three
-     * factors were correct.
+     * competition quiz(es).
+     *
+     * A wrong password rolls the session back and throws uniformly, so nothing
+     * leaks that the three factors were correct. A SHUT SEASON is different and
+     * must not be dressed up as a failed identification: the server refuses it
+     * before issuing anything, with a message that says so, and it reaches the
+     * screen unchanged. Which streams are open is public knowledge anyway.
      */
     async function enterCompetition(payload: IdentifyPayload, password: string): Promise<void> {
+        /*
+         * Outside the rollback on purpose. Identification either created a
+         * session or it did not, and when it did not there is nothing here to
+         * undo - whereas `logout()` would revoke whatever token this browser
+         * was already holding. That is how a competitor practising in one tab
+         * used to be signed out by a live entry that the season had shut
+         * (2026-08-27). Only a failure AFTER a session exists rolls one back.
+         */
+        await identify(payload, 'competition');
+
         try {
-            await identify(payload);
             const { data } = await studentApi.availability(token.value ?? '');
             const competition = data.quizzes.filter((q) => q.mode === 'competition');
             const gated = competition.filter((q) => q.requires_password && !q.unlocked);

@@ -13,6 +13,10 @@ import type { CmsMedia, LayoutButtonValue, LayoutRegistry } from '@/types/models
  * whether this button may ever be seen, `gate` is a season condition on top of
  * it. Out of season a gated button is hidden however the switch is set — the
  * hint under the field is there so nobody reads the switch as a promise.
+ *
+ * A gated button also gets a third field: the line that stands in its place once
+ * the season closes. Left empty the button just disappears, which is what it did
+ * before there was anywhere to write the reason (2026-08-27).
  */
 const props = defineProps<{
     modelValue: LayoutButtonValue;
@@ -35,6 +39,7 @@ function patchTarget(part: Partial<LayoutButtonValue['target']>): void {
 const NEEDS_LOOKUP = ['page', 'post', 'category'];
 const needsLookup = computed(() => NEEDS_LOOKUP.includes(value.value.target.type));
 const isFile = computed(() => value.value.target.type === 'file');
+const isRoute = computed(() => value.value.target.type === 'route');
 
 const targets = ref<SearchSelectOption[]>([]);
 const targetsLoading = ref(false);
@@ -109,10 +114,24 @@ const field = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:
             </button>
         </div>
 
+        <!-- A screen is chosen, never typed. The box that used to be here took
+             any string beginning with a slash, so one wrong character published
+             a well-styled button that led to Not Found (2026-08-27). -->
+        <label v-else-if="isRoute" class="block">
+            <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('layout.button.screen') }}</span>
+            <select :value="value.target.value ?? ''" :class="field"
+                @change="patchTarget({ value: ($event.target as HTMLSelectElement).value || null })">
+                <option value="">{{ $t('layout.button.screenNone') }}</option>
+                <option v-for="route in registry.routes" :key="route.value" :value="route.value">
+                    {{ route.label }}
+                </option>
+            </select>
+        </label>
+
         <label v-else class="block">
             <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('layout.button.address') }}</span>
             <input :value="value.target.value ?? ''" type="text" maxlength="500" :class="field"
-                :placeholder="value.target.type === 'route' ? '/student/access/sample' : 'https://…'"
+                placeholder="https://…"
                 @input="patchTarget({ value: ($event.target as HTMLInputElement).value })" />
         </label>
 
@@ -133,6 +152,16 @@ const field = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:
                     </option>
                 </select>
                 <p class="mt-1 text-xs text-gray-400">{{ $t('layout.button.gateHint') }}</p>
+            </label>
+
+            <!-- Only offered once a gate is chosen: without one the season never
+                 closes this button and the line would never be shown. -->
+            <label v-if="value.gate" class="block sm:col-span-2">
+                <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('layout.button.closedNote') }}</span>
+                <input :value="value.closed_note ?? ''" type="text" maxlength="160" :class="field"
+                    :placeholder="$t('layout.button.closedNotePlaceholder')"
+                    @input="patch({ closed_note: ($event.target as HTMLInputElement).value || null })" />
+                <p class="mt-1 text-xs text-gray-400">{{ $t('layout.button.closedNoteHint') }}</p>
             </label>
         </div>
     </div>

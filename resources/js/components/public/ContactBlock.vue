@@ -2,13 +2,41 @@
 import { computed } from 'vue';
 import type { PublicBlock } from '@/types/models';
 
-/** Where to ask: a heading and a short list of addresses, on hairlines. */
+/**
+ * Where to ask: a heading and a short list of addresses, on hairlines.
+ *
+ * 🪤 A row is not always a link. The address is optional in the schema, and a
+ * contact worth listing may have none - a telephone number, a postal address, a
+ * name. Every row used to be drawn as an `<a>` regardless, so an entry with no
+ * address published `href=""`, which reloads the page onto itself, and it wore
+ * the leaves-the-site arrow while doing it. The row now renders as plain text
+ * when there is nowhere to go, keeping the content and dropping the promise.
+ */
 const props = defineProps<{ block: PublicBlock }>();
 
-const c = computed(() => props.block.content as Record<string, string>);
-const links = computed(() => (props.block.content.links ?? []) as { label: string; value: string; url: string }[]);
+interface ContactLink {
+    label?: string;
+    value?: string;
+    url?: string;
+}
 
-const external = (url: string): boolean => /^https?:/.test(url);
+const c = computed(() => props.block.content as Record<string, string>);
+const links = computed(() => (props.block.content.links ?? []) as ContactLink[]);
+
+/** Somewhere to go: a web address, a mail address, or an anchor on the site. */
+const href = (link: ContactLink): string | null => {
+    const url = (link.url ?? '').trim();
+
+    return url === '' ? null : url;
+};
+
+/**
+ * The arrow means "this leaves the site", so only a web address earns it - the
+ * same test {@see LayoutButtons} applies to a button. A `mailto:` hands over to
+ * a mail client rather than opening a page, and an internal address goes
+ * nowhere at all.
+ */
+const external = (link: ContactLink): boolean => /^https?:/i.test((link.url ?? '').trim());
 </script>
 
 <template>
@@ -22,21 +50,23 @@ const external = (url: string): boolean => /^https?:/.test(url);
             </div>
 
             <div class="flex flex-col">
-                <a v-for="(link, i) in links" :key="i" :href="link.url"
-                    :target="external(link.url) ? '_blank' : undefined"
-                    :rel="external(link.url) ? 'noopener' : undefined"
+                <component :is="href(link) ? 'a' : 'div'" v-for="(link, i) in links" :key="i"
+                    :href="href(link) ?? undefined"
+                    :target="external(link) ? '_blank' : undefined"
+                    :rel="external(link) ? 'noopener' : undefined"
                     class="group flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-brand-palette-4/10 py-6"
                     :class="i === links.length - 1 ? 'border-b' : ''">
                     <span class="w-[140px] shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-brand-palette-4/40">
                         {{ link.label }}
                     </span>
-                    <span class="text-lg font-medium tracking-[-0.015em] text-brand-palette-4 group-hover:text-brand-palette-2 sm:text-xl">
+                    <span class="text-lg font-medium tracking-[-0.015em] text-brand-palette-4 sm:text-xl"
+                        :class="href(link) ? 'group-hover:text-brand-palette-2' : ''">
                         {{ link.value }}
                     </span>
-                    <svg class="ml-auto h-4 w-4 text-brand-palette-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg v-if="external(link)" class="ml-auto h-4 w-4 text-brand-palette-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M7 17L17 7" /><path d="M9 7h8v8" />
                     </svg>
-                </a>
+                </component>
             </div>
         </div>
     </section>

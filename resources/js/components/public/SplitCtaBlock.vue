@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import BlockButton from '@/components/public/BlockButton.vue';
-import type { PublicBlock, PublicBlockButton } from '@/types/models';
+import ShutNote from '@/components/public/ShutNote.vue';
+import { isShut, type PublicBlock, type PublicBlockSlot } from '@/types/models';
 
 /**
  * `block_Results`: practice and results side by side, type-led, each under its
  * own coloured rule. Each column carries its own button, so switching one off
  * leaves the other alone.
+ *
+ * 🪤 The two columns are not gated alike. Both are open all year — practice
+ * has nothing to do with whether a round has started (owner, 2026-08-27) — but
+ * the left one still asks whether a sample test is published, so the page never
+ * offers a door with nothing behind it. When that answer was no the column lost
+ * its button while the right kept its own, and the band went lopsided with
+ * nothing to explain it: heading, small print and paragraph all still there,
+ * the action simply missing. The column now draws the reason in the button's
+ * place ({@see LayoutButtons::shut}), which is what the shape needs to hold:
+ * something under every heading.
  */
 const props = defineProps<{ block: PublicBlock }>();
 
@@ -15,7 +26,8 @@ interface Column {
     title?: string;
     note?: string;
     text?: string;
-    button?: PublicBlockButton | null;
+    /** An action, or the line left behind when its season closed. */
+    button?: PublicBlockSlot | null;
 }
 
 const c = computed(() => props.block.content as Record<string, string>);
@@ -55,7 +67,8 @@ const rule = (accent?: string): string =>
                 </p>
                 <div v-if="column.text" class="rich-text text-[17px] leading-relaxed text-brand-palette-4/70" v-html="column.text"></div>
                 <div v-if="column.button" class="pt-2">
-                    <BlockButton :button="column.button" />
+                    <ShutNote v-if="isShut(column.button)" :note="column.button.note" />
+                    <BlockButton v-else :button="column.button" />
                 </div>
             </div>
         </div>

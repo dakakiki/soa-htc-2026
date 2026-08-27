@@ -409,17 +409,40 @@ export default {
             round: 'Round {round} · {year}',
             examRound: '· {round} in play',
             open: 'Live exams open',
-            closed: 'Live exams closed · sample open',
+            // Two closed states, because they are not the same news. The single
+            // string this replaced asserted "sample open" whatever the sample was
+            // doing, and out of season with no sample quiz active that was a lie
+            // the strip told on every page (2026-08-27).
+            closedSample: 'Live exams closed · sample open',
+            closed: 'Live exams closed',
         },
         news: {
+            // The mono line above the masthead. The front page numbers its
+            // sections 01-04; the journal carries on from there.
+            eyebrow: '05 — Journal',
             title: 'News',
-            subtitle: 'Announcements and results from the contest.',
+            subtitle: 'Announcements, round dates and results from the contest.',
             all: 'All',
+            // A fresh site opens on this, so it is a first impression rather
+            // than an edge case - hence a second line offering a way onward.
             empty: 'Nothing has been published yet.',
+            emptyNote: 'Round dates, results and venue notices appear here as they are announced.',
             missing: 'This article is not available.',
             latest: 'Latest news',
             readAll: 'All news',
-            readMore: 'Read more…',
+            readMore: 'Read more',
+            moreIn: 'More in',
+            newer: '← Newer',
+            older: 'Older →',
+        },
+        page: {
+            /*
+             * The one label on this screen nobody typed. A CMS page carries no
+             * date, author or category, so the masthead would lose its mono line
+             * entirely without it. Change it here, or empty it - the paragraph
+             * is dropped when the string is blank.
+             */
+            eyebrow: 'Information',
         },
         dashboard: 'Dashboard',
         // The tagline, both column headings and the copyright line moved into the
@@ -446,6 +469,12 @@ export default {
             showResults: 'Show my results',
             starting: 'Starting…',
             error: 'We could not verify your details. Please check and try again.',
+            // The shut states. Never "check your details" - see messages.php.
+            shutCompetition: 'Live exams open when the round starts',
+            shutSample: 'No sample test is published just now',
+            shutLead: 'There is nothing to enter here at the moment. These are open:',
+            shutTrySample: 'Try a sample exam',
+            shutCheckResults: 'Check your results',
         },
         dashboard: {
             // Everything on this screen is either DATA (the quiz, exam and test
@@ -561,11 +590,16 @@ export default {
             file: 'File',
             chooseFile: 'Choose a file…',
             address: 'Address',
+            screen: 'Which screen',
+            screenNone: 'Choose a screen…',
             visible: 'Visible',
             visibleHint: 'Whether this button may be shown at all.',
             gate: 'Only while open',
             gateNone: 'Always',
             gateHint: 'On top of the switch: out of season the button is hidden even when it is on.',
+            closedNote: 'Line to show while it is closed',
+            closedNotePlaceholder: 'Live exams open when the round starts',
+            closedNoteHint: 'Shown in the button’s place out of season. Leave it empty and the button simply disappears.',
         },
         styles: {
             primary: 'Primary (orange)',

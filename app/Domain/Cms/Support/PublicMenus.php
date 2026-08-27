@@ -60,30 +60,49 @@ final class PublicMenus
 
     /**
      * @param  Collection<int, MenuItem>  $items
+     * @param  list<string>|null  $shut  screens whose season is closed, resolved once
      * @return list<array<string, mixed>>
      */
-    public static function visibleItems($items): array
+    public static function visibleItems($items, ?array $shut = null): array
     {
+        // Asked once for the whole menu rather than once per item: EntryWindow is
+        // deliberately not memoised, so a five-item navigation would otherwise
+        // put ten identical EXISTS queries through it.
+        $shut ??= PublicRoutes::shutPaths();
+
         return $items
-            ->filter(fn (MenuItem $item): bool => self::isVisible($item))
+            ->filter(fn (MenuItem $item): bool => self::isVisible($item, $shut))
             ->map(fn (MenuItem $item): array => [
                 'label' => $item->resolvedLabel(),
                 'href' => $item->resolvedHref(),
                 'target' => $item->link_target,
-                'children' => $item->relationLoaded('children') ? self::visibleItems($item->children) : [],
+                'children' => $item->relationLoaded('children') ? self::visibleItems($item->children, $shut) : [],
             ])
             ->values()
             ->all();
     }
 
-    /** A link is only worth showing when there is something published behind it. */
-    public static function isVisible(MenuItem $item): bool
+    /**
+     * A link is only worth showing when there is something published behind it
+     * - and, since 2026-08-27, when the season it leads into is open.
+     *
+     * The seasonal half was the last place the gate did not reach. A button on
+     * the front page has been dropped out of season since ADR-0043 and a link
+     * written into a paragraph since {@see SeasonLinks}, but a menu item pointing
+     * at the live entry stayed in the navigation all year. It was masked rather
+     * than fixed: the seeded items point at anchors on the front page, so the
+     * gap only showed if an admin pointed one straight at the form.
+     *
+     * @param  list<string>|null  $shut  resolved once per menu by visibleItems()
+     */
+    public static function isVisible(MenuItem $item, ?array $shut = null): bool
     {
         return match ($item->type) {
             MenuItemType::Page => $item->page !== null && $item->page->newQuery()->live()->whereKey($item->page_id)->exists(),
             MenuItemType::Post => $item->post !== null && $item->post->newQuery()->live()->whereKey($item->post_id)->exists(),
             MenuItemType::Category => $item->category !== null && $item->category->status === 'active',
-            MenuItemType::Custom => $item->url !== null && $item->url !== '',
+            MenuItemType::Custom => $item->url !== null && $item->url !== ''
+                && ! in_array(PublicRoutes::normalise($item->url), $shut ?? PublicRoutes::shutPaths(), true),
         };
     }
 

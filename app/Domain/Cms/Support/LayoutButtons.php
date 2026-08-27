@@ -79,9 +79,11 @@ final class LayoutButtons
             return null;
         }
 
-        // 2. The season, derived rather than maintained.
+        // 2. The season, derived rather than maintained. A closed button does
+        //    not simply evaporate any more — if the admin wrote a line for the
+        //    closed state, it goes out in the button's place (see self::shut).
         if (! self::windowOpen($button['gate'] ?? null)) {
-            return null;
+            return self::shut($button);
         }
 
         $target = is_array($button['target'] ?? null) ? $button['target'] : [];
@@ -123,6 +125,30 @@ final class LayoutButtons
         ];
     }
 
+    /**
+     * What a season-closed button leaves behind.
+     *
+     * Without a line to show it is still dropped, exactly as before: a hole is
+     * better than a stub nobody can read. With one, the page gets a marker
+     * carrying the reason — which is also the signal the hero uses to promote
+     * the action that is left (owner, 2026-08-24). The two travel together on
+     * purpose: reshuffling the buttons while saying nothing about the one that
+     * went would be a change the visitor cannot account for.
+     *
+     * 🪤 A marker is NOT a button. It has no `href`, `style` or `label`, so a
+     * component that renders the payload blind will draw an empty control. Every
+     * consumer has to split the list — {@see ShutNote} is the counterpart.
+     *
+     * @param  array<string, mixed>  $button
+     * @return array<string, mixed>|null
+     */
+    private static function shut(array $button): ?array
+    {
+        $note = trim((string) ($button['closed_note'] ?? ''));
+
+        return $note === '' ? null : ['shut' => true, 'note' => $note];
+    }
+
     private static function windowOpen(?string $gate): bool
     {
         return match ($gate) {
@@ -145,8 +171,13 @@ final class LayoutButtons
             'page' => self::pageHref($id),
             'post' => self::postHref($id),
             'category' => self::categoryHref($id),
-            // A named application route, stored as the path the router knows.
-            'route' => str_starts_with($value, '/') ? $value : null,
+            // A named application screen, stored as the path the router knows.
+            // Checked against the register rather than for a leading slash: a
+            // slash is not a destination, and a typo used to publish a
+            // well-styled button that led to Not Found (2026-08-27). Rows saved
+            // before the editor offered a list are dropped here rather than
+            // published, which is what happens to every other dead target.
+            'route' => PublicRoutes::has($value) ? PublicRoutes::normalise($value) : null,
             // `file` never reaches here — resolve() handles it, because it needs
             // the media row's name as well as its address.
             'file' => null,

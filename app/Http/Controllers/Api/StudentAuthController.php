@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Enums\QuizType;
+use App\Domain\Assessment\Support\EntryWindow;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Models\StudentSession;
 use App\Domain\Organization\Models\Country;
@@ -24,10 +26,27 @@ class StudentAuthController extends Controller
      * answered uniformly so a caller cannot tell which field was wrong. On
      * success a fresh, single-active session is issued (prior ones revoked) and
      * the bearer token is returned once.
+     *
+     * A shut stream is refused FIRST, before the lookup and before anything is
+     * revoked (2026-08-27). Two things went wrong without that. The competitor
+     * was told "We could not verify your details" when all three were right -
+     * the page could only report the season as a failed identification, so an
+     * exam room re-read a card that had never been wrong. And a doomed attempt
+     * destroyed a session that was working: identification revokes the
+     * registration's earlier sessions, so somebody practising in another tab was
+     * signed out by an entry that was never going to succeed.
+     *
+     * The refusal leaks nothing. Which streams are open is already public, on
+     * the front page and at `api/public/site`; it is a fact about the contest,
+     * not about the person asking.
      */
     public function identify(IdentifyStudentRequest $request): JsonResponse
     {
         $data = $request->validated();
+
+        if (($shut = $this->streamShut($data['mode'] ?? null)) !== null) {
+            return response()->json(['message' => $shut], Response::HTTP_CONFLICT);
+        }
 
         $registration = Registration::query()
             ->where('status', 'active')
@@ -63,6 +82,26 @@ class StudentAuthController extends Controller
             'expires_at' => $session->expires_at->toIso8601String(),
             'registration' => $this->summary($registration),
         ]);
+    }
+
+    /**
+     * Why this stream cannot be entered right now, or null when it can.
+     *
+     * Derived from the same fact everything else reads - whether an active quiz
+     * of that type exists ({@see EntryWindow}) - so it cannot disagree with the
+     * button on the front page or with the strip at the top of it.
+     *
+     * `results` is never shut: looking back at what has already been sat needs
+     * nothing published (owner, 2026-08-27), which is exactly why that column of
+     * the front page keeps its button when the practice column loses one.
+     */
+    private function streamShut(?string $mode): ?string
+    {
+        return match ($mode) {
+            'competition' => EntryWindow::isOpen(QuizType::Competition) ? null : __('messages.student.competition_shut'),
+            'sample' => EntryWindow::isOpen(QuizType::Sample) ? null : __('messages.student.sample_shut'),
+            default => null,
+        };
     }
 
     /**

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { listCountries } from '@/api/student';
 import { apiErrorMessage } from '@/api/http';
-import { getPublicLayout } from '@/api/publicContent';
+import { getPublicLayout, getSiteStatus } from '@/api/publicContent';
 import { useStudentSessionStore, type EntryMode } from '@/stores/studentSession';
 import PublicFormPage from '@/components/public/PublicFormPage.vue';
+import ShutNote from '@/components/public/ShutNote.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import DateBoxes from '@/components/DateBoxes.vue';
 import type { Country } from '@/types/models';
@@ -49,6 +50,23 @@ const password = ref('');
 const countries = ref<Country[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
+
+/**
+ * Whether this stream can be entered at all.
+ *
+ * The server refuses a shut one outright, so this is not what protects the
+ * contest - it is what stops the screen offering a form that cannot succeed.
+ * Nothing on the front page links here while the stream is shut, but a
+ * bookmark, a shared link or a typed address still arrives, and until
+ * 2026-08-27 all three met the full form and were told their details were
+ * wrong (owner's round: "gate koji laže kandidatu").
+ *
+ * `null` while the answer is unknown, so the page commits to neither state
+ * before it has one: guessing "open" flashes a form that is about to vanish,
+ * guessing "shut" tells a lie of its own to anyone on a slow connection.
+ */
+const streamOpen = ref<boolean | null>(null);
+const shut = computed(() => streamOpen.value === false);
 
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name, sub: c.code })));
 
@@ -113,6 +131,33 @@ onMounted(async () => {
     }
 });
 
+/**
+ * Looking up marks needs nothing published, so that stream is never shut
+ * (owner, 2026-08-27) and does not spend a request asking.
+ *
+ * If the status cannot be read the form is offered anyway: the server is the
+ * one that decides, and a screen that hid itself over a failed request would
+ * shut a stream that is open.
+ */
+watch(
+    mode,
+    async (value) => {
+        if (value === 'results') {
+            streamOpen.value = true;
+
+            return;
+        }
+        streamOpen.value = null;
+        try {
+            const { data } = await getSiteStatus();
+            streamOpen.value = value === 'competition' ? data.data.competition_open : data.data.sample_open;
+        } catch {
+            streamOpen.value = true;
+        }
+    },
+    { immediate: true },
+);
+
 async function submit(): Promise<void> {
     if (!canSubmit.value || countryId.value === null) {
         return;
@@ -166,7 +211,35 @@ async function submit(): Promise<void> {
             ></div>
         </template>
 
-        <form @submit.prevent="submit">
+        <!--
+            The shut state stands where the form would be, in the same column, so
+            the words on the left still introduce it. It says when the stream
+            returns and offers the ways in that ARE open - a dead end with no way
+            onward is what a visitor already had.
+        -->
+        <div v-if="shut" class="border-t border-brand-palette-4/15 pt-8">
+            <ShutNote :note="mode === 'competition' ? $t('student.access.shutCompetition') : $t('student.access.shutSample')" />
+            <p class="mt-5 max-w-[420px] text-[17px] leading-relaxed text-brand-palette-4/70">
+                {{ $t('student.access.shutLead') }}
+            </p>
+            <div class="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <RouterLink
+                    v-if="mode === 'competition'"
+                    to="/student/access/sample"
+                    class="inline-flex items-center gap-2 rounded-full bg-brand-palette-2 px-7 py-3.5 text-sm font-semibold text-white transition hover:brightness-95"
+                >
+                    {{ $t('student.access.shutTrySample') }}
+                </RouterLink>
+                <RouterLink
+                    to="/student/access/results"
+                    class="inline-flex items-center gap-2 text-sm font-medium text-brand-palette-4 shadow-[inset_0_-1px_0_rgba(0,55,88,0.35)] transition hover:text-brand-palette-2"
+                >
+                    {{ $t('student.access.shutCheckResults') }}
+                </RouterLink>
+            </div>
+        </div>
+
+        <form v-else-if="streamOpen" @submit.prevent="submit">
             <div class="grid gap-7 sm:grid-cols-2">
                 <!-- 🪤 A SearchSelect never goes inside a <label>: the label's own
                      click reaches the trigger and closes the dropdown again. -->

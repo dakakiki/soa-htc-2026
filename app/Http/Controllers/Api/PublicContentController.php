@@ -15,6 +15,7 @@ use App\Domain\Cms\Support\LayoutButtons;
 use App\Domain\Cms\Support\LayoutZones;
 use App\Domain\Cms\Support\PublicMenus;
 use App\Domain\Cms\Support\PublicPaths;
+use App\Domain\Cms\Support\SeasonLinks;
 use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
@@ -185,10 +186,19 @@ class PublicContentController extends Controller
             ->get()
             ->map(fn (LayoutBlock $block): array => [
                 'type' => $block->type->value,
-                // Two walks over the same payload, each resolving what it owns:
-                // buttons carry the season gate, menu references carry the
-                // published-target rule. Neither belongs in the other's class.
-                'content' => PublicMenus::resolvePayload(LayoutButtons::resolvePayload($block->data ?? [])),
+                // Three walks over the same payload, each resolving what it
+                // owns: links inside admin prose carry the season gate, buttons
+                // carry it too, and menu references carry the published-target
+                // rule. None of them belongs in another's class.
+                //
+                // The prose walk goes FIRST, on the raw payload: after
+                // LayoutButtons a resolved button holds an `href`, and a walk
+                // looking for anchors would be reading values it does not own.
+                'content' => PublicMenus::resolvePayload(
+                    LayoutButtons::resolvePayload(
+                        SeasonLinks::resolvePayload($block->data ?? []),
+                    ),
+                ),
                 'image' => $block->image === null ? null : [
                     'url' => $block->image->url(),
                     'alt' => $block->image->alt,

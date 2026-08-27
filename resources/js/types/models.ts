@@ -707,6 +707,26 @@ export interface PublicBlockButton {
     external: boolean;
 }
 
+/**
+ * What a button leaves behind once its season has closed, when the admin wrote a
+ * line for that state (`closed_note`). A button whose season is shut and which
+ * has nothing to say is dropped as before, so a marker always carries a reason.
+ *
+ * 🪤 It is NOT a button: no `href`, no `label`, no `style`. Anything rendering
+ * a block's `buttons` has to split the list before drawing — see `isShut`.
+ */
+export interface PublicBlockShut {
+    shut: true;
+    note: string;
+}
+
+/** A slot in a block's button row: either an action, or the reason it is gone. */
+export type PublicBlockSlot = PublicBlockButton | PublicBlockShut;
+
+export function isShut(slot: PublicBlockSlot): slot is PublicBlockShut {
+    return (slot as PublicBlockShut).shut === true;
+}
+
 /** One section of a zone. `content` is shaped by the block's type. */
 export interface PublicBlock {
     type: string;
@@ -753,6 +773,8 @@ export interface LayoutRegistry {
     button_styles: string[];
     target_types: string[];
     gates: string[];
+    /** The application screens a `route` target may name, with their labels. */
+    routes: { value: string; label: string }[];
     /** Options for every `menu` field, shipped with the registry. */
     menus: { id: number; name: string; slug: string }[];
 }
@@ -763,6 +785,8 @@ export interface LayoutButtonValue {
     style: string;
     status: boolean;
     gate: string | null;
+    /** The line shown in its place once the gate's season has closed. */
+    closed_note: string | null;
     target: { type: string; id: number | null; value: string | null };
 }
 

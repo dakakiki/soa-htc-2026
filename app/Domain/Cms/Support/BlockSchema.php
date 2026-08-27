@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Cms\Support;
 
 use App\Domain\Cms\Enums\BlockType;
+use Closure;
 use Illuminate\Validation\Rule;
 
 /**
@@ -274,13 +275,44 @@ final class BlockSchema
             $path.'.style' => ['required_with:'.$path, Rule::in(self::BUTTON_STYLES)],
             $path.'.status' => ['required_with:'.$path, 'boolean'],
             $path.'.gate' => ['nullable', Rule::in(self::GATES)],
-            $path.'.target' => ['required_with:'.$path, 'array'],
+            // What stands in the button's place once its season has closed. A
+            // gated button used to leave a hole: the heading and the paragraph
+            // above it stayed, the action vanished, and nothing said why. Short
+            // on purpose — it is one line beside a button, not a paragraph.
+            $path.'.closed_note' => ['nullable', 'string', 'max:160'],
+            $path.'.target' => ['required_with:'.$path, 'array', self::routeExists()],
             $path.'.target.type' => ['required_with:'.$path.'.target', Rule::in(self::TARGET_TYPES)],
             // A foreign key for internal targets; `route`, `url` and `file` use
             // the value instead.
             $path.'.target.id' => ['nullable', 'integer'],
             $path.'.target.value' => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    /**
+     * A `route` target has to name a screen the application actually has.
+     *
+     * Checked on the target as a whole rather than on its `value`, because the
+     * rule only applies to one `type` and a rule bound to the value alone
+     * cannot see which type it belongs to. An empty value stays valid: a button
+     * saved before its destination exists is a normal thing to do, and
+     * {@see LayoutButtons} drops it from the page until it has one.
+     */
+    private static function routeExists(): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail): void {
+            if (! is_array($value) || ($value['type'] ?? null) !== 'route') {
+                return;
+            }
+
+            $path = trim((string) ($value['value'] ?? ''));
+
+            if ($path === '' || PublicRoutes::has($path)) {
+                return;
+            }
+
+            $fail(__('messages.layout.unknown_route', ['path' => $path]));
+        };
     }
 
     /**
