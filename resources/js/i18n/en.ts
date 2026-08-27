@@ -407,6 +407,7 @@ export default {
         },
         status: {
             round: 'Round {round} · {year}',
+            examRound: '· {round} in play',
             open: 'Live exams open',
             closed: 'Live exams closed · sample open',
         },

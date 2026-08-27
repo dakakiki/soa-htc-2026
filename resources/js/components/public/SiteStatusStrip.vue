@@ -19,6 +19,13 @@ defineProps<{ site: SiteStatus | null }>();
             <span v-if="site.round" class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/85">
                 {{ $t('public.status.round', { round: site.round, year: site.year }) }}
             </span>
+            <!-- Its own `v-if`, and never nested in the one above: between rounds
+                 there is no current round, and a season without an active row must
+                 not swallow this too. No `ml-auto` — two of the spans below carry
+                 one already and a third breaks the arrangement. -->
+            <span v-if="site.exam_round" class="hidden font-mono text-[11px] uppercase tracking-[0.16em] text-white/85 sm:block">
+                {{ $t('public.status.examRound', { round: site.exam_round }) }}
+            </span>
             <span class="ml-auto inline-flex items-center gap-2 sm:ml-0">
                 <span class="h-1.5 w-1.5 rounded-full"
                     :class="site.competition_open

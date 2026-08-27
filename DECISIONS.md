@@ -1361,10 +1361,26 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   označavanje jedne obara ostale u istoj transakciji, a skidanje oznake ostavlja **nijednu** — što je
   tačan odgovor između rundi. Kontrola je radio dugme u koloni „Running now" na ekranu Exam rounds;
   klik na već označenu je skida.
-- ⚠️ **Polje NIŠTA još ne pokreće.** Namerno: gde treba da ima efekat zavisi od toga čemu služi, a
-  pogrešna pretpostavka bi ili prejudicirala ekran ili prekršila pravilo *„filteri se nikad ne čiste
-  sami"* ([[ui-gotchas]]). Kandidati, po korisnosti: podrazumevani Exam filter na Publishing-u ·
-  traka statusa na javnom delu · podrazumevani Round filter na listi Students. **Čeka vlasnika.**
+- **Kontrola je prekidač, ne radio** (vlasnik, 2026-08-27) — isti `ToggleSwitch` kao „Active", ali u
+  **brend plavoj**, sa tooltipom. Zeleno u ovoj administraciji svuda znači „u upotrebi, ne diraj"; kolona
+  koja znači nešto drugo mora i da izgleda drugačije, inače se čita kao ista kolona dvaput. `ToggleSwitch`
+  je dobio prop `onClass` (default `bg-green-500`), pa svih 24 postojećih upotreba izgledaju identično.
+- **Polje pokreće dve stvari** (vlasnik, 2026-08-27):
+  1. **Publishing otvara kviz na rundi koja se igra.** `reports/filters` uz svaki ispit šalje izvedeni
+     `is_current` — ne id runde, jer bi klijent onda morao da pita `GET /api/exam-rounds`, a to je iza
+     `content.manage` koju onaj ko objavljuje rezultate ne mora da ima. 🪤 Default stoji **isključivo u
+     `onQuizChange`**, nikad u `loadOptions()`: brisanje Exam filtera zove `loadOptions()`, pa bi se
+     default vratio istog trena i filter se ne bi mogao očistiti — tačno ono što pravilo *„filteri se
+     nikad ne čiste sami"* sprečava. Dva ispita u istoj rundi ili nijedna aktuelna runda → **ne dira se
+     filter**, umesto da se pogodi jedan.
+  2. **Javna traka statusa piše koja je runda u toku** — `/api/public/site` dobija `exam_round` (direktan
+     upit u `PublicContentController`, ne kroz `ExamRoundController` koji je iza `content.manage`).
+     Svoj `v-if`, **nikad ugnežden** u onaj za `round`: sezona bez aktivnog reda ne sme da proguta i ovo.
+     🪤 Bez `ml-auto` — dva raspona u traci ga već nose, treći razbija raspored.
+- ⚠️ **„Round" znači dve različite stvari i kod ih namerno drži razdvojene.** `seasons.round_number` je
+  **izdanje** takmičenja (četrnaesto), UNIQUE, i prefiks je svakog kandidatskog broja. `exam_rounds` su
+  Preliminary/National/Final. Traka sada prikazuje **oba** — „ROUND 14 · 2026 · NATIONAL ROUND IN PLAY".
+  Ne spajati ih u jedan string i ne prenameniti postojeći.
 - **`/api/...` otvoren u adresnoj traci vraća 401, ne 500.** `Authenticate` gradi odredište za redirekciju
   **pre** nego što se išta odluči o formatu odgovora, a podrazumevano traži `route('login')` — koju ova
   aplikacija nema (login je SPA ruta iza web catch-all-a). Lookup je pucao pre nego što je

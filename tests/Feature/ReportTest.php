@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
+use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Attempt;
@@ -59,7 +60,7 @@ class ReportTest extends TestCase
         $test->levels()->attach($level->id);
         $exam->tests()->attach($test->id, ['position' => 1]);
 
-        return ['quiz' => $quiz, 'test' => $test];
+        return ['quiz' => $quiz, 'exam' => $exam, 'test' => $test];
     }
 
     private function registration(?School $school = null): Registration
@@ -251,6 +252,30 @@ class ReportTest extends TestCase
         $this->assertNotEmpty($response->json('exams'));
         $this->assertNotEmpty($response->json('tests'));
         $this->assertSame($c['test']->id, $response->json('tests.0.id'));
+    }
+
+    public function test_filters_say_which_exam_belongs_to_the_round_being_run(): void
+    {
+        $c = $this->content();
+
+        // Nothing is being run: no exam is the current one, and Publishing has
+        // nothing to open on.
+        $rows = $this->actingAs($this->admin())->getJson("/api/reports/filters?quiz_id={$c['quiz']->id}")->assertOk()->json('exams');
+        $this->assertNotEmpty($rows);
+        $this->assertSame([], array_values(array_filter($rows, fn (array $r): bool => $r['is_current'])));
+
+        // Mark the round its exam belongs to, and the flag rides along. It has
+        // to come from here: the exam-rounds endpoint is behind content.manage,
+        // which somebody publishing results need not hold.
+        $round = ExamRound::query()->firstOrFail();
+        Exam::whereKey($c['exam']->id)->update(['exam_round_id' => $round->id]);
+        $round->update(['is_current' => true]);
+
+        $rows = $this->actingAs($this->admin())->getJson("/api/reports/filters?quiz_id={$c['quiz']->id}")->assertOk()->json('exams');
+        $current = array_values(array_filter($rows, fn (array $r): bool => $r['is_current']));
+
+        $this->assertCount(1, $current);
+        $this->assertSame($c['exam']->id, $current[0]['id']);
     }
 
     public function test_filters_cascade_tests_to_a_chosen_exam(): void

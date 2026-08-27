@@ -781,6 +781,8 @@ export interface CmsLayoutBlock {
 /** Which round is running, and whether it can be entered. */
 export interface SiteStatus {
     round: number | null;
+    /** The contest round being run right now (Preliminary, National…), if any. */
+    exam_round: string | null;
     year: number | null;
     season: string | null;
     competition_open: boolean;

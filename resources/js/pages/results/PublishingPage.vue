@@ -101,11 +101,29 @@ async function onCountryChange(id: number | null): Promise<void> {
     await loadOverview();
 }
 
+/**
+ * Choosing a quiz opens it on the round being run now, when it has one.
+ *
+ * This is the ONLY place a filter is set for the user (owner, 2026-08-27), and
+ * it sits inside the one action that was already clearing this field. It must
+ * never move into `loadOptions()`: clearing the Exam select calls that too, so
+ * the default would re-apply itself the instant it was cleared and the filter
+ * could not be got rid of — which is exactly what the rule about filters never
+ * changing themselves is there to prevent.
+ *
+ * Two exams can share a round (position inside the quiz is only their
+ * tiebreak), and between rounds none is current. Both cases leave the filter
+ * alone rather than picking one of them.
+ */
 async function onQuizChange(id: number | null): Promise<void> {
     q.quiz_id = id;
     q.exam_id = null;
     q.test_id = null;
     await loadOptions();
+
+    const current = opts.value.exams.filter((exam) => exam.is_current);
+    q.exam_id = current.length === 1 ? current[0].id : null;
+
     await loadOverview();
 }
 

@@ -34,7 +34,7 @@ export interface ReportFilterOptions {
     schools: { id: number; name: string }[];
     levels: { id: number; label: string }[];
     quizzes: { id: number; title: string }[];
-    exams: { id: number; title: string }[];
+    exams: { id: number; title: string; is_current?: boolean }[];
     tests: { id: number; title: string }[];
     coordinators: { id: number; name: string }[];
 }

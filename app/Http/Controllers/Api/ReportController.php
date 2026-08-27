@@ -437,12 +437,22 @@ class ReportController extends Controller
         $quiz = $quizId
             ? Quiz::query()->with([
                 'exams' => fn ($q) => $q->where('exams.status', 'active'),
+                'exams.round',
                 'exams.tests' => fn ($q) => $q->where('tests.status', 'active'),
             ])->find($quizId)
             : null;
 
         $exams = $quiz
-            ? $quiz->exams->map(fn (Exam $e) => ['id' => $e->id, 'title' => $e->title])->sortBy('title')->values()
+            // `is_current` rides along so Publishing can open on the round being
+            // run without asking a second endpoint — `GET /api/exam-rounds` is
+            // behind `content.manage`, which somebody publishing results need not
+            // hold. Derived here, not the round id: the client has no way to turn
+            // an id into "this is the one" on its own.
+            ? $quiz->exams->map(fn (Exam $e) => [
+                'id' => $e->id,
+                'title' => $e->title,
+                'is_current' => (bool) $e->round?->is_current,
+            ])->sortBy('title')->values()
             : [];
 
         // With an exam chosen, tests cascade to just that exam's tests; otherwise

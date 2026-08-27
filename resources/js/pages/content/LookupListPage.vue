@@ -232,10 +232,15 @@ onMounted(load);
                         <td v-else class="px-4 py-3 text-gray-500">{{ item.id }}</td>
                         <td class="px-4 py-3 font-medium text-gray-900">{{ item.name }}</td>
                         <td v-if="cfg.hasCurrent" class="px-4 py-3">
+                            <!-- The same switch as Active, in the brand blue: the two
+                                 mean different things and must not read as one column
+                                 repeated. Only one round can be on, so switching one on
+                                 puts the rest off; switching the on one off leaves none,
+                                 which is what is true between rounds. -->
                             <Tooltip :text="item.is_current ? $t('content.clearCurrent') : $t('content.setCurrent')">
-                                <input type="radio" class="h-4 w-4 accent-brand-primary disabled:opacity-40"
-                                    :checked="item.is_current ?? false" :disabled="!canManage"
-                                    :aria-label="$t('content.setCurrent')" @click="setCurrent(item)" />
+                                <ToggleSwitch :model-value="item.is_current ?? false" :disabled="!canManage"
+                                    on-class="bg-brand-primary" :aria-label="$t('content.setCurrent')"
+                                    @update:model-value="() => setCurrent(item)" />
                             </Tooltip>
                         </td>
                         <td v-if="cfg.hasActive" class="px-4 py-3">
