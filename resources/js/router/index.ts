@@ -14,8 +14,6 @@ declare module 'vue-router' {
         guestOnly?: boolean;
         permission?: string;
         zone?: Zone;
-        /** Redirect an already-identified competitor away (e.g. the access form). */
-        studentGuestOnly?: boolean;
         /**
          * Render straight into the shell, without its centred container — for a
          * page that paints its own edge-to-edge sections (the front page).
@@ -68,10 +66,17 @@ const routes: RouteRecordRaw[] = [
         meta: { zone: 'public' },
     },
     {
+        /*
+         * All three streams ask for the three details every time, even when a
+         * session is already open (owner, 2026-08-27). The form used to be
+         * skipped for anyone already identified, which sent a competitor who
+         * had clicked "Check results" to the dashboard instead of to their
+         * marks.
+         */
         path: '/student/access/:mode(sample|competition|results)',
         name: 'student.access.form',
         component: () => import('@/pages/student/StudentAccessFormPage.vue'),
-        meta: { zone: 'public', studentGuestOnly: true },
+        meta: { zone: 'public' },
     },
     {
         /*
@@ -593,15 +598,11 @@ router.beforeEach(async (to) => {
     }
 
     // Competitor (student) session — separate from the admin session above.
-    if (to.meta.zone === 'student' || to.meta.studentGuestOnly) {
+    if (to.meta.zone === 'student') {
         const student = useStudentSessionStore();
         await student.ensureLoaded();
 
-        if (to.meta.studentGuestOnly && student.isIdentified) {
-            return { name: 'student.dashboard' };
-        }
-
-        if (to.meta.zone === 'student' && !student.isIdentified) {
+        if (!student.isIdentified) {
             return { name: 'home' };
         }
     }
