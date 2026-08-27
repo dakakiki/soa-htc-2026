@@ -1296,6 +1296,26 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   da li je kviz otključan u tekućoj sesiji. Kroz UI se ne vidi (zaključan kviz prikazuje sve testove kao
   `locked`), ali ručno sastavljen poziv može da nastavi takmičarski pokušaj bez lozinke. Zatvara se jednim
   uslovom ako se ikad odluči da i nastavak traži otključan kviz.
+- ⚠️ **Prava rupa nije bila u ekranima nego u relaciji.** `Quiz::exams()` je sortirala po
+  `exam_quiz.position` i rundu nije ni gledala — a kroz nju idu **sva tri** ekrana: takmičarska lista,
+  Check results i Publishing. Sad sortira po rundi; pozicija je razrešenje kad su dva ispita u istoj
+  rundi, a ispit bez runde pada na kraj umesto da NULL-om skoči na vrh. Na zatečenim podacima se
+  pozicija i runda poklapaju u **svih 15 kvizova**, pa se ništa nije videlo: greška je bila
+  **nevidljiva, ne odsutna** — pukla bi prvi put kad se ubaci runda u sredinu ili izmeni pozicija.
+- **Smer: liste onoga što je URAĐENO čitaju taj redosled unazad.** Check results i Publishing prikazuju
+  **poslednju rundu prvu** (vlasnik: *„ne može nikada preliminari biti ispred national round"*) — ko otvara
+  Check results traži ocenu koju je upravo dobio, ko otvara Publishing objavljuje rundu koja se upravo
+  završila. **Takmičarska lista („My tests") ostaje unapred**: ona nije istorija nego red čekanja, i
+  zaključan National iznad Preliminary-ja koji se tek radi nema smisla.
+- **Izgled Check results-a** (vlasnik, 2026-08-27): runda vodi blok i ide **celom širinom kolone na
+  toniranoj traci** (`.round-band`, tonirana iz `currentColor`), naziv ispita ispod nje **bold**,
+  CONTEST/PRACTICE veći, PRACTICE naslov u brend narandžastoj, takmičenje na **sivom panelu**
+  (`.stream-panel`), a svaka kolona nosi svoju plavu koju sve u njoj nasleđuje (`.stream-contest` /
+  `.stream-practice`, obe mešane iz slotova palete da promena teme nosi obe). Prigušeni tekstovi idu na
+  `opacity`, ne na fiksnu navy prozirnost — inače ne prate boju svoje kolone.
+- 🪤 **`first:` je `:first-child`, a ne „prvi iz `v-for`-a".** Prvi blok nije prvo dete kolone (naslov je),
+  pa `first:border-t-0` nikad nije radio i ispod naslova su se crtale **dve linije**. Vezano za indeks iz
+  `v-for`-a. Isto važi svuda gde lista ima zaglavlje iznad sebe — vidi [[ui-gotchas]].
 - ⚠️ **`is_practice` nikada nije bio postavljen — ispravlja ADR-0054.** Žig je poredio
   `Quiz::whereKey($id)->value('quiz_type')` sa `QuizType::Sample->value`, a `value()` prolazi kroz cast
   modela i vraća **enum, ne string iza njega**. Poređenje je uvek bilo `false`, pa je **svaki** pokušaj ikad
@@ -1304,6 +1324,28 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   takmičarski. **Tri testa su tvrdila baš to odbijanje nad sample kvizovima** — opisivali su grešku, ne
   pravilo, pa sada grade takmičarski kviz o kome su oduvek bili; novi test seda na sample test dvaput kroz
   endpoint, što do sada nije radio niko. Redove ispravlja migracija (na dev-u 4.176 pokušaja, ispravnih nula).
+
+## ADR-0056 — Pretraga nalazi po delu vrednosti, a odbijen ulaz kaže zašto
+
+- **Status:** Prihvaćeno (2026-08-27). **IMPLEMENTIRANO.**
+- **Kandidatski broj se traži BILO GDE u broju, ne samo od početka.** I globalna pretraga i lista Students
+  su gađale `competitor_number` prefiksom, pa `0014` — četiri cifre koje se pročitaju sa spiska ili
+  bedža — nije nalazilo **ništa**, jer svaki broj u sezoni počinje sa `14`. Imena i venue-i su već tražili
+  bilo gde; brojevi, jedina stvar koju ljudi zaista prepisuju, nisu. Cena je indeks, koji vodeći
+  wildcard ionako ne može da iskoristi — na veličini jedne sezone to je skeniranje od nekoliko
+  milisekundi, a pretraga koja ne nalazi ne vredi koliko indeks koji štedi.
+- 🪤 **Što i dalje NE radi:** više reči koje nisu jedna do druge. „Škola Speak" neće naći
+  „Škola stranih jezika Speak Up", jer je to jedan `LIKE` preko celog niza. Rešenje bi bilo razbiti unos
+  po rečima i tražiti da se svaka pojavi bilo gde; nije urađeno, otvoreno.
+- **Identifikacija takmičara: 20 pokušaja po broju na sat** (bilo 10; po IP ostaje 8 u minuti). Deset se
+  potroši u jednom popodnevu običnog rada — sala koja ponovo ulazi, takmičar koji proverava ocenu — a
+  ograničenje koje prvo zaustavi poštenog malo vredi protiv nekoga ko ionako ide kroz spisak datuma
+  rođenja.
+- ⚠️ **Gore od broja je bilo ćutanje.** Odbijanje zbog previše pokušaja vraćalo se **istom porukom kao
+  pogrešni podaci** (*„We could not verify your details"*), pa je takmičar čiji je broj bio ispravan slat
+  da ga iznova čita. Oba ograničenja sada vraćaju razlog i koliko da se čeka, a vreme uzimaju iz
+  **`Retry-After`** zaglavlja da poruka ne može da protivreči stvarnom čekanju. Forma prikazuje ono što
+  je server rekao umesto svoje uopštene rečenice.
 
 ---
 
