@@ -183,6 +183,23 @@ class StudentIdentifyTest extends TestCase
         $this->assertTrue($first->equalTo(StudentSession::firstOrFail()->expires_at));
     }
 
+    public function test_too_many_attempts_says_so_instead_of_blaming_the_details(): void
+    {
+        $r = $this->registration();
+        $wrong = $this->payload($r, ['date_of_birth' => '2000-01-01']);
+
+        // The per-IP cap is eight a minute; the ninth is refused without the
+        // details being looked at, and must say that rather than send the
+        // competitor back to re-read a number that was right.
+        for ($i = 0; $i < 8; $i++) {
+            $this->postJson('/api/student/identify', $wrong)->assertStatus(422);
+        }
+
+        $this->postJson('/api/student/identify', $wrong)
+            ->assertStatus(429)
+            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'Too many attempts'));
+    }
+
     public function test_a_session_left_alone_past_its_lifetime_is_not_revived(): void
     {
         $r = $this->registration();

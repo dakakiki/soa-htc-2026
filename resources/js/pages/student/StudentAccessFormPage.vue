@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { listCountries } from '@/api/student';
+import { apiErrorMessage } from '@/api/http';
 import { getPublicLayout } from '@/api/publicContent';
 import { useStudentSessionStore, type EntryMode } from '@/stores/studentSession';
 import PublicFormPage from '@/components/public/PublicFormPage.vue';
@@ -127,8 +128,12 @@ async function submit(): Promise<void> {
         } else {
             await student.enterSample(payload);
         }
-    } catch {
-        error.value = t('student.access.error');
+    } catch (e) {
+        // Say what the server said when it knows why. Too many attempts names
+        // the wait; the generic line would send a competitor back to re-read a
+        // number that was right all along. A wrong exam password carries no
+        // response of its own and falls back to it.
+        error.value = apiErrorMessage(e, t('student.access.error'));
         return;
     } finally {
         loading.value = false;

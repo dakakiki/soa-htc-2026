@@ -23,6 +23,7 @@ use App\Policies\SeasonUserAssignmentPolicy;
 use App\Policies\SettingPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -85,9 +86,18 @@ class AppServiceProvider extends ServiceProvider
         // Web identify is guessable down to the competitor's date of birth, so cap
         // attempts per competitor_number (which IP rotation can't dodge) alongside
         // the per-IP cap — otherwise a targeted DOB brute force could take a session.
+        //
+        // Twenty an hour per number (owner, 2026-08-27): the old ten ran out in a
+        // single afternoon of ordinary use — an exam room re-entering, a
+        // competitor checking marks — and a cap that stops the honest is worth
+        // little against someone with a date-of-birth list. Both caps say WHY
+        // they refused; the screen showed "check your details and try again",
+        // which sent people to re-read a number that was right all along.
         RateLimiter::for('student-identify', fn (Request $request): array => [
-            Limit::perMinute(8)->by('ip:'.$request->ip()),
-            Limit::perMinutes(60, 10)->by('num:'.(string) $request->input('competitor_number')),
+            Limit::perMinute(8)->by('ip:'.$request->ip())
+                ->response(fn (Request $r, array $headers) => $this->tooManyAttempts($headers)),
+            Limit::perMinutes(60, 20)->by('num:'.(string) $request->input('competitor_number'))
+                ->response(fn (Request $r, array $headers) => $this->tooManyAttempts($headers)),
         ]);
 
         // Coordinator registration (ADR-0053) is the only public endpoint that
@@ -100,5 +110,24 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(20)->by('ip:'.$request->ip()),
             Limit::perDay(3)->by('mail:'.mb_strtolower(trim((string) $request->input('email')))),
         ]);
+    }
+
+    /**
+     * Why identification was refused when the details were never looked at. A
+     * competitor told to "check your details" reads the same right number over
+     * and over; told to wait, they wait. The wait comes from `Retry-After`, so
+     * the message can never contradict the header the middleware set.
+     *
+     * @param  array<string, mixed>  $headers
+     */
+    private function tooManyAttempts(array $headers): JsonResponse
+    {
+        $seconds = (int) ($headers['Retry-After'] ?? 60);
+
+        return response()->json([
+            'message' => __('Too many attempts. Please wait :minutes minutes and try again.', [
+                'minutes' => max(1, (int) ceil($seconds / 60)),
+            ]),
+        ], 429, $headers);
     }
 }
