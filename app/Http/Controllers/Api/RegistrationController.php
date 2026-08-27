@@ -375,8 +375,12 @@ class RegistrationController extends Controller
         if ($request->filled('search')) {
             $search = trim((string) $request->string('search'));
             if (ctype_digit($search)) {
-                // Numbers search competitor_number by prefix, which uses its unique index.
-                $query->where('competitor_number', 'like', $search.'%');
+                // Anywhere in the number, not just its start: people search with
+                // the fragment they can read off a list or a badge. It gives up
+                // the unique index, which no leading wildcard can use, and at
+                // one season's size that scan is worth a search that finds
+                // things (owner, 2026-08-27).
+                $query->where('competitor_number', 'like', '%'.$search.'%');
             } else {
                 $query->where('name', 'like', '%'.$search.'%');
             }

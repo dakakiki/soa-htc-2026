@@ -72,8 +72,12 @@ class SearchController extends Controller
 
     /**
      * Competitors by number or by name. A digits-only term is a competitor
-     * number and matches by prefix, which is what its unique index is for;
-     * anything else is a name.
+     * number, anything else is a name, and both match ANYWHERE in the value:
+     * people search with the fragment they can read off a list or a badge —
+     * the middle of a number, the second word of a name — not with the way it
+     * starts. It costs the index on `competitor_number`, which a leading
+     * wildcard cannot use, and that is the right trade at roster size: a scan
+     * of one season is milliseconds, and a search that misses is worthless.
      *
      * @param  Collection<int, int>|null  $allowed
      * @return list<array<string, mixed>>
@@ -88,7 +92,7 @@ class SearchController extends Controller
             ->when($allowed !== null, fn ($q) => $q->whereIn('r.school_id', $allowed->all()))
             ->when(
                 $byNumber,
-                fn ($q) => $q->where('r.competitor_number', 'like', $term.'%')->orderBy('r.competitor_number'),
+                fn ($q) => $q->where('r.competitor_number', 'like', '%'.$term.'%')->orderBy('r.competitor_number'),
                 fn ($q) => $q->where('r.name', 'like', '%'.$term.'%')->orderBy('r.name'),
             )
             ->limit(self::PER_GROUP)
