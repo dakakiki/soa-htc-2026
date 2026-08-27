@@ -7,11 +7,14 @@ export interface Lookup {
     active?: boolean;
     /** Exam rounds only: the position they run in. */
     sort_order?: number;
+    /** Exam rounds only: the one being run right now, if any. */
+    is_current?: boolean;
 }
 
 export interface LookupPayload {
     name: string;
     active?: boolean;
+    is_current?: boolean;
 }
 
 /** CRUD helpers bound to a lookup resource path. */

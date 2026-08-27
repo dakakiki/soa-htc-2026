@@ -1292,10 +1292,14 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   stranice samo po sebi ne radi ništa** — pukla veza ne sme da košta ispit, a sat pokušaja ionako sam preda
   test kad istekne. Odgovori koji su već dati i dalje se broje: pokušaj se zatvara i ide na ocenjivanje, ne
   briše se. Zatvaranje pokušaja sada ima jedno mesto, `Attempt::complete()`, koje koristi i istek sata.
-- 🪤 **Rupa koja ostaje, svesno:** `AttemptController::start` vraća otvoren pokušaj **pre** nego što proveri
-  da li je kviz otključan u tekućoj sesiji. Kroz UI se ne vidi (zaključan kviz prikazuje sve testove kao
-  `locked`), ali ručno sastavljen poziv može da nastavi takmičarski pokušaj bez lozinke. Zatvara se jednim
-  uslovom ako se ikad odluči da i nastavak traži otključan kviz.
+- ✅ **Rupa zatvorena (2026-08-27, isti dan).** `AttemptController::start` je vraćao otvoren pokušaj **pre**
+  nego što proveri da li je kviz otključan u tekućoj sesiji, pa je ručno sastavljen poziv mogao da nastavi
+  takmičarski pokušaj bez lozinke i zaobiđe pravilo o napuštenom pokušaju. Isto je važilo za
+  `GET /attempts/{id}`, koji uz to **vraća i pitanja**. Oba sada traže da je kviz otvoren toj sesiji
+  (`StudentAvailability::quizIsOpenTo`), inače 403 sa istom porukom kao i svako drugo odbijanje starta.
+  **Predaja NIJE zatvorena** namerno: odgovori su njihovi, sadržaj testa je već isporučen, a odbiti predaju
+  značilo bi baciti rad bez ikakve dobiti. Praksa je netaknuta — sample ne traži lozinku, pa je otvorena
+  svakoj sesiji po definiciji.
 - ⚠️ **Prava rupa nije bila u ekranima nego u relaciji.** `Quiz::exams()` je sortirala po
   `exam_quiz.position` i rundu nije ni gledala — a kroz nju idu **sva tri** ekrana: takmičarska lista,
   Check results i Publishing. Sad sortira po rundi; pozicija je razrešenje kad su dva ispita u istoj
@@ -1305,8 +1309,9 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 - **Smer: liste onoga što je URAĐENO čitaju taj redosled unazad.** Check results i Publishing prikazuju
   **poslednju rundu prvu** (vlasnik: *„ne može nikada preliminari biti ispred national round"*) — ko otvara
   Check results traži ocenu koju je upravo dobio, ko otvara Publishing objavljuje rundu koja se upravo
-  završila. **Takmičarska lista („My tests") ostaje unapred**: ona nije istorija nego red čekanja, i
-  zaključan National iznad Preliminary-ja koji se tek radi nema smisla.
+  završila. **Takmičarska lista („My tests") ostaje unapred** — potvrđeno 2026-08-27, vlasnik prepustio
+  odluku: ona nije istorija nego **red čekanja**, i zaključan National iznad Preliminary-ja koji se tek
+  radi ne bi imao smisla. Obrtanje je jedan `sortByDesc` ako se ikad predomisli.
 - **Izgled Check results-a** (vlasnik, 2026-08-27): runda vodi blok i ide **celom širinom kolone na
   toniranoj traci** (`.round-band`, tonirana iz `currentColor`), naziv ispita ispod nje **bold**,
   CONTEST/PRACTICE veći, PRACTICE naslov u brend narandžastoj, takmičenje na **sivom panelu**
@@ -1346,6 +1351,26 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   da ga iznova čita. Oba ograničenja sada vraćaju razlog i koliko da se čeka, a vreme uzimaju iz
   **`Retry-After`** zaglavlja da poruka ne može da protivreči stvarnom čekanju. Forma prikazuje ono što
   je server rekao umesto svoje uopštene rečenice.
+
+## ADR-0057 — Runda koja se trenutno igra je zaseban podatak, i 401 nije 500
+
+- **Status:** Prihvaćeno (2026-08-27). **IMPLEMENTIRANO.**
+- **`exam_rounds.is_current`** — koja se runda **trenutno igra**. Sezona već nosi `round_number`, ali to je
+  koje je ovo izdanje takmičenja (četrnaesto) i ne govori ništa o tome da li je ove nedelje u igri
+  Preliminary ili National. Zasebno pitanje, zasebna kolona. **Najviše jedna** runda je aktuelna:
+  označavanje jedne obara ostale u istoj transakciji, a skidanje oznake ostavlja **nijednu** — što je
+  tačan odgovor između rundi. Kontrola je radio dugme u koloni „Running now" na ekranu Exam rounds;
+  klik na već označenu je skida.
+- ⚠️ **Polje NIŠTA još ne pokreće.** Namerno: gde treba da ima efekat zavisi od toga čemu služi, a
+  pogrešna pretpostavka bi ili prejudicirala ekran ili prekršila pravilo *„filteri se nikad ne čiste
+  sami"* ([[ui-gotchas]]). Kandidati, po korisnosti: podrazumevani Exam filter na Publishing-u ·
+  traka statusa na javnom delu · podrazumevani Round filter na listi Students. **Čeka vlasnika.**
+- **`/api/...` otvoren u adresnoj traci vraća 401, ne 500.** `Authenticate` gradi odredište za redirekciju
+  **pre** nego što se išta odluči o formatu odgovora, a podrazumevano traži `route('login')` — koju ova
+  aplikacija nema (login je SPA ruta iza web catch-all-a). Lookup je pucao pre nego što je
+  `shouldRenderJsonWhen` stigao da kaže da `api/*` ide kao JSON, pa je ispadao **500 sa stack trace-om**.
+  Rešenje je `redirectGuestsTo('/login')` — **putanja, ne imenovana ruta**: nema šta da pukne, `api/*` i
+  dalje dobija 401 JSON, a običan browser ide na login ekran.
 
 ---
 
