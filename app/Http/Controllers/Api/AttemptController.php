@@ -45,7 +45,7 @@ class AttemptController extends Controller
             $this->finalizeIfExpired($existing);
 
             if ($this->blocksRestart($existing)) {
-                return $this->resumeOrRefuse($existing, $test);
+                return $this->resumeOrRefuse($session, $existing, $test);
             }
         }
 
@@ -60,7 +60,7 @@ class AttemptController extends Controller
                 $this->finalizeIfExpired($again);
 
                 if ($this->blocksRestart($again)) {
-                    return $this->resumeOrRefuse($again, $test);
+                    return $this->resumeOrRefuse($session, $again, $test);
                 }
             }
 
@@ -99,6 +99,12 @@ class AttemptController extends Controller
 
         if ($attempt->status === AttemptStatus::Completed) {
             return response()->json($this->completedPayload($attempt));
+        }
+
+        // Reading an open attempt hands back its questions, so it is the same
+        // door as resuming and takes the same key.
+        if (! $this->mayReopen($this->session($request), $attempt)) {
+            return response()->json(['message' => __('This test is not available to start.')], 403);
         }
 
         return response()->json($this->openPayload($attempt, $attempt->test));
@@ -195,13 +201,31 @@ class AttemptController extends Controller
         return $attempt->status !== AttemptStatus::Completed || ! $attempt->is_practice;
     }
 
-    private function resumeOrRefuse(Attempt $attempt, Test $test): JsonResponse
+    private function resumeOrRefuse(StudentSession $session, Attempt $attempt, Test $test): JsonResponse
     {
         if ($attempt->status === AttemptStatus::Completed) {
             return response()->json(['message' => __('This test has already been submitted.')], 409);
         }
 
+        if (! $this->mayReopen($session, $attempt)) {
+            return response()->json(['message' => __('This test is not available to start.')], 403);
+        }
+
         return response()->json($this->openPayload($attempt, $test));
+    }
+
+    /**
+     * An open attempt is not a key. Getting back into one goes through the same
+     * door as starting it: the exam password must be cleared for its quiz in
+     * THIS session (ADR-0055). Without it a competitor who identified again —
+     * for the results screen, say — could carry on a contest test the room had
+     * already closed behind them, and the questions would come back with it.
+     * Practice is untouched: a sample quiz asks for no password, so it is open
+     * to every session by definition.
+     */
+    private function mayReopen(StudentSession $session, Attempt $attempt): bool
+    {
+        return StudentAvailability::quizIsOpenTo($session, $attempt->quiz_id);
     }
 
     /**

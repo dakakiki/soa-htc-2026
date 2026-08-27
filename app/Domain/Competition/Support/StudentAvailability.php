@@ -103,6 +103,23 @@ final class StudentAvailability
             ->get();
     }
 
+    /**
+     * Whether this session may be inside $quizId at all — the exam password is
+     * cleared for it, or it never asked for one. Public because getting BACK
+     * into an attempt is gated by the same door as starting one: an attempt
+     * already open is not a way past the password (ADR-0055).
+     */
+    public static function quizIsOpenTo(StudentSession $session, ?int $quizId): bool
+    {
+        if ($quizId === null) {
+            return false;
+        }
+
+        $quiz = Quiz::query()->whereKey($quizId)->first();
+
+        return $quiz !== null && self::isOpen($quiz, self::unlockedIds($session));
+    }
+
     /** @return array<int> */
     private static function unlockedIds(StudentSession $session): array
     {

@@ -499,6 +499,48 @@ class AttemptTest extends TestCase
         $this->withToken($again)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->assertStatus(409);
     }
 
+    public function test_an_open_contest_attempt_cannot_be_reopened_without_the_exam_password(): void
+    {
+        $c = $this->quizWithTests('H2', 1, 'competition', 'secret-code');
+        $token = $this->tokenFor('H2');
+        $registration = Registration::latest('id')->firstOrFail();
+
+        $this->withToken($token)->postJson("/api/student/quizzes/{$c['quiz']->id}/unlock", ['password' => 'secret-code'])->assertOk();
+        $attemptId = $this->withToken($token)
+            ->postJson("/api/student/tests/{$c['tests'][0]->id}/start")
+            ->assertStatus(201)
+            ->json('attempt.id');
+
+        // A fresh session with nothing unlocked — identifying for the results
+        // screen looks exactly like this. The attempt is still open, and that
+        // must not be a way back into a test the room has closed.
+        $again = $this->identifyAgain($registration);
+
+        $this->withToken($again)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->assertStatus(403);
+        $this->withToken($again)->getJson("/api/student/attempts/{$attemptId}")->assertStatus(403);
+
+        // The password puts them back in — and, by the rule above, ends the run.
+        $this->withToken($again)->postJson("/api/student/quizzes/{$c['quiz']->id}/unlock", ['password' => 'secret-code'])->assertOk();
+        $this->assertSame(AttemptStatus::Completed, Attempt::findOrFail($attemptId)->status);
+    }
+
+    public function test_an_open_practice_attempt_reopens_from_any_session(): void
+    {
+        $c = $this->quizWithTests('H2', 1);
+        $token = $this->tokenFor('H2');
+        $registration = Registration::latest('id')->firstOrFail();
+
+        $attemptId = $this->withToken($token)
+            ->postJson("/api/student/tests/{$c['tests'][0]->id}/start")
+            ->assertStatus(201)
+            ->json('attempt.id');
+
+        // Sample asks for no password, so there is no door to be shut out of.
+        $again = $this->identifyAgain($registration);
+        $this->withToken($again)->getJson("/api/student/attempts/{$attemptId}")->assertOk();
+        $this->withToken($again)->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->assertOk();
+    }
+
     public function test_coming_back_leaves_an_open_practice_attempt_alone(): void
     {
         $sample = $this->quizWithTests('H2', 1);
