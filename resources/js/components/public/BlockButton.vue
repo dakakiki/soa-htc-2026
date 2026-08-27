@@ -16,6 +16,13 @@ import type { PublicBlockButton } from '@/types/models';
  */
 const props = defineProps<{
     button: PublicBlockButton;
+    /**
+     * Draw it in this style instead of its own. The one caller is the hero, where
+     * the action left standing takes the departed one's place out of season
+     * (owner, 2026-08-24) — a season is not something an admin can hold two
+     * styles for, so the page makes that swap rather than the payload.
+     */
+    styleAs?: PublicBlockButton['style'];
     /** On a navy section the outline and link styles have to invert. */
     onDark?: boolean;
     full?: boolean;
@@ -27,7 +34,7 @@ const pill = 'rounded-full px-7 py-3.5';
 const classes = computed(() => {
     const width = props.full ? 'w-full' : '';
 
-    switch (props.button.style) {
+    switch (props.styleAs ?? props.button.style) {
         case 'primary':
             return `${base} ${pill} ${width} bg-brand-palette-2 font-semibold text-white hover:brightness-95`;
         case 'navy':

@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import BlockButton from '@/components/public/BlockButton.vue';
-import type { PublicBlock, PublicBlockButton } from '@/types/models';
+import ShutNote from '@/components/public/ShutNote.vue';
+import { isShut, type PublicBlock, type PublicBlockButton, type PublicBlockSlot } from '@/types/models';
 
 /** `block_CompetitionRules`: the sky band, with the two country groups. */
 const props = defineProps<{ block: PublicBlock }>();
 
 const c = computed(() => props.block.content as Record<string, string>);
 const groups = computed(() => (props.block.content.groups ?? []) as { numeral: string; title: string; text: string }[]);
-const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBlockButton[]);
+/*
+ * Neither of this section's buttons is gated today, but a gate is two fields in
+ * the editor away — so the row splits actions from closed-season notes here as
+ * well, rather than drawing a marker as an empty control the day somebody sets
+ * one ({@see LayoutButtons::shut}).
+ */
+const slots = computed(() => (props.block.content.buttons ?? []) as PublicBlockSlot[]);
+const buttons = computed(() => slots.value.filter((slot): slot is PublicBlockButton => !isShut(slot)));
+const shut = computed(() => slots.value.filter(isShut));
 </script>
 
 <template>
@@ -24,8 +33,9 @@ const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBloc
                     </h2>
                     <div v-if="c.lead" class="rich-text max-w-[420px] text-[17px] leading-relaxed text-brand-palette-4/75"
                         v-html="c.lead"></div>
-                    <div v-if="buttons.length" class="flex flex-wrap items-center gap-4 pt-1">
-                        <BlockButton v-for="(button, i) in buttons" :key="i" :button="button" />
+                    <div v-if="slots.length" class="flex flex-wrap items-center gap-x-5 gap-y-4 pt-1">
+                        <BlockButton v-for="(button, i) in buttons" :key="`b${i}`" :button="button" />
+                        <ShutNote v-for="(slot, i) in shut" :key="`s${i}`" :note="slot.note" />
                     </div>
                 </div>
 

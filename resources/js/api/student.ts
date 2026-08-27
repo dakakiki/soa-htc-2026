@@ -21,8 +21,14 @@ export interface IdentifyPayload {
     date_of_birth: string;
 }
 
-export function identify(payload: IdentifyPayload) {
-    return http.post<StudentIdentifyResult>('/api/student/identify', payload);
+/**
+ * `mode` is the door the competitor came through. The server needs it to answer
+ * a shut stream as a shut stream: without it the only thing it could say was
+ * that the details did not match, which was untrue and sent people back to
+ * re-read a correct candidate number (2026-08-27).
+ */
+export function identify(payload: IdentifyPayload, mode?: string) {
+    return http.post<StudentIdentifyResult>('/api/student/identify', mode ? { ...payload, mode } : payload);
 }
 
 export function me(token: string) {

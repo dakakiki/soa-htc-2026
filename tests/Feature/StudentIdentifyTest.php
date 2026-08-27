@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Models\StudentSession;
 use App\Domain\Organization\Models\School;
@@ -198,6 +200,118 @@ class StudentIdentifyTest extends TestCase
         $this->postJson('/api/student/identify', $wrong)
             ->assertStatus(429)
             ->assertJsonPath('message', fn (string $m) => str_contains($m, 'Too many attempts'));
+    }
+
+    /*
+     * The stream gate (2026-08-27). Before this the entry screens hid a shut
+     * stream's BUTTON and nothing more: a bookmark reached the full form, and a
+     * competitor whose candidate number, country and date of birth were all
+     * correct was told "We could not verify your details" - because a closed
+     * season could only arrive at the page as a failed identification.
+     */
+
+    private function openWindow(QuizType $type): Quiz
+    {
+        return Quiz::create(['title' => 'Q '.$type->value, 'quiz_type' => $type, 'status' => 'active']);
+    }
+
+    public function test_a_shut_live_stream_says_so_instead_of_blaming_the_details(): void
+    {
+        $r = $this->registration();
+
+        $response = $this->postJson('/api/student/identify', $this->payload($r, ['mode' => 'competition']))
+            ->assertStatus(409);
+
+        $this->assertSame('Live exams are not open right now.', $response->json('message'));
+        // The sentence that used to be shown, and the whole point of this.
+        $this->assertStringNotContainsString('verify your details', (string) $response->json('message'));
+    }
+
+    /**
+     * The collateral damage. Identification revokes the registration's earlier
+     * sessions, so a doomed live entry used to sign out a competitor who was
+     * practising in another tab. Refusing before the lookup leaves them alone.
+     */
+    public function test_a_refused_live_entry_leaves_an_open_session_working(): void
+    {
+        $r = $this->registration();
+        $this->openWindow(QuizType::Sample);
+
+        $token = $this->postJson('/api/student/identify', $this->payload($r, ['mode' => 'sample']))
+            ->assertOk()->json('token');
+
+        $this->postJson('/api/student/identify', $this->payload($r, ['mode' => 'competition']))
+            ->assertStatus(409);
+
+        $this->withToken($token)->getJson('/api/student/me')->assertOk();
+        $this->assertSame(0, StudentSession::query()->whereNotNull('revoked_at')->count());
+    }
+
+    public function test_the_same_request_succeeds_once_the_season_opens(): void
+    {
+        $r = $this->registration();
+
+        $this->postJson('/api/student/identify', $this->payload($r, ['mode' => 'competition']))->assertStatus(409);
+
+        $this->openWindow(QuizType::Competition);
+
+        $this->postJson('/api/student/identify', $this->payload($r, ['mode' => 'competition']))
+            ->assertOk()
+            ->assertJsonStructure(['token', 'expires_at', 'registration']);
+    }
+
+    public function test_a_shut_sample_stream_says_what_is_missing(): void
+    {
+        $r = $this->registration();
+
+        // A live quiz does not open the sample's door.
+        $this->openWindow(QuizType::Competition);
+
+        $this->postJson('/api/student/identify', $this->payload($r, ['mode' => 'sample']))
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'No sample test is published just now.');
+    }
+
+    /**
+     * Looking back at what has already been sat needs nothing published, so this
+     * stream is never shut (owner, 2026-08-27) - the same rule that lets the
+     * front page keep its results button when the practice one goes.
+     */
+    public function test_the_results_stream_is_never_shut(): void
+    {
+        $r = $this->registration();
+
+        $this->postJson('/api/student/identify', $this->payload($r, ['mode' => 'results']))->assertOk();
+    }
+
+    /** A shut stream is refused whatever the details were: it leaks nothing. */
+    public function test_a_shut_stream_is_refused_before_the_details_are_looked_at(): void
+    {
+        $this->registration();
+
+        $this->postJson('/api/student/identify', [
+            'competitor_number' => '99999999',
+            'country_id' => 1,
+            'date_of_birth' => '2000-01-01',
+            'mode' => 'competition',
+        ])->assertStatus(409);
+    }
+
+    /** Identification on its own is stream-agnostic and stays that way. */
+    public function test_a_request_that_names_no_stream_identifies_as_before(): void
+    {
+        $r = $this->registration();
+
+        $this->postJson('/api/student/identify', $this->payload($r))->assertOk();
+    }
+
+    public function test_a_stream_the_application_does_not_have_is_rejected(): void
+    {
+        $r = $this->registration();
+
+        $this->postJson('/api/student/identify', $this->payload($r, ['mode' => 'archive']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('mode');
     }
 
     public function test_a_session_left_alone_past_its_lifetime_is_not_revived(): void

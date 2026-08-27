@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import BlockButton from '@/components/public/BlockButton.vue';
-import type { PublicBlock, PublicBlockButton } from '@/types/models';
+import ShutNote from '@/components/public/ShutNote.vue';
+import { isShut, type PublicBlock, type PublicBlockButton, type PublicBlockSlot } from '@/types/models';
 
 /**
  * `block_Coordinators`: the one dark band in the middle of the page. Same
@@ -11,7 +12,15 @@ import type { PublicBlock, PublicBlockButton } from '@/types/models';
 const props = defineProps<{ block: PublicBlock }>();
 
 const c = computed(() => props.block.content as Record<string, string>);
-const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBlockButton[]);
+/*
+ * Neither of this section's buttons is gated today, but a gate is two fields in
+ * the editor away — so the row splits actions from closed-season notes here as
+ * well, rather than drawing a marker as an empty control the day somebody sets
+ * one ({@see LayoutButtons::shut}).
+ */
+const slots = computed(() => (props.block.content.buttons ?? []) as PublicBlockSlot[]);
+const buttons = computed(() => slots.value.filter((slot): slot is PublicBlockButton => !isShut(slot)));
+const shut = computed(() => slots.value.filter(isShut));
 </script>
 
 <template>
@@ -31,8 +40,9 @@ const buttons = computed(() => (props.block.content.buttons ?? []) as PublicBloc
                     {{ c.title }}
                 </h2>
                 <div v-if="c.lead" class="rich-text max-w-[460px] text-[17px] leading-relaxed text-white/70" v-html="c.lead"></div>
-                <div v-if="buttons.length" class="flex flex-wrap items-center gap-5 pt-1">
-                    <BlockButton v-for="(button, i) in buttons" :key="i" :button="button" on-dark />
+                <div v-if="slots.length" class="flex flex-wrap items-center gap-x-6 gap-y-4 pt-1">
+                    <BlockButton v-for="(button, i) in buttons" :key="`b${i}`" :button="button" on-dark />
+                    <ShutNote v-for="(slot, i) in shut" :key="`s${i}`" :note="slot.note" on-dark />
                 </div>
             </div>
         </div>

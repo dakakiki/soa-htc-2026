@@ -9,6 +9,7 @@ use App\Domain\Cms\Models\LayoutBlock;
 use App\Domain\Cms\Models\Menu;
 use App\Domain\Cms\Support\BlockSchema;
 use App\Domain\Cms\Support\LayoutZones;
+use App\Domain\Cms\Support\PublicRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CmsLayoutBlockResource;
 use Illuminate\Http\Request;
@@ -64,6 +65,10 @@ class LayoutController extends Controller
                 'button_styles' => BlockSchema::BUTTON_STYLES,
                 'target_types' => BlockSchema::TARGET_TYPES,
                 'gates' => BlockSchema::GATES,
+                // The screens a `route` target may name. Shipped rather than
+                // typed: the editor used to offer a free text box, where one
+                // wrong character published a button that led to Not Found.
+                'routes' => PublicRoutes::options(),
                 // Options for every `menu` field, shipped with the registry so the
                 // form does not need a second request to know what it may offer.
                 'menus' => Menu::query()

@@ -85,31 +85,54 @@
 /*
  * Rendering for admin-authored rich text on the public site (CMS pages and
  * posts). Tailwind's reset strips headings, lists and links, and the editor's
- * own styles are scoped to the editor — so the published article needs its own,
+ * own styles are scoped to the editor - so the published article needs its own,
  * at reading size rather than form size.
+ *
+ * Redrawn 2026-08-27 in the site's own language. It used to be set in the
+ * ADMIN's colours - body `#1f2937`, links `--color-brand-link` (the admin
+ * blue), grey rules and grey table lines - which is most of why an article read
+ * as a different website from the page that linked to it. Every colour here is
+ * now a palette slot, so re-skinning the theme carries the article with it.
+ *
+ * `color-mix` rather than a hex: the palette is a runtime CSS variable the admin
+ * can change, and a fixed tint would drift away from it the moment they did.
  */
 .cms-content {
-    color: #1f2937;
-    line-height: 1.7;
+    color: color-mix(in srgb, var(--color-brand-palette-4, #003758) 82%, transparent);
+    font-size: 1.125rem;
+    line-height: 1.75;
 }
 .cms-content p {
-    margin: 0 0 1rem;
+    margin: 0 0 1.15em;
 }
 .cms-content h2 {
-    font-size: 1.5rem;
+    font-size: 1.6875rem;
     font-weight: 600;
-    letter-spacing: -0.01em;
-    margin: 2rem 0 0.75rem;
+    letter-spacing: -0.028em;
+    line-height: 1.2;
+    margin: 2.2em 0 0.6em;
+    color: var(--color-brand-palette-4, #003758);
 }
 .cms-content h3 {
-    font-size: 1.2rem;
+    font-size: 1.3125rem;
     font-weight: 600;
-    margin: 1.5rem 0 0.5rem;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin: 1.8em 0 0.5em;
+    color: var(--color-brand-palette-4, #003758);
+}
+/*
+ * Everything the editor can emit bold, capped at 600. The font pipeline ships
+ * 400/500/600 only, so a browser-default 700 is SYNTHESISED - it prints heavier
+ * and blurrier than any weight the design uses, and only in admin-written text.
+ */
+.cms-content :is(strong, b, h1, h2, h3, h4, h5, h6) {
+    font-weight: 600;
 }
 .cms-content ul,
 .cms-content ol {
-    padding-left: 1.5rem;
-    margin: 0 0 1rem;
+    padding-left: 1.25rem;
+    margin: 0 0 1.15em;
 }
 .cms-content ul {
     list-style: disc;
@@ -118,49 +141,72 @@
     list-style: decimal;
 }
 .cms-content li {
-    margin: 0.25rem 0;
+    margin: 0.3em 0;
 }
 .cms-content a {
-    color: var(--color-brand-link, #2563eb);
+    color: var(--color-brand-palette-4, #003758);
     text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.cms-content a:hover {
+    color: var(--color-brand-palette-2, #f39200);
 }
 .cms-content blockquote {
-    border-left: 3px solid var(--color-brand-palette-3, #97bddd);
-    padding-left: 1rem;
-    margin: 0 0 1rem;
-    color: #4b5563;
+    border-left: 2px solid var(--color-brand-palette-2, #f39200);
+    padding-left: 1.25rem;
+    margin: 1.6em 0;
+    color: var(--color-brand-palette-4, #003758);
 }
+/* Photographs are not in boxes here either - see the hero (ADR-0043). */
 .cms-content img {
     max-width: 100%;
     height: auto;
-    border-radius: 0.5rem;
 }
 .cms-content hr {
     border: 0;
-    border-top: 1px solid #e5e7eb;
-    margin: 2rem 0;
+    border-top: 1px solid color-mix(in srgb, var(--color-brand-palette-4, #003758) 15%, transparent);
+    margin: 2.5rem 0;
 }
 
-/* Tables and images an author inserted in the article editor. */
+/*
+ * Tables and images an author inserted in the article editor.
+ *
+ * 🪤 The table SCROLLS rather than stretching the page. A five-column table
+ * on a phone used to widen the whole document, so every other line on the screen
+ * gained a horizontal scrollbar and the layout broke out of its container - one
+ * table pasted into one article, and the site was crooked.
+ *
+ * `display: block` is what makes that possible: the element becomes a scrolling
+ * block box, and its rows generate an anonymous table inside it, so the table
+ * still lays out as a table. The price is that it shrinks to its content instead
+ * of filling the measure, which is why the width is a MINIMUM. It cannot be done
+ * by wrapping the table in a scrolling div - this is admin-authored HTML that
+ * arrives through `v-html`, with nowhere to hang a wrapper.
+ */
 .cms-content table {
-    width: 100%;
+    display: block;
+    width: fit-content;
+    min-width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
     border-collapse: collapse;
-    margin: 0 0 1rem;
-    font-size: 0.95rem;
+    margin: 0 0 1.15em;
+    font-size: 1rem;
 }
 .cms-content th,
 .cms-content td {
-    border: 1px solid #d1d5db;
-    padding: 0.5rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--color-brand-palette-4, #003758) 15%, transparent);
+    padding: 0.625rem 0.875rem;
     text-align: left;
     vertical-align: top;
 }
 .cms-content th {
-    background: #f9fafb;
+    background: color-mix(in srgb, var(--color-brand-palette-3, #97bddd) 22%, transparent);
     font-weight: 600;
+    color: var(--color-brand-palette-4, #003758);
 }
 .cms-content figure {
-    margin: 0 0 1rem;
+    margin: 0 0 1.15em;
 }
 
 /*

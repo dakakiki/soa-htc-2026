@@ -98,6 +98,7 @@ function emptyButton(): LayoutButtonValue {
         style: props.registry.button_styles[0] ?? 'primary',
         status: true,
         gate: null,
+        closed_note: null,
         target: { type: 'route', id: null, value: null },
     };
 }

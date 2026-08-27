@@ -85,8 +85,18 @@ async function loadChrome(zone: string): Promise<Record<string, unknown> | null>
     }
 }
 
+/**
+ * A click anywhere else closes what is open.
+ *
+ * 🪤 It used to close the desktop dropdown ONLY, and the drawer was left to
+ * be dismissed by its own button or by following a link - on the one screen
+ * where the drawer also locks the page behind it. The `@click.stop` guards on
+ * the toggle and on the drawer were already here for this; nothing was reading
+ * them (2026-08-27).
+ */
 function onClickOutside(): void {
     openSub.value = null;
+    mobileOpen.value = false;
 }
 
 /** `/#block_Start` → `#block_Start`; anything without a hash → ''. */
