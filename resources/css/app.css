@@ -162,3 +162,17 @@
 .cms-content figure {
     margin: 0 0 1rem;
 }
+
+/*
+ * Check results: the two streams are told apart by colour as well as by their
+ * headings, because a competitor scanning the page reads the marks before the
+ * labels. Both blues come from the theme's own palette slots — practice is the
+ * deep one lightened toward the pale one — so changing the theme carries both
+ * and they can never drift into the same colour.
+ */
+.stream-contest {
+    color: var(--color-brand-palette-4, #003758);
+}
+.stream-practice {
+    color: color-mix(in oklab, var(--color-brand-palette-4, #003758) 60%, var(--color-brand-palette-3, #97bddd));
+}

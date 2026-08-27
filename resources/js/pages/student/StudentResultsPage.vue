@@ -36,24 +36,38 @@ function doneTests(exam: AvailabilityExam): AvailabilityTest[] {
     return exam.tests.filter((test) => test.status === 'completed');
 }
 
-/**
- * One stream, reduced to what it actually holds: quizzes → rounds → finished
- * tests, with everything empty dropped so no heading stands over nothing.
- */
-function streamOf(mode: 'competition' | 'sample') {
-    return quizzes.value
-        .filter((quiz) => quiz.mode === mode)
-        .map((quiz) => ({
-            ...quiz,
-            exams: quiz.exams
-                .map((exam) => ({ ...exam, tests: doneTests(exam) }))
-                .filter((exam) => exam.tests.length > 0),
-        }))
-        .filter((quiz) => quiz.exams.length > 0);
+interface ResultBlock {
+    key: string;
+    round: string | null;
+    quiz: string;
+    tests: AvailabilityTest[];
 }
 
-const competition = computed(() => streamOf('competition'));
-const practice = computed(() => streamOf('sample'));
+/**
+ * One stream, flattened to what the screen shows: a block per round, carrying
+ * the paper it was sat on. The ROUND leads (owner, 2026-08-27) — it is what a
+ * competitor looks for first, and the quiz only says which paper that was — so
+ * a quiz spanning two rounds prints its title over each of them rather than
+ * once above both. Everything empty is dropped, so no heading ever stands over
+ * nothing.
+ */
+function blocksOf(mode: 'competition' | 'sample'): ResultBlock[] {
+    return quizzes.value
+        .filter((quiz) => quiz.mode === mode)
+        .flatMap((quiz) =>
+            quiz.exams
+                .map((exam) => ({
+                    key: `${quiz.id}-${exam.id}`,
+                    round: exam.round,
+                    quiz: quiz.title,
+                    tests: doneTests(exam),
+                }))
+                .filter((block) => block.tests.length > 0),
+        );
+}
+
+const competition = computed(() => blocksOf('competition'));
+const practice = computed(() => blocksOf('sample'));
 const nothingAtAll = computed(() => competition.value.length === 0 && practice.value.length === 0);
 
 async function load(): Promise<void> {
@@ -90,34 +104,37 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
         </p>
 
         <!-- Contest left, practice right. They are two different things — one
-             counts, one does not — so they never share a list. -->
+             counts, one does not — so they never share a list, and each column
+             carries its own blue (`stream-contest` / `stream-practice`) that
+             everything inside it inherits. -->
         <div v-else class="mt-10 grid gap-12 lg:mt-12 lg:grid-cols-2 lg:gap-16">
             <div v-for="column in [
-                { key: 'competition', heading: $t('student.results.contest'), quizzes: competition, note: $t('student.results.contestNote') },
-                { key: 'sample', heading: $t('student.results.practice'), quizzes: practice, note: $t('student.results.practiceNote') },
-            ]" :key="column.key">
-                <p class="border-b-2 border-brand-palette-4/25 pb-3 font-semibold"
-                    :class="[mono, 'text-[13px]', column.key === 'competition' ? 'text-brand-palette-4' : 'text-brand-palette-2']">
+                { key: 'competition', tone: 'stream-contest', heading: $t('student.results.contest'), blocks: competition, note: $t('student.results.contestNote') },
+                { key: 'sample', tone: 'stream-practice', heading: $t('student.results.practice'), blocks: practice, note: $t('student.results.practiceNote') },
+            ]" :key="column.key" :class="column.tone">
+                <p class="border-b-2 border-current/30 pb-3 font-semibold" :class="[mono, 'text-[16px] lg:text-[18px]']">
                     {{ column.heading }}
                 </p>
 
-                <p v-if="column.quizzes.length === 0" class="pt-6 text-[15px] text-brand-palette-4/55">
+                <p v-if="column.blocks.length === 0" class="pt-6 text-[15px] opacity-60">
                     {{ column.note }}
                 </p>
 
-                <article v-for="quiz in column.quizzes" :key="quiz.id" class="pt-7">
-                    <h2 class="text-[19px] font-medium tracking-[-0.02em] lg:text-[21px]">{{ quiz.title }}</h2>
+                <article v-for="block in column.blocks" :key="block.key" class="pt-8">
+                    <!-- The round leads; the paper it was sat on comes under it. -->
+                    <p v-if="block.round" class="font-semibold" :class="[mono, 'text-[15px] lg:text-[16px]']">
+                        {{ block.round }}
+                    </p>
+                    <h2 class="mt-1.5 text-[19px] font-medium tracking-[-0.02em] opacity-80 lg:text-[21px]">
+                        {{ block.quiz }}
+                    </h2>
 
-                    <section v-for="exam in quiz.exams" :key="exam.id" class="mt-5">
-                        <p v-if="exam.round" class="mb-1.5 font-semibold text-brand-palette-4/60" :class="[mono, 'text-[12px]']">
-                            {{ exam.round }}
-                        </p>
-
-                        <div v-for="test in exam.tests" :key="test.id"
-                            class="flex items-center gap-4 border-b border-brand-palette-4/10 py-4 last:border-b-0">
+                    <div class="mt-4">
+                        <div v-for="test in block.tests" :key="test.id"
+                            class="flex items-center gap-4 border-b border-current/10 py-4 last:border-b-0">
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-baseline gap-2.5">
-                                    <span v-if="test.type" :class="[mono, 'text-[12px]']" class="font-semibold text-brand-palette-4">{{ test.type }}</span>
+                                    <span v-if="test.type" :class="[mono, 'text-[12px]']" class="font-semibold opacity-70">{{ test.type }}</span>
                                 </div>
                                 <p class="mt-1 text-[17px] font-medium tracking-[-0.02em] lg:text-[19px]">{{ test.title }}</p>
                             </div>
@@ -127,7 +144,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                                      of this screen. -->
                                 <p v-if="test.published && test.score !== null"
                                     class="text-[22px] font-semibold tracking-[-0.02em] lg:text-[26px]">
-                                    {{ test.score }}<span class="text-[15px] text-brand-palette-4/45">/{{ test.max_score }}</span>
+                                    {{ test.score }}<span class="text-[15px] opacity-50">/{{ test.max_score }}</span>
                                 </p>
 
                                 <p class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palette-2 px-3 py-1 text-white"
@@ -139,12 +156,12 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                                 <!-- Not published: sat, marked or not, but not
                                      released. Said in the same words as the
                                      contest list, so the two agree. -->
-                                <p v-if="!test.published" class="mt-1.5 text-[13px] text-brand-palette-4/60">
+                                <p v-if="!test.published" class="mt-1.5 text-[13px] opacity-70">
                                     {{ $t('student.dashboard.awaitingResult') }}
                                 </p>
                             </div>
                         </div>
-                    </section>
+                    </div>
                 </article>
             </div>
         </div>
