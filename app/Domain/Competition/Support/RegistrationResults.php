@@ -44,7 +44,7 @@ final class RegistrationResults
         }
 
         $columns = [];
-        foreach (DB::table('exam_rounds')->where('name', '!=', self::EXCLUDED_ROUND)->orderBy('id')->get(['id', 'name']) as $round) {
+        foreach (DB::table('exam_rounds')->where('name', '!=', self::EXCLUDED_ROUND)->orderBy('sort_order')->orderBy('id')->get(['id', 'name']) as $round) {
             $types = $typesByRound[$round->id] ?? [];
             ksort($types); // by test-type id → Reading first, then Writing/Speaking/Use of English
 
@@ -123,7 +123,9 @@ final class RegistrationResults
             ->join('tests', 'tests.id', '=', 'registration_results.test_id')
             ->leftJoin('test_types', 'test_types.id', '=', 'registration_results.test_type_id')
             ->where('registration_results.registration_id', $registrationId)
-            // Latest round first — World final (if any) down to Preliminary.
+            // Latest round first — World final (if any) down to Preliminary,
+            // by the order the rounds are configured in, not by row id.
+            ->orderByDesc('exam_rounds.sort_order')
             ->orderByDesc('exam_rounds.id')
             ->orderBy('registration_results.test_type_id')
             ->get([

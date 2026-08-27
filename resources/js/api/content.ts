@@ -5,6 +5,8 @@ export interface Lookup {
     id: number;
     name: string;
     active?: boolean;
+    /** Exam rounds only: the position they run in. */
+    sort_order?: number;
 }
 
 export interface LookupPayload {
@@ -23,5 +25,12 @@ function lookupApi(base: string) {
 }
 
 export const testTypesApi = lookupApi('test-types');
-export const examRoundsApi = lookupApi('exam-rounds');
+export const examRoundsApi = {
+    ...lookupApi('exam-rounds'),
+    /**
+     * The whole order at once. The server numbers the rounds from this array,
+     * so a move is one request and the list can never end up half-renumbered.
+     */
+    reorder: (ids: number[]) => http.put<{ data: Lookup[] }>('/api/exam-rounds/reorder', { ids }),
+};
 export const questionTagsApi = lookupApi('question-tags');

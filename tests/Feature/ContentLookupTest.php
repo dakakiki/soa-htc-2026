@@ -91,6 +91,49 @@ class ContentLookupTest extends TestCase
             ->assertJsonPath('data.active', false);
     }
 
+    public function test_exam_rounds_come_back_in_running_order(): void
+    {
+        $this->actingAs($this->admin())
+            ->getJson('/api/exam-rounds')
+            ->assertOk()
+            ->assertJsonPath('data.0.name', 'Preliminary round')
+            ->assertJsonPath('data.0.sort_order', 1)
+            ->assertJsonPath('data.4.name', 'Sample')
+            ->assertJsonPath('data.4.sort_order', 5);
+    }
+
+    public function test_admin_can_reorder_exam_rounds(): void
+    {
+        $ids = ExamRound::query()->orderBy('sort_order')->pluck('id')->all();
+        // Move the last round to the front — the case the row ids could not do.
+        $moved = array_merge([array_pop($ids)], $ids);
+
+        $this->actingAs($this->admin())
+            ->putJson('/api/exam-rounds/reorder', ['ids' => $moved])
+            ->assertOk()
+            ->assertJsonPath('data.0.name', 'Sample')
+            ->assertJsonPath('data.0.sort_order', 1);
+
+        $this->assertSame($moved, ExamRound::query()->orderBy('sort_order')->pluck('id')->all());
+    }
+
+    public function test_a_new_exam_round_lands_at_the_end(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/exam-rounds', ['name' => 'Play-off'])
+            ->assertCreated()
+            ->assertJsonPath('data.sort_order', 6);
+    }
+
+    public function test_non_manager_cannot_reorder_exam_rounds(): void
+    {
+        $ids = ExamRound::query()->orderBy('sort_order')->pluck('id')->all();
+
+        $this->actingAs($this->nonManager())
+            ->putJson('/api/exam-rounds/reorder', ['ids' => array_reverse($ids)])
+            ->assertForbidden();
+    }
+
     public function test_non_manager_is_forbidden(): void
     {
         $user = $this->nonManager();

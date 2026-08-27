@@ -8,10 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class ExamRound extends Model
 {
-    protected $fillable = ['name', 'active', 'legacy_id'];
+    protected $fillable = ['name', 'active', 'sort_order', 'legacy_id'];
 
     protected function casts(): array
     {
-        return ['active' => 'boolean', 'legacy_id' => 'integer'];
+        return ['active' => 'boolean', 'sort_order' => 'integer', 'legacy_id' => 'integer'];
     }
 }

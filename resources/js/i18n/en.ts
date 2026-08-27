@@ -1222,6 +1222,8 @@ export default {
         examRounds: 'Exam rounds',
         tags: 'Question tags',
         id: 'ID',
+        order: 'Order',
+        reorderFailed: 'Could not save the new order.',
         name: 'Name',
         active: 'Active',
         toggleActive: 'Toggle active',

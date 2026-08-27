@@ -202,6 +202,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Content configuration lookups (admin-only; gated in the controllers).
     Route::apiResource('test-types', TestTypeController::class)->only(['index', 'store', 'update', 'destroy']);
+    // Before the resource, or `reorder` is read as a round id.
+    Route::put('exam-rounds/reorder', [ExamRoundController::class, 'reorder']);
     Route::apiResource('exam-rounds', ExamRoundController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('question-tags', QuestionTagController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('questions', QuestionController::class)->only(['index', 'show', 'store', 'update', 'destroy']);

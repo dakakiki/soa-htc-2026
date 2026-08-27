@@ -8,7 +8,7 @@ import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import Tooltip from '@/components/Tooltip.vue';
-import { IconPencil, IconTrash, IconPlus } from '@tabler/icons-vue';
+import { IconPencil, IconTrash, IconPlus, IconGripVertical } from '@tabler/icons-vue';
 
 const props = defineProps<{ kind: 'testType' | 'examRound' | 'tag' }>();
 
@@ -18,9 +18,11 @@ const confirm = useConfirmStore();
 const canManage = computed(() => session.can('content.manage'));
 
 const CONFIG = {
-    testType: { api: testTypesApi, title: 'content.testTypes', add: 'content.addTestType', hasActive: false },
-    examRound: { api: examRoundsApi, title: 'content.examRounds', add: 'content.addExamRound', hasActive: true },
-    tag: { api: questionTagsApi, title: 'content.tags', add: 'content.addTag', hasActive: false },
+    testType: { api: testTypesApi, title: 'content.testTypes', add: 'content.addTestType', hasActive: false, ordered: false },
+    // Rounds run in an order and everything else reads it from here, so this is
+    // the one lookup that shows its position instead of its row id.
+    examRound: { api: examRoundsApi, title: 'content.examRounds', add: 'content.addExamRound', hasActive: true, ordered: true },
+    tag: { api: questionTagsApi, title: 'content.tags', add: 'content.addTag', hasActive: false, ordered: false },
 } as const;
 const cfg = computed(() => CONFIG[props.kind]);
 
@@ -81,6 +83,69 @@ async function onToggleActive(item: Lookup, value: boolean): Promise<void> {
         error.value = apiErrorMessage(e);
     }
 }
+// Row being dragged, and the order the drag started from — the fallback if the
+// server refuses the new one.
+const dragIndex = ref<number | null>(null);
+const dragFrom = ref<Lookup[] | null>(null);
+
+/** Move a row within the list. Local only; dropping is what saves. */
+function move(from: number, to: number): void {
+    if (to < 0 || to >= items.value.length || from === to) {
+        return;
+    }
+    const list = items.value.slice();
+    const [row] = list.splice(from, 1);
+    list.splice(to, 0, row);
+    items.value = list;
+}
+
+function onDragStart(i: number): void {
+    dragIndex.value = i;
+    dragFrom.value = items.value;
+}
+
+// Live-reorder as the pointer passes over another row, the way the menu editor does.
+function onDragOver(i: number): void {
+    if (dragIndex.value === null || dragIndex.value === i) {
+        return;
+    }
+    move(dragIndex.value, i);
+    dragIndex.value = i;
+}
+
+/**
+ * Dropping is what saves. The rows have already moved, so a refusal puts the
+ * list back where the drag started rather than leaving the screen lying about
+ * an order the server never took.
+ */
+async function onDragEnd(): Promise<void> {
+    const previous = dragFrom.value;
+    dragIndex.value = null;
+    dragFrom.value = null;
+    if (previous === null || previous.map((i) => i.id).join() === items.value.map((i) => i.id).join()) {
+        return;
+    }
+    error.value = null;
+    try {
+        const { data } = await examRoundsApi.reorder(items.value.map((i) => i.id));
+        items.value = data.data;
+    } catch (e) {
+        items.value = previous;
+        error.value = apiErrorMessage(e, t('content.reorderFailed'));
+    }
+}
+
+/** Keyboard equivalent of the drag, so the order is not mouse-only. */
+async function onGripKey(i: number, delta: number): Promise<void> {
+    const previous = items.value;
+    move(i, i + delta);
+    if (items.value === previous) {
+        return;
+    }
+    dragFrom.value = previous;
+    await onDragEnd();
+}
+
 async function remove(item: Lookup): Promise<void> {
     if (!(await confirm.ask({ message: t('content.confirmDelete', { name: item.name }) }))) {
         return;
@@ -119,15 +184,32 @@ onMounted(load);
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                     <tr>
-                        <th class="px-4 py-3">{{ $t('content.id') }}</th>
+                        <th class="px-4 py-3">{{ cfg.ordered ? $t('content.order') : $t('content.id') }}</th>
                         <th class="px-4 py-3">{{ $t('content.name') }}</th>
                         <th v-if="cfg.hasActive" class="px-4 py-3">{{ $t('content.active') }}</th>
                         <th class="px-4 py-3 text-right">{{ $t('common.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="item in items" :key="item.id" class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft">
-                        <td class="px-4 py-3 text-gray-500">{{ item.id }}</td>
+                    <tr v-for="(item, index) in items" :key="item.id"
+                        class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft"
+                        :class="{ 'opacity-50': dragIndex === index }"
+                        :draggable="cfg.ordered && canManage"
+                        @dragstart="onDragStart(index)" @dragover.prevent="onDragOver(index)"
+                        @dragend="onDragEnd" @drop.prevent="onDragEnd">
+                        <td v-if="cfg.ordered" class="px-4 py-3">
+                            <div class="flex items-center gap-2">
+                                <Tooltip v-if="canManage" :text="$t('common.dragReorder')">
+                                    <button type="button" class="cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+                                        :aria-label="$t('common.dragReorder')"
+                                        @keydown.up.prevent="onGripKey(index, -1)" @keydown.down.prevent="onGripKey(index, 1)">
+                                        <IconGripVertical :size="16" />
+                                    </button>
+                                </Tooltip>
+                                <span class="w-4 text-gray-500">{{ index + 1 }}</span>
+                            </div>
+                        </td>
+                        <td v-else class="px-4 py-3 text-gray-500">{{ item.id }}</td>
                         <td class="px-4 py-3 font-medium text-gray-900">{{ item.name }}</td>
                         <td v-if="cfg.hasActive" class="px-4 py-3">
                             <Tooltip :text="$t('content.toggleActive')">
