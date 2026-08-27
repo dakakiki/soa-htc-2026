@@ -134,6 +134,42 @@ class ContentLookupTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_only_one_exam_round_is_being_run_at_a_time(): void
+    {
+        $rounds = ExamRound::query()->orderBy('sort_order')->get();
+
+        // Nothing is marked until somebody says so.
+        $this->assertSame(0, ExamRound::query()->where('is_current', true)->count());
+
+        $this->actingAs($this->admin())
+            ->putJson("/api/exam-rounds/{$rounds[0]->id}", ['is_current' => true])
+            ->assertOk()
+            ->assertJsonPath('data.is_current', true);
+
+        // Marking the next one puts the first down; there is only ever one.
+        $this->actingAs($this->admin())
+            ->putJson("/api/exam-rounds/{$rounds[1]->id}", ['is_current' => true])
+            ->assertOk();
+
+        $this->assertSame(1, ExamRound::query()->where('is_current', true)->count());
+        $this->assertTrue(ExamRound::findOrFail($rounds[1]->id)->is_current);
+
+        // And clearing it leaves none, which is what is true between rounds.
+        $this->actingAs($this->admin())
+            ->putJson("/api/exam-rounds/{$rounds[1]->id}", ['is_current' => false])
+            ->assertOk();
+
+        $this->assertSame(0, ExamRound::query()->where('is_current', true)->count());
+    }
+
+    public function test_an_api_address_opened_in_a_browser_answers_401_not_500(): void
+    {
+        // No JSON Accept header: this is somebody typing the address in. The
+        // redirect target used to be looked up as a named route that does not
+        // exist, and the lookup threw before anything could answer.
+        $this->get('/api/exam-rounds')->assertStatus(401);
+    }
+
     public function test_non_manager_is_forbidden(): void
     {
         $user = $this->nonManager();

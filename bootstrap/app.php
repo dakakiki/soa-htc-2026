@@ -20,6 +20,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias(['student.session' => EnsureStudentSession::class]);
 
         /*
+         * Where a guest is sent, as a PATH and not a named route. `Authenticate`
+         * builds the redirect target before the exception is rendered, and its
+         * default asks for `route('login')` — which this app does not have: the
+         * login screen is a SPA route behind the web catch-all. So an `/api/...`
+         * address typed straight into the address bar answered a **500 with a
+         * stack trace** instead of 401, because the lookup threw before anything
+         * could decide the response should be JSON. Naming the path skips the
+         * lookup; `shouldRenderJsonWhen` below then still answers `api/*` with
+         * 401 JSON and sends a plain browser to the login screen.
+         */
+        $middleware->redirectGuestsTo('/login');
+
+        /*
          * The competitor API does NOT ride on the web session, so it must not be
          * gated by the web session's CSRF token.
          *
