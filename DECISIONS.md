@@ -1267,6 +1267,44 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   Na produkciji red ostaje `database` uz nadziranog radnika — `sync` bi predaju testa vezao za ocenjivanje
   i izgubio ponavljanje pri prolaznoj grešci, baš u minutu kad cela sala predaje.
 
+## ADR-0055 — Runde imaju svoj redosled, ulaz uvek traži podatke, a napušten takmičarski pokušaj je potrošen (ispravlja ADR-0054)
+
+- **Status:** Prihvaćeno (2026-08-27). **IMPLEMENTIRANO.**
+- **Runde nose `exam_rounds.sort_order`.** Redosled je do sada čitan iz `id`-ja — radi samo dok niko ne ubaci
+  rundu u sredinu, i ne može da se promeni bez ponovnog kreiranja redova. Ekran **Exam rounds** je zamenio
+  kolonu `ID` kolonom **Order**: red se hvata za grip i prevlači, a **ispuštanje** snima ceo redosled jednim
+  transakcionim pozivom (`PUT /api/exam-rounds/reorder`) — pomeranje ne može da ostavi listu napola
+  prenumerisanu. Test types i Question tags zadržavaju `ID`; kod njih redosled ne znači ništa. Sva tri
+  selecta čitaju isti `GET /api/exam-rounds`, pa je sortiranje na serveru dovoljno; kolone rezultatskog
+  grida i detalj registracije sortiraju po `sort_order` umesto po `id`. Postojeće baze zadržavaju redosled
+  koji su imale (backfill po legacy brojevima rundi).
+- 🪤 **Studentski ekran rezultata NE čita ovaj redosled i to je namerno.** On grupiše po
+  `exam_quiz.position` — redosledu kojim su ispiti poređani unutar kviza, što je zasebna odluka koju je
+  administrator već doneo. Dva redosleda, svaki na svom mestu.
+- **Sva tri ulaza takmičara traže podatke svaki put** (vlasnik: *„insistiranje na unošenju podataka za sve
+  3 stavke sample, competition, results"*). Ranije je `studentGuestOnly` propuštao već identifikovanog pravo
+  unutra, pa je „Check Results" sa otvorenom sesijom vodio na **dashboard umesto na ocene**. `identify` i
+  inače poništava prethodnu sesiju, tako da ponovni ulaz zamenjuje staru, ne slaže se na nju.
+- **Napušten takmičarski pokušaj je gotov** (vlasnik: *„izašao sa testa koji je radio — to je gotovo, nema
+  više pravo da ga pokreće ponovo"*). Okidač je **prolazak kroz `competition` formu**, i to je zakačeno na
+  `unlock` — jedini korak koji radi samo takmičarski ulaz i traži lozinku sa ispita, pa ga klijent ne može
+  odglumiti. **Samo `competition`:** provera rezultata ili sample ne diraju ispit u toku. **Napuštanje
+  stranice samo po sebi ne radi ništa** — pukla veza ne sme da košta ispit, a sat pokušaja ionako sam preda
+  test kad istekne. Odgovori koji su već dati i dalje se broje: pokušaj se zatvara i ide na ocenjivanje, ne
+  briše se. Zatvaranje pokušaja sada ima jedno mesto, `Attempt::complete()`, koje koristi i istek sata.
+- 🪤 **Rupa koja ostaje, svesno:** `AttemptController::start` vraća otvoren pokušaj **pre** nego što proveri
+  da li je kviz otključan u tekućoj sesiji. Kroz UI se ne vidi (zaključan kviz prikazuje sve testove kao
+  `locked`), ali ručno sastavljen poziv može da nastavi takmičarski pokušaj bez lozinke. Zatvara se jednim
+  uslovom ako se ikad odluči da i nastavak traži otključan kviz.
+- ⚠️ **`is_practice` nikada nije bio postavljen — ispravlja ADR-0054.** Žig je poredio
+  `Quiz::whereKey($id)->value('quiz_type')` sa `QuizType::Sample->value`, a `value()` prolazi kroz cast
+  modela i vraća **enum, ne string iza njega**. Poređenje je uvek bilo `false`, pa je **svaki** pokušaj ikad
+  napravljen zaveden kao takmičarski. Time je tiho poništeno pravilo da se praksa ponavlja: završen sample
+  test odbijao je drugi pokušaj, jer je zastavica koju čita pravilo jednog pokušaja govorila da je taj red
+  takmičarski. **Tri testa su tvrdila baš to odbijanje nad sample kvizovima** — opisivali su grešku, ne
+  pravilo, pa sada grade takmičarski kviz o kome su oduvek bili; novi test seda na sample test dvaput kroz
+  endpoint, što do sada nije radio niko. Redove ispravlja migracija (na dev-u 4.176 pokušaja, ispravnih nula).
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
