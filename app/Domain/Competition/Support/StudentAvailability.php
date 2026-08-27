@@ -235,6 +235,9 @@ final class StudentAvailability
                 'id' => $exam->id,
                 'title' => $exam->title,
                 'round' => $exam->round?->name,
+                // Check results reads the rounds the other way up — the latest
+                // one first — so it needs the order itself, not just the name.
+                'round_order' => $exam->round?->sort_order,
                 'tests' => $exam->tests->map(function (Test $test) use ($statuses, $attempts, $retakeable) {
                     $attempt = $attempts[$test->id] ?? null;
                     $published = $attempt['published'] ?? false;

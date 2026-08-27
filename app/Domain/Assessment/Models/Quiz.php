@@ -49,11 +49,24 @@ class Quiz extends Model
         return $this->belongsToMany(DifficultyLevel::class, 'difficulty_level_quiz');
     }
 
-    /** @return BelongsToMany<Exam, $this> */
+    /**
+     * The quiz's exams, in the order the ROUNDS run (ADR-0055). Everything that
+     * lists a quiz's exams reads this one relation — the competitor's own list,
+     * Check results and Publishing — so ordering it here is what makes all of
+     * them agree with what Exam rounds says. Position inside the quiz is only
+     * the tiebreak between two exams of the same round, and an exam with no
+     * round at all falls to the end rather than jumping to the front on a NULL.
+     *
+     * @return BelongsToMany<Exam, $this>
+     */
     public function exams(): BelongsToMany
     {
+        $roundOrder = '(select sort_order from exam_rounds where exam_rounds.id = exams.exam_round_id)';
+
         return $this->belongsToMany(Exam::class, 'exam_quiz')
             ->withPivot('position')
+            ->orderByRaw("{$roundOrder} is null")
+            ->orderByRaw($roundOrder)
             ->orderBy('exam_quiz.position');
     }
 }

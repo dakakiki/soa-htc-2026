@@ -65,6 +65,8 @@ export interface AvailabilityExam {
     id: number;
     title: string;
     round: string | null;
+    /** The round's place in the running order, as set in Exam rounds. */
+    round_order: number | null;
     tests: AvailabilityTest[];
 }
 

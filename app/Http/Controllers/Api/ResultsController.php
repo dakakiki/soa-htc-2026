@@ -74,12 +74,19 @@ class ResultsController extends Controller
             ->with([
                 'exams' => fn ($q) => $q->where('exams.status', 'active')
                     ->when($f['exam_id'] ?? null, fn ($q, $v) => $q->whereKey($v)),
+                'exams.round',
                 'exams.tests' => fn ($q) => $q->where('tests.status', 'active')
                     ->when($f['test_id'] ?? null, fn ($q, $v) => $q->whereKey($v)),
             ])
             ->findOrFail($f['quiz_id']);
 
+        // Latest round first (owner, 2026-08-27). Whoever opens this screen has
+        // a round that has just been sat and wants to release it; the rounds
+        // behind it are already out. The relation hands them over in the order
+        // Exam rounds sets, so this reads that order backwards — and, PHP's sort
+        // being stable, two exams of one round keep the order they were given.
         $exams = $quiz->exams
+            ->sortByDesc(fn (Exam $exam) => $exam->round?->sort_order ?? -1)
             ->map(fn (Exam $exam) => [
                 'id' => $exam->id,
                 'title' => $exam->title,

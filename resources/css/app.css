@@ -179,3 +179,12 @@
 .stream-panel {
     background: color-mix(in oklab, var(--color-brand-palette-4, #003758) 7%, #ffffff);
 }
+
+/*
+ * A round's name on Check results: a band the width of its column, tinted from
+ * whatever colour that column carries, so contest and practice each get their
+ * own without a second rule to maintain.
+ */
+.round-band {
+    background: color-mix(in oklab, currentColor 12%, transparent);
+}

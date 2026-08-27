@@ -39,6 +39,7 @@ function doneTests(exam: AvailabilityExam): AvailabilityTest[] {
 interface ResultBlock {
     key: string;
     round: string | null;
+    order: number;
     quiz: string;
     tests: AvailabilityTest[];
 }
@@ -50,6 +51,12 @@ interface ResultBlock {
  * a quiz spanning two rounds prints its title over each of them rather than
  * once above both. Everything empty is dropped, so no heading ever stands over
  * nothing.
+ *
+ * The LATEST round comes first, always: whoever opens this page has just sat
+ * something and is looking for that mark, not for the one they already know.
+ * A National round can therefore never appear under a Preliminary, whatever
+ * order the exams sit in inside the quiz. Rounds run everywhere else in the
+ * order Exam rounds sets; here, and only here, that order is read backwards.
  */
 function blocksOf(mode: 'competition' | 'sample'): ResultBlock[] {
     return quizzes.value
@@ -59,11 +66,14 @@ function blocksOf(mode: 'competition' | 'sample'): ResultBlock[] {
                 .map((exam) => ({
                     key: `${quiz.id}-${exam.id}`,
                     round: exam.round,
+                    // No round sorts below every round that has one.
+                    order: exam.round_order ?? -1,
                     quiz: quiz.title,
                     tests: doneTests(exam),
                 }))
                 .filter((block) => block.tests.length > 0),
-        );
+        )
+        .sort((a, b) => b.order - a.order);
 }
 
 const competition = computed(() => blocksOf('competition'));
@@ -112,10 +122,11 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
              the same padding so their headings still line up. -->
         <div v-else class="mt-10 grid gap-8 lg:mt-12 lg:grid-cols-2 lg:gap-10">
             <div v-for="column in [
-                { key: 'competition', tone: 'stream-contest', panel: 'stream-panel', heading: $t('student.results.contest'), blocks: competition, note: $t('student.results.contestNote') },
-                { key: 'sample', tone: 'stream-practice', panel: '', heading: $t('student.results.practice'), blocks: practice, note: $t('student.results.practiceNote') },
+                { key: 'competition', tone: 'stream-contest', panel: 'stream-panel', headingTone: '', heading: $t('student.results.contest'), blocks: competition, note: $t('student.results.contestNote') },
+                { key: 'sample', tone: 'stream-practice', panel: '', headingTone: 'text-brand-palette-2', heading: $t('student.results.practice'), blocks: practice, note: $t('student.results.practiceNote') },
             ]" :key="column.key" class="rounded-2xl p-6 lg:p-8" :class="[column.tone, column.panel]">
-                <p class="border-b-2 border-current/30 pb-3 font-semibold" :class="[mono, 'text-[16px] lg:text-[18px]']">
+                <p class="border-b-2 border-current/30 pb-3 font-semibold"
+                    :class="[mono, 'text-[16px] lg:text-[18px]', column.headingTone]">
                     {{ column.heading }}
                 </p>
 
@@ -123,12 +134,18 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     {{ column.note }}
                 </p>
 
-                <article v-for="block in column.blocks" :key="block.key" class="pt-8">
-                    <!-- The round leads; the paper it was sat on comes under it. -->
-                    <p v-if="block.round" class="font-semibold" :class="[mono, 'text-[15px] lg:text-[16px]']">
+                <!-- One round per block. The round's name runs the full width of
+                     the column on a tinted band, which is read as a heading over
+                     what follows it: a rule would have been one more line among
+                     the hairlines that divide the tests, and a chip looked like
+                     something to press. -->
+                <article v-for="(block, i) in column.blocks" :key="block.key" :class="i === 0 ? 'pt-6' : 'pt-9'">
+                    <p v-if="block.round" class="round-band rounded-md px-3.5 py-2.5 font-semibold"
+                        :class="[mono, 'text-[15px] lg:text-[16px]']">
                         {{ block.round }}
                     </p>
-                    <h2 class="mt-1.5 text-[19px] font-medium tracking-[-0.02em] opacity-80 lg:text-[21px]">
+                    <h2 class="mt-2 text-[19px] font-bold tracking-[-0.02em] lg:text-[21px]"
+                        :class="{ 'mt-0': !block.round }">
                         {{ block.quiz }}
                     </h2>
 
