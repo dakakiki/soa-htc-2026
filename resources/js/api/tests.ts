@@ -10,6 +10,7 @@ export interface TestPayload {
     level_ids: number[];
     // Ordered — the array order becomes the question order on the test.
     question_ids: number[];
+    notes?: { before_position: number; body: string }[];
 }
 
 export interface TestListParams {

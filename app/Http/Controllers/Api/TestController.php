@@ -45,7 +45,7 @@ class TestController extends Controller
     {
         $this->authorize('content.manage');
 
-        return TestResource::make($test->load(['type', 'levels', 'questions']));
+        return TestResource::make($test->load(['type', 'levels', 'questions', 'notes']));
     }
 
     /** Read-only answer-key preview: every question in order with its answers. */
@@ -53,7 +53,7 @@ class TestController extends Controller
     {
         $this->authorize('content.manage');
 
-        return TestPreviewResource::make($test->load(['type', 'questions.answers']));
+        return TestPreviewResource::make($test->load(['type', 'questions.answers', 'notes']));
     }
 
     public function store(StoreTestRequest $request): JsonResponse
@@ -63,6 +63,7 @@ class TestController extends Controller
         $test = Test::create($this->attributes($request));
         $test->levels()->sync($request->input('level_ids', []));
         $test->questions()->sync($this->questionPivot($request));
+        $this->replaceNotes($request, $test);
 
         return TestResource::make($this->fresh($test))->response()->setStatusCode(201);
     }
@@ -77,6 +78,9 @@ class TestController extends Controller
         }
         if ($request->has('question_ids')) {
             $test->questions()->sync($this->questionPivot($request));
+        }
+        if ($request->has('notes')) {
+            $this->replaceNotes($request, $test);
         }
 
         return TestResource::make($this->fresh($test));
@@ -95,7 +99,33 @@ class TestController extends Controller
     /** @return array<string, mixed> */
     private function attributes(StoreTestRequest|UpdateTestRequest $request): array
     {
-        return $request->safe()->except(['level_ids', 'question_ids']);
+        return $request->safe()->except(['level_ids', 'question_ids', 'notes']);
+    }
+
+    /**
+     * Notes are replaced wholesale rather than reconciled: they carry nothing
+     * worth preserving across a save — no answers hang off them, nothing refers
+     * to them — and the alternative is diffing free text by position.
+     *
+     * `sort_order` is taken from the order they arrive in when two notes share
+     * an anchor, so the client does not have to compute it.
+     */
+    private function replaceNotes(Request $request, Test $test): void
+    {
+        $test->notes()->delete();
+
+        $seen = [];
+
+        foreach ($request->input('notes', []) as $note) {
+            $before = (int) ($note['before_position'] ?? 0);
+            $seen[$before] = ($seen[$before] ?? 0) + 1;
+
+            $test->notes()->create([
+                'before_position' => $before,
+                'sort_order' => (int) ($note['sort_order'] ?? $seen[$before]),
+                'body' => (string) $note['body'],
+            ]);
+        }
     }
 
     /**
@@ -116,6 +146,6 @@ class TestController extends Controller
 
     private function fresh(Test $test): Test
     {
-        return $test->refresh()->load(['type', 'levels', 'questions'])->loadCount('questions');
+        return $test->refresh()->load(['type', 'levels', 'questions', 'notes'])->loadCount('questions');
     }
 }
