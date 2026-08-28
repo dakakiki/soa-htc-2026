@@ -6,6 +6,8 @@ namespace App\Http\Requests;
 
 use App\Domain\Assessment\Enums\AnswerNumbering;
 use App\Domain\Assessment\Enums\QuestionType;
+use App\Domain\Assessment\Support\ContentCompleteness;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -38,5 +40,26 @@ class StoreQuestionRequest extends FormRequest
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'audio' => ['nullable', 'file', 'mimes:mp3,wav,ogg,m4a', 'max:10240'],
         ];
+    }
+
+    /**
+     * `answers.*.is_correct` being optional is right — an option may of course be
+     * wrong. What was missing is the rule one level up: an ACTIVE multiple-choice
+     * question needs at least one that is not. {@see ContentCompleteness}
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $shortfall = ContentCompleteness::questionShortfall(
+                null,
+                $this->has('status') ? (string) $this->input('status') : null,
+                $this->has('question_type') ? (string) $this->input('question_type') : null,
+                $this->input('answers', []),
+            );
+
+            if ($shortfall !== null) {
+                $validator->errors()->add('answers', trans('messages.content.'.$shortfall));
+            }
+        });
     }
 }

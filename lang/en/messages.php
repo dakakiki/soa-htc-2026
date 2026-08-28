@@ -58,6 +58,12 @@ return [
     ],
     'content' => [
         'tag_in_use' => 'This tag is used by questions and cannot be deleted.',
+        // The Phase 2 exit condition: nothing inconsistent may be published.
+        // Each one names the way out, because the toggle that would fix it is
+        // on the same screen.
+        'test_without_questions' => 'An active test needs at least one question. Add one, or set the test to inactive to keep it as a draft.',
+        'question_without_a_correct_answer' => 'A multiple-choice question needs one answer marked correct before it can be active. Without one it pays full marks to whoever leaves it blank.',
+        'question_without_gaps' => 'A gap-filling question needs at least one gap with an accepted answer before it can be active.',
     ],
     'cms' => [
         'slug_reserved' => 'This address is used by the application. Choose another slug.',

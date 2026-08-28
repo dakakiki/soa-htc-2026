@@ -199,6 +199,17 @@ final class AttemptGrader
     private static function responseMatches(array $question, array $response): bool
     {
         if ($question['type'] === QuestionType::MultipleChoice->value) {
+            // A question with nothing marked correct cannot be got right, and
+            // must not be got right by accident. Without this line the empty
+            // selection matches the empty correct-set, so the question pays its
+            // full mark to whoever skips it — `StudentTestPage` submits a row
+            // for every question, blank ones included — and nothing to whoever
+            // answers. Gap-filling below has always guarded this
+            // (`$acceptable === []`); multiple choice never did.
+            if ($question['correctIds'] === []) {
+                return false;
+            }
+
             $selected = collect($response['selected'] ?? [])
                 ->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
 

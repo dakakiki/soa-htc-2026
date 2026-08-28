@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domain\Assessment\Support\ContentCompleteness;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreTestRequest extends FormRequest
@@ -29,5 +31,25 @@ class StoreTestRequest extends FormRequest
             'question_ids' => ['array'],
             'question_ids.*' => ['integer', 'exists:questions,id'],
         ];
+    }
+
+    /**
+     * A test with no questions may be saved, but not while it is active — and a
+     * create that says nothing about `status` is creating an active one, because
+     * that is the column default. {@see ContentCompleteness}
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $shortfall = ContentCompleteness::testShortfall(
+                null,
+                $this->has('status') ? (string) $this->input('status') : null,
+                $this->input('question_ids', []),
+            );
+
+            if ($shortfall !== null) {
+                $validator->errors()->add('question_ids', trans('messages.content.'.$shortfall));
+            }
+        });
     }
 }

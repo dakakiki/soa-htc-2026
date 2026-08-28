@@ -435,6 +435,42 @@ class AttemptTest extends TestCase
         $this->assertDatabaseHas('attempt_answers', ['attempt_id' => $attemptId, 'question_id' => $mc['question']->id, 'is_correct' => false]);
     }
 
+    public function test_a_question_with_no_correct_answer_pays_nobody(): void
+    {
+        // Built straight from the model, because the API will not make one any
+        // more (ContentCompletenessTest). The migrated legacy content, however,
+        // arrived with 23 of them — all active — so the grader has to hold too.
+        $question = Question::create([
+            'title' => 'Nothing is right here', 'question_type' => 'multiple_choice', 'points' => 2, 'status' => 'active',
+        ]);
+        $level = DifficultyLevel::where('level_short', 'H2')->firstOrFail();
+        $question->levels()->attach($level->id);
+        $wrong = QuestionAnswer::create(['question_id' => $question->id, 'text' => 'a', 'is_correct' => false, 'position' => 1]);
+
+        $test = $this->singleQuestionTest($question);
+        $token = $this->tokenFor('H2');
+
+        // The exam screen submits a row for EVERY question, blank ones included
+        // — so this is what skipping the question actually looks like on the
+        // wire. It used to match the empty correct-set and pay the full mark.
+        $skipped = $this->submitAttempt($token, $test, [
+            ['question_id' => $question->id, 'response' => ['selected' => []]],
+        ]);
+
+        $this->assertSame('0.00', Attempt::findOrFail($skipped)->score);
+        $this->assertDatabaseHas('attempt_answers', [
+            'attempt_id' => $skipped, 'question_id' => $question->id, 'is_correct' => false,
+        ]);
+
+        // And answering it is no better, which is the point: it cannot be got
+        // right by anybody, so it must not be got right by anybody.
+        $answered = $this->submitAttempt($this->tokenFor('H2'), $test, [
+            ['question_id' => $question->id, 'response' => ['selected' => [$wrong->id]]],
+        ]);
+
+        $this->assertSame('0.00', Attempt::findOrFail($answered)->score);
+    }
+
     public function test_gap_filling_is_graded_case_and_space_insensitively(): void
     {
         $gap = $this->makeGap();
