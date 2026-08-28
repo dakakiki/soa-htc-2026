@@ -7,7 +7,7 @@ import { startTest, submitAttempt } from '@/api/student';
 import { apiErrorMessage } from '@/api/http';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import { answerMarker } from '@/utils/answerNumbering';
-import type { AttemptQuestion, AttemptSession, SubmitAnswer } from '@/types/models';
+import type { AttemptNote, AttemptQuestion, AttemptSession, SubmitAnswer } from '@/types/models';
 
 /**
  * A test in progress. The most careful screen in the application, and the one
@@ -91,6 +91,23 @@ const clock = computed(() => {
 });
 
 const questions = computed<AttemptQuestion[]>(() => session.value?.questions ?? []);
+
+/**
+ * Headings between the questions. They arrive outside `questions` so they cannot
+ * disturb the numbering, and say how many questions come before them instead.
+ */
+const notes = computed<AttemptNote[]>(() => session.value?.notes ?? []);
+
+function notesBefore(index: number): AttemptNote[] {
+    return notes.value.filter((n) => n.before_position === index).sort((a, b) => a.sort_order - b.sort_order);
+}
+
+/** Anchored at or past the end — a closing line after the last question. */
+const trailingNotes = computed<AttemptNote[]>(() =>
+    notes.value
+        .filter((n) => n.before_position >= questions.value.length)
+        .sort((a, b) => a.before_position - b.before_position || a.sort_order - b.sort_order),
+);
 
 /**
  * Something rather than nothing: a question with one gap of three filled counts
@@ -359,6 +376,16 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                         ? 'mt-6 lg:mt-8'
                         : 'mt-8 border-t border-brand-palette-4/12 pt-7 lg:mt-9'"
                 >
+                    <!-- Headings the author put in front of this question: the
+                         paper's own words, in the same voice as the test's
+                         introduction above. Never numbered, never answerable. -->
+                    <div
+                        v-for="(note, ni) in notesBefore(qi)"
+                        :key="`note-${qi}-${ni}`"
+                        class="rich-text mb-5 border-l-[3px] border-brand-palette-3 py-0.5 pl-4 text-[15px] leading-relaxed text-brand-palette-4/70"
+                        v-html="note.body"
+                    ></div>
+
                     <!-- The number comes from the question's place in the test,
                          never from anything typed into its title. -->
                     <p :class="[mono, 'text-[11px]']" class="text-brand-ink-accent">
@@ -425,6 +452,14 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                         ></textarea>
                     </div>
                 </div>
+
+                <!-- Anchored past the last question: a closing line. -->
+                <div
+                    v-for="(note, ni) in trailingNotes"
+                    :key="`note-end-${ni}`"
+                    class="rich-text mt-8 border-l-[3px] border-brand-palette-3 py-0.5 pl-4 text-[15px] leading-relaxed text-brand-palette-4/70 lg:mt-9"
+                    v-html="note.body"
+                ></div>
 
                 <div class="h-8 lg:h-16"></div>
             </div>

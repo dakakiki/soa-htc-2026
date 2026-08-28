@@ -1552,6 +1552,48 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   (jedno od 23) → **422** sa porukom; isti zahtev na ispravnom pitanju → **200**; nov aktivan test
   bez pitanja → **422**. Ništa nije ostalo za sobom.
 
+## ADR-0061 — Beleška između pitanja je svoja stvar, ne pitanje bez odgovora
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** naslov zadatka („TASK 2 Look at the pictures and choose a, b or c…") nije imao gde
+  da stane osim **u samo pitanje** — red u `questions` sa naslovom i bez ijedne opcije. Legacy uvoz
+  je doneo 20 takvih (ADR-0060), a autor koji danas piše test nema bolji izbor. Vlasnik
+  (2026-08-28): *„to bi zapravo trebalo da postoji kod kreiranja testa — da pored pretrage banke
+  pitanja možeš da uneseš 'note' između pitanja kad god želiš"*, i *„to nije pitanje koje ćeš
+  uzimati u obzir prilikom validacije testa, već samo note koje prati neka pitanja."*
+- **Beleška NIJE red u `questions`.** Zasebna tabela `test_notes`, pa je validacija ni ne vidi, ne
+  ocenjuje se, ne ulazi u `max_score`, i ne broji se kao „test ima nešto u sebi". Izuzetak iz
+  ADR-0060 time nestaje sam od sebe.
+- 🪤 **Vezana je ISPRED pitanja, nije ubačena u isti redosled.** Ispitni ekran numeriše pitanja po
+  **indeksu u nizu** koji dobije (ADR-0034: broj dolazi iz mesta pitanja), pa bi beleška u tom nizu
+  **pojela broj**. Zato `before_position` = „koliko pitanja ide pre nje": 0 je iznad svega, a
+  vrednost jednaka broju pitanja pada iza poslednjeg. `sort_order` razdvaja dve beleške na istom
+  mestu. Ispitni payload ih zato šalje **van** `questions`.
+- **Isto pravilo važi i u graditelju.** `OrderableList` je dobio opcioni `label`, pa `TestFormPage`
+  numeriše **samo pitanja**, a beleška stoji bez broja. Bez toga bi beleška iznad prvog pitanja
+  napravila da autor vidi „2" tamo gde takmičar vidi „1" — dva različita broja za isti zadatak.
+- **Jedna lista u graditelju, dve na žici.** Autor prevlači pitanja i beleške u istom nizu; klijent
+  to razlaže na `question_ids` (redosled) i `notes` (svaka sa `before_position`), i sklapa nazad pri
+  učitavanju. `question_ids` je time ostao netaknut, pa i pravilo kompletnosti iz ADR-0060 stoji
+  kako je bilo.
+- **Beleške se pri snimanju zamenjuju u celini**, ne mire se red po red: ništa ne visi o njima, a
+  alternativa je poređenje slobodnog teksta po poziciji. Prazna beleška se ne snima — isto kao što
+  forma pitanja odbacuje prazan odgovor.
+- **Tekst se piše u modalu, red izgleda kao svaki drugi** (vlasnik, 2026-08-28, pošto je prva
+  verzija imala editor otvoren u samom redu): *„predlažem da se otvori modal i tu unese tekst, potom
+  da red sa note izgleda identično kao i ostala pitanja u testu; ako se klikne na view otvori se
+  modal gde može da pogleda i uredi note."* Graditelj pun otvorenih editora prestaje da liči na
+  papir koji sastavlja. Red beleške zato nosi skraćen tekst i oznaku „Note" tamo gde pitanje nosi
+  bodove, a isto oko (`view`) je otvara za čitanje i prepravku. Beleška koja se otkaže a nikad nije
+  napisana briše red koji je otvorila.
+- **Tri površine je crtaju istim jezikom** kao i uvod testa (leva ivica u brend boji): graditelj
+  (`TestFormPage`), pregled sa ključem (`TestPreviewModal`) i ispitni ekran (`StudentTestPage`).
+- ✅ **Provereno uživo:** dugme **Add note** stoji uz pretragu banke; tri beleške napravljene kroz
+  API vraćaju se u redosledu i učitavaju u graditelj svaka u svom editoru, **bez broja**; probni
+  test obrisan (59 testova, 0 beleški posle čišćenja).
+- ⏭ **Šta ostaje klijentu:** onih 20 zatečenih naslova su i dalje pitanja bez odgovora. Sada postoji
+  gde da se presele; sama selidba je sadržajni posao, ne kod.
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)

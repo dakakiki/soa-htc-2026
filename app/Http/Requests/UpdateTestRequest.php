@@ -34,6 +34,11 @@ class UpdateTestRequest extends FormRequest
             'level_ids.*' => ['integer', 'exists:difficulty_levels,id'],
             'question_ids' => ['sometimes', 'array'],
             'question_ids.*' => ['integer', 'exists:questions,id'],
+            // Headings between the questions. {@see TestNote}
+            'notes' => ['sometimes', 'array'],
+            'notes.*.before_position' => ['required', 'integer', 'min:0'],
+            'notes.*.sort_order' => ['sometimes', 'integer', 'min:1'],
+            'notes.*.body' => ['required', 'string', 'max:20000'],
         ];
     }
 

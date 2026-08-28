@@ -36,6 +36,13 @@ class TestResource extends JsonResource
                 'points' => (float) $q->points,
                 'position' => (int) $q->pivot->position,
             ])->values()),
+            // Headings between the questions. Never numbered, never graded.
+            'notes' => $this->whenLoaded('notes', fn () => $this->notes->map(fn ($n) => [
+                'id' => $n->id,
+                'before_position' => $n->before_position,
+                'sort_order' => $n->sort_order,
+                'body' => $n->body,
+            ])->values()),
             'questions_count' => $this->whenCounted('questions'),
         ];
     }
