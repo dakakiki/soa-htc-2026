@@ -20,6 +20,10 @@ class ContentLookupSeeder extends Seeder
             TestType::query()->updateOrCreate(['legacy_id' => $legacyId], ['name' => $name]);
         }
 
+        // 🪤 The Sample round is marked by `is_sample`, never by its name: the
+        // results domain turns on that flag, and a name can be retyped.
+        $sampleLegacyId = 5;
+
         $rounds = [
             1 => 'Preliminary round',
             2 => 'National round',
@@ -33,7 +37,7 @@ class ContentLookupSeeder extends Seeder
         foreach ($rounds as $legacyId => $name) {
             ExamRound::query()->updateOrCreate(
                 ['legacy_id' => $legacyId],
-                ['name' => $name, 'active' => true, 'sort_order' => ++$position],
+                ['name' => $name, 'active' => true, 'sort_order' => ++$position, 'is_sample' => $legacyId === $sampleLegacyId],
             );
         }
 

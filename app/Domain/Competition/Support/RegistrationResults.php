@@ -18,9 +18,6 @@ use Illuminate\Support\Facades\DB;
  */
 final class RegistrationResults
 {
-    /** The practice round is never shown as a results column. */
-    private const EXCLUDED_ROUND = 'Sample';
-
     /**
      * Ordered result columns: every round but Sample, each with the test types
      * that actually appear in its tests (first letter used as the column head).
@@ -44,7 +41,7 @@ final class RegistrationResults
         }
 
         $columns = [];
-        foreach (DB::table('exam_rounds')->where('name', '!=', self::EXCLUDED_ROUND)->orderBy('sort_order')->orderBy('id')->get(['id', 'name']) as $round) {
+        foreach (DB::table('exam_rounds')->where('is_sample', false)->orderBy('sort_order')->orderBy('id')->get(['id', 'name']) as $round) {
             $types = $typesByRound[$round->id] ?? [];
             ksort($types); // by test-type id → Reading first, then Writing/Speaking/Use of English
 

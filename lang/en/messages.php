@@ -58,6 +58,10 @@ return [
     ],
     'content' => [
         'tag_in_use' => 'This tag is used by questions and cannot be deleted.',
+        // Deleting a round in use does not fail — it unhooks its exams and
+        // publishing then writes nothing. Both messages name the way out.
+        'round_in_use' => 'Exams sit in this round, so it cannot be deleted. Move them to another round first.',
+        'round_is_practice' => 'This is the practice round. Deleting it would make practice results count as official ones, so it cannot be removed.',
         // The Phase 2 exit condition: nothing inconsistent may be published.
         // Each one names the way out, because the toggle that would fix it is
         // on the same screen.
