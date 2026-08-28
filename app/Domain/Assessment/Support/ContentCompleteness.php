@@ -34,6 +34,10 @@ use App\Domain\Assessment\Models\Test;
  *    silent. The list screens PUT nothing but `status`, so a question with no
  *    correct answer would otherwise be activated by a toggle that never
  *    mentions its answers.
+ *  - It is not "a question must be answerable". A question carrying NO answers
+ *    at all is left alone, because that is how this application is used today to
+ *    put a heading or a comment between questions, and entered content must not
+ *    be hidden (owner, 2026-08-28). See {@see questionShortfall}.
  *
  * 🪤 `status` is `default('active')` on every one of these tables, so a create
  * that says nothing about status is creating an ACTIVE row, and has to be held
@@ -87,6 +91,27 @@ final class ContentCompleteness
 
         $rows = $answers ?? self::storedAnswers($question);
 
+        /*
+         * 🪤 A question carrying NO answers at all is left alone, and that is
+         * the owner's rule rather than an oversight (2026-08-28): whatever has
+         * been entered has to be shown, exactly as entered.
+         *
+         * This application has no item type for a heading or a comment between
+         * questions yet, so the legacy import — and an author working today —
+         * puts one in as a question with a title and nothing under it. Twenty of
+         * them are in the migrated content. Refusing those would leave their
+         * author two ways out, and both are wrong: invent a correct answer, or
+         * set it inactive and hide entered content.
+         *
+         * So the rule is narrower than "a question must be answerable": a
+         * question that CARRIES answers must carry usable ones. One that carries
+         * none is not claiming to be answerable, and the grader already scores
+         * it zero for everybody.
+         */
+        if ($rows === []) {
+            return null;
+        }
+
         if ($type === QuestionType::MultipleChoice->value) {
             $correct = array_filter($rows, static fn (array $a): bool => filter_var(
                 $a['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN,
@@ -96,8 +121,9 @@ final class ContentCompleteness
         }
 
         // Gap-filling: each row is one gap, and its text holds the spellings
-        // that count. A gap with nothing acceptable can never be got right, so
-        // it is the same defect wearing a different type.
+        // that count. A row that is there but blank can never be got right, so
+        // it is the same defect wearing a different type. (Rows being absent
+        // altogether has already returned above.)
         $gaps = array_filter($rows, static fn (array $a): bool => trim((string) ($a['text'] ?? '')) !== '');
 
         return $gaps === [] ? 'question_without_gaps' : null;

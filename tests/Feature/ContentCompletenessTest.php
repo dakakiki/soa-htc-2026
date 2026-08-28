@@ -151,17 +151,35 @@ class ContentCompletenessTest extends TestCase
             ->assertJsonValidationErrors('answers');
     }
 
-    public function test_a_multiple_choice_question_with_no_options_at_all_is_refused(): void
+    public function test_a_question_with_no_answers_at_all_is_left_alone(): void
     {
-        // How the legacy import made most of them: a task heading landed in the
-        // questions table as a multiple-choice question with nothing under it.
+        // A heading between questions, which is the only way this application
+        // can hold one today — and how the legacy import brought twenty across.
+        // Entered content must be shown as entered (owner, 2026-08-28), so the
+        // gate must not force its author to invent a correct answer or hide it.
         $this->actingAs($this->admin())
             ->postJson('/api/questions', [
-                'title' => 'TASK 2 Look at the pictures',
+                'title' => 'TASK 2 Look at the pictures and choose a, b or c',
                 'question_type' => 'multiple_choice',
                 'points' => 1,
                 'status' => 'active',
                 'answers' => [],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'active');
+    }
+
+    public function test_but_one_wrong_answer_is_enough_to_ask_for_a_right_one(): void
+    {
+        // The line between the two: nothing under it is a heading, something
+        // under it is a question, and a question has to be answerable.
+        $this->actingAs($this->admin())
+            ->postJson('/api/questions', [
+                'title' => 'Pick one',
+                'question_type' => 'multiple_choice',
+                'points' => 1,
+                'status' => 'active',
+                'answers' => [['text' => 'only option', 'is_correct' => false, 'position' => 1]],
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('answers');
@@ -220,15 +238,17 @@ class ContentCompletenessTest extends TestCase
             ->assertCreated();
     }
 
-    public function test_a_gap_filling_question_needs_at_least_one_gap(): void
+    public function test_a_gap_that_accepts_nothing_is_refused(): void
     {
+        // A gap is there, and nothing counts as filling it — the same defect as
+        // a multiple-choice question with no correct answer, in the other type.
         $this->actingAs($this->admin())
             ->postJson('/api/questions', [
                 'title' => 'Fill it in',
                 'question_type' => 'gap_filling',
                 'points' => 1,
                 'status' => 'active',
-                'answers' => [],
+                'answers' => [['text' => '   ', 'is_correct' => true, 'position' => 1]],
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('answers');

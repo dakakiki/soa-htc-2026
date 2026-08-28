@@ -1527,6 +1527,23 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 - **Vlasnikova odluka (2026-08-28):** **ne** pisati komandu za izveštavanje o zatečenom, jer je taj
   sadržaj dev materijal koji na produkciju ne ide. Zaštita ocenjivača ostaje, jer ne košta ništa i
   ne oslanja se na to da je pretpostavka tačna.
+- 🪤 **Pravilo je suženo istog dana, i to je vlasnikova odluka:** *„svaka stavka mora da se prikaže,
+  title, description — šta god je uneto mora da je prikazano; ne treba da menjaš ni sakrivaš ništa."*
+  Prva verzija kapije je odbijala i pitanje **bez ijednog odgovora**, a to je upravo oblik u kome
+  ovih 20 naslova postoji. Takva kapija ostavlja autoru dva izlaza i oba su pogrešna: **izmisli
+  tačan odgovor** (falsifikovanje sadržaja) ili **stavi na `inactive`** (skrivanje unetog). Zamka je
+  bila utoliko gora što je klijent taj koji te stavke treba da prepravi.
+  **Pravilo je sada uže:** pitanje koje **nosi** odgovore mora da nosi upotrebljive; pitanje koje ne
+  nosi nijedan se ne dira. Ono ionako po ocenjivaču nosi nulu svima.
+- ⏭ **Izuzetak je privremen i zna se čime se gasi.** Aplikacija nema stavku tipa „beleška",
+  pa autor nema gde drugde da stavi naslov zadatka nego u pitanje bez odgovora. Vlasnik
+  (2026-08-28): *„to bi zapravo trebalo da postoji kod kreiranja testa — da pored pretrage banke
+  pitanja možeš da uneseš 'note' između pitanja kad god želiš."* Kad ta stavka postoji, naslovi
+  postaju beleške i izuzetak sme da se stegne. **Nije deo ove runde.**
+- ⚠️ **Šta je bilo urađeno pa vraćeno:** onih 20 naslova sam bio postavio na `inactive` (prestaju da
+  se isporučuju: `questionsPayload` i `AttemptGrader` oboje filtriraju `status = active`, pa su
+  ispali i sa ekrana i iz `max_score` — testovi #17/#22/#27 su pali sa 35/35/34 na 34/30/30).
+  Vlasnik je to odbio i **vraćeno je u zatečeno stanje**; `max_score` je opet 35/35/34.
 - ✅ **Provereno uživo na dev bazi, ne samo u suite-u:** `PUT` `status: active` na pitanju #167
   (jedno od 23) → **422** sa porukom; isti zahtev na ispravnom pitanju → **200**; nov aktivan test
   bez pitanja → **422**. Ništa nije ostalo za sobom.
