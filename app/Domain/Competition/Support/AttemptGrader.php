@@ -86,6 +86,11 @@ final class AttemptGrader
      * Recompute the total and grading status after a manual essay grade (5b):
      * the score sums every awarded point, and the attempt becomes `graded` once
      * every essay answer has been graded.
+     *
+     * This is the ONLY path that changes a score which may already be official —
+     * every other one (auto-grading, finalising an expired attempt) runs before
+     * anything is published. See {@see syncPublishedResult()} for what that
+     * costs if it is forgotten.
      */
     public static function recompute(Attempt $attempt): void
     {
@@ -104,6 +109,39 @@ final class AttemptGrader
             'score' => $score,
             'grading_status' => $allEssaysGraded ? GradingStatus::Graded : GradingStatus::PendingGrading,
         ], final: $allEssaysGraded));
+
+        self::syncPublishedResult($attempt);
+    }
+
+    /**
+     * Carry a corrected mark into the results layer (ADR-0064).
+     *
+     * Layer B (`registration_results`) is a copy, written when an attempt is
+     * published. Correcting an essay AFTER publication changed `attempts.score`
+     * and left the copy behind — and the copy is what the results grid, the
+     * .xlsx export and the SOA certificate read. The competitor was handed a
+     * printed certificate carrying the mark the correction had just replaced,
+     * and nothing anywhere disagreed: every screen read the same stale row.
+     *
+     * 🪤 Here rather than in `GradingController`, which is where publish,
+     * unpublish and reset each call `reconcile` themselves (ADR-0027). Those
+     * three change WHETHER an attempt counts, which is a decision the controller
+     * makes; this changes WHAT it counts for, which happens wherever a score is
+     * written. Put in the controller it would have been one more line for the
+     * next score-changing action to forget — which is exactly how it came to be
+     * missing.
+     *
+     * Nothing to do until the attempt is published: an unpublished one has no
+     * Layer B row, and publishing will read the corrected score anyway. The
+     * practice round has none either, and `reconcile` excludes it regardless.
+     */
+    private static function syncPublishedResult(Attempt $attempt): void
+    {
+        if ($attempt->published_at === null) {
+            return;
+        }
+
+        ResultLedger::reconcile([(int) $attempt->registration_id], [(int) $attempt->test_id]);
     }
 
     /**

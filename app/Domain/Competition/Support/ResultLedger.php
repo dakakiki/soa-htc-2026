@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\DB;
  * each, {@see reconcile()} rebuilds the attempt-sourced Layer B rows for the
  * affected scope so the flat results table mirrors the attempts' published state.
  *
+ * A fourth event reaches it, and it is not a decision anybody makes on a screen:
+ * an essay corrected after publication changes WHAT an already-official attempt
+ * scores. That one calls in from {@see AttemptGrader::recompute()} rather than
+ * from a controller, because a score can be rewritten anywhere a score is
+ * written — see the note there (ADR-0064).
+ *
  * Import-sourced rows (`source=import`) are otherwise left alone — they have no
  * attempt behind them — except that a currently-published attempt supersedes an
  * import row for the same competitor + test (ADR-0027 precedence), so such a row
