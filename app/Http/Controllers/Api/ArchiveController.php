@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,13 +17,47 @@ use Illuminate\Support\Facades\DB;
  * self-contained (no config joins), so every read is a simple aggregate over the
  * `archive_*` tables. Populated by `season:reset` (current season) and the
  * `legacy:archive-round` migration (historical seasons).
+ *
+ * 🔴 ADMINISTRATORS ONLY, and not because somebody decided the archive was
+ * sensitive — because the row scope this application enforces everywhere else
+ * CANNOT be applied here truthfully. See {@see assertGlobalScope()}.
  */
 class ArchiveController extends Controller
 {
+    /**
+     * Refuse a reader who is scoped to particular venues (ADR-0067).
+     *
+     * Every other read in this application narrows to `allowedSchoolIds()` — a
+     * list of `schools.id`. Layer C has no school ids. It is denormalized on
+     * purpose (ADR-0027): a self-contained snapshot that survives the venue being
+     * renamed, moved or deleted, carrying `country`, `region` and `venue` as
+     * TEXT, as they read on the day.
+     *
+     * So the scope could only be approximated by matching those strings against
+     * the names the caller's venues happen to have today — which is wrong in both
+     * directions. A venue renamed since the round would hide rows that are the
+     * reader's own; two venues that once shared a name would show rows that are
+     * not. An approximate authorization boundary is worse than an honest refusal,
+     * because it looks like it is working.
+     *
+     * Today this changes nothing in practice: `reports.view` is granted only to
+     * Administrator, who is global. It matters the moment somebody builds a custom
+     * role with it — which the Roles screen exists to let them do.
+     */
+    private function assertGlobalScope(Request $request): void
+    {
+        abort_if(
+            $request->user()?->allowedSchoolIds() !== null,
+            Response::HTTP_FORBIDDEN,
+            'The results archive is not scoped to particular venues, so it is open to administrators only.',
+        );
+    }
+
     /** The archived rounds available to browse, newest first, with headline counts. */
     public function rounds(Request $request): JsonResponse
     {
         $this->authorize('reports.view');
+        $this->assertGlobalScope($request);
 
         $registered = DB::table('archive_registrations')
             ->groupBy('round_number')
@@ -59,6 +94,7 @@ class ArchiveController extends Controller
     public function summary(Request $request): JsonResponse
     {
         $this->authorize('reports.view');
+        $this->assertGlobalScope($request);
 
         $filters = $request->validate([
             'round' => ['required', 'integer'],

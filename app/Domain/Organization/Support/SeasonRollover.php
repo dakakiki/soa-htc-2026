@@ -30,7 +30,8 @@ use Illuminate\Support\Facades\DB;
  *
  * ARCHIVE (snapshot)    the roster + results layer → archive_* (Layer C, ADR-0027), tagged by round
  * WIPE (delete rows)    registrations + the whole attempt/result/session/publication chain,
- *                       plus audit_logs (a new season starts on a fresh trail)
+ *                       plus the audit rows that are ABOUT them (the seasons'
+ *                       own trail survives — ADR-0068)
  * DELETE (accounts)     users who are SCHOOL coordinators in the season being closed
  * DEACTIVATE (status)   remaining non-admin users (country coordinators) + all schools
  * KEEP untouched        content library, countries/regions, difficulty, roles, lookups, settings
@@ -48,9 +49,25 @@ final class SeasonRollover
         'student_session_quiz',
         'student_sessions',
         'publication_batches',
-        'audit_logs',
         'registrations',
     ];
+
+    /**
+     * 🪤 `audit_logs` is deliberately NOT in the list above (ADR-0068).
+     *
+     * It used to be, and the consequence was a table that could never answer
+     * anything: the only row anybody writes to it is `season.started`, and the
+     * next season start deleted it. One row, always, describing the season you
+     * are already looking at — and the history of the rollovers themselves,
+     * which is the one thing a trail of season starts is for, never accumulated.
+     *
+     * ADR-0007 said audit and history stay complete; ADR-0044 said a new season
+     * starts on a fresh trail. Both are right about different rows. What is
+     * cleared is the trail OF the season — rows about competitors and attempts
+     * that are being deleted around them. What is kept is the trail of the
+     * seasons THEMSELVES. See {@see clearSeasonScopedAuditRows()}.
+     */
+    private const AUDIT_SUBJECT_KEPT = Season::class;
 
     /**
      * What a rollover would touch right now — counts only, no writes.
@@ -74,6 +91,10 @@ final class SeasonRollover
         foreach (self::WIPE_TABLES as $table) {
             $wipe[$table] = DB::table($table)->count();
         }
+
+        // Reported under its own name so the confirmation screen still says what
+        // happens to it — the number is now "cleared", not "emptied".
+        $wipe['audit_logs'] = self::seasonScopedAuditRows()->count();
 
         return [
             'archive' => [
@@ -134,6 +155,8 @@ final class SeasonRollover
             $applied[$table] = DB::table($table)->delete();
         }
 
+        $applied['audit_logs'] = self::clearSeasonScopedAuditRows();
+
         if ($schoolCoordinators->isNotEmpty()) {
             // Custom API tokens for the removed accounts (Sanctum morph has no FK).
             DB::table('personal_access_tokens')
@@ -193,8 +216,10 @@ final class SeasonRollover
                 $applied['assignments_moved'] = self::moveAssignmentsForward($previous->id, $season->id, $now);
             }
 
-            // The first row of the new season's trail — audit_logs was just emptied,
-            // so an entry written before this point would not survive to be read.
+            // Written after the wipe, which is where it has always been: an entry
+            // made before this point would have been swept up with the rest. Now
+            // that the seasons' own rows are kept (ADR-0068), this is the row that
+            // joins the trail rather than the row that starts it over.
             AuditLog::create([
                 'actor_id' => $actor?->id,
                 'actor_label' => $actor?->name,
@@ -215,6 +240,29 @@ final class SeasonRollover
 
             return ['season' => $season, 'previous' => $previous, 'applied' => $applied];
         });
+    }
+
+    /**
+     * The audit rows a rollover clears: everything that is not about a season.
+     *
+     * A row about a competitor, an attempt or a publication describes something
+     * that is being deleted in the same transaction, and a trail pointing at rows
+     * that no longer exist is not history, it is litter. A row about a season is
+     * the opposite: it outlives the season by design, and is the only thing that
+     * can ever answer "when did round 13 start, and who started it".
+     *
+     * @return Builder
+     */
+    private static function seasonScopedAuditRows()
+    {
+        return DB::table('audit_logs')->where(
+            fn ($q) => $q->whereNull('subject_type')->orWhere('subject_type', '!=', self::AUDIT_SUBJECT_KEPT),
+        );
+    }
+
+    private static function clearSeasonScopedAuditRows(): int
+    {
+        return self::seasonScopedAuditRows()->delete();
     }
 
     /**

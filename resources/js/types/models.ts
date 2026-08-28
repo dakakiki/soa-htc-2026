@@ -860,10 +860,22 @@ export interface SeasonRolloverPlan {
     };
 }
 
+/** One rollover this installation has made, read back from the audit trail. */
+export interface SeasonRolloverRecord {
+    at: string | null;
+    /** The name as it read on the day. Null means the console started it. */
+    by: string | null;
+    round: number | null;
+    year: number | null;
+    previous_round: number | null;
+    archived_registrations: number | null;
+}
+
 export interface SeasonSettings {
     active: Season | null;
     plan: SeasonRolloverPlan;
     suggested: { round_number: number; year: number };
+    history: SeasonRolloverRecord[];
 }
 
 export interface Paginated<T> {

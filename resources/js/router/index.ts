@@ -12,7 +12,8 @@ declare module 'vue-router' {
     interface RouteMeta {
         requiresAuth?: boolean;
         guestOnly?: boolean;
-        permission?: string;
+        /** One permission, or a list of which ALL are required. */
+        permission?: string | string[];
         zone?: Zone;
         /**
          * Render straight into the shell, without its centred container — for a
@@ -422,7 +423,10 @@ const routes: RouteRecordRaw[] = [
         path: '/results/archive',
         name: 'results.archive',
         component: () => import('@/pages/results/ArchivePage.vue'),
-        meta: { requiresAuth: true, permission: 'reports.view' },
+        // Both, matching what the server enforces: the archive is denormalized to
+        // names and cannot be narrowed to a reader's venues, so it is refused to
+        // anyone who is not global (ADR-0067).
+        meta: { requiresAuth: true, permission: ['reports.view', 'schools.view.all'] },
     },
     {
         path: '/reset',
@@ -622,8 +626,11 @@ router.beforeEach(async (to) => {
         return { name: 'login', query: { redirect: to.fullPath } };
     }
 
-    if (to.meta.permission && !session.can(to.meta.permission)) {
-        return { name: 'home' };
+    if (to.meta.permission) {
+        const required = Array.isArray(to.meta.permission) ? to.meta.permission : [to.meta.permission];
+        if (!required.every((p) => session.can(p))) {
+            return { name: 'home' };
+        }
     }
 
     // Competitor (student) session — separate from the admin session above.

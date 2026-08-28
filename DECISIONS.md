@@ -1778,6 +1778,137 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0066 — Prelazak na sezonu se proba na serveru, komandom koja ništa ne menja
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** vlasnik seli sve na produkcioni server u DEV okruženje, da bi se sve istestiralo
+  tamo. ADR-0065 je ostavio jedno pitanje koje kod ne može da zatvori: koliki je na tom serveru
+  **web** `max_execution_time` i šta stoji ispred PHP-a. Uz to, ceo niz stvari zavisi od mašine, a
+  ne od koda — red, mejl, potpisane adrese iza TLS-a, granice otpremanja, verzija MySQL-a.
+- **`php artisan season:rehearse`.** Pusti **ceo** prelazak nad pravim podacima tog servera unutar
+  transakcije, ispiše koliko je trajao i šta je uradio, pa sve vrati unazad. Nije simulacija:
+  `INSERT … SELECT` sa sedam `JOIN`-ova zaista se izvrši nad tom bazom, što je jedini način da se
+  sazna da li ta baza to prima.
+- 🪤 **Odbija da počne ako ijedna tabela koju dira nije InnoDB.** MyISAM ćutke ignoriše transakciju:
+  redovi bi nestali, a komanda bi preko toga ispisala vedar izveštaj. Legacy baza iz koje ovaj
+  projekat uvozi koristila je MyISAM za šest tabela, pa server sklopljen po tom uzoru nije
+  hipoteza.
+- **Zašto je bezbedno:** u prelasku nema DDL-a — samo `INSERT`/`DELETE`/`UPDATE`, a brisanje je
+  `DELETE` a ne `TRUNCATE`, koji bi implicitno potvrdio transakciju i odneo probu sa sobom.
+- **Na kraju uporedi i javi.** Ako `ROLLBACK` nije vratio svaki broj, komanda to prijavi kao grešku
+  umesto da ćuti. Ako sam prelazak pukne, uhvati izuzetak, vrati transakciju i kaže da je pao
+  **ovde a ne na dan** — što je i cela svrha.
+- **Broj koji ispiše nije ceo odgovor, i tako i kaže.** CLI proces obično nema limit, pa komanda
+  izričito upućuje na **web** `max_execution_time` i na nginx `fastcgi_read_timeout` / Apache
+  `ProxyTimeout` / `IPCCommTimeout`, koje aplikacija ne može da dohvati.
+- **`docs/06_DEPLOYMENT.md` dobija sekciju „What only that server can tell you"** — spisak izveden
+  iz onoga što ova aplikacija stvarno radi, ne opšti savet: `queue:work`, pravi SMTP (tri mejla
+  koja nikad nisu stvarno poslata jer je lokalno `MAIL_MAILER=log`), ispitni mediji preko HTTPS-a
+  (potpisana adresa, a `TrustProxies` nije podešen), `storage:link`, granice otpremanja prema 5 MB
+  obrasca za venue, Sanctum kolačić na pravom hostu, verzija i `sql_mode` MySQL-a, mPDF temp
+  direktorijum, `APP_TIMEZONE` naspram `expires_at`.
+  📎 Zabeleženo i da je dev **MySQL 8.3 sa `ONLY_FULL_GROUP_BY` i `STRICT_TRANS_TABLES` uključenim**,
+  pa je sve dosad vežbano u strogom režimu; stariji MySQL ili MariaDB razlikuju se u drugu stranu.
+- **Testovi (`SeasonRehearsalTest`, 5):** posle probe je **svaki broj redova isti** i aktivna sezona
+  ista; proba zaista radi posao (ispisuje preseljene dodele, nula zaostalih, jednu aktivnu sezonu,
+  administratora koji je zadržao pravo); uvek kaže koliko je trajalo; bez aktivne sezone odbija;
+  a na **produkcionom** okruženju pita pre nego što išta upiše.
+  🪤 `ConfirmableTrait` pita **samo** kad je okruženje `production` — u testu se okruženje mora
+  namestiti, inače test prođe pored pitanja i ne dokazuje ništa.
+- ✅ **Provereno uživo:** komanda je puštena na dev MySQL-u — 50.004 registracije arhivirane, 134
+  dodele preseljene, 0 zaostalih, 1 aktivna sezona, administrator zadržao `settings.manage`,
+  **53,9 s**, pa „every table is back to the row count it started with".
+
+---
+
+## ADR-0067 — Izveštaji se crtaju unutar čitaočevog opsega, a arhiva se odbija umesto da ga glumi
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** `ReportController` je zvao `authorize('reports.view')` na četiri mesta, a
+  `allowedSchoolIds()` koristio **jednom** — i to za **opcioni filter iz zahteva**
+  (`coordinator_user_id`), ne za pozivaoca. `ArchiveController` nije ni to.
+  🪤 Dve različite stvari završavale su u istoj listi: `coordinator_user_id` je **filter** (čitalac
+  traži da vidi venue-e jednog koordinatora), a pozivaočev opseg je **granica** (šta god da je
+  tražio, ne-globalan čitalac vidi samo svoje). `ResultsController::applyPopulationFilters` granicu
+  primenjuje oduvek, i u sopstvenom komentaru piše da je **to** ono što delegiranje
+  `results.manage`/`reports.view` koordinatoru čini bezbednim. Izveštaji je nisu primenjivali, pa je
+  druga polovina te rečenice bila neistina.
+- ⚠️ **Danas se to ne vidi:** `reports.view` ima samo Administrator, a on je globalan. Postaje
+  stvarno čim neko napravi **prilagođenu rolu** sa tom permisijom — a ekran Roles postoji upravo
+  zato. Zato svaki test u `ReportScopeTest` gradi tačno takvu rolu; drugačije se rupa ne vidi.
+- **Popravka za izveštaje:** `populationSchoolIds()` **preseca** traženi filter sa pozivaočevim
+  opsegom i predaje presek u `coordinator_school_ids`. Prazna lista **nije** „bez ograničenja" —
+  `ReportSummary` je pretvara u `whereIn(…, [])` i vraća nule, što je tačan odgovor.
+  Primenjeno na `summary`, `matrix` i `exportPdf`.
+- **I na ono što ekran NUDI, ne samo na ono što prikazuje.** Birači zemalja, regiona, venue-a i
+  koordinatora sada se izvode iz opsega. Spisak svih zemalja nekome ko sme da vidi jednu nije
+  curenje rezultata, ali jeste curenje oblika takmičenja — a svaki izbor van opsega vraća nule, što
+  se čita kao pokvareno a ne kao zabranjeno.
+- 🔴 **Arhiva: samo administrator.** Ne zato što je neko odlučio da je osetljiva, nego zato što se
+  opseg na nju **ne može primeniti istinito**. Layer C je namerno denormalizovan (ADR-0027):
+  samostalan snimak koji preživljava preimenovanje, premeštanje i brisanje venue-a, i nosi
+  `country`, `region` i `venue` kao **tekst**, onako kako su glasili tog dana. Opseg bi mogao da se
+  približi jedino poklapanjem tih stringova sa imenima koja pozivaočevi venue-i imaju **danas** — a
+  to greši u oba smera: venue preimenovan posle runde sakrio bi redove koji jesu čitaočevi, a dva
+  venue-a koja su nekad delila ime pokazala bi one koji nisu. **Približna granica je gora od
+  poštenog odbijanja, jer izgleda kao da radi.**
+- **SPA prati server:** stavka Archive u meniju i njena ruta traže **obe** stvari
+  (`reports.view` + `schools.view.all`), pa se zaključana vrata ne nude. `perm` u `AppSidebar` i
+  `meta.permission` u ruteru sada primaju i listu, koja znači „sve navedeno".
+- **Testovi (`ReportScopeTest`, 8):** čitalac vezan za jedan venue vidi samo svoje u zbiru; traženje
+  **tuđe zemlje** ne širi opseg nego vraća nule; grupisanje po zemlji nudi jednu; heatmap je omeđen
+  isto (uz kontrolnu tvrdnju da administrator vidi obe, inače test ne dokazuje ništa); filtriranje
+  po koordinatoru **van** opsega ne doseže preko granice; biračima se nudi samo ono što se sme
+  videti; arhiva vraća **403** takvom čitaocu i **200** administratoru.
+  Mutaciono provereno — bez granice padaju **šest od osam**, uključujući „Failed asserting that 2 is
+  identical to 1" (čitalac je video oba venue-a) i arhivu koja vrati 200 umesto 403.
+- **Suite 645/645** (bilo 637), `pint --dirty` i `npm run type-check` čisti.
+
+---
+
+## ADR-0068 — Trag sezona nadživljava sezone, i može da se pročita (ispravlja ADR-0044)
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** `audit_logs` je imao **tačno jednog pisca** — prelazak na sezonu (`season.started`) —
+  i bio je u listi tabela koje taj isti prelazak prazni. Posledica: tabela je **uvek** držala jedan
+  red, i to onaj koji opisuje sezonu koja je već na ekranu. Istorija samih prelazaka nije mogla da
+  postoji. Čitača takođe nije bilo — ni ekrana ni endpointa — pa se to nikad ne bi ni primetilo.
+- ⚠️ **Dve zapisane odluke su se sudarale.** ADR-0007: *„audit i istorija ostaju potpuni"*.
+  ADR-0044: *„`audit_logs` je u listi tabela koje se prazne (nova sezona kreće od čistog traga)"*.
+  **Obe su tačne, ali o različitim redovima**, i to razlikovanje je ono što je falilo.
+- **Odluka:** briše se trag **O** sezoni, ostaje trag **SAMIH** sezona.
+  Red o takmičaru, pokušaju ili objavi opisuje nešto što se u istoj transakciji briše — takav trag
+  ne pokazuje ni na šta i nije istorija nego smeće. Red o sezoni je suprotno: on sezonu nadživljava
+  po definiciji i jedini može da odgovori na pitanje *„kada je krenula runda 13 i ko ju je pokrenuo"*.
+  Implementacija: `audit_logs` izlazi iz `WIPE_TABLES`, a briše se ciljano — sve čiji `subject_type`
+  nije `Season` (uključujući redove bez subjekta). Broj i dalje stoji u `plan()['wipe']` pod svojim
+  imenom, pa ekran potvrde i dalje kaže šta se dešava.
+- 🪤 **Audit red se i dalje piše POSLE brisanja**, gde je oduvek i bio. Razlika je što on sada
+  **pristupa tragu** umesto da ga počinje iznova.
+- **Čitalac, tamo gde se pitanje postavlja.** `GET /api/settings/season` vraća i `history`:
+  poslednjih 50 prelazaka, najnoviji prvi — kada, ko, koja runda, koja prethodna i koliko je
+  registracija arhivirano. Ekran Settings → Season ih prikazuje ispod forme.
+  **Namerno NIJE opšti pregledač audita**: odgovara na pitanje o kome taj ekran ionako jeste, na
+  mestu gde onaj ko odlučuje da pokrene rundu već stoji.
+- 🪤 **`actor_label` se čuva pored `actor_id`.** Brisanje naloga nulira FK — a prelazak briše
+  školske koordinatore — pa bi trag koji pamti samo `actor_id` zaboravio ko je šta uradio čim taj
+  ode. Test to drži: nalog se obriše, ime ostaje.
+- **Šta ovim NIJE rešeno, i namerno se ne odlučuje:** koliko toga uopšte treba da piše u
+  `audit_logs`. Nije to praznina kakva izgleda — ozbiljne radnje već imaju **svoje** namenske
+  tragove: `attempt_resets` (poništen pokušaj, ADR-0022), `grade_revisions` (ispravka ocene, 5b),
+  `publication_batches` (objava), `coordinator_registrations.reviewed_by/reviewed_at` (odluka o
+  prijavi, ADR-0053). Opšti audit **svake** administratorske radnje je proizvodna odluka i čeka
+  vlasnika.
+- **Testovi (`SeasonTrailTest`, 5):** dva prelaska ostavljaju **dva** reda; red o takmičaru i red bez
+  subjekta se i dalje brišu; ekran vraća prelaske najnoviji prvi sa imenom onoga ko ih je pokrenuo;
+  ime preživi brisanje naloga (uz tvrdnju da je FK zaista nuliran, inače test ne dokazuje ništa);
+  sveža instalacija vraća praznu listu umesto greške.
+  Mutaciono provereno — sa starim brisanjem cele tabele padaju dva testa: „Failed asserting that 1
+  is identical to 2" i istorija u kojoj nedostaje prethodna runda.
+- **Suite 650/650** (bilo 645), `pint --dirty` i `npm run type-check` čisti.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
