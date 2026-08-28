@@ -6,7 +6,7 @@ import { useConfirmStore } from '@/stores/confirm';
 import { getSeasonSettings, startSeason } from '@/api/seasons';
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
-import type { Season, SeasonRolloverPlan } from '@/types/models';
+import type { Season, SeasonRolloverPlan, SeasonRolloverRecord } from '@/types/models';
 
 /**
  * Settings → Season.
@@ -28,6 +28,12 @@ const canManage = computed(() => session.can('settings.manage'));
 
 const active = ref<Season | null>(null);
 const plan = ref<SeasonRolloverPlan | null>(null);
+/**
+ * The rollovers already made (ADR-0068). Until now the audit row for a season
+ * start was deleted by the next one, so this list could not exist — one row,
+ * always, describing the season already on screen.
+ */
+const history = ref<SeasonRolloverRecord[]>([]);
 
 const loading = ref(true);
 const saving = ref(false);
@@ -74,6 +80,7 @@ async function load(): Promise<void> {
         const { data } = await getSeasonSettings();
         active.value = data.active;
         plan.value = data.plan;
+        history.value = data.history ?? [];
         form.round_number = data.suggested.round_number;
         form.year = data.suggested.year;
         form.name = t('seasonSettings.defaultName', { year: data.suggested.year });
@@ -251,6 +258,36 @@ onMounted(load);
                         </span>
                     </label>
                 </div>
+            </div>
+
+            <!-- What has already happened, under what is about to. A person deciding
+                 whether to start a round is the same person who wants to know when
+                 the last one was started, and by whom. -->
+            <div v-if="history.length" class="mt-8 border-t border-gray-200 pt-6">
+                <h3 class="text-sm font-medium text-gray-700">{{ $t('seasonSettings.historyTitle') }}</h3>
+                <table class="mt-3 w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-400">
+                            <th class="py-2 pr-4 font-medium">{{ $t('seasonSettings.historyRound') }}</th>
+                            <th class="py-2 pr-4 font-medium">{{ $t('seasonSettings.historyStarted') }}</th>
+                            <th class="py-2 pr-4 font-medium">{{ $t('seasonSettings.historyBy') }}</th>
+                            <th class="py-2 text-right font-medium">{{ $t('seasonSettings.historyArchived') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(row, i) in history" :key="i" class="border-b border-gray-100 last:border-0">
+                            <td class="py-2 pr-4 font-medium tabular-nums">
+                                {{ row.round ?? '—' }}<span v-if="row.year" class="text-gray-400"> · {{ row.year }}</span>
+                            </td>
+                            <td class="py-2 pr-4 text-gray-600">{{ row.at ? new Date(row.at).toLocaleString() : '—' }}</td>
+                            <!-- Null means nobody typed it into a screen. -->
+                            <td class="py-2 pr-4 text-gray-600">{{ row.by ?? $t('seasonSettings.historyConsole') }}</td>
+                            <td class="py-2 text-right tabular-nums text-gray-600">
+                                {{ row.archived_registrations === null ? '—' : num(row.archived_registrations) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
 
             <p v-if="error" class="mt-4 text-sm text-red-600">{{ error }}</p>

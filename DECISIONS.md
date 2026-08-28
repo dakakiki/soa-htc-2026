@@ -1866,6 +1866,49 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0068 — Trag sezona nadživljava sezone, i može da se pročita (ispravlja ADR-0044)
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** `audit_logs` je imao **tačno jednog pisca** — prelazak na sezonu (`season.started`) —
+  i bio je u listi tabela koje taj isti prelazak prazni. Posledica: tabela je **uvek** držala jedan
+  red, i to onaj koji opisuje sezonu koja je već na ekranu. Istorija samih prelazaka nije mogla da
+  postoji. Čitača takođe nije bilo — ni ekrana ni endpointa — pa se to nikad ne bi ni primetilo.
+- ⚠️ **Dve zapisane odluke su se sudarale.** ADR-0007: *„audit i istorija ostaju potpuni"*.
+  ADR-0044: *„`audit_logs` je u listi tabela koje se prazne (nova sezona kreće od čistog traga)"*.
+  **Obe su tačne, ali o različitim redovima**, i to razlikovanje je ono što je falilo.
+- **Odluka:** briše se trag **O** sezoni, ostaje trag **SAMIH** sezona.
+  Red o takmičaru, pokušaju ili objavi opisuje nešto što se u istoj transakciji briše — takav trag
+  ne pokazuje ni na šta i nije istorija nego smeće. Red o sezoni je suprotno: on sezonu nadživljava
+  po definiciji i jedini može da odgovori na pitanje *„kada je krenula runda 13 i ko ju je pokrenuo"*.
+  Implementacija: `audit_logs` izlazi iz `WIPE_TABLES`, a briše se ciljano — sve čiji `subject_type`
+  nije `Season` (uključujući redove bez subjekta). Broj i dalje stoji u `plan()['wipe']` pod svojim
+  imenom, pa ekran potvrde i dalje kaže šta se dešava.
+- 🪤 **Audit red se i dalje piše POSLE brisanja**, gde je oduvek i bio. Razlika je što on sada
+  **pristupa tragu** umesto da ga počinje iznova.
+- **Čitalac, tamo gde se pitanje postavlja.** `GET /api/settings/season` vraća i `history`:
+  poslednjih 50 prelazaka, najnoviji prvi — kada, ko, koja runda, koja prethodna i koliko je
+  registracija arhivirano. Ekran Settings → Season ih prikazuje ispod forme.
+  **Namerno NIJE opšti pregledač audita**: odgovara na pitanje o kome taj ekran ionako jeste, na
+  mestu gde onaj ko odlučuje da pokrene rundu već stoji.
+- 🪤 **`actor_label` se čuva pored `actor_id`.** Brisanje naloga nulira FK — a prelazak briše
+  školske koordinatore — pa bi trag koji pamti samo `actor_id` zaboravio ko je šta uradio čim taj
+  ode. Test to drži: nalog se obriše, ime ostaje.
+- **Šta ovim NIJE rešeno, i namerno se ne odlučuje:** koliko toga uopšte treba da piše u
+  `audit_logs`. Nije to praznina kakva izgleda — ozbiljne radnje već imaju **svoje** namenske
+  tragove: `attempt_resets` (poništen pokušaj, ADR-0022), `grade_revisions` (ispravka ocene, 5b),
+  `publication_batches` (objava), `coordinator_registrations.reviewed_by/reviewed_at` (odluka o
+  prijavi, ADR-0053). Opšti audit **svake** administratorske radnje je proizvodna odluka i čeka
+  vlasnika.
+- **Testovi (`SeasonTrailTest`, 5):** dva prelaska ostavljaju **dva** reda; red o takmičaru i red bez
+  subjekta se i dalje brišu; ekran vraća prelaske najnoviji prvi sa imenom onoga ko ih je pokrenuo;
+  ime preživi brisanje naloga (uz tvrdnju da je FK zaista nuliran, inače test ne dokazuje ništa);
+  sveža instalacija vraća praznu listu umesto greške.
+  Mutaciono provereno — sa starim brisanjem cele tabele padaju dva testa: „Failed asserting that 1
+  is identical to 2" i istorija u kojoj nedostaje prethodna runda.
+- **Suite 650/650** (bilo 645), `pint --dirty` i `npm run type-check` čisti.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

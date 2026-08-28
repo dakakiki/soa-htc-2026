@@ -1321,6 +1321,14 @@ export default {
         confirmDelete: 'Delete "{name}"?',
     },
     seasonSettings: {
+        // The rollovers already made (ADR-0068). Read from `audit_logs`, which
+        // until now deleted its own only row at every season start.
+        historyTitle: 'Rounds already started',
+        historyRound: 'Round',
+        historyStarted: 'Started',
+        historyBy: 'By',
+        historyArchived: 'Archived',
+        historyConsole: 'Console',
         title: 'Season',
         subtitle: 'Start the next round. Saving archives the season that is running, clears it and makes the new round the active one.',
         current: 'Running now',
