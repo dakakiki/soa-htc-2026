@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Models\Question;
+use App\Domain\Assessment\Support\QuestionMedia;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreQuestionRequest;
 use App\Http\Requests\UpdateQuestionRequest;
@@ -84,11 +85,10 @@ class QuestionController extends Controller
         $this->authorize('content.manage');
 
         // Freely deletable for now; a test/result guard will be added with those layers.
-        if ($question->image_path) {
-            Storage::disk('public')->delete($question->image_path);
-        }
-        if ($question->audio_path) {
-            Storage::disk('public')->delete($question->audio_path);
+        foreach (QuestionMedia::KINDS as $column) {
+            if ($question->{$column}) {
+                Storage::disk(QuestionMedia::DISK)->delete($question->{$column});
+            }
         }
         $question->delete();
 
@@ -101,14 +101,19 @@ class QuestionController extends Controller
         return $request->safe()->except(['image', 'audio', 'level_ids', 'answers']);
     }
 
+    /**
+     * Both files go to the PRIVATE disk. The `kind` in {@see QuestionMedia::KINDS}
+     * doubles as the upload field's name, so the two lists cannot drift apart.
+     */
     private function storeFiles(Request $request, Question $question): void
     {
-        foreach (['image' => 'image_path', 'audio' => 'audio_path'] as $field => $column) {
+        foreach (QuestionMedia::KINDS as $field => $column) {
             if ($request->hasFile($field)) {
                 if ($question->{$column}) {
-                    Storage::disk('public')->delete($question->{$column});
+                    Storage::disk(QuestionMedia::DISK)->delete($question->{$column});
                 }
-                $question->{$column} = $request->file($field)->store('questions', 'public');
+                $question->{$column} = $request->file($field)
+                    ->store(QuestionMedia::DIRECTORY, QuestionMedia::DISK);
             }
         }
         if ($question->isDirty(['image_path', 'audio_path'])) {

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\QuestionTag;
+use App\Domain\Assessment\Support\QuestionMedia;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Season;
@@ -99,7 +100,10 @@ class QuestionApiTest extends TestCase
 
     public function test_image_upload_is_stored(): void
     {
-        Storage::fake('public');
+        // The PRIVATE disk. Faking `public` here left a real file behind in
+        // `storage/app/private/questions` on every run once the media moved
+        // (ADR-0059); where the bytes land is `QuestionMediaTest`'s subject.
+        Storage::fake(QuestionMedia::DISK);
 
         $this->actingAs($this->admin())
             ->post('/api/questions', [

@@ -1430,6 +1430,65 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   `/storage/…` adresa vraća HTML stranu aplikacije i **200**. Slike pukle, a dugme za PDF isporučuje
   HTML dokument sa `.pdf` nastavkom — sveža produkcija bi izgledala nedovršeno bez ijednog traga u logu.
 
+## ADR-0059 — Ispitni mediji žive na privatnom disku, a takmičar do njih dolazi potpisanom adresom
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** slike i audio pitanja su išli na **javni** disk (`QuestionController::storeFiles` →
+  `store('questions', 'public')`), a i admin resurs i ispitni payload su ih citirali kao
+  `{APP_URL}/storage/questions/…`. API je gejtovao **listu** pitanja po nivou, ali bajtove nije
+  gejtovalo ništa: materijal žive olimpijade — slike zadataka i snimci za slušanje — skidao se bez
+  ijedne sesije, sa adrese koja se prošeta.
+- **Fajlovi idu na disk `local`** (`storage/app/private`), u isti direktorijum `questions`. Zatečene
+  putanje u `questions.image_path` / `audio_path` zato ostaju tačne — promenio se disk, ne putanja.
+- 🪤 **Dva ulaza, jer dva pozivaoca ne mogu da nose isti ključ.** Ovo je nalaz runde i nije se video
+  iz radnog naloga, koji je tražio `EnsureStudentSession` na samoj ruti:
+  - **Osoblje** dolazi sa kolačićem SPA sesije, koji pretraživač sam kači na `<img src>` i
+    `<a href>`. Obična autorizovana ruta: `GET /api/questions/{q}/media/{kind}` iza `content.manage`.
+    Ekrani `QuestionFormPage` i `QuestionPreviewModal` se nisu menjali.
+  - **Takmičar** se autentifikuje **bearer tokenom**, a `<img>` i `<audio>` ne mogu da pošalju
+    zaglavlje — nijedno. Zato adresa nosi sopstveni dokaz: **potpisana** je, kuje se u ispitnom
+    payload-u (koji **jeste** iza `student.session`, pa sesija i dalje zaslužuje pristup), i važi do
+    `attempt->expires_at + SUBMIT_GRACE_SECONDS` — tačno dok traje i pravo da se test preda.
+    `StudentTestPage.vue` se nije menjao.
+- ⚠️ **Potpis JESTE takmičarev ključ i to treba reći naglas:** u tom prozoru adresa radi kome god
+  dođe u ruke. To je neuporedivo manje od otvorenog direktorijuma koji zamenjuje — vezano je za
+  jedno pitanje i za sat jednog pokušaja — a alternativa (dovlačenje kroz `fetch` sa bearer tokenom
+  pa `URL.createObjectURL`) oduzela bi audiu progresivni streaming i premotavanje, što se na ispitu
+  iz slušanja oseti. Vlasnikova odluka, 2026-08-28.
+- **`response()->file()`, ne `Storage::download()`** — pretraživač mora da sliku **prikaže**, a ne da
+  je snimi, i Symfony-jev odgovor odgovara na `Range` zahtev, što je ono što takmičaru dozvoljava da
+  se vrati kroz snimak umesto da ga čeka iznova. Uz to `X-Content-Type-Options: nosniff`, jer se tip
+  pogađa iz fajla; upload je već stegnut na raster i audio u `StoreQuestionRequest`, pa je ovo druga
+  brava, ne prva.
+- ✅ **Provereno na živom dev stack-u, ne samo u suite-u** (SQLite ≠ MySQL nije jedini razlog — ovde
+  se proverava HTTP sloj koji test zaobilazi kroz `actingAs`): `<img>` sa **samo** kolačićem učita
+  sliku (`loaded 1x1`, `image/png`, `accept-ranges: bytes`); ista ruta **bez** kolačića → **401**;
+  studentska bez potpisa → **403**; **sa** potpisom i bez ikakve sesije → **200**; potpis sa jednim
+  izmenjenim znakom → **403**; stara `/storage/questions/…` adresa vraća HTML ljusku SPA, nijedan
+  bajt slike.
+- **Migracija fajlova je u praksi bila prazna.** Radni nalog je pretpostavljao da na dev-u ima
+  sadržaja — nema: 1699 pitanja, **nijedno** sa slikom ili audiom, a `storage/app/public/questions`
+  prazan. Migracija `2026_08_28_120000_move_question_media_off_the_public_disk` ipak postoji,
+  idempotentna i reverzibilna, zbog instalacije koja nije ova.
+- 🪤 **Zatečen test je lagao, i to skupo.** `QuestionApiTest::test_image_upload_is_stored` lažira
+  disk `public`; kad su fajlovi otišli na `local`, test je i dalje prolazio a **upisivao pravi fajl**
+  u `storage/app/private/questions` pri svakom pokretanju suite-a. Uhvaćeno gledanjem diska posle
+  zelenog prolaza, ne testom.
+- 🔴 **Prva verzija migracije je brisala original posle kopije koja može tiho da padne.** Oba diska
+  su `'throw' => false, 'report' => false`, pa `writeStream()` guta `UnableToWriteFile` i vraća
+  **`false` bez izuzetka i bez reda u logu**. Povratna vrednost se nije gledala, a `delete()` je bio
+  sledeća linija — pun disk ili read-only mount na pola posla obrisao bi jedini primerak snimka za
+  slušanje, dok `migrate` ispiše DONE i izađe sa 0. Sada se piše, **proverava da je stiglo**
+  (`fileExists`, ne `exists`, da direktorijum ne prođe kao fajl), pa tek onda briše; neuspeh diže
+  `RuntimeException` i zaustavlja migraciju — jer migracija koja stane ostavlja fajlove čitljivim
+  tamo gde su bili. Isto važi za `down()`. Test `test_the_migration_keeps_the_original_when_the_copy_does_not_arrive`
+  lažira disk koji odbija upis kao pun volumen; mutaciono provereno da pada kad se zaštita skine.
+- **`->setPrivate()` na odgovoru.** `BinaryFileResponse` se konstruiše sa `$public = true` i zove
+  `setPublic()` **posle** prosleđenih zaglavlja, pa je ispitni medij izlazio sa `Cache-Control: public`.
+  Danas nema deljenog keša u putanji (jedan Apache), ali `docs/02` u ciljnoj slici ima load balancer
+  i CDN, a privatan ispitni snimak nije stvar koju treba ostaviti da visi o tome. `private`, ne
+  `no-store`: takmičarev pretraživač **treba** da zadrži snimak, inače ga premotavanje skida iznova.
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
