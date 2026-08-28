@@ -8,6 +8,7 @@ use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\QuestionAnswer;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
+use App\Domain\Assessment\Support\QuestionMedia;
 use App\Domain\Competition\Enums\AttemptStatus;
 use App\Domain\Competition\Enums\GradingStatus;
 use App\Domain\Competition\Jobs\GradeAttempt;
@@ -17,8 +18,10 @@ use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AttemptTest extends TestCase
@@ -120,6 +123,41 @@ class AttemptTest extends TestCase
         // The correct-answer flag must never reach the client.
         $this->assertStringNotContainsString('is_correct', json_encode($response->json(), JSON_THROW_ON_ERROR));
         $this->assertDatabaseHas('attempts', ['test_id' => $c['tests'][0]->id, 'status' => 'in_progress']);
+    }
+
+    public function test_the_exam_payload_signs_the_media_and_the_signature_dies_with_the_attempt(): void
+    {
+        Storage::fake(QuestionMedia::DISK);
+
+        $c = $this->quizWithTests('H2', 1);
+        $question = $c['tests'][0]->questions()->firstOrFail();
+        $question->forceFill([
+            'image_path' => UploadedFile::fake()->image('q.png', 20, 20)
+                ->store(QuestionMedia::DIRECTORY, QuestionMedia::DISK),
+        ])->save();
+
+        $response = $this->withToken($this->tokenFor('H2'))
+            ->postJson("/api/student/tests/{$c['tests'][0]->id}/start")
+            ->assertStatus(201);
+
+        $url = (string) $response->json('questions.0.image_url');
+
+        // Never a file address, and never one that works without the signature.
+        $this->assertStringNotContainsString('/storage/', $url);
+        $this->assertStringContainsString('signature=', $url);
+
+        // `<img src>` sends no bearer token, so this has to work with no session
+        // of any kind — the signature is the whole credential.
+        $this->get($url)->assertOk();
+
+        // …and it is spent when the right to hand this test in is. The attempt
+        // is the clock, not the competitor's session.
+        $expiry = Attempt::findOrFail($response->json('attempt.id'))->expires_at
+            ->addSeconds(Attempt::SUBMIT_GRACE_SECONDS);
+
+        $this->travelTo($expiry->copy()->addSecond(), function () use ($url) {
+            $this->get($url)->assertForbidden();
+        });
     }
 
     public function test_next_test_unlocks_only_after_an_admin_publishes_the_previous(): void

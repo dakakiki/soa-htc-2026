@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Assessment\Support\QuestionMedia;
 use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AttemptController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PublicContentController;
 use App\Http\Controllers\Api\QuestionController;
+use App\Http\Controllers\Api\QuestionMediaController;
 use App\Http\Controllers\Api\QuestionTagController;
 use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\RegionController;
@@ -109,6 +111,23 @@ Route::prefix('auth')->group(function () {
 Route::prefix('student')->group(function () {
     Route::post('identify', [StudentAuthController::class, 'identify'])->middleware('throttle:student-identify');
     Route::get('countries', [StudentAuthController::class, 'countries']);
+
+    /*
+     * A question's picture and recording, for the competitor looking at them.
+     *
+     * 🪤 Outside `student.session` on purpose, and it is the one route here that
+     * is. `<img src>` and `<audio src>` cannot send the bearer token the
+     * competitor authenticates with, so the address carries its own proof: it is
+     * SIGNED, minted inside the attempt payload (which IS behind
+     * `student.session`), and it expires with the attempt. Moving this line into
+     * the group below would return a 401 to every picture on the exam screen.
+     */
+    Route::get('questions/{question}/media/{kind}', [QuestionMediaController::class, 'student'])
+        ->whereNumber('question')
+        ->whereIn('kind', QuestionMedia::kinds())
+        ->middleware('signed')
+        ->name('student.questions.media');
+
     Route::middleware('student.session')->group(function () {
         Route::get('me', [StudentAuthController::class, 'me']);
         Route::post('logout', [StudentAuthController::class, 'logout']);
@@ -206,6 +225,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('exam-rounds/reorder', [ExamRoundController::class, 'reorder']);
     Route::apiResource('exam-rounds', ExamRoundController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('question-tags', QuestionTagController::class)->only(['index', 'store', 'update', 'destroy']);
+    // A question's picture and recording live on the private disk and come out
+    // only here. The staff SPA reaches this with the session cookie, which the
+    // browser attaches to `<img src>` on its own.
+    Route::get('questions/{question}/media/{kind}', [QuestionMediaController::class, 'show'])
+        ->whereNumber('question')
+        ->whereIn('kind', QuestionMedia::kinds())
+        ->name('questions.media');
     Route::apiResource('questions', QuestionController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::get('tests/{test}/preview', [TestController::class, 'preview']);
     Route::apiResource('tests', TestController::class)->only(['index', 'show', 'store', 'update', 'destroy']);

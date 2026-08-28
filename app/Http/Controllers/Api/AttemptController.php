@@ -9,6 +9,7 @@ use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
+use App\Domain\Assessment\Support\QuestionMedia;
 use App\Domain\Competition\Enums\AttemptStatus;
 use App\Domain\Competition\Enums\GradingStatus;
 use App\Domain\Competition\Jobs\GradeAttempt;
@@ -21,7 +22,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * The attempt engine (Faza 4): start a test, resume an open attempt, and submit.
@@ -246,7 +246,7 @@ class AttemptController extends Controller
                 'description' => $test->description,
                 'duration' => $test->duration,
             ],
-            'questions' => $this->questionsPayload($test),
+            'questions' => $this->questionsPayload($test, $attempt),
         ];
     }
 
@@ -271,14 +271,26 @@ class AttemptController extends Controller
      *
      * @return list<array<string, mixed>>
      */
-    private function questionsPayload(Test $test): array
+    private function questionsPayload(Test $test, Attempt $attempt): array
     {
         $test->load([
             'questions' => fn ($q) => $q->where('questions.status', 'active'),
             'questions.answers',
         ]);
 
-        return $test->questions->map(function (Question $question) {
+        /*
+         * Pictures and recordings are on the private disk, so each one is quoted
+         * as a signed address rather than a file. The signature expires exactly
+         * when the right to hand this test in does — a competitor submitting on
+         * the last second must still have had the audio playing a moment before,
+         * and nothing beyond that moment has any business reading it.
+         *
+         * Resuming re-enters this method, so a paused attempt gets fresh
+         * addresses rather than stale ones.
+         */
+        $mediaUntil = $attempt->expires_at->copy()->addSeconds(Attempt::SUBMIT_GRACE_SECONDS);
+
+        return $test->questions->map(function (Question $question) use ($mediaUntil) {
             $isMultipleChoice = $question->question_type === QuestionType::MultipleChoice;
 
             return [
@@ -289,8 +301,8 @@ class AttemptController extends Controller
                 'answer_numbering' => $question->answer_numbering?->value,
                 'points' => (float) $question->points,
                 'position' => (int) $question->pivot->position,
-                'image_url' => $question->image_path ? Storage::disk('public')->url($question->image_path) : null,
-                'audio_url' => $question->audio_path ? Storage::disk('public')->url($question->audio_path) : null,
+                'image_url' => QuestionMedia::signedUrl($question, 'image', $mediaUntil),
+                'audio_url' => QuestionMedia::signedUrl($question, 'audio', $mediaUntil),
                 'options' => $isMultipleChoice
                     ? $question->answers->map(fn ($a) => ['id' => $a->id, 'text' => $a->text])->values()->all()
                     : [],
