@@ -54,6 +54,35 @@ const routes: RouteRecordRaw[] = [
         meta: { guestOnly: true, zone: 'public' },
     },
     {
+        /*
+         * Password recovery (ADR-0063), two screens. `guestOnly` like the two
+         * above: somebody already signed in changes their password on their own
+         * profile screen, where knowing the old one is the proof of identity.
+         *
+         * 🪤 The token is a path parameter and the address a query one, which is
+         * the shape the mail writes and the shape Laravel's own reset route
+         * uses. Both halves are the broker's and are handed straight back to it.
+         */
+        path: '/forgot-password',
+        name: 'password.forgot',
+        component: () => import('@/pages/ForgotPasswordPage.vue'),
+        meta: { guestOnly: true, zone: 'public' },
+    },
+    {
+        /*
+         * 🪤 NOT `guestOnly`, unlike every other screen around it. This one is
+         * arrived at from an e-mail, and a browser that still holds a live
+         * session would be bounced to the dashboard — the link would look broken
+         * to the one person holding a valid one. The token is proof of the
+         * mailbox and stands on its own; the screen signs the session out itself
+         * once the password has changed, because the server has just deleted it.
+         */
+        path: '/reset-password/:token',
+        name: 'password.reset',
+        component: () => import('@/pages/ResetPasswordPage.vue'),
+        meta: { zone: 'public' },
+    },
+    {
         path: '/news',
         name: 'news',
         component: () => import('@/pages/public/NewsListPage.vue'),

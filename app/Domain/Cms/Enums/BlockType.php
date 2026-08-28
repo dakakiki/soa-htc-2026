@@ -38,6 +38,12 @@ enum BlockType: string
     // admin editing "the registration screen" should not have to find its second
     // half in another zone.
     case Register = 'register';
+    // Password recovery (ADR-0063). One type over two zones, like `Identify`:
+    // asking for the link and choosing the new password are two screens a person
+    // arrives at separately — the second one straight from an e-mail, having
+    // never seen the first — so each gets its own words rather than sharing a
+    // record whose halves would be edited in the wrong place.
+    case PasswordRecovery = 'password_recovery';
 
     public function label(): string
     {
@@ -55,6 +61,7 @@ enum BlockType: string
             self::Login => 'Sign in',
             self::Identify => 'Competitor entry',
             self::Register => 'Coordinator registration',
+            self::PasswordRecovery => 'Password recovery',
         };
     }
 
@@ -69,6 +76,8 @@ enum BlockType: string
      */
     public function isSingle(): bool
     {
-        return in_array($this, [self::Header, self::Footer, self::Login, self::Identify, self::Register], true);
+        return in_array($this, [
+            self::Header, self::Footer, self::Login, self::Identify, self::Register, self::PasswordRecovery,
+        ], true);
     }
 }

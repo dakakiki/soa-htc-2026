@@ -82,6 +82,18 @@ final class LayoutZones
     public const PUBLIC_REGISTER = 'public.register';
 
     /**
+     * The two halves of password recovery (ADR-0063). Two zones for the same
+     * reason the entry streams are two: a person meets one of these screens or
+     * the other, and the second one they reach from an e-mail without having
+     * seen the first. An administrator editing "the screen that asks for the
+     * address" should not have to pick its words out of the screen that sets the
+     * password.
+     */
+    public const PUBLIC_FORGOT_PASSWORD = 'public.forgot-password';
+
+    public const PUBLIC_RESET_PASSWORD = 'public.reset-password';
+
+    /**
      * Zone key => what it is, and which block types it accepts.
      *
      * @return array<string, array{label: string, description: string, types: list<BlockType>}>
@@ -122,6 +134,16 @@ final class LayoutZones
                 'label' => 'Register',
                 'description' => 'The words on the coordinator registration screen, and on the panel shown once it has been sent for approval.',
                 'types' => [BlockType::Register],
+            ],
+            self::PUBLIC_FORGOT_PASSWORD => [
+                'label' => 'Forgot password',
+                'description' => 'The words on the screen that asks for an address, and on the panel shown once a link has been asked for.',
+                'types' => [BlockType::PasswordRecovery],
+            ],
+            self::PUBLIC_RESET_PASSWORD => [
+                'label' => 'Set a new password',
+                'description' => 'The words on the screen a recovery link leads to, and on the panel shown once the password has been changed.',
+                'types' => [BlockType::PasswordRecovery],
             ],
             self::PUBLIC_IDENTIFY_COMPETITION => [
                 'label' => 'Start quiz',

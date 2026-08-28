@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Domain\Organization\Models\CoordinatorRegistration;
-use App\Domain\Organization\Models\Setting;
+use App\Mail\Concerns\KnowsTheSite;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -24,24 +24,7 @@ use Illuminate\Queue\SerializesModels;
  */
 abstract class CoordinatorRegistrationMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use KnowsTheSite, Queueable, SerializesModels;
 
     public function __construct(public readonly CoordinatorRegistration $registration) {}
-
-    /**
-     * The site's own name, as the theme editor set it, so the mail matches the
-     * site the applicant registered on rather than the framework's app name.
-     */
-    protected function siteName(): string
-    {
-        $title = trim(strip_tags((string) (Setting::current()->site_title ?? '')));
-
-        return $title !== '' ? $title : (string) config('app.name', 'SOA HTC');
-    }
-
-    /** Where the applicant signs in, once there is anything to sign in to. */
-    protected function loginUrl(): string
-    {
-        return rtrim((string) config('app.url'), '/').'/login';
-    }
 }

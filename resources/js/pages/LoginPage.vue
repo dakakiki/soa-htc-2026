@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconEye, IconEyeOff } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
@@ -50,7 +50,13 @@ onMounted(async () => {
     }
 });
 
-const email = ref('admin@soahtc.test');
+// 🪤 Empty, not the dev administrator's address. It was seeded with
+// `admin@soahtc.test` — handy locally, and on a real site a form that arrives
+// with somebody else's account already typed into it, naming a test account that
+// does not exist there. ADR-0058 took the dev password out of the install
+// instructions for the same reason; this is the last place it was still written
+// down.
+const email = ref('');
 const password = ref('');
 const remember = ref(false);
 const revealed = ref(false);
@@ -146,6 +152,16 @@ async function submit(): Promise<void> {
                             <IconEye v-else :size="20" />
                         </button>
                     </span>
+                    <!-- The way out for somebody who cannot get in (ADR-0063).
+                         Under the field it belongs to rather than beside the
+                         button: it is not an alternative to signing in, it is
+                         what to do about the field above it. -->
+                    <RouterLink
+                        to="/forgot-password"
+                        class="mt-3 inline-block text-[15px] text-brand-palette-4 underline underline-offset-4 hover:text-brand-ink-accent"
+                    >
+                        {{ $t('login.forgot') }}
+                    </RouterLink>
                 </label>
             </div>
 

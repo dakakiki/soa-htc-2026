@@ -8,6 +8,7 @@ import { listSchools } from '@/api/schools';
 import { apiErrorMessage } from '@/api/http';
 import { useSessionStore } from '@/stores/session';
 import { IconX } from '@tabler/icons-vue';
+import PasswordResetLinkButton from '@/components/PasswordResetLinkButton.vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import LockedField from '@/components/LockedField.vue';
@@ -395,6 +396,11 @@ const fileBtn =
                                 autocomplete="new-password" :class="field" />
                         </div>
                     </div>
+
+                    <!-- Only on an existing account (ADR-0063). This is the screen
+                         it matters most on: a school coordinator who has forgotten
+                         their password is who the whole flow was written for. -->
+                    <PasswordResetLinkButton v-if="id !== null" :user-id="id" />
 
                     <hr class="border-gray-200" />
 

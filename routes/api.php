@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\DifficultyLevelController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ExamRoundController;
 use App\Http\Controllers\Api\GradingController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PublicContentController;
@@ -101,6 +102,21 @@ Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::get('user', [AuthController::class, 'user'])->middleware('auth:sanctum');
+
+    /*
+     * Recovering a forgotten password (ADR-0063). Public, because somebody who
+     * cannot sign in is the only person who needs them.
+     *
+     * 🪤 Two different caps, not one. Asking for a link puts mail into an inbox
+     * on nothing but a typed address, so it is capped per address as well as per
+     * IP. Spending one sends nothing and is capped like the sign-in screen — put
+     * on the same per-address cap, a coordinator who mistyped the new password
+     * twice would find the link they are holding refused for the rest of the day.
+     */
+    Route::post('forgot-password', [PasswordResetController::class, 'sendLink'])
+        ->middleware('throttle:password-reset');
+    Route::post('reset-password', [PasswordResetController::class, 'reset'])
+        ->middleware('throttle:10,1');
 });
 
 /*
@@ -296,6 +312,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Staff users and their season role/scope assignments.
     Route::apiResource('users', UserController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    /*
+     * "Send a link" instead of typing a password for somebody (ADR-0063). One
+     * endpoint for both screens: the Coordinators screen calls it too, because a
+     * coordinator IS a user and a second route over the same table would be a
+     * second place for the permission to be got wrong. Who may use it is the
+     * policy's answer, and it is the same one as for editing the account.
+     */
+    Route::post('users/{user}/password-reset-link', [UserController::class, 'sendPasswordResetLink'])
+        ->whereNumber('user')
+        // 🪤 NOT `throttle:password-reset`. That limiter keys its per-address cap
+        // on `email` in the body, which this request does not carry — every
+        // administrator in the country would share one bucket keyed on the empty
+        // string, and the third link of the day anywhere would be refused. The
+        // broker's own one-a-minute-per-address throttle is what actually caps
+        // this one; the rest is the same belt the sign-in screen wears.
+        ->middleware('throttle:10,1');
     // Coordinators export (.xlsx) + bulk import (.xlsx) — registered before the
     // apiResource so "coordinators/export" isn't captured as a {coordinator} show.
     Route::get('coordinators/export', [CoordinatorController::class, 'export']);

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\Quiz;
+use App\Domain\Cms\Support\PublicPaths;
 use App\Domain\Cms\Support\PublicRoutes;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -110,6 +111,46 @@ class PublicRoutesTest extends TestCase
     {
         $this->assertFalse(PublicRoutes::has(''));
         $this->assertFalse(PublicRoutes::has('   '));
+    }
+
+    /**
+     * The other half of the register: the slugs a CMS page may NOT take.
+     *
+     * Pages sit at the root, so a page slug that matches a top-level application
+     * route is shadowed by it — the SPA's router matches its own path first, and
+     * a reader who followed a link to `/website` is sent to a sign-in screen
+     * instead of to the page somebody wrote. Nothing reports it; the page simply
+     * never appears.
+     *
+     * 🪤 The list was kept in step by hand and four had fallen out of it by the
+     * time this test was written (ADR-0063): `register`, `coordinator-registrations`,
+     * `website` and `cms`. Keeping it by hand is what did not work, which is why
+     * this reads the router rather than a list somebody maintains twice.
+     */
+    public function test_every_top_level_screen_is_a_slug_a_page_may_not_take(): void
+    {
+        $source = file_get_contents(base_path(self::ROUTER));
+        $this->assertNotFalse($source, self::ROUTER.' could not be read.');
+
+        preg_match_all("~path:\s*'/([^']*)'~", $source, $matches);
+        $this->assertNotEmpty($matches[1], 'No routes found in '.self::ROUTER.'; the pattern has gone stale.');
+
+        foreach ($matches[1] as $path) {
+            $segment = explode('/', $path)[0];
+
+            // The front page, and the two catch-alls that are not segments at
+            // all: `/:slug` IS the page being protected, and `/:pathMatch(.*)*`
+            // is Not Found.
+            if ($segment === '' || str_starts_with($segment, ':')) {
+                continue;
+            }
+
+            $this->assertTrue(
+                PublicPaths::isReserved($segment),
+                "The SPA answers /{$segment}, but a page may still be saved at that slug — "
+                    .'add it to PublicPaths::RESERVED.',
+            );
+        }
     }
 
     public function test_a_screen_carries_the_season_that_governs_it(): void

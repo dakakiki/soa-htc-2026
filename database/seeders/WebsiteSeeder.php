@@ -188,6 +188,46 @@ class WebsiteSeeder extends Seeder
             }
         }
 
+        // Password recovery, once per screen (ADR-0063). Neither says what has
+        // gone wrong or whether an account was found — the words match what the
+        // endpoint behind them will admit to, which is nothing.
+        $recovery = [
+            LayoutZones::PUBLIC_FORGOT_PASSWORD => [
+                'eyebrow' => 'Staff access',
+                'title' => 'Forgot your password?',
+                'lead' => '<p>Give us the address your account is under and we will send a link'
+                    .' for setting a new password.</p>',
+                'done_title' => 'Check your inbox',
+                // 🪤 "If there is an account", not "we have sent it". The server
+                // answers the same to every address on purpose, and copy that
+                // promised a mail would make the screen the enumeration form the
+                // endpoint refuses to be — as well as leaving somebody who
+                // mistyped their address waiting for a mail that is not coming.
+                'done_lead' => '<p>If there is an account under that address, a link is on its way.'
+                    .' It works once and stops working in an hour.</p>',
+            ],
+            LayoutZones::PUBLIC_RESET_PASSWORD => [
+                'eyebrow' => 'Staff access',
+                'title' => 'Set a new password',
+                'lead' => '<p>Choose a password of at least eight characters. This link works once.</p>',
+                'done_title' => 'That is done',
+                'done_lead' => '<p>Your password has been changed and everywhere you were signed in'
+                    .' has been signed out. Sign in with the new one.</p>',
+            ],
+        ];
+
+        foreach ($recovery as $zone => $data) {
+            if (! LayoutBlock::query()->where('zone', $zone)->exists()) {
+                LayoutBlock::query()->create([
+                    'zone' => $zone,
+                    'type' => BlockType::PasswordRecovery,
+                    'status' => true,
+                    'position' => 1,
+                    'data' => $data,
+                ]);
+            }
+        }
+
         $headerMenu = Menu::query()->where('slug', 'public-header')->value('id');
         $footerMenu = Menu::query()->where('slug', 'public-footer')->value('id');
 

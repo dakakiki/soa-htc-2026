@@ -73,6 +73,16 @@ export function setUserStatus(id: number, status: string) {
     return http.put<{ data: AdminUser }>(`/api/users/${id}`, { status });
 }
 
+/**
+ * Send this account a link to set its own password (ADR-0063).
+ *
+ * The Coordinators screen calls this too — a coordinator is a user, and the
+ * permission is decided by the policy rather than by which screen asked.
+ */
+export function sendPasswordResetLink(id: number) {
+    return http.post<{ data: { sent: boolean } }>(`/api/users/${id}/password-reset-link`);
+}
+
 export function deleteUser(id: number) {
     return http.delete(`/api/users/${id}`);
 }

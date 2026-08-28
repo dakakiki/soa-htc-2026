@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
+use App\Domain\Identity\Support\PasswordRecovery;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
@@ -13,9 +14,11 @@ use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\AdminUserResource;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -138,6 +141,37 @@ class UserController extends Controller
         $user->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Send this account a link to set its own password (ADR-0063).
+     *
+     * The way out of the only thing an administrator could do about a forgotten
+     * password before this: type a new one into the form above, and then find a
+     * way to tell somebody what it is. That way ends with a password two people
+     * know, written down in whatever channel was to hand.
+     *
+     * The typed password stays — an account being opened by hand still needs a
+     * first one, and there are rooms where a link to an inbox is no use. This is
+     * the other option, not a replacement.
+     *
+     * 🪤 The answer says a link was sent and means it, unlike the public form's
+     * deliberately vague one: here the account is on screen, so there is nothing
+     * to give away by confirming that it exists.
+     */
+    public function sendPasswordResetLink(User $user): JsonResponse
+    {
+        $this->authorize('sendPasswordResetLink', $user);
+
+        $status = PasswordRecovery::offer($user->email);
+
+        if ($status === Password::RESET_THROTTLED) {
+            throw ValidationException::withMessages([
+                'user' => [trans('messages.password_reset.too_soon')],
+            ]);
+        }
+
+        return response()->json(['data' => ['sent' => true]]);
     }
 
     /**

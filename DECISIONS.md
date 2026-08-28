@@ -1629,6 +1629,72 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0063 — Zaboravljena lozinka se oporavlja linkom, a administrator je ne izgovara
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** oporavka lozinke **nije bilo nijedne** — ni rute, ni kontrolera, ni mejla, ni
+  ekrana. Tabela `password_reset_tokens` stajala je prazna iz Laravel skeleta. Koordinator koji
+  zaboravi lozinku nije imao šta da uradi; administrator je imao samo jedno — da mu **upiše** novu
+  na ekranu Users, pa da je nekako **saopšti**. To je lozinka koju znaju dvoje, izgovorena
+  telefonom ili poslata porukom.
+  🪤 Mejl o odobrenju koordinatorske prijave (ADR-0053) je već upućivao na „Forgot password?" na
+  ekranu prijave. Rečenica je stajala u mejlu koji je odlazio ljudima, a dugmeta nije bilo.
+- **Broker radi ono što je lako pogrešiti.** Hešovan token za jednu upotrebu, rok od sat vremena,
+  jedan link u minutu po adresi. Nije reimplementirano — nasleđeno, pa je dopisano samo ono što
+  okvir ostavlja otvorenim.
+- **Javni obrazac ćuti.** `POST /api/auth/forgot-password` odgovara **isto** na adresu iza koje
+  postoji nalog i na onu iza koje ne postoji — ista rečenica, isti status. Bez `exists:users,email`
+  (pravilo bi javilo „nema takvog korisnika"), bez prosleđivanja brokerovog statusa, i **sa
+  hvatanjem izuzetka iz mejlera**: SMTP koji odbija vezu puca samo za adresu koja postoji, pa bi
+  nezaštićeni 500 bio isto curenje na druga vrata. Greška ide u log, jer mejler koji ne radi mora
+  da se sazna nekako drugačije. Ekran govori isto: „**ako** postoji nalog pod tom adresom".
+- **Ekran koji troši link odbija naglas.** Za razliku od traženja, ovo mora da može da propadne
+  vidljivo — onaj ko drži istekao link mora da sazna da traži novi. Jedna poruka pokriva sva četiri
+  načina (nikad izdat, već potrošen, istekao, izdat za drugu adresu) i visi o polju `email`, ne
+  `token`: razlika među njima je podatak o tome ko ovde ima nalog.
+- 🪤 **`/reset-password/:token` NIJE `guestOnly`,** jedini javni ekran koji nije. Do njega se stiže
+  iz mejla; pretraživač sa živom sesijom bio bi odbijen na dashboard, pa bi link izgledao pokvareno
+  baš onome ko drži ispravan. Ekran sam gasi sesiju kad promeni lozinku, jer ju je server već
+  obrisao.
+- **Promena lozinke gasi sve sesije.** Ko je zaboravio lozinku možda je resetuje **zato što je neko
+  drugi zna**. Nova lozinka koja bi ostavila tuđu sesiju otvorenom ne bi promenila ništa dok taj
+  klikće. Briše se `sessions` po `user_id` (samo kad je drajver `database`) i menja `remember_token`,
+  jer je „Keep me signed in" kolačić koji stari token i dalje overava.
+- **Administratorova polovina je isti mejl, ne druga staza.** `POST /api/users/{user}/password-reset-link`,
+  jedan endpoint za oba ekrana (Users i Coordinators — koordinator **jeste** korisnik), a ko sme
+  odlučuje `UserPolicy::sendPasswordResetLink`, što je isto pravilo kao za izmenu naloga. Upisivanje
+  lozinke ostaje: nalog koji se otvara rukom i dalje treba prvu, a ima soba gde link do inboksa ne
+  vredi. Ovo je **druga mogućnost, ne zamena**.
+  Ovde se **ne ćuti**: nalog je na ekranu, pa nema šta da se oda. Kad broker odbije drugi link u
+  istom minutu, administrator to i sazna — inače bi čekao mejl koji nije poslat.
+- **Mejl je Mailable, ne `ResetPassword` notifikacija.** Da bi govorio imenom sajta (`Setting`) i
+  istim glasom kao koordinatorski mejlovi pored njega; okvirov naslov je „Reset Password
+  Notification" od `APP_NAME`, što je na sajtu koji se zove Hippo the Contest mejl ni od koga.
+  `siteName()`/`loginUrl()` su iz `CoordinatorRegistrationMail` izvučeni u `KnowsTheSite`, jer bi
+  prepisani razišli prvom promenom naslova sajta.
+- **Reči su sadržaj.** Dva bloka (`public.forgot-password`, `public.reset-password`), jedan tip
+  `password_recovery` nad obe zone — kao `Identify`: čovek sretne jedan od dva ekrana, a drugi
+  otvara iz mejla ne videvši prvi. Polja su `done_title`/`done_lead`, ne `sent_*`: ekran koji bira
+  lozinku ništa ne šalje. Link nazad na prijavu je **interfejs**, ne sadržaj — administrator koji ga
+  isprazni ostavio bi ekran bez izlaza.
+- ⚠️ **Usput nađeno i popravljeno: `PublicPaths::RESERVED` je bio nepotpun.** Falila su četiri
+  segmenta koja SPA odgovara — `register` (od ADR-0053), `website`, `cms` i
+  `coordinator-registrations`. CMS stranica sa takvim slugom bila bi **zaklonjena** rutom aplikacije
+  (ruter prvo poklopi svoju putanju i pošalje čitaoca na prijavu), a nigde ništa ne bi javilo zašto
+  se stranica ne pojavljuje. Lista se održavala rukom i to nije radilo, pa `PublicRoutesTest` sada
+  **čita ruter** i pada kad top-level ruta nije rezervisana.
+- ⚠️ **Usput: ekran prijave je stizao sa `admin@soahtc.test` u polju.** Korisno lokalno; na pravom
+  sajtu obrazac koji dolazi sa tuđim nalogom već ukucanim, i to nalogom koji tamo ne postoji.
+  ADR-0058 je iz istog razloga izbacio dev lozinku iz uputstva za instalaciju — ovo je bilo poslednje
+  mesto gde je još stajala zapisana.
+- ✅ **Provereno uživo na dev bazi (MySQL, kroz pretraživač):** traženje linka **200**; mejl u logu
+  nosi ispravnu adresu i ime sajta; ekran postavlja lozinku i njome se prijavljuje na dashboard;
+  **isti link po drugi put** vraća jednu poruku o potrošenom linku; administratorsko dugme šalje link
+  i na drugi pritisak u istom minutu kaže da sačeka. Probni nalozi obrisani.
+- **Suite 625/625** (bilo 609), `pint --dirty` i `npm run type-check` čisti.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

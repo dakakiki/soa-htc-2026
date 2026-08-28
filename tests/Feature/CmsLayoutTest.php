@@ -390,6 +390,11 @@ class CmsLayoutTest extends TestCase
         // screens to whoever arrives at them.
         $this->assertTrue($zones->has(LayoutZones::PUBLIC_IDENTIFY_COMPETITION));
         $this->assertTrue($zones->has(LayoutZones::PUBLIC_IDENTIFY_SAMPLE));
+        // Password recovery is two zones for the same reason (ADR-0063): a
+        // person meets one of the two screens, and reaches the second from an
+        // e-mail without having seen the first.
+        $this->assertTrue($zones->has(LayoutZones::PUBLIC_FORGOT_PASSWORD));
+        $this->assertTrue($zones->has(LayoutZones::PUBLIC_RESET_PASSWORD));
         // The front page is a list of sections; the rest are one record edited as
         // a form, and the editor branches on this rather than on a hard-coded list
         // of zone names.
@@ -397,6 +402,7 @@ class CmsLayoutTest extends TestCase
         $this->assertTrue($zones[LayoutZones::PUBLIC_HEADER]['is_single']);
         $this->assertTrue($zones[LayoutZones::PUBLIC_LOGIN]['is_single']);
         $this->assertTrue($zones[LayoutZones::PUBLIC_IDENTIFY_SAMPLE]['is_single']);
+        $this->assertTrue($zones[LayoutZones::PUBLIC_FORGOT_PASSWORD]['is_single']);
 
         // The menu field's options ship with the registry, so the form needs no
         // second request to know what it may offer.
