@@ -1695,6 +1695,46 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0064 — Ispravljena ocena stiže do rezultata, jer je Layer B kopija a ne pogled
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** `registration_results` (Layer B, ADR-0027) je **kopija**, upisana u trenutku objave.
+  Ispravka eseja **posle objave** menjala je `attempts.score` i ostavljala kopiju iza sebe —
+  a kopiju čitaju mreža rezultata (`RegistrationResults`), `.xlsx` izvoz (`ResultExporter`) i
+  **SOA sertifikat** (`SoaCertificate`).
+- ⚠️ **Zašto se to nije videlo.** Nijedan ekran nije protivrečio drugom: svi čitaju **isti** ustajali
+  red, pa su svi pokazivali istu staru ocenu. Iz aplikacije greška je nevidljiva; vidi se tek na
+  sertifikatu u nečijoj ruci. Ovo je bio poslednji nalaz preseka 2026-08-27 označen kao „nije
+  provereno lično, agentska tvrdnja" — provereno 2026-08-28, tačan.
+- **Popravka:** `AttemptGrader::recompute` posle upisa poziva `ResultLedger::reconcile` za taj
+  jedan par (registracija × test), i to samo kad je pokušaj **objavljen**. Neobjavljen nema red u
+  Layer B, a objava ionako čita ispravljenu ocenu.
+- 🪤 **U domenu, ne u kontroleru.** Objava, poništenje objave i reset svaki zovu `reconcile` iz
+  `ResultsController` — ali ta tri menjaju **DA LI** pokušaj važi, što je odluka koju kontroler
+  donosi. Ovo menja **KOLIKO** važi, a to se dešava gde god se ocena upisuje. U kontroleru bi bila
+  još jedna linija koju sledeća akcija koja menja ocenu zaboravi — a tako je i nastala.
+- **`recompute` je jedini takav put.** `AttemptGrader::grade` (automatsko ocenjivanje iz reda,
+  `FinalizeExpiredAttempts`) uvek radi **pre** objave; objava odbija sve što nije `auto_graded`
+  ili `graded`. Runda vežbe se sama objavljuje kad je ocenjivanje konačno (ADR-0062), pa je to
+  jedini slučaj gde `published_at` postoji bez ičije odluke — `reconcile` je ionako isključuje
+  (`is_sample = false`), i test to drži.
+- **Testovi (`GradeCorrectionTest`, 7):** ceo lanac — oceni, objavi, ispravi — pa se gleda **Layer B**,
+  ne `attempts`, jer `attempts` nikad nije bio pogrešan. Uz to: neobjavljen pokušaj se ocenjivanjem
+  ne uvlači u zvanične rezultate; vežba ostaje van njih i kad se sama objavi; ispravka **jednog**
+  takmičara ne dira redove ostalih na istom testu (isti red, isti `id`); i uvezen (`source=import`)
+  red koji je objavljeni pokušaj potisnuo ne vaskrsava.
+  Mutaciono provereno — bez poziva padaju tačno dva testa, sa „Failed asserting that 4.0 is
+  identical to 2.0", što je bug ispisan brojevima sa sertifikata.
+  🪤 Poređenje je **numeričko**, ne po stringu: isti red daje `'4'` na SQLite-u i `'4.00'` na
+  MySQL-u, pa bi `assertSame('4.00', …)` bio test koji prolazi na jednoj a pada na drugoj bazi.
+- ✅ **Provereno uživo na dev bazi (MySQL, kroz HTTP):** privremeni esej pokušaj u zvaničnoj rundi →
+  ocena 4 → objava (`attempts_count: 1`) → Layer B **4.00** → ispravka na 2 sa razlogom → Layer B
+  **2.00**, i dalje **jedan** red, `source=attempt`; mreža rezultata vraća `score: 2`. Privremeni
+  podaci obrisani, Layer B vraćen na zatečenih 802 reda.
+- **Suite 632/632** (bilo 625), `pint --dirty` čist.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
