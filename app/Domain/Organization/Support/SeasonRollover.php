@@ -98,6 +98,29 @@ final class SeasonRollover
      */
     public static function archiveAndWipe(?int $seasonId, string $now): array
     {
+        /*
+         * The rollover is a long request (ADR-0065). Measured on the dev database
+         * — 50 004 registrations, 4 978 attempts, an archive already 292 610 rows
+         * deep — the whole thing takes 54 seconds, and the Settings → Season form
+         * runs it inside an HTTP request. PHP's default ceiling is 30 or 60 on a
+         * stock production install, so without this it dies in the middle of the
+         * one operation nobody gets to repeat.
+         *
+         * 300, the same as the roster importer, which moves the same table at the
+         * same order of magnitude. Set here rather than in `start()` so the
+         * `season:reset` command gets it too, and because `set_time_limit` restarts
+         * the clock — everything after this call is covered by the same budget.
+         *
+         * 🪤 This is the only ceiling this code can raise. A proxy or FastCGI
+         * timeout in front of PHP is the operator's to set, and would cut the
+         * request off whatever is written here.
+         *
+         * If it is cut off anyway, the data is safe: the caller owns the
+         * transaction, and a dropped connection rolls the whole thing back. That
+         * was verified on the dev database, on exactly this workload.
+         */
+        @set_time_limit(300);
+
         $admins = self::userIdsWithRole('admin', $seasonId);
         $schoolCoordinators = self::schoolCoordinatorIds($seasonId, $admins);
 

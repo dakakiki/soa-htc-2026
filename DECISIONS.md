@@ -1735,6 +1735,49 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0065 — Prelazak na novu sezonu dobija vreme koje mu treba, i proveren je na pravoj bazi
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** vlasnik je pitao „da li smo ok sa pokretanjem nove sezone?". Logika je bila pokrivena
+  testovima (`SeasonApiTest`, `SeasonResetTest`), ali **isključivo na SQLite-u** — a arhiviranje je
+  `INSERT … SELECT` sa sedam `JOIN`-ova, tačno onaj oblik za koji `CLAUDE.md` kaže da zelen suite
+  nije dokaz. Prelazak nikad nije bio izvršen na MySQL-u.
+- **Provera bez posledica.** Ceo `SeasonRollover::start` pokrenut je na dev MySQL-u **unutar
+  transakcije koja je na kraju vraćena unazad**. U tom kodu nema DDL-a (samo `INSERT`/`DELETE`/`UPDATE`,
+  brisanje je `DELETE` a ne `TRUNCATE`), pa je `ROLLBACK` potpun. **Recept vredi zapamtiti za svaku
+  nepovratnu operaciju:** izvrši je nad pravim podacima, pročitaj stanje iznutra, pa je poništi.
+- ✅ **Šta se izvršilo** (dev, 2026-08-28): arhivirano **50.004** registracije, 802 rezultata, 3
+  kvalifikacije; obrisano 50.004 registracije, 4.978 pokušaja, 802 reda Layer B; 1 školski
+  koordinator obrisan, 96 naloga i 2.226 venue-a deaktivirano; **134 dodele preseljene**, nijedna
+  nije ostala na staroj sezoni; aktivnih sezona posle: **1**; administrator zadržao `settings.manage`,
+  mereno nad pravom bazom. Posle `ROLLBACK`-a **svaki broj je vraćen**, aktivna sezona opet #1 runda 14.
+  🪤 Pre je bilo 135 dodela a preseljeno 134, i `assignment_schools` je otišao 2230 → 2229: razlika je
+  jedan obrisan školski koordinator čija je dodela otišla kaskadno sa nalogom. Potvrda da ADR-0044
+  radi tačno kako je dogovoreno — `season_id` se osveži, ništa se ne dodaje ni oduzima.
+- 🔴 **Šta je provera otkrila:** trajalo je **54 sekunde**, a `SeasonController::store` to izvršava
+  **u HTTP zahtevu**. Za razliku od tri importera i PDF pisača, prelazak **nije dizao
+  `set_time_limit`**. Ovde je `max_execution_time = 120` pa dev preživljava; na produkciji je
+  podrazumevano 30 ili 60, gde 54 sekunde ne prolaze — i to na operaciji koja se radi jednom
+  godišnje i nije reverzibilna. Arhiva uz to raste svake sezone (već 292.610 redova).
+- **Popravka:** `@set_time_limit(300)` na početku `archiveAndWipe` — isti broj kao `RegistrationImporter`,
+  koji pomera istu tabelu istog reda veličine. U `archiveAndWipe` a ne u `start`, da ga dobije i
+  komanda `season:reset`, i zato što `set_time_limit` **restartuje sat** pa isti budžet pokriva i
+  sve posle njega.
+- 🪤 **To je jedini plafon koji ovaj kod sme da digne.** Proxy ili FastCGI timeout ispred PHP-a je
+  operatorov i preseca zahtev bez obzira na ovo. Klijent nije problem: axios nema podešen `timeout`,
+  pa pretraživač čeka koliko treba.
+- **Ako zahtev ipak pukne, podaci su celi** — pozivalac drži transakciju, a prekinuta veza je vraća.
+  To nije pretpostavka: isti dry-run je to dokazao nad tačno ovim opterećenjem.
+- ⚠️ **Tri ranije tvrdnje o prelasku su POVUČENE** (2026-08-28), pošto ih je vlasnik osporio i bio u
+  pravu u sva tri slučaja: grana `if ($previous !== null)` je nedostižna (`StartSeasonRequest`
+  traži `settings.manage`, što se razrešava kroz aktivnu sezonu → 403); nema puta koji udvaja arhivu
+  (drugi prolaz nema šta da arhivira, a `legacy:archive-round` prvo briše redove runde pa upisuje);
+  i nema CRUD-a za sezone uopšte, pa dve aktivne sezone nastaju samo ručnom izmenom baze.
+  **Pouka: nalaz bez pronađenog poziva koji do njega vodi nije nalaz.**
+- **Suite 632/632**, `pint --dirty` čist.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
