@@ -150,6 +150,59 @@ the way in.
 - **Publish a sample quiz.** Practice is meant to be available all year (owner,
   2026-08-27); with no active sample quiz the practice entry is shown as closed.
 
+## What only that server can tell you
+
+Everything above builds the site. This section is for the questions no test on a
+laptop can answer, because the answer belongs to the machine: its PHP limits, what
+sits in front of PHP, its MySQL, its mail. Work through it on a staging copy on
+the real server before the site is used in anger.
+
+The local suite runs on **SQLite**; dev and production run on **MySQL**. That is
+the one standing reason a green suite is not proof (`CLAUDE.md`).
+
+### The one that has already bitten
+
+**How long the season rollover takes, and whether the server allows it.**
+
+Starting a season archives the roster, wipes the season and opens the next round,
+inside one HTTP request. On the dev machine, against 50 004 registrations, that
+takes **54 seconds**. `SeasonRollover::archiveAndWipe` raises PHP's own ceiling to
+300 (ADR-0065) — but that is the only ceiling the application can raise.
+
+```
+php artisan season:rehearse
+```
+
+runs the whole rollover against this server's real data inside a transaction and
+then rolls it back, printing how long it took. It changes nothing, and it refuses
+to start if any table it touches is not InnoDB (a `ROLLBACK` would not restore a
+MyISAM table, and the rehearsal would become the real thing).
+
+Compare the number it prints against:
+
+- the **web** `max_execution_time` — the CLI's own limit says nothing about the
+  web SAPI, so read it from the FPM pool or a `phpinfo()` page;
+- **whatever sits in front of PHP**: nginx `fastcgi_read_timeout`, Apache
+  `ProxyTimeout`, mod_fcgid `IPCCommTimeout`. The application cannot touch these.
+
+If the request is cut off anyway, the data is whole — the rollover owns its
+transaction and a dropped connection rolls it back. The administrator is left not
+knowing that, which is why the limits are worth setting rather than relying on.
+
+### The rest of the checklist
+
+| What | Why it can only be answered here | The check |
+| --- | --- | --- |
+| **`queue:work` is running** | Without it nothing is graded, publishing announces nothing and no competitor sees a mark — one cause, four symptoms. Needs supervisor or systemd. | Sit a test and watch it reach `graded` |
+| **Real SMTP** | Locally `MAIL_MAILER=log`, so no mail has ever actually left. Coordinator registration sends two (ADR-0053), password recovery one (ADR-0063). | Ask for a password link and register a coordinator; then check SPF/DKIM so the three do not land in spam |
+| **Exam media over HTTPS** | Pictures and recordings live on the private disk and are fetched with a signed address (ADR-0059). Behind a proxy that terminates TLS, a wrong scheme breaks the signature — and `TrustProxies` is not configured. | Open a question with a picture and a recording as a competitor: the picture must render and the audio must **seek** (Range) |
+| **`storage:link`** | Without it every uploaded image comes back as the SPA's HTML page — a broken picture with a 200 status. | Upload a logo in Settings → Theme and see it draw |
+| **Upload limits** | The venue approval form is capped at 5 MB (ADR-0053) and the .xlsx imports are larger; `max_input_vars` bounds the long forms. | `upload_max_filesize`, `post_max_size`, `max_input_vars`; then import a real roster |
+| **SPA session** | Sanctum's cookie session needs the real host listed, and a secure cookie on HTTPS. | `SANCTUM_STATEFUL_DOMAINS`, `SESSION_SECURE_COOKIE=true`, `SESSION_DOMAIN`; sign in, reload, stay signed in |
+| **MySQL version and mode** | Dev is **MySQL 8.3 with `ONLY_FULL_GROUP_BY` and `STRICT_TRANS_TABLES` already on**, so everything has been exercised in strict mode. An older MySQL or MariaDB differs in the other direction. | `SELECT VERSION(), @@sql_mode`; then open Reports and Archive, which lean hardest on `GROUP BY` |
+| **PDF** | mPDF needs a writable temp directory, and the certificate and attendance register render in chunks. | Generate a certificate and an attendance register for a real venue |
+| **Timezone** | An attempt's `expires_at` is computed server-side; a wrong `APP_TIMEZONE` ends exams at the wrong moment. | `APP_TIMEZONE` against the competition's own clock |
+
 ## Setting up for development
 
 The template is aimed at a server, so a laptop turns a handful of lines around

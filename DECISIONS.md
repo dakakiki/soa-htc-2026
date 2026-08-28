@@ -1778,6 +1778,49 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0066 — Prelazak na sezonu se proba na serveru, komandom koja ništa ne menja
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** vlasnik seli sve na produkcioni server u DEV okruženje, da bi se sve istestiralo
+  tamo. ADR-0065 je ostavio jedno pitanje koje kod ne može da zatvori: koliki je na tom serveru
+  **web** `max_execution_time` i šta stoji ispred PHP-a. Uz to, ceo niz stvari zavisi od mašine, a
+  ne od koda — red, mejl, potpisane adrese iza TLS-a, granice otpremanja, verzija MySQL-a.
+- **`php artisan season:rehearse`.** Pusti **ceo** prelazak nad pravim podacima tog servera unutar
+  transakcije, ispiše koliko je trajao i šta je uradio, pa sve vrati unazad. Nije simulacija:
+  `INSERT … SELECT` sa sedam `JOIN`-ova zaista se izvrši nad tom bazom, što je jedini način da se
+  sazna da li ta baza to prima.
+- 🪤 **Odbija da počne ako ijedna tabela koju dira nije InnoDB.** MyISAM ćutke ignoriše transakciju:
+  redovi bi nestali, a komanda bi preko toga ispisala vedar izveštaj. Legacy baza iz koje ovaj
+  projekat uvozi koristila je MyISAM za šest tabela, pa server sklopljen po tom uzoru nije
+  hipoteza.
+- **Zašto je bezbedno:** u prelasku nema DDL-a — samo `INSERT`/`DELETE`/`UPDATE`, a brisanje je
+  `DELETE` a ne `TRUNCATE`, koji bi implicitno potvrdio transakciju i odneo probu sa sobom.
+- **Na kraju uporedi i javi.** Ako `ROLLBACK` nije vratio svaki broj, komanda to prijavi kao grešku
+  umesto da ćuti. Ako sam prelazak pukne, uhvati izuzetak, vrati transakciju i kaže da je pao
+  **ovde a ne na dan** — što je i cela svrha.
+- **Broj koji ispiše nije ceo odgovor, i tako i kaže.** CLI proces obično nema limit, pa komanda
+  izričito upućuje na **web** `max_execution_time` i na nginx `fastcgi_read_timeout` / Apache
+  `ProxyTimeout` / `IPCCommTimeout`, koje aplikacija ne može da dohvati.
+- **`docs/06_DEPLOYMENT.md` dobija sekciju „What only that server can tell you"** — spisak izveden
+  iz onoga što ova aplikacija stvarno radi, ne opšti savet: `queue:work`, pravi SMTP (tri mejla
+  koja nikad nisu stvarno poslata jer je lokalno `MAIL_MAILER=log`), ispitni mediji preko HTTPS-a
+  (potpisana adresa, a `TrustProxies` nije podešen), `storage:link`, granice otpremanja prema 5 MB
+  obrasca za venue, Sanctum kolačić na pravom hostu, verzija i `sql_mode` MySQL-a, mPDF temp
+  direktorijum, `APP_TIMEZONE` naspram `expires_at`.
+  📎 Zabeleženo i da je dev **MySQL 8.3 sa `ONLY_FULL_GROUP_BY` i `STRICT_TRANS_TABLES` uključenim**,
+  pa je sve dosad vežbano u strogom režimu; stariji MySQL ili MariaDB razlikuju se u drugu stranu.
+- **Testovi (`SeasonRehearsalTest`, 5):** posle probe je **svaki broj redova isti** i aktivna sezona
+  ista; proba zaista radi posao (ispisuje preseljene dodele, nula zaostalih, jednu aktivnu sezonu,
+  administratora koji je zadržao pravo); uvek kaže koliko je trajalo; bez aktivne sezone odbija;
+  a na **produkcionom** okruženju pita pre nego što išta upiše.
+  🪤 `ConfirmableTrait` pita **samo** kad je okruženje `production` — u testu se okruženje mora
+  namestiti, inače test prođe pored pitanja i ne dokazuje ništa.
+- ✅ **Provereno uživo:** komanda je puštena na dev MySQL-u — 50.004 registracije arhivirane, 134
+  dodele preseljene, 0 zaostalih, 1 aktivna sezona, administrator zadržao `settings.manage`,
+  **53,9 s**, pa „every table is back to the row count it started with".
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
