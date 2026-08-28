@@ -53,7 +53,7 @@ class ReportController extends Controller
         $echoedFilters['season_id'] = $validated['season_id'] ?? SeasonContext::active()?->id;
 
         $filters = $echoedFilters;
-        $filters['coordinator_school_ids'] = $this->coordinatorSchoolIds(
+        $filters['coordinator_school_ids'] = $this->populationSchoolIds(
             isset($validated['coordinator_user_id']) ? (int) $validated['coordinator_user_id'] : null
         );
 
@@ -90,7 +90,7 @@ class ReportController extends Controller
 
         $filters = $validated;
         $filters['season_id'] = $validated['season_id'] ?? SeasonContext::active()?->id;
-        $filters['coordinator_school_ids'] = $this->coordinatorSchoolIds(
+        $filters['coordinator_school_ids'] = $this->populationSchoolIds(
             isset($validated['coordinator_user_id']) ? (int) $validated['coordinator_user_id'] : null
         );
 
@@ -131,7 +131,7 @@ class ReportController extends Controller
         $echoed['season_id'] = $validated['season_id'] ?? SeasonContext::active()?->id;
 
         $filters = $echoed;
-        $filters['coordinator_school_ids'] = $this->coordinatorSchoolIds(
+        $filters['coordinator_school_ids'] = $this->populationSchoolIds(
             isset($validated['coordinator_user_id']) ? (int) $validated['coordinator_user_id'] : null
         );
 
@@ -475,22 +475,51 @@ class ReportController extends Controller
 
         $seasonId = SeasonContext::active()?->id;
 
+        /*
+         * The reader's own scope, applied to what the screen OFFERS as well as to
+         * what it reports (ADR-0067). A picker that lists every country to somebody
+         * who may see one is not a leak of results, but it is a leak of the shape of
+         * the competition — and every choice outside the scope answers with zeroes,
+         * which reads as broken rather than as forbidden.
+         */
+        $callerSchoolIds = $this->callerSchoolIds();
+
         $coordinators = User::query()
             ->when($seasonId, fn ($q) => $q->whereHas('seasonAssignments', fn ($a) => $a
                 ->where('season_id', $seasonId)
                 ->where('status', 'active')
                 ->whereIn('role_id', $coordinatorRoleIds)))
             ->when(! $seasonId, fn ($q) => $q->whereRaw('1 = 0'))
+            // A scoped reader is offered the coordinators of their own venues only.
+            ->when($callerSchoolIds !== null, fn ($q) => $q->whereHas(
+                'seasonAssignments',
+                fn ($a) => $a->whereHas('schools', fn ($sc) => $sc->whereIn('schools.id', $callerSchoolIds ?? [])),
+            ))
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // Countries and regions are derived from the venues in scope, so the three
+        // pickers can never disagree with one another.
+        $scopedCountryIds = $callerSchoolIds === null
+            ? null
+            : School::query()->whereIn('id', $callerSchoolIds)->distinct()->pluck('country_id')->all();
+
         return response()->json([
-            'countries' => Country::query()->orderBy('name')->get(['id', 'name']),
+            'countries' => Country::query()
+                ->when($scopedCountryIds !== null, fn ($q) => $q->whereIn('id', $scopedCountryIds ?? []))
+                ->orderBy('name')->get(['id', 'name']),
             'regions' => $countryId
-                ? Region::query()->where('country_id', $countryId)->ordered()->get(['id', 'name'])
+                ? Region::query()->where('country_id', $countryId)
+                    ->when($callerSchoolIds !== null, fn ($q) => $q->whereIn(
+                        'id',
+                        School::query()->whereIn('id', $callerSchoolIds ?? [])->distinct()->pluck('region_id')->filter()->all(),
+                    ))
+                    ->ordered()->get(['id', 'name'])
                 : [],
             'schools' => $countryId
-                ? School::query()->where('country_id', $countryId)->orderBy('name')->get(['id', 'name'])
+                ? School::query()->where('country_id', $countryId)
+                    ->when($callerSchoolIds !== null, fn ($q) => $q->whereIn('id', $callerSchoolIds ?? []))
+                    ->orderBy('name')->get(['id', 'name'])
                 : [],
             'levels' => DifficultyLevel::query()->orderBy('position')->get(['id', 'level_short'])
                 ->map(fn (DifficultyLevel $l) => ['id' => $l->id, 'label' => $l->level_short]),
@@ -519,5 +548,49 @@ class ReportController extends Controller
 
         // A global-scope coordinator (null) narrows nothing.
         return $schoolIds?->values()->all();
+    }
+
+    /**
+     * The caller's OWN row scope. Null means global (`schools.view.all`).
+     *
+     * @return list<int>|null
+     */
+    private function callerSchoolIds(): ?array
+    {
+        return auth()->user()?->allowedSchoolIds()?->values()->all();
+    }
+
+    /**
+     * The population every report is drawn inside (ADR-0067).
+     *
+     * Two different things end up in the same list and they must not be confused.
+     * `coordinator_user_id` is a FILTER — the reader asking to see one coordinator's
+     * schools — and it was the only thing here. The caller's own scope is a
+     * BOUNDARY: whatever the request asked for, a non-global reader only ever sees
+     * their own schools. `ResultsController::applyPopulationFilters` has always
+     * done this, and its comment says in as many words that it is what makes
+     * delegating `results.manage`/`reports.view` to a coordinator safe. Reports
+     * never did it, so the second half of that sentence was not true.
+     *
+     * 🪤 An empty list is not "no restriction". A reader scoped to schools the
+     * filter excludes sees nothing, which is the right answer: `ReportSummary`
+     * turns `[]` into `whereIn(…, [])` and returns zeroes rather than everything.
+     *
+     * @return list<int>|null
+     */
+    private function populationSchoolIds(?int $coordinatorUserId): ?array
+    {
+        $filtered = $this->coordinatorSchoolIds($coordinatorUserId);
+        $caller = $this->callerSchoolIds();
+
+        if ($caller === null) {
+            return $filtered;
+        }
+
+        if ($filtered === null) {
+            return $caller;
+        }
+
+        return array_values(array_intersect($filtered, $caller));
     }
 }

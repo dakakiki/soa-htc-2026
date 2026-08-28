@@ -53,7 +53,12 @@ interface NavItem {
     icon: Component;
     to: string;
     prefix: string;
-    perm?: string;
+    /**
+     * What the account must hold to be offered this screen. A list means ALL of
+     * them — the archive needs `reports.view` and a global scope, because the
+     * server refuses it to a reader bound to particular venues (ADR-0067).
+     */
+    perm?: string | string[];
     /**
      * A count shown beside the label. One entry uses it: the coordinator
      * registration queue (ADR-0053), where nothing else tells anybody that
@@ -163,7 +168,14 @@ const nav: NavNode[] = [
             { label: t('nav.import'), icon: IconFileImport, to: 'results.import', prefix: 'results.import', perm: 'results.manage' },
             { label: t('nav.export'), icon: IconFileExport, to: 'results.export', prefix: 'results.export', perm: 'results.manage' },
             { label: t('nav.reports'), icon: IconChartBar, to: 'reports', prefix: 'reports', perm: 'reports.view' },
-            { label: t('nav.archive'), icon: IconArchive, to: 'results.archive', prefix: 'results.archive', perm: 'reports.view' },
+            // 🪤 Two permissions, not one. Layer C carries venue and country as
+            // text rather than ids, so the row scope cannot be applied to it and
+            // the server hands a scoped reader a 403 (ADR-0067). Offering the
+            // screen anyway would be offering a locked door.
+            {
+                label: t('nav.archive'), icon: IconArchive, to: 'results.archive',
+                prefix: 'results.archive', perm: ['reports.view', 'schools.view.all'],
+            },
             { label: t('nav.reset'), icon: IconRotate, to: 'reset', prefix: 'reset', perm: 'results.manage' },
         ],
     },
@@ -207,7 +219,8 @@ const nav: NavNode[] = [
     },
 ];
 
-const canSee = (perm?: string): boolean => !perm || session.can(perm);
+const canSee = (perm?: string | string[]): boolean =>
+    !perm || (Array.isArray(perm) ? perm.every((p) => session.can(p)) : session.can(perm));
 const visibleNav = computed<NavNode[]>(() =>
     nav
         .map((n) => (n.kind === 'group' ? { ...n, children: n.children.filter((c) => canSee(c.perm)) } : n))

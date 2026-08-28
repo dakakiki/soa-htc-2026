@@ -1821,6 +1821,51 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0067 — Izveštaji se crtaju unutar čitaočevog opsega, a arhiva se odbija umesto da ga glumi
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** `ReportController` je zvao `authorize('reports.view')` na četiri mesta, a
+  `allowedSchoolIds()` koristio **jednom** — i to za **opcioni filter iz zahteva**
+  (`coordinator_user_id`), ne za pozivaoca. `ArchiveController` nije ni to.
+  🪤 Dve različite stvari završavale su u istoj listi: `coordinator_user_id` je **filter** (čitalac
+  traži da vidi venue-e jednog koordinatora), a pozivaočev opseg je **granica** (šta god da je
+  tražio, ne-globalan čitalac vidi samo svoje). `ResultsController::applyPopulationFilters` granicu
+  primenjuje oduvek, i u sopstvenom komentaru piše da je **to** ono što delegiranje
+  `results.manage`/`reports.view` koordinatoru čini bezbednim. Izveštaji je nisu primenjivali, pa je
+  druga polovina te rečenice bila neistina.
+- ⚠️ **Danas se to ne vidi:** `reports.view` ima samo Administrator, a on je globalan. Postaje
+  stvarno čim neko napravi **prilagođenu rolu** sa tom permisijom — a ekran Roles postoji upravo
+  zato. Zato svaki test u `ReportScopeTest` gradi tačno takvu rolu; drugačije se rupa ne vidi.
+- **Popravka za izveštaje:** `populationSchoolIds()` **preseca** traženi filter sa pozivaočevim
+  opsegom i predaje presek u `coordinator_school_ids`. Prazna lista **nije** „bez ograničenja" —
+  `ReportSummary` je pretvara u `whereIn(…, [])` i vraća nule, što je tačan odgovor.
+  Primenjeno na `summary`, `matrix` i `exportPdf`.
+- **I na ono što ekran NUDI, ne samo na ono što prikazuje.** Birači zemalja, regiona, venue-a i
+  koordinatora sada se izvode iz opsega. Spisak svih zemalja nekome ko sme da vidi jednu nije
+  curenje rezultata, ali jeste curenje oblika takmičenja — a svaki izbor van opsega vraća nule, što
+  se čita kao pokvareno a ne kao zabranjeno.
+- 🔴 **Arhiva: samo administrator.** Ne zato što je neko odlučio da je osetljiva, nego zato što se
+  opseg na nju **ne može primeniti istinito**. Layer C je namerno denormalizovan (ADR-0027):
+  samostalan snimak koji preživljava preimenovanje, premeštanje i brisanje venue-a, i nosi
+  `country`, `region` i `venue` kao **tekst**, onako kako su glasili tog dana. Opseg bi mogao da se
+  približi jedino poklapanjem tih stringova sa imenima koja pozivaočevi venue-i imaju **danas** — a
+  to greši u oba smera: venue preimenovan posle runde sakrio bi redove koji jesu čitaočevi, a dva
+  venue-a koja su nekad delila ime pokazala bi one koji nisu. **Približna granica je gora od
+  poštenog odbijanja, jer izgleda kao da radi.**
+- **SPA prati server:** stavka Archive u meniju i njena ruta traže **obe** stvari
+  (`reports.view` + `schools.view.all`), pa se zaključana vrata ne nude. `perm` u `AppSidebar` i
+  `meta.permission` u ruteru sada primaju i listu, koja znači „sve navedeno".
+- **Testovi (`ReportScopeTest`, 8):** čitalac vezan za jedan venue vidi samo svoje u zbiru; traženje
+  **tuđe zemlje** ne širi opseg nego vraća nule; grupisanje po zemlji nudi jednu; heatmap je omeđen
+  isto (uz kontrolnu tvrdnju da administrator vidi obe, inače test ne dokazuje ništa); filtriranje
+  po koordinatoru **van** opsega ne doseže preko granice; biračima se nudi samo ono što se sme
+  videti; arhiva vraća **403** takvom čitaocu i **200** administratoru.
+  Mutaciono provereno — bez granice padaju **šest od osam**, uključujući „Failed asserting that 2 is
+  identical to 1" (čitalac je video oba venue-a) i arhivu koja vrati 200 umesto 403.
+- **Suite 645/645** (bilo 637), `pint --dirty` i `npm run type-check` čisti.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
