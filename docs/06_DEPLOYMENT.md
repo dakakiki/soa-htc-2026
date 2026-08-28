@@ -3,16 +3,56 @@
 What a new production database needs before anybody can sign in, and what has to
 be uploaded by hand afterwards. Written 2026-08-27, when a fresh install was
 found to come up with an empty front page and **no administrator account at all**.
+Extended 2026-08-28: the version below prescribed `db:seed --force` without a word
+about `APP_ENV`, and the `.env` template it silently relied on shipped
+`APP_ENV=local`. Following this page to the letter could therefore open a live
+site with an administrator whose password is written down in this repository.
 
 ## The order
 
 ```bash
+[ -f .env ] || cp .env.example .env     # exactly what `composer setup` already did
+php artisan key:generate                # first install only — see below
 php artisan migrate --force
 php artisan db:seed --force
 php artisan soahtc:create-admin
+php artisan storage:link
 ```
 
-That is the whole bootstrap. Each step is safe to repeat.
+That is the whole bootstrap, and everything from `migrate` down is safe to repeat
+— which matters, because the template leaves the database user blank on purpose,
+so a fix-and-run-it-again loop is the ordinary first-install experience.
+
+> ⚠️ **`key:generate` is the one line that is not.** It rewrites `APP_KEY`, and
+> every open session and every encrypted cookie was written against the old one.
+> It asks first only when `APP_ENV` is exactly `production` — never under
+> `--force`, and never on the box that wrongly calls itself `local`. The copy on
+> the line above it is guarded for the same reason: a bare `cp` would overwrite a
+> `.env` that is in no repository and has no backup step on this page.
+
+### 0. `.env`
+
+`.env.example` is a **production** template: `APP_ENV=production`, `APP_DEBUG=false`,
+`SESSION_SECURE_COOKIE=true`, logging at `error`. Copying it without reading it
+lands somewhere closed rather than somewhere open. What it deliberately leaves
+blank is what it wants from you:
+
+| Key | What it wants |
+| --- | --- |
+| `APP_KEY` | `php artisan key:generate` writes it. Everything encrypted is encrypted with it |
+| `APP_URL` | the site's own address, `https://` included — mail links and the browser session both read it |
+| `DB_DATABASE` · `DB_USERNAME` · `DB_PASSWORD` | the database. The user name is blank on purpose: an unconfigured install then fails to connect on the first command, instead of quietly turning out to be pointed at somebody else's data |
+| `MAIL_*` | a real mailer. Coordinator registration answers by e-mail, twice, and the log driver swallows both |
+| `SANCTUM_STATEFUL_DOMAINS` | the site's host and nothing else — each entry is a host allowed to act as a signed-in user |
+
+> ⚠️ **`APP_ENV` is load-bearing, not decoration.** `MasterDataSeeder` — three
+> invented countries, three invented schools, a fake `Season 2026`, a sample
+> article and a `Dev Admin` account with every permission — is held back by
+> nothing but `app()->environment('local', 'testing')`. Leave `APP_ENV=local` on
+> a server and step 2 publishes development fiction onto the live site. Since
+> 2026-08-28 that account at least has no password anyone knows (`config/development.php`),
+> but the rest still spills. Check `php artisan tinker --execute="echo app()->environment();"`
+> before seeding if you are not certain.
 
 ### 1. `migrate`
 
@@ -30,7 +70,9 @@ Three seeders run on every environment:
 
 `MasterDataSeeder` is **synthetic development data** — invented schools, three
 countries, a dev administrator — and refuses to run outside `local`/`testing`.
-Nothing in it is needed on production.
+Nothing in it is needed on production. That refusal reads `APP_ENV` and believes
+it, which is why step 0 puts `APP_ENV` first: the seeder cannot tell a production
+box that calls itself `local` from a laptop.
 
 Every seeder fills only what is empty, so re-running after a later deploy adds
 what is new and leaves an edited page alone.
@@ -56,6 +98,25 @@ command therefore offers to open it first, and creates nothing if you decline.
 
 It refuses an e-mail that already has an account: resetting somebody's password
 from a console command is not its business.
+
+### 4. `storage:link`
+
+Every upload in the application — the logo, the photographs, the categories PDF,
+the venue form, question images and audio, coordinator documents — is written to
+the `public` disk, whose root is `storage/app/public` and whose URL is
+`{APP_URL}/storage/…`. That URL is only a file if `public/storage` points at it,
+and **nothing in the repository creates that link**: it is in `.gitignore`, and
+`composer setup` does not run this command.
+
+Skip it and the failure is quiet rather than loud. `public/.htaccess` sends
+anything that is not a file to `index.php`, and the SPA catch-all in
+`routes/web.php` answers **every** `/storage/…` address with the application's
+own HTML page and a `200`. So the pictures in the table below render as broken
+images, and the two download buttons hand the visitor an HTML document named
+`.pdf`. Nothing in the log, no error page — just a site that looks unfinished.
+
+The command is idempotent, and worth re-running after any move of the
+installation, because the link stores an absolute path.
 
 ## What is NOT seeded, and has to be uploaded
 
@@ -88,3 +149,39 @@ the way in.
   status strip shows the season but no round.
 - **Publish a sample quiz.** Practice is meant to be available all year (owner,
   2026-08-27); with no active sample quiz the practice entry is shown as closed.
+
+## Setting up for development
+
+The template is aimed at a server, so a laptop turns a handful of lines around
+after `composer setup` has copied it:
+
+```dotenv
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://dev.lcl.soa-htc.wrk      # whichever vhost you serve it from
+LOG_LEVEL=debug
+DB_DATABASE=soa_htc_dev
+DB_USERNAME=root                        # WAMP's MySQL, no password
+SESSION_SECURE_COOKIE=false             # a plain-HTTP host cannot sign you in with this on
+MAIL_MAILER=log
+SANCTUM_STATEFUL_DOMAINS=dev.lcl.soa-htc.wrk,localhost,127.0.0.1
+```
+
+Then `php artisan migrate:fresh --seed` builds the invented world — three
+countries, three schools, both difficulty sets, an active `Season 2026`, one
+sample page and one sample article, and the `admin@soahtc.test` administrator.
+`php artisan storage:link` is needed here too, once, for the same reason as on a
+server: without it every image you upload comes back as the SPA's HTML page.
+
+**That account's password is printed when the account is created, and only
+then**: `firstOrCreate` leaves an existing one alone, so a reseed onto a database
+that already has it says so rather than inventing a password that would not work.
+To keep the same one across every `migrate:fresh`, name it in your own `.env`:
+
+```dotenv
+DEV_ADMIN_PASSWORD=password
+```
+
+It is absent from `.env.example` on purpose, and must stay absent — a test says
+so (`FreshInstallSafetyTest`). That file is what gets copied onto servers, and a
+password travelling with it is exactly the hole this page was rewritten to close.
