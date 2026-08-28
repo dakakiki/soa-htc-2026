@@ -19,6 +19,7 @@ use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Models\Setting;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 /**
  * Synthetic development master data.
@@ -26,6 +27,14 @@ use Illuminate\Database\Seeder;
  * IMPORTANT: contains NO data derived from the legacy dump (which is real PII).
  * Country codes/names are public ISO reference data; schools/people are invented.
  * Only runs in local/testing environments. Assumes RolePermissionSeeder ran first.
+ *
+ * 🪤 That environment check is only as good as `APP_ENV`, and until 2026-08-28
+ * `.env.example` shipped `APP_ENV=local`. A deployment that copied the template
+ * and did not read it therefore ran this seeder on the live site and got
+ * `admin@soahtc.test` with the password `password` — an account holding every
+ * permission, in the active season, reachable by anyone who has ever seen this
+ * file. The template now defaults to production and the password is no longer a
+ * literal ({@see devAdminPassword}), so the same mistake stops handing out keys.
  */
 class MasterDataSeeder extends Seeder
 {
@@ -57,15 +66,19 @@ class MasterDataSeeder extends Seeder
         $vojvodina = Region::query()->firstOrCreate(['country_id' => $countries['RS']->id, 'name' => 'Vojvodina']);
         Region::query()->firstOrCreate(['country_id' => $countries['RS']->id, 'name' => 'Belgrade']);
 
+        $password = $this->devAdminPassword();
+
         $admin = User::query()->firstOrCreate(
             ['email' => 'admin@soahtc.test'],
             [
                 'name' => 'Dev Admin',
-                'password' => 'password',
+                'password' => $password,
                 'country_id' => $countries['RS']->id,
                 'region_id' => $vojvodina->id,
             ],
         );
+
+        $this->reportDevAdmin($admin, $password);
 
         $season = Season::query()->firstOrCreate(
             ['round_number' => 14],
@@ -112,6 +125,57 @@ class MasterDataSeeder extends Seeder
         );
 
         $this->seedSampleContent($admin->id);
+    }
+
+    /**
+     * The password the development administrator is created with.
+     *
+     * Never a literal outside `testing`. The account itself is harmless — it is
+     * the *known* password that turned a wrong `APP_ENV` into a way in, so that
+     * is what goes. Unset, the seeder invents one and prints it; a developer who
+     * would rather type the same one every time puts `DEV_ADMIN_PASSWORD` in
+     * their own `.env`, which is not in the repository and so cannot be copied
+     * onto a server by accident.
+     *
+     * `testing` keeps a fixed one on purpose: `LoginTest` signs in with it, and
+     * a test database is built and thrown away inside a single test.
+     */
+    private function devAdminPassword(): string
+    {
+        if (app()->environment('testing')) {
+            return 'password';
+        }
+
+        $configured = (string) config('development.admin_password');
+
+        // No symbols: this is read off a Windows console and typed back in.
+        return $configured !== '' ? $configured : Str::password(20, symbols: false);
+    }
+
+    /**
+     * Say what the password ended up being, once, when the account is actually
+     * created — a generated password nobody is told is a development site
+     * nobody can sign in to. Silent on an account that was already there:
+     * `firstOrCreate` did not touch its password, and saying so on every reseed
+     * would be noise.
+     */
+    private function reportDevAdmin(User $admin, string $password): void
+    {
+        if (! app()->environment('local')) {
+            return;
+        }
+
+        if (! $admin->wasRecentlyCreated) {
+            $this->command?->line('Dev administrator '.$admin->email.' was already there; its password is unchanged.');
+
+            return;
+        }
+
+        $this->command?->info('Dev administrator '.$admin->email.' — password: '.$password);
+
+        if ((string) config('development.admin_password') === '') {
+            $this->command?->line('  Invented, and shown only here. Set DEV_ADMIN_PASSWORD in .env to choose your own.');
+        }
     }
 
     /**

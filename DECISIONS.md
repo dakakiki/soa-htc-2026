@@ -1388,6 +1388,41 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   Rešenje je `redirectGuestsTo('/login')` — **putanja, ne imenovana ruta**: nema šta da pukne, `api/*` i
   dalje dobija 401 JSON, a običan browser ide na login ekran.
 
+## ADR-0058 — Šablon okruženja je produkcijski, a dev administrator nema lozinku koju je moguće pročitati
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** `.env.example` je do danas bio Laravelov podrazumevani — `APP_ENV=local`,
+  `APP_DEBUG=true`, uz zaostale dev vrednosti (`DB_DATABASE=soa_htc_dev`, `DB_USERNAME=root`,
+  `SANCTUM_STATEFUL_DOMAINS=dev.lcl.soa-htc.wrk`). `composer setup` taj fajl **kopira** u `.env`
+  kad ga nema, a `docs/06_DEPLOYMENT.md` je propisivao `php artisan db:seed --force` bez ijedne
+  reči o `APP_ENV`. `DatabaseSeeder` zove `MasterDataSeeder` bezuslovno; jedina brana je
+  `app()->environment('local','testing')` unutar samog seeder-a. Deployer koji je kopirao šablon i
+  pratio dokument dobijao je na **živom sajtu** nalog `admin@soahtc.test` sa lozinkom `password` —
+  sa svim permisijama, u aktivnoj sezoni — plus izmišljene zemlje i škole, lažnu `Season 2026` i
+  objavljen uzorak sadržaja. Dokument je moj propust od 2026-08-27; ovde se ne brani nego ispravlja.
+- **Dve nezavisne brane, jer jedna nije brana.**
+  1. **`.env.example` je produkcijski šablon.** `APP_ENV=production`, `APP_DEBUG=false`,
+     `SESSION_SECURE_COOKIE=true`, `LOG_LEVEL=error`, prazan `DB_USERNAME` (nepodešena baza pukne na
+     prvoj komandi umesto da se tiho ispostavi kao tuđa), `MAIL_MAILER=smtp`, `SANCTUM_STATEFUL_DOMAINS`
+     na živi host. Smer otkaza je sada bezbedan: **kopiraš i ne pročitaš → dobiješ zatvorenu
+     instalaciju**, ne otvorenu. Cena pada na dev, gde je bezopasna: laptop svesno vraća šačicu linija,
+     nabrojanih u `docs/06` pod „Setting up for development".
+  2. **Poznata lozinka je izvađena iz jednačine.** `MasterDataSeeder` više ne nosi literal. Lozinku daje
+     `config('development.admin_password')` (`DEV_ADMIN_PASSWORD`), a kad je nema — `Str::password(20)`
+     koji seeder **ispiše jednom**, pri kreiranju naloga. Nalog nad postojećom bazom se ne dira
+     (`firstOrCreate`) i seeder to kaže umesto da izmisli lozinku koja ne bi radila.
+- 🪤 **`DEV_ADMIN_PASSWORD` ne sme u `.env.example`.** Taj fajl je ono što se kopira na server; lozinka
+  koja putuje s njim vraća celu rupu. Zato stoji u `config/development.php` i u ličnom `.env`, a
+  `FreshInstallSafetyTest` to tvrdi kao **pravilo**, ne kao stil.
+- **Pod `testing` lozinka ostaje `password`, namerno.** `LoginTest` se njome prijavljuje, a test baza
+  živi koliko i jedan test. Pravilo je „nikad literal **van** `testing`", ne „nikad literal".
+- ⚠️ **Druga brana ne zamenjuje prvu.** `APP_ENV=local` na serveru i dalje izliva izmišljene škole,
+  lažnu sezonu i uzorak članaka na javni sajt — samo više nikome ne daje ključ. `docs/06` zato dobija
+  **korak 0** koji `.env` stavlja **ispred** `migrate`, i upozorenje da `MasterDataSeeder` ne ume da
+  razlikuje produkcijsku mašinu koja se predstavlja kao `local` od laptopa.
+- **Šta se nije menjalo:** `soahtc:create-admin` ostaje jedini put do pravog naloga (ADR uz `docs/06`,
+  2026-08-27) i nije diran.
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
