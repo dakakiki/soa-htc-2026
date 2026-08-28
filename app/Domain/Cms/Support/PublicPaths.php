@@ -28,11 +28,29 @@ final class PublicPaths
      */
     public const RESERVED = [
         'api', 'up', 'storage', 'build',
-        'login', 'profile', 'dashboard', 'student', 'students', 'venues', 'users',
-        'coordinators', 'locations', 'difficulty', 'content', 'grading', 'publishing',
-        'results', 'reports', 'reset', 'roles', 'settings',
+        'login', 'register', 'forgot-password', 'reset-password',
+        'profile', 'dashboard', 'student', 'students', 'venues', 'users',
+        'coordinators', 'coordinator-registrations', 'locations', 'difficulty',
+        'content', 'grading', 'publishing', 'results', 'reports', 'reset',
+        'roles', 'settings', 'website', 'cms',
         self::POST_PREFIX,
     ];
+
+    /*
+     * 🪤 Four of those went missing and nobody noticed: `register` since
+     * coordinator registration was written (ADR-0053), and `website`, `cms` and
+     * `coordinator-registrations` since the screens behind them were. A page
+     * saved at one of those slugs would have been shadowed by the application
+     * route — the router matches its own path first and sends the reader to a
+     * sign-in screen — and the page would simply never have appeared, with
+     * nothing anywhere reporting why.
+     *
+     * They were found while adding the recovery screens beside them (ADR-0063),
+     * by writing the test that should have existed from the start:
+     * `PublicRoutesTest` now reads the router file and fails if a top-level route
+     * is missing from this list. Keeping the two in step by hand is what did not
+     * work.
+     */
 
     public static function isReserved(string $slug): bool
     {

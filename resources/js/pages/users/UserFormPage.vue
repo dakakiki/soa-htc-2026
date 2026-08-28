@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { createUser, getUser, updateUser, type UserPayload } from '@/api/users';
 import { listCountries, listRegions, listRoles } from '@/api/reference';
 import { apiErrorMessage } from '@/api/http';
+import PasswordResetLinkButton from '@/components/PasswordResetLinkButton.vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
@@ -257,6 +258,12 @@ const fileBtn =
                                 autocomplete="new-password" :class="field" />
                         </div>
                     </div>
+
+                    <!-- Only on an existing account (ADR-0063): a new one has
+                         nowhere to send a link to until it has been saved, and
+                         somebody creating it is choosing the first password in
+                         the fields above anyway. -->
+                    <PasswordResetLinkButton v-if="id !== null" :user-id="id" />
 
                     <hr class="border-gray-200" />
 

@@ -72,6 +72,22 @@ class UserPolicy
             && self::isSchoolCoordinator($coordinator);
     }
 
+    /**
+     * Sending somebody a link to set their own password (ADR-0063).
+     *
+     * The same rule as editing them, and deliberately not a rule of its own: an
+     * administrator who may already type a new password into this account loses
+     * nothing by sending a link instead, and a country coordinator who may not
+     * touch an administrator must not be able to post one mail to their inbox
+     * either. What the action changes is not who may act but what an
+     * administrator has to do afterwards — nothing, instead of finding a safe way
+     * to say a password out loud.
+     */
+    public function sendPasswordResetLink(User $user, User $model): bool
+    {
+        return $this->manageCoordinator($user, $model);
+    }
+
     /** Whether the account holds the school-coordinator role in the active season. */
     public static function isSchoolCoordinator(User $user): bool
     {

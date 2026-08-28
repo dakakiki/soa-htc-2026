@@ -100,6 +100,8 @@ class WebsiteSeederTest extends TestCase
             LayoutZones::PUBLIC_IDENTIFY_COMPETITION,
             LayoutZones::PUBLIC_IDENTIFY_SAMPLE,
             LayoutZones::PUBLIC_IDENTIFY_RESULTS,
+            LayoutZones::PUBLIC_FORGOT_PASSWORD,
+            LayoutZones::PUBLIC_RESET_PASSWORD,
         ] as $zone) {
             $blocks = $this->getJson('/api/public/layout/'.$zone)->assertOk()->json('data.blocks');
 

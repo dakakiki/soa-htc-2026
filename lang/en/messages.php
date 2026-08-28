@@ -36,6 +36,17 @@ return [
     'user' => [
         'self_delete' => 'You cannot delete your own account.',
     ],
+    /*
+     * Password recovery (ADR-0063). One refusal covers every way a link can fail
+     * — never issued, already spent, expired, issued for another address — on
+     * purpose: the differences between them are facts about who has an account
+     * here, and the way out is the same sentence in all four cases.
+     */
+    'password_reset' => [
+        'link_spent' => 'This link has expired or has already been used. Ask for a new one.',
+        'sent' => 'A link is on its way.',
+        'too_soon' => 'A link was sent to this address less than a minute ago. Wait, then send another.',
+    ],
     'coordinator' => [
         'role_invalid' => 'Select a coordinator role (country or school coordinator).',
         'role_above_actor' => 'You may only manage school coordinators.',

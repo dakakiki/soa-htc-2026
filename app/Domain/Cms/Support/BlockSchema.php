@@ -50,7 +50,7 @@ final class BlockSchema
             BlockType::Hero, BlockType::Contact, BlockType::News => 1,
             // Chrome and screen copy: one record per zone, always.
             BlockType::Header, BlockType::Footer, BlockType::Login,
-            BlockType::Identify, BlockType::Register => 1,
+            BlockType::Identify, BlockType::Register, BlockType::PasswordRecovery => 1,
             default => null,
         };
     }
@@ -199,6 +199,23 @@ final class BlockSchema
                 self::text('sent_title', 'After sending: heading', 120),
                 self::rich('sent_lead', 'After sending: paragraph', 1600),
                 self::rich('sent_note', 'After sending: note at the foot', 800),
+            ],
+            // Password recovery (ADR-0063), one record per screen. The same four
+            // words twice over, because each screen ends by replacing its form
+            // with a panel: "check your inbox" on one, "it is changed, sign in"
+            // on the other. `done_` rather than `sent_` — nothing is sent by the
+            // screen that chooses the new password, and a field labelled as if
+            // something were would be read as a bug on that half.
+            //
+            // The link back to the sign-in screen is NOT here. It is a way
+            // through the application, like the eye that shows a password, and an
+            // admin who emptied it would leave the screen with no way out.
+            BlockType::PasswordRecovery => [
+                self::text('eyebrow', 'Label above the heading', 60),
+                self::text('title', 'Heading', 120),
+                self::rich('lead', 'Paragraph', 1600),
+                self::text('done_title', 'Afterwards: heading', 120),
+                self::rich('done_lead', 'Afterwards: paragraph', 1600),
             ],
         };
     }

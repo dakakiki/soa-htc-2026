@@ -347,6 +347,35 @@ export default {
         submitting: 'Signing in…',
         failed: 'Sign in failed.',
         remember: 'Keep me signed in',
+        // The way to the recovery screen. Interface, not content: the approval
+        // mail tells a coordinator to look for "Forgot password?" on this screen
+        // by name, so an admin renaming it would break a sentence in an e-mail
+        // nobody would think to look at.
+        forgot: 'Forgot password?',
+    },
+    /*
+     * Password recovery (ADR-0063). The headings and the paragraphs on both
+     * screens are CONTENT (`public.forgot-password` and `public.reset-password`);
+     * what is here is interface — field labels, buttons, and the two refusals the
+     * screen makes on its own before the server is asked.
+     */
+    passwordReset: {
+        email: 'E-mail',
+        // 🪤 `@` starts a linked message in vue-i18n; `{'@'}` is the literal form.
+        emailPlaceholder: "you{'@'}school.org",
+        send: 'Send the link',
+        sending: 'Sending…',
+        checkSpam: 'The mail can take a minute. If it has not arrived, look in your spam folder.',
+        account: 'Account',
+        newPassword: 'New password',
+        repeat: 'Repeat it',
+        hint: 'At least 8 characters.',
+        save: 'Save the password',
+        saving: 'Saving…',
+        signIn: 'Sign in',
+        mismatch: 'The two passwords are not the same.',
+        failed: 'That did not work. Try again.',
+        backToSignIn: 'Back to sign in',
     },
     register: {
         // Same division as `login` above: the heading, the paragraph and the two
@@ -701,6 +730,14 @@ export default {
         notFound: 'User not found.',
         saveFailed: 'Save failed.',
         passwordEditHint: 'Password (leave blank to keep)',
+        // The other way out of a forgotten password (ADR-0063). Under `user.`
+        // although the Coordinators screen shows it too — one component, one
+        // endpoint, one set of words.
+        resetLink: 'Send a password link',
+        resetLinkSending: 'Sending…',
+        resetLinkSent: 'Link sent',
+        resetLinkNote: 'They choose the password themselves. The link works once, for an hour.',
+        resetLinkFailed: 'The link could not be sent.',
         new: 'New user (admin / coordinator)',
         name: 'Name',
         email: 'Email',

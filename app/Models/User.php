@@ -9,6 +9,7 @@ use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Support\SeasonContext;
+use App\Mail\PasswordResetLink;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
@@ -30,6 +32,21 @@ class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * The recovery mail, in place of the framework's notification (ADR-0063).
+     *
+     * The broker calls this once it has minted and stored the token, so this is
+     * the only hook where the mail can be swapped without reimplementing the
+     * expiry, the single use and the throttle that come with it. Sent, not
+     * queued: the reader is sitting in front of the screen that just told them
+     * to check their inbox, and a queue nobody is running would make that screen
+     * a lie. The coordinator decision mails go the same way.
+     */
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        Mail::to($this->email)->send(new PasswordResetLink($this, (string) $token));
+    }
 
     /** @return HasMany<SeasonUserAssignment, $this> */
     public function seasonAssignments(): HasMany

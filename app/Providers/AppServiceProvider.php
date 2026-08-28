@@ -105,6 +105,19 @@ class AppServiceProvider extends ServiceProvider
         // bill as well as a queue full of noise. Capped per address as well as
         // per IP: one school behind one NAT is a normal day, one address applying
         // repeatedly is not.
+        // Asking for a password link (ADR-0063) posts mail to an address the
+        // sender does not have to prove anything about, which is the one public
+        // endpoint that can be pointed at somebody else. Three a day per address
+        // is more than anybody needs and few enough that the form cannot be used
+        // to bury an inbox; the per-IP caps are what stop a list being worked
+        // through. The broker's own throttle (one link a minute per address)
+        // sits underneath all of it.
+        RateLimiter::for('password-reset', fn (Request $request): array => [
+            Limit::perMinute(5)->by('ip:'.$request->ip()),
+            Limit::perDay(40)->by('ip:'.$request->ip()),
+            Limit::perDay(3)->by('mail:'.mb_strtolower(trim((string) $request->input('email')))),
+        ]);
+
         RateLimiter::for('coordinator-registration', fn (Request $request): array => [
             Limit::perMinute(3)->by('ip:'.$request->ip()),
             Limit::perDay(20)->by('ip:'.$request->ip()),
