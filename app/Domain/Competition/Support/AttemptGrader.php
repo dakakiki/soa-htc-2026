@@ -127,7 +127,12 @@ final class AttemptGrader
         return $attributes;
     }
 
-    /** Whether the attempt's test sits in the Sample round of an active exam. */
+    /**
+     * Whether the attempt's test sits in the practice round of an active exam.
+     *
+     * The ROUND's own flag, never its name: a name is something an administrator
+     * can retype, and this decides whether a result publishes itself.
+     */
     private static function inSampleRound(Attempt $attempt): bool
     {
         return DB::table('exam_test')
@@ -135,7 +140,7 @@ final class AttemptGrader
             ->join('exam_rounds', 'exam_rounds.id', '=', 'exams.exam_round_id')
             ->where('exam_test.test_id', $attempt->test_id)
             ->where('exams.status', 'active')
-            ->where('exam_rounds.name', 'Sample')
+            ->where('exam_rounds.is_sample', true)
             ->exists();
     }
 

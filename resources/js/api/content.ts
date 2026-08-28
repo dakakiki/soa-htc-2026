@@ -9,6 +9,12 @@ export interface Lookup {
     sort_order?: number;
     /** Exam rounds only: the one being run right now, if any. */
     is_current?: boolean;
+    /**
+     * Exam rounds only: which round is practice. Read-only — the results domain
+     * turns on it, so it is structure rather than something to retype, and the
+     * API does not accept it.
+     */
+    is_sample?: boolean;
 }
 
 export interface LookupPayload {

@@ -230,7 +230,15 @@ onMounted(load);
                             </div>
                         </td>
                         <td v-else class="px-4 py-3 text-gray-500">{{ item.id }}</td>
-                        <td class="px-4 py-3 font-medium text-gray-900">{{ item.name }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-900">
+                            {{ item.name }}
+                            <!-- Which round is practice is not something the name says any
+                                 more, and it decides how results behave — so the screen
+                                 has to say it, and say that it cannot be removed. -->
+                            <Tooltip v-if="item.is_sample" :text="$t('content.practiceRoundHint')">
+                                <span class="ml-2 rounded-full bg-brand-primary-soft px-2 py-0.5 text-xs font-medium text-brand-primary">{{ $t('content.practiceRound') }}</span>
+                            </Tooltip>
+                        </td>
                         <td v-if="cfg.hasCurrent" class="px-4 py-3">
                             <!-- The same switch as Active, in the brand blue: the two
                                  mean different things and must not read as one column

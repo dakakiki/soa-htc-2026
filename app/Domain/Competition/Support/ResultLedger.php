@@ -20,9 +20,6 @@ use Illuminate\Support\Facades\DB;
  */
 final class ResultLedger
 {
-    /** The practice round is never recorded as an official result. */
-    private const EXCLUDED_ROUND = 'Sample';
-
     /**
      * Rebuild the attempt-sourced Layer B rows for a scope of
      * (registrations × tests): drop the existing attempt rows in scope, then
@@ -86,7 +83,7 @@ final class ResultLedger
                 ->whereIn('registration_results.test_id', $testIds)
                 ->where('attempts.status', 'completed')
                 ->whereNotNull('attempts.published_at')
-                ->where('exam_rounds.name', '!=', self::EXCLUDED_ROUND);
+                ->where('exam_rounds.is_sample', false);
             $scopeRegistrations($superseded, 'attempts.registration_id')->delete();
 
             // 3) Re-insert from the attempts published right now.
@@ -99,7 +96,7 @@ final class ResultLedger
                 ->whereIn('attempts.test_id', $testIds)
                 ->where('attempts.status', 'completed')
                 ->whereNotNull('attempts.published_at')
-                ->where('exam_rounds.name', '!=', self::EXCLUDED_ROUND)
+                ->where('exam_rounds.is_sample', false)
                 ->selectRaw(
                     'attempts.registration_id, attempts.test_id, tr.exam_round_id, tests.test_type_id, '
                     .'attempts.quiz_id, registrations.season_id, attempts.score, attempts.max_score, '

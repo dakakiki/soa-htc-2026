@@ -1594,6 +1594,39 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 - ⏭ **Šta ostaje klijentu:** onih 20 zatečenih naslova su i dalje pitanja bez odgovora. Sada postoji
   gde da se presele; sama selidba je sadržajni posao, ne kod.
 
+## ADR-0062 — Runda vežbe je zastavica, ne ime; a runda koja se koristi se ne briše
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** tri mesta u rezultatskom domenu pitala su `exam_rounds.name = 'Sample'`:
+  `AttemptGrader` (rezultat vežbe se objavljuje sam čim je ocenjivanje konačno),
+  `RegistrationResults` (vežba nikad nije kolona u mreži rezultata) i `ResultLedger` (pokušaj iz
+  vežbe se nikad ne upisuje u Layer B). Sva tri su, dakle, visila o **natpisu koji administrator
+  sme da prekuca**, a `ExamRoundController` ga nije ničim štitio.
+- ⚠️ **Dva tiha otkaza koja iz toga slede.** **Preimenovanje** ubaci vežbu u zvanične rezultate i
+  istovremeno joj ugasi samo-objavljivanje — takmičar svoju ocenu sa vežbe više nikad ne vidi, jer
+  vežbu niko ne objavljuje ručno. **Brisanje** ne puca: `exams.exam_round_id` je `nullOnDelete`, pa
+  tiho otkači svaki ispit koji je u toj rundi sedeo; objava zatim javi uspeh i **ne upiše ništa**,
+  jer se Layer B spaja kroz rundu.
+- **`exam_rounds.is_sample`.** Migracija je backfill-uje po `legacy_id = 5` (ključ na koji je
+  `ContentLookupSeeder` vezuje i koji je legacy uvoz doneo, pa preživljava preimenovanje), a po imenu
+  samo ako takvog reda nema. Seeder je postavlja na svežoj instalaciji.
+- 🪤 **Nije isto što i `quizzes.quiz_type = sample`.** To je ono u šta takmičar **ulazi** — kviz za
+  vežbu, otvoren cele godine. Ovo je gde ispit **stoji** u putanji takmičenja. Kod ih je oduvek
+  razdvajao i mora i dalje. `SampleRoundTest` zato pravi **competition** kviz u oba slučaja, pa
+  jedina promenljiva ostaje runda.
+- **Zastavica nije administratorska.** API je ne prima ni u `store` ni u `update`; vraća je samo za
+  čitanje, da ekran može da kaže koja je runda vežba. Ime i redosled ostaju administratorovi —
+  **preimenovanje je sada bezopasno, i to je cela poenta.**
+- **Brisanje se odbija dvaput:** runda vežbe nikad, i runda u kojoj sede ispiti nikad dok se ne
+  presele. Obe poruke imenuju izlaz, jer ih `apiErrorMessage` prikazuje takve kakve jesu.
+- **Testovi tvrde pravilo naopako:** runda se **prvo preimenuje**, pa se tvrdi da se ništa nije
+  promenilo. Mutaciono provereno — vraćanje na poređenje po imenu obara oba testa sa
+  „Failed asserting that null is not null", što je tačno ta greška: `published_at` ostaje prazan.
+- ✅ **Provereno uživo na dev bazi:** migracija je označila tačno jednu rundu (#5 `Sample`,
+  `legacy_id = 5`), u njoj sedi 7 ispita; `DELETE` na nju vraća **422** sa porukom o rundi vežbe, a
+  `DELETE` na Preliminary (u kojoj ima ispita) **422** sa porukom o preseljenju. Nijedna runda nije
+  obrisana — i dalje ih je pet.
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)

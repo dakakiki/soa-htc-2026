@@ -1267,6 +1267,8 @@ export default {
         reorderFailed: 'Could not save the new order.',
         current: 'Running now',
         setCurrent: 'Mark this as the round being run now',
+        practiceRound: 'Practice',
+        practiceRoundHint: 'The practice round. Its results publish themselves and never count as official ones, so it cannot be deleted.',
         clearCurrent: 'No round is being run now',
         name: 'Name',
         active: 'Active',
