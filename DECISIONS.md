@@ -1535,11 +1535,15 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   bila utoliko gora što je klijent taj koji te stavke treba da prepravi.
   **Pravilo je sada uže:** pitanje koje **nosi** odgovore mora da nosi upotrebljive; pitanje koje ne
   nosi nijedan se ne dira. Ono ionako po ocenjivaču nosi nulu svima.
-- ⏭ **Izuzetak je privremen i zna se čime se gasi.** Aplikacija nema stavku tipa „beleška",
-  pa autor nema gde drugde da stavi naslov zadatka nego u pitanje bez odgovora. Vlasnik
-  (2026-08-28): *„to bi zapravo trebalo da postoji kod kreiranja testa — da pored pretrage banke
-  pitanja možeš da uneseš 'note' između pitanja kad god želiš."* Kad ta stavka postoji, naslovi
-  postaju beleške i izuzetak sme da se stegne. **Nije deo ove runde.**
+- ⏭ **Izuzetak je privremen i zna se čime se gasi — i ne gasi se stezanjem pravila.** Aplikacija
+  nema stavku tipa „beleška", pa autor nema gde drugde da stavi naslov zadatka nego u pitanje bez
+  odgovora. Vlasnik (2026-08-28): *„to bi zapravo trebalo da postoji kod kreiranja testa — da pored
+  pretrage banke pitanja možeš da uneseš 'note' između pitanja kad god želiš"*, i uz to presudno:
+  *„tada nemamo izuzetak, već to nije pitanje koje ćeš uzimati u obzir prilikom validacije testa,
+  već samo note koje prati neka pitanja."*
+  **Dakle beleška nije red u `questions`.** Kad postoji, validacija je ni ne vidi, izuzetak nestaje
+  sam od sebe, a pitanje bez ijednog odgovora ponovo postaje ono što i jeste — greška.
+  **Nije deo ove runde.**
 - ⚠️ **Šta je bilo urađeno pa vraćeno:** onih 20 naslova sam bio postavio na `inactive` (prestaju da
   se isporučuju: `questionsPayload` i `AttemptGrader` oboje filtriraju `status = active`, pa su
   ispali i sa ekrana i iz `max_score` — testovi #17/#22/#27 su pali sa 35/35/34 na 34/30/30).
