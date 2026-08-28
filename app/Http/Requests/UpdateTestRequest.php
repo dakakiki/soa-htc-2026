@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domain\Assessment\Models\Test;
+use App\Domain\Assessment\Support\ContentCompleteness;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateTestRequest extends FormRequest
@@ -32,5 +35,29 @@ class UpdateTestRequest extends FormRequest
             'question_ids' => ['sometimes', 'array'],
             'question_ids.*' => ['integer', 'exists:questions,id'],
         ];
+    }
+
+    /**
+     * The rule is about the state the save LEAVES BEHIND, not about the payload:
+     * the list screen PUTs nothing but `status`, so the questions have to be
+     * counted in the database when the request does not mention them.
+     * {@see ContentCompleteness}
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            /** @var Test|null $test */
+            $test = $this->route('test');
+
+            $shortfall = ContentCompleteness::testShortfall(
+                $test,
+                $this->has('status') ? (string) $this->input('status') : null,
+                $this->has('question_ids') ? $this->input('question_ids', []) : null,
+            );
+
+            if ($shortfall !== null) {
+                $validator->errors()->add('question_ids', trans('messages.content.'.$shortfall));
+            }
+        });
     }
 }

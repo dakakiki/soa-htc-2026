@@ -1489,6 +1489,48 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   i CDN, a privatan ispitni snimak nije stvar koju treba ostaviti da visi o tome. `private`, ne
   `no-store`: takmičarev pretraživač **treba** da zadrži snimak, inače ga premotavanje skida iznova.
 
+## ADR-0060 — Ništa nekonzistentno ne sme da bude aktivno, a pitanje bez tačnog odgovora ne plaća nikome
+
+- **Status:** Prihvaćeno (2026-08-28). **IMPLEMENTIRANO.**
+- **Kontekst:** izlazni uslov Faze 2 iz `docs/01_DEVELOPMENT_ROADMAP.md` — *„sistem ne dozvoljava
+  objavu nekonzistentne konfiguracije"* — nije sprovodilo **ništa**. `StoreTestRequest` je za
+  `question_ids` imao samo `['array']`, a `status` je primao `active`: **test bez ijednog pitanja
+  mogao je da se aktivira.** `answers.*.is_correct` je `sometimes|boolean`, pa je i **pitanje sa
+  višestrukim izborom bez ijednog tačnog odgovora prolazilo.**
+- ⚠️ **Drugo je bilo gore nego što je izgledalo, i u suprotnom smeru.** `AttemptGrader` poredi
+  `$selected === $question['correctIds']`; kad nema tačnog odgovora, oba niza su prazna — a
+  `StudentTestPage.vue:196` šalje red za **svako** pitanje, i za nedirnuto (`selected: []`). Takvo
+  pitanje je dakle **plaćalo pun bod svakome ko ga preskoči**, a nulu svakome ko odgovori.
+  Izmereno mutacionim testom: bez zaštite preskočeno pitanje daje **2.00 od 2.00**.
+- **Kapija je na AKTIVNOSTI, ne na čuvanju.** Nacrt sme da bude nedovršen koliko autoru treba;
+  zabrana ide na ono što stavlja sadržaj pred takmičara. Deaktivacija **uvek** prolazi.
+- **Kapija čita ISHOD, ne payload** (`ContentCompleteness`): payload gde payload govori, baza gde
+  ćuti. Bez toga bi inline prekidač u listi — koji šalje **samo** `status` — uključio pitanje
+  zahtevom koji nikad ne pomene šta s njim nije u redu.
+- 🪤 **`status` je `default('active')` na sve četiri tabele**, pa `POST` koji ne kaže ništa o statusu
+  pravi **aktivan** zapis i mora da prođe isti prag. Ćutanje nije nacrt.
+- **Prošireno na `gap_filling`** — pitanje bez ijedne praznine ne može da se pogodi, isti kvar u
+  drugom tipu. Vredi reći da je ocenjivač za gap tu zaštitu **oduvek imao** (`$acceptable === []`),
+  a za višestruki izbor je nije imao nikad.
+- **Ocenjivač je popravljen, i to nije proširenje nego ista greška tamo gde ujeda.** Pitanje bez
+  tačnog odgovora sada ne može da se pogodi — ni ćutanjem. Validacija štiti budućnost; ovo štiti
+  **zatečene redove**, kojih ima.
+- 🔴 **Zatečeni sadržaj (dev, 2026-08-28): 23 aktivna MC pitanja bez tačnog odgovora**, od toga **16
+  nosi bodove**, u **10 aktivnih testova**, dostupna kroz **5 aktivnih competition kvizova sezone
+  2026** (Baby Hippo, Hippo Little, Hippo 1, Hippo 2‑S1, Hippo 4‑S3). Dve populacije:
+  - **20 bez ijedne opcije** — legacy naslovi zadatka („TASK 2 Look at the pictures and choose a, b
+    or c…") koje je uvoznik pretvorio u pitanja, jer `ImportLegacyQuestions.php:70` svaki
+    **nemapiran** legacy tip preslikava u `multiple_choice` (`TYPE_MAP` zna samo 1/2/5);
+  - **3 prava pitanja** sa 3–4 opcije gde nijedna nije tačna (`know/remember/invite`,
+    `yellow/red/green`, `measuring/gaining/maintaining/losing`) — legacy ni sam nije imao
+    `correct_answer`, pa ih ponovni uvoz reprodukuje.
+- **Vlasnikova odluka (2026-08-28):** **ne** pisati komandu za izveštavanje o zatečenom, jer je taj
+  sadržaj dev materijal koji na produkciju ne ide. Zaštita ocenjivača ostaje, jer ne košta ništa i
+  ne oslanja se na to da je pretpostavka tačna.
+- ✅ **Provereno uživo na dev bazi, ne samo u suite-u:** `PUT` `status: active` na pitanju #167
+  (jedno od 23) → **422** sa porukom; isti zahtev na ispravnom pitanju → **200**; nov aktivan test
+  bez pitanja → **422**. Ništa nije ostalo za sobom.
+
 ---
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)

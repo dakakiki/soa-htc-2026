@@ -6,6 +6,9 @@ namespace App\Http\Requests;
 
 use App\Domain\Assessment\Enums\AnswerNumbering;
 use App\Domain\Assessment\Enums\QuestionType;
+use App\Domain\Assessment\Models\Question;
+use App\Domain\Assessment\Support\ContentCompleteness;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,5 +43,30 @@ class UpdateQuestionRequest extends FormRequest
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'audio' => ['nullable', 'file', 'mimes:mp3,wav,ogg,m4a', 'max:10240'],
         ];
+    }
+
+    /**
+     * The inline status toggle PUTs `status` and nothing else, so the answers and
+     * the type have to be read from the database when the request is silent about
+     * them — otherwise a question could be switched on by a request that never
+     * mentions what is wrong with it. {@see ContentCompleteness}
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            /** @var Question|null $question */
+            $question = $this->route('question');
+
+            $shortfall = ContentCompleteness::questionShortfall(
+                $question,
+                $this->has('status') ? (string) $this->input('status') : null,
+                $this->has('question_type') ? (string) $this->input('question_type') : null,
+                $this->has('answers') ? $this->input('answers', []) : null,
+            );
+
+            if ($shortfall !== null) {
+                $validator->errors()->add('answers', trans('messages.content.'.$shortfall));
+            }
+        });
     }
 }
