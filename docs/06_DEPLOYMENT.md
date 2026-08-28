@@ -11,14 +11,24 @@ site with an administrator whose password is written down in this repository.
 ## The order
 
 ```bash
-cp .env.example .env        # `composer setup` has already done this
-php artisan key:generate
+[ -f .env ] || cp .env.example .env     # exactly what `composer setup` already did
+php artisan key:generate                # first install only — see below
 php artisan migrate --force
 php artisan db:seed --force
 php artisan soahtc:create-admin
+php artisan storage:link
 ```
 
-That is the whole bootstrap. Each step is safe to repeat.
+That is the whole bootstrap, and everything from `migrate` down is safe to repeat
+— which matters, because the template leaves the database user blank on purpose,
+so a fix-and-run-it-again loop is the ordinary first-install experience.
+
+> ⚠️ **`key:generate` is the one line that is not.** It rewrites `APP_KEY`, and
+> every open session and every encrypted cookie was written against the old one.
+> It asks first only when `APP_ENV` is exactly `production` — never under
+> `--force`, and never on the box that wrongly calls itself `local`. The copy on
+> the line above it is guarded for the same reason: a bare `cp` would overwrite a
+> `.env` that is in no repository and has no backup step on this page.
 
 ### 0. `.env`
 
@@ -89,6 +99,25 @@ command therefore offers to open it first, and creates nothing if you decline.
 It refuses an e-mail that already has an account: resetting somebody's password
 from a console command is not its business.
 
+### 4. `storage:link`
+
+Every upload in the application — the logo, the photographs, the categories PDF,
+the venue form, question images and audio, coordinator documents — is written to
+the `public` disk, whose root is `storage/app/public` and whose URL is
+`{APP_URL}/storage/…`. That URL is only a file if `public/storage` points at it,
+and **nothing in the repository creates that link**: it is in `.gitignore`, and
+`composer setup` does not run this command.
+
+Skip it and the failure is quiet rather than loud. `public/.htaccess` sends
+anything that is not a file to `index.php`, and the SPA catch-all in
+`routes/web.php` answers **every** `/storage/…` address with the application's
+own HTML page and a `200`. So the pictures in the table below render as broken
+images, and the two download buttons hand the visitor an HTML document named
+`.pdf`. Nothing in the log, no error page — just a site that looks unfinished.
+
+The command is idempotent, and worth re-running after any move of the
+installation, because the link stores an absolute path.
+
 ## What is NOT seeded, and has to be uploaded
 
 The owner's decision of 2026-08-25: **no images or documents in the repository.**
@@ -141,6 +170,8 @@ SANCTUM_STATEFUL_DOMAINS=dev.lcl.soa-htc.wrk,localhost,127.0.0.1
 Then `php artisan migrate:fresh --seed` builds the invented world — three
 countries, three schools, both difficulty sets, an active `Season 2026`, one
 sample page and one sample article, and the `admin@soahtc.test` administrator.
+`php artisan storage:link` is needed here too, once, for the same reason as on a
+server: without it every image you upload comes back as the SPA's HTML page.
 
 **That account's password is printed when the account is created, and only
 then**: `firstOrCreate` leaves an existing one alone, so a reseed onto a database

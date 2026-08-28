@@ -1422,6 +1422,13 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   razlikuje produkcijsku mašinu koja se predstavlja kao `local` od laptopa.
 - **Šta se nije menjalo:** `soahtc:create-admin` ostaje jedini put do pravog naloga (ADR uz `docs/06`,
   2026-08-27) i nije diran.
+- **Uz to, `php artisan storage:link` je ušao u recept** — nije ga bilo nigde: ni u `docs/`, ni u
+  `README.md`, ni u `composer setup`, a `/public/storage` je u `.gitignore`. Na ovoj mašini link
+  postoji jer je **ručno** napravljen 2026-08-14, pa se propust nikad nije video. Bez njega otkaz je
+  **tih, ne bučan**: `public/.htaccess` sve što nije fajl šalje na `index.php`, SPA catch-all u
+  `routes/web.php` je registrovan **pre** framework-ove `storage/{path}` rute, pa svaka
+  `/storage/…` adresa vraća HTML stranu aplikacije i **200**. Slike pukle, a dugme za PDF isporučuje
+  HTML dokument sa `.pdf` nastavkom — sveža produkcija bi izgledala nedovršeno bez ijednog traga u logu.
 
 ---
 
