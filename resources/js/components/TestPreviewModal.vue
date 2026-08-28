@@ -1,15 +1,32 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { getTestPreview } from '@/api/tests';
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
-import type { TestPreview } from '@/types/models';
+import type { TestNoteRef, TestPreview } from '@/types/models';
 
 const props = defineProps<{ testId: number | null }>();
 const emit = defineEmits<{ close: [] }>();
 
 const preview = ref<TestPreview | null>(null);
+
+/**
+ * Headings between the questions. They live outside `questions` so they cannot
+ * disturb the numbering, and say how many questions come before them instead.
+ */
+function notesBefore(index: number): TestNoteRef[] {
+    return (preview.value?.notes ?? [])
+        .filter((n) => n.before_position === index)
+        .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+/** Anchored past the last question: a closing line. */
+const trailingNotes = computed<TestNoteRef[]>(() =>
+    (preview.value?.notes ?? [])
+        .filter((n) => n.before_position >= (preview.value?.questions.length ?? 0))
+        .sort((a, b) => a.before_position - b.before_position || a.sort_order - b.sort_order),
+);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
@@ -68,6 +85,12 @@ watch(
 
                     <ol class="mt-6 space-y-6">
                         <li v-for="q in preview.questions" :key="q.id" class="border-t border-gray-100 pt-4 first:border-t-0 first:pt-0">
+                            <!-- Headings the author put before this question. Never
+                                 numbered: the numbers here are the competitor's. -->
+                            <!-- eslint-disable-next-line vue/no-v-html -- admin-authored WYSIWYG content -->
+                            <div v-for="(note, ni) in notesBefore(q.position - 1)" :key="`note-${q.id}-${ni}`"
+                                class="prose prose-sm mb-3 max-w-none border-l-[3px] border-brand-primary pl-3 text-gray-600"
+                                v-html="note.body"></div>
                             <div class="flex items-start gap-2">
                                 <span class="shrink-0 font-semibold text-brand-primary">{{ q.position }}.</span>
                                 <div class="min-w-0 flex-1">
@@ -91,6 +114,9 @@ watch(
                             </div>
                         </li>
                         <li v-if="preview.questions.length === 0" class="text-center text-sm text-gray-400">{{ $t('test.noQuestions') }}</li>
+                        <!-- eslint-disable-next-line vue/no-v-html -- admin-authored WYSIWYG content -->
+                        <li v-for="(note, ni) in trailingNotes" :key="`note-end-${ni}`"
+                            class="prose prose-sm max-w-none border-l-[3px] border-brand-primary pl-3 text-gray-600" v-html="note.body"></li>
                     </ol>
                 </template>
             </div>

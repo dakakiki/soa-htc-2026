@@ -30,6 +30,12 @@ class StoreTestRequest extends FormRequest
             'level_ids.*' => ['integer', 'exists:difficulty_levels,id'],
             'question_ids' => ['array'],
             'question_ids.*' => ['integer', 'exists:questions,id'],
+            // Headings between the questions. `before_position` is how many
+            // questions come first, so 0 is above everything. {@see TestNote}
+            'notes' => ['array'],
+            'notes.*.before_position' => ['required', 'integer', 'min:0'],
+            'notes.*.sort_order' => ['sometimes', 'integer', 'min:1'],
+            'notes.*.body' => ['required', 'string', 'max:20000'],
         ];
     }
 

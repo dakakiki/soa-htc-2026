@@ -11,6 +11,10 @@ const props = withDefaults(
         /** Off when removing a row means more than dropping it from the list (e.g. a
          *  guarded server delete) — the caller then supplies its own action. */
         removable?: boolean;
+        /** What to print in the number column. Defaults to the row's place in the
+         *  list; a caller whose list holds more than one kind of thing can number
+         *  only some of them, or none. */
+        label?: (item: T, index: number) => string;
     }>(),
     { removable: true },
 );
@@ -66,7 +70,7 @@ function onDragEnd(): void {
                     <IconGripVertical :size="16" />
                 </span>
             </Tooltip>
-            <span class="w-6 shrink-0 text-center text-xs font-medium text-gray-400">{{ i + 1 }}</span>
+            <span class="w-6 shrink-0 text-center text-xs font-medium text-gray-400">{{ label ? label(item, i) : i + 1 }}</span>
             <div class="flex min-w-0 flex-1 items-center gap-2">
                 <slot name="item" :item="item" :index="i" />
             </div>

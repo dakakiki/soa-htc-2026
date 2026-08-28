@@ -233,6 +233,11 @@ class AttemptController extends Controller
      */
     private function openPayload(Attempt $attempt, Test $test): array
     {
+        // Explicit rather than relying on `questionsPayload` having loaded it:
+        // the order array literals happen to evaluate in is not something the
+        // next reader should have to know.
+        $test->loadMissing('notes');
+
         return [
             'attempt' => [
                 'id' => $attempt->id,
@@ -247,6 +252,17 @@ class AttemptController extends Controller
                 'duration' => $test->duration,
             ],
             'questions' => $this->questionsPayload($test, $attempt),
+            /*
+             * Headings between the questions, kept OUT of the questions array on
+             * purpose: the exam screen numbers questions by their index in it
+             * (ADR-0034), so a note sharing that list would eat a number. Each
+             * one says how many questions come before it instead.
+             */
+            'notes' => $test->notes->map(fn ($note) => [
+                'before_position' => $note->before_position,
+                'sort_order' => $note->sort_order,
+                'body' => $note->body,
+            ])->values()->all(),
         ];
     }
 
@@ -276,6 +292,7 @@ class AttemptController extends Controller
         $test->load([
             'questions' => fn ($q) => $q->where('questions.status', 'active'),
             'questions.answers',
+            'notes',
         ]);
 
         /*

@@ -7,6 +7,7 @@ namespace App\Domain\Assessment\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Test extends Model
 {
@@ -41,5 +42,18 @@ class Test extends Model
         return $this->belongsToMany(Question::class, 'question_test')
             ->withPivot('position')
             ->orderBy('question_test.position');
+    }
+
+    /**
+     * Headings and instructions between the questions. Not questions: never
+     * answered, never graded, never numbered. {@see TestNote}
+     *
+     * @return HasMany<TestNote, $this>
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(TestNote::class)
+            ->orderBy('before_position')
+            ->orderBy('sort_order');
     }
 }

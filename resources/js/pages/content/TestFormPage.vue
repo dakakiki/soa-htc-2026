@@ -16,9 +16,10 @@ import RichTextEditor from '@/components/RichTextEditor.vue';
 import OrderableList from '@/components/OrderableList.vue';
 import Tooltip from '@/components/Tooltip.vue';
 import QuestionPreviewModal from './QuestionPreviewModal.vue';
-import { IconEye, IconPencil } from '@tabler/icons-vue';
+import TestNoteModal from './TestNoteModal.vue';
+import { IconEye, IconNotes, IconPencil } from '@tabler/icons-vue';
 import type { Lookup } from '@/api/content';
-import type { LevelOption, Question, TestQuestionRef } from '@/types/models';
+import type { LevelOption, Question, TestNoteRef, TestQuestionRef } from '@/types/models';
 
 const { t } = useI18n();
 
@@ -35,7 +36,20 @@ const id = computed(() => Number(route.params.id));
 const form = reactive<{ title: string; description: string; test_type_id: number | null; duration: number | null; status: string; level_ids: number[] }>({
     title: '', description: '', test_type_id: null, duration: null, status: 'active', level_ids: [],
 });
-const selected = ref<TestQuestionRef[]>([]);
+/**
+ * What the builder is composing: questions from the bank, and notes dropped
+ * between them. One list, so a note is dragged around exactly like a question.
+ *
+ * 🪤 A note's `id` is a NEGATIVE counter, not a server id. It exists only to key
+ * the row while it is being edited, and it can never collide with a question id.
+ */
+type BuilderItem =
+    | { id: number; kind: 'question'; title: string | null; points: number }
+    | { id: number; kind: 'note'; body: string };
+
+let nextNoteId = -1;
+
+const selected = ref<BuilderItem[]>([]);
 // Question shown in the preview modal; null keeps it closed.
 const previewId = ref<number | null>(null);
 
@@ -48,7 +62,8 @@ const search = ref('');
 const results = ref<Question[]>([]);
 const searching = ref(false);
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
-const selectedIds = computed(() => new Set(selected.value.map((s) => s.id)));
+// Questions only: a note has no bank entry to already be holding.
+const selectedIds = computed(() => new Set(selected.value.filter((s) => s.kind === 'question').map((s) => s.id)));
 
 const loading = ref(true);
 const saving = ref(false);
@@ -80,7 +95,102 @@ function add(q: Question): void {
     if (selectedIds.value.has(q.id)) {
         return;
     }
-    selected.value.push({ id: q.id, title: q.title, points: q.points, position: selected.value.length + 1 });
+    selected.value.push({ id: q.id, kind: 'question', title: q.title, points: q.points });
+}
+
+/**
+ * The number the competitor will see, and nothing beside a note.
+ *
+ * Without this the builder would number the whole list, so a note above the
+ * first question would make it "2" here and "1" on the exam screen — which
+ * numbers by the question's place among questions (ADR-0034).
+ */
+function rowLabel(item: BuilderItem, index: number): string {
+    return item.kind === 'note'
+        ? ''
+        : String(selected.value.slice(0, index + 1).filter((s) => s.kind === 'question').length);
+}
+
+/**
+ * The note whose text is open in the modal, by builder id. Null keeps it closed.
+ *
+ * The text is written there rather than in the row, so a note's row looks like a
+ * question's row (owner, 2026-08-28).
+ */
+const noteEditingId = ref<number | null>(null);
+const noteDraft = computed(() => {
+    const item = selected.value.find((s) => s.id === noteEditingId.value);
+
+    return item !== undefined && item.kind === 'note' ? item.body : null;
+});
+
+/** A note goes on the end, and is dragged from there to wherever it belongs. */
+function addNote(): void {
+    const id = nextNoteId--;
+    selected.value.push({ id, kind: 'note', body: '' });
+    noteEditingId.value = id;
+}
+
+function saveNote(body: string): void {
+    const item = selected.value.find((s) => s.id === noteEditingId.value);
+    if (item !== undefined && item.kind === 'note') {
+        item.body = body;
+    }
+    noteEditingId.value = null;
+}
+
+/** Cancelling a note that was never written drops the row it opened. */
+function closeNote(): void {
+    const item = selected.value.find((s) => s.id === noteEditingId.value);
+    if (item !== undefined && item.kind === 'note' && item.body.trim() === '') {
+        selected.value = selected.value.filter((s) => s.id !== noteEditingId.value);
+    }
+    noteEditingId.value = null;
+}
+
+/**
+ * The one list back into the two the API takes: questions in order, and each
+ * note carrying how many questions come before it.
+ *
+ * A note left blank is dropped rather than saved, the same way the question form
+ * drops a blank answer.
+ */
+function composition(): { question_ids: number[]; notes: { before_position: number; body: string }[] } {
+    const question_ids: number[] = [];
+    const notes: { before_position: number; body: string }[] = [];
+
+    for (const item of selected.value) {
+        if (item.kind === 'question') {
+            question_ids.push(item.id);
+        } else if (item.body.trim() !== '') {
+            notes.push({ before_position: question_ids.length, body: item.body });
+        }
+    }
+
+    return { question_ids, notes };
+}
+
+/** …and the two back into the one, for editing. */
+function interleave(questions: TestQuestionRef[], notes: TestNoteRef[]): BuilderItem[] {
+    const out: BuilderItem[] = [];
+    const at = (anchor: number): TestNoteRef[] =>
+        notes.filter((n) => n.before_position === anchor).sort((a, b) => a.sort_order - b.sort_order);
+    const push = (list: TestNoteRef[]): void => {
+        for (const n of list) {
+            out.push({ id: nextNoteId--, kind: 'note', body: n.body });
+        }
+    };
+
+    questions.forEach((q, i) => {
+        push(at(i));
+        out.push({ id: q.id, kind: 'question', title: q.title, points: q.points });
+    });
+
+    // Anchored at or past the end: a closing line after the last question. Also
+    // where a note lands if its question was removed from the test.
+    push(notes.filter((n) => n.before_position >= questions.length).sort((a, b) => a.before_position - b.before_position || a.sort_order - b.sort_order));
+
+    return out;
 }
 
 function goBack(): void {
@@ -101,7 +211,7 @@ async function save(): Promise<void> {
         duration: form.duration,
         status: form.status,
         level_ids: form.level_ids,
-        question_ids: selected.value.map((s) => s.id),
+        ...composition(),
     };
     try {
         if (isEdit.value) {
@@ -131,7 +241,7 @@ onMounted(async () => {
             form.duration = x.duration;
             form.status = x.status;
             form.level_ids = (x.levels ?? []).map((l) => l.id);
-            selected.value = (x.questions ?? []).map((q) => ({ ...q }));
+            selected.value = interleave(x.questions ?? [], x.notes ?? []);
         }
     } catch (e) {
         error.value = apiErrorMessage(e, t('test.error'));
@@ -163,7 +273,18 @@ onMounted(async () => {
 
                     <!-- Question picker -->
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">{{ $t('test.questions') }}</label>
+                        <div class="mb-1 flex items-center justify-between gap-3">
+                            <label class="block text-sm font-medium text-gray-700">{{ $t('test.questions') }}</label>
+                            <!-- Beside the bank search, because a note is composed
+                                 with the questions rather than configured apart. -->
+                            <Tooltip :text="$t('test.addNoteHint')">
+                                <button type="button"
+                                    class="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                    @click="addNote">
+                                    <IconNotes :size="14" /> {{ $t('test.addNote') }}
+                                </button>
+                            </Tooltip>
+                        </div>
                         <div class="relative">
                             <input v-model="search" type="search" :placeholder="$t('test.searchQuestions')"
                                 class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" @input="runSearch" />
@@ -185,25 +306,42 @@ onMounted(async () => {
                             </div>
                         </div>
 
-                        <OrderableList v-model="selected" :empty-text="$t('test.noQuestions')" class="mt-3">
+                        <OrderableList v-model="selected" :empty-text="$t('test.noQuestions')" :label="rowLabel" class="mt-3">
                             <template #item="{ item }">
-                                <span class="flex-1 truncate">{{ toPlainText(item.title) || $t('common.dash') }}</span>
-                                <Tooltip :text="$t('question.points')">
-                                    <span class="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">{{ item.points }}</span>
-                                </Tooltip>
+                                <!-- A note reads as one more row of the paper: same
+                                     shape as a question, its own text truncated, and
+                                     a chip where the mark would be. -->
+                                <template v-if="item.kind === 'note'">
+                                    <span class="flex-1 truncate italic text-gray-600">{{ toPlainText(item.body) || $t('test.emptyNote') }}</span>
+                                    <span class="shrink-0 rounded-full bg-brand-primary-soft px-2 py-0.5 text-xs font-medium text-brand-primary">{{ $t('test.note') }}</span>
+                                </template>
+                                <template v-else>
+                                    <span class="flex-1 truncate">{{ toPlainText(item.title) || $t('common.dash') }}</span>
+                                    <Tooltip :text="$t('question.points')">
+                                        <span class="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">{{ item.points }}</span>
+                                    </Tooltip>
+                                </template>
                             </template>
                             <template #actions="{ item }">
-                                <Tooltip :text="$t('common.view')">
+                                <!-- Same eye as a question's, and it opens the note to
+                                     be read and rewritten. -->
+                                <Tooltip v-if="item.kind === 'note'" :text="$t('common.view')">
                                     <button type="button" class="text-orange-500 hover:text-orange-600"
-                                        :aria-label="$t('common.view')" @click="previewId = item.id"><IconEye :size="16" /></button>
+                                        :aria-label="$t('common.view')" @click="noteEditingId = item.id"><IconEye :size="16" /></button>
                                 </Tooltip>
-                                <!-- New tab: this test is unsaved, and leaving would drop it. -->
-                                <Tooltip :text="$t('common.edit')">
-                                    <RouterLink :to="{ name: 'questions.edit', params: { id: item.id } }" target="_blank"
-                                        class="text-green-600 hover:text-green-700" :aria-label="$t('common.edit')">
-                                        <IconPencil :size="16" />
-                                    </RouterLink>
-                                </Tooltip>
+                                <template v-if="item.kind === 'question'">
+                                    <Tooltip :text="$t('common.view')">
+                                        <button type="button" class="text-orange-500 hover:text-orange-600"
+                                            :aria-label="$t('common.view')" @click="previewId = item.id"><IconEye :size="16" /></button>
+                                    </Tooltip>
+                                    <!-- New tab: this test is unsaved, and leaving would drop it. -->
+                                    <Tooltip :text="$t('common.edit')">
+                                        <RouterLink :to="{ name: 'questions.edit', params: { id: item.id } }" target="_blank"
+                                            class="text-green-600 hover:text-green-700" :aria-label="$t('common.edit')">
+                                            <IconPencil :size="16" />
+                                        </RouterLink>
+                                    </Tooltip>
+                                </template>
                             </template>
                         </OrderableList>
                     </div>
@@ -244,5 +382,6 @@ onMounted(async () => {
         </div>
 
         <QuestionPreviewModal :question-id="previewId" @close="previewId = null" />
+        <TestNoteModal :body="noteDraft" @close="closeNote" @save="saveNote" />
     </section>
 </template>

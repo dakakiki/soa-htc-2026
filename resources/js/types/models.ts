@@ -107,10 +107,24 @@ export interface AttemptSummary {
     submitted_at?: string | null;
 }
 
+/**
+ * A heading between the questions, as the exam screen receives it.
+ *
+ * Outside `questions` on purpose: the screen numbers questions by their index in
+ * that array (ADR-0034), so a note sharing it would eat a number.
+ * `before_position` is how many questions come first.
+ */
+export interface AttemptNote {
+    before_position: number;
+    sort_order: number;
+    body: string;
+}
+
 export interface AttemptSession {
     attempt: AttemptSummary;
     test: { id: number; title: string; description: string | null; duration: number | null };
     questions: AttemptQuestion[];
+    notes: AttemptNote[];
 }
 
 /** A submitted answer's response payload, shaped by the question type. */
@@ -248,6 +262,14 @@ export interface TestQuestionRef {
     position: number;
 }
 
+/** A heading between the questions of a test. Never numbered, never graded. */
+export interface TestNoteRef {
+    id: number;
+    before_position: number;
+    sort_order: number;
+    body: string;
+}
+
 export interface Test {
     id: number;
     title: string;
@@ -257,6 +279,7 @@ export interface Test {
     type?: { id: number; name?: string };
     levels?: { id: number; level_short: string }[];
     questions?: TestQuestionRef[];
+    notes?: TestNoteRef[];
     questions_count?: number;
 }
 
@@ -284,6 +307,7 @@ export interface TestPreview {
     duration: number | null;
     type?: { id: number; name?: string };
     questions: TestPreviewQuestion[];
+    notes: TestNoteRef[];
 }
 
 export interface ExamTestRef {
