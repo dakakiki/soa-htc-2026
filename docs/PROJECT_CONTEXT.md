@@ -264,6 +264,9 @@ Saglasnost roditelja/staratelja za učešće maloletnog takmičara nije deo apli
 - Redis za cache, rate limiting, session/queue potrebe i koordinaciju vremenski osetljivih operacija;
 - queue worker za izvoz, sertifikate, masovne uvoze i duge obračune;
 - PHPUnit ili Pest za backend i Vitest + komponentni/E2E testovi za ključne frontend tokove.
+  🔴 **Frontend polovina je NAPUŠTENA** (vlasnik, 2026-08-29): Vitest je bio uveden pa povučen
+  istog dana — pravi test je sajt na serveru. Vidi ADR-0074 u `DECISIONS.md` za ono što se time
+  gubi i za sve što je usput naučeno, ako se odluka ikad promeni.
 
 Patch/minor verzije treba zaključati tek prilikom inicijalizacije projekta na tadašnje stabilne verzije.
 

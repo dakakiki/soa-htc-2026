@@ -2156,44 +2156,35 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   koji može da odgovori samo server.
 
 
-## ADR-0074 — Front dobija svoj test runner, jer polovinu ovog koda PHP ne vidi
+## ADR-0074 — Front dobija svoj test runner (UVEDENO PA POVUČENO istog dana)
 
-- **Status:** Prihvaćeno (2026-08-29). **IMPLEMENTIRANO.**
-- **Kontekst:** ADR-0072 je uveo stanje koje živi **isključivo u pregledaču** — nacrt odgovora na
-  uređaju na kom se polaže. Nijedan PHP test ga ne dodiruje: odgovori u bazu stižu tek iz `submit`, a
-  payload za nastavak namerno ne nosi nijedan dat odgovor. Provera je zato bila ručna šetnja kroz
-  ekran plus jednokratni harness pod Node-om — a **baš je taj harness našao pravi bug** (jedan `try`
-  oko celog prolaza kroz zastarele nacrte). Alat koji nađe grešku prvi put kad se pokrene, pa se
-  baci, je alat koji nedostaje.
-- **Odluka:** **Vitest 4** + **@vue/test-utils 2**, testovi u `tests/js/`, komanda `npm test`.
-- 🪤 **happy-dom, ne jsdom** — i ne iz ukusa: `jsdom` 30 vuče `undici` koji traži noviji Node nego što
-  projekat vozi (v20.19) i **puca na import pre nego što se ijedan test sakupi**
-  (`webidl.util.markAsUncloneable is not a function`). happy-dom je čist JS, i uz to brži.
-- 🪤 **Zasebna `vitest.config.ts`.** `laravel-vite-plugin` tamo nema šta da traži — piše hot fajl i
-  očekuje Blade ulaze, a ništa od toga u testu ne postoji. Tailwind takođe ne, jer nijedan test ne
-  pita šta se klasa izračuna. Ostaje Vue kompajler i `@` alias.
-- 🪤 **`tests/js/` je bezbedno** jer `phpunit.xml` imenuje `tests/Unit` i `tests/Feature` izričito.
-  `tsconfig.json` ih uključuje, pa `npm run type-check` pokriva i same testove.
-- 🪤 **`clearMocks` i `restoreMocks` nisu isto.** `restoreMocks` vraća implementacije, ali **istoriju
-  poziva briše samo `clearMocks`** — bez njega je test koji čita `mock.calls[0]` čitao **poziv
-  prethodnog testa** i prolazio na tuđem poslu. Uhvaćeno time što je test pao iz pogrešnog razloga.
-- 🔴 **Testovi su provereni mutacijom, i jedan je na tome pao.** Prvi „odbaci opciju koju pitanje više
-  ne nudi" prolazio je i sa uklonjenom proverom: id-ja `999` nema ni u DOM-u, pa se ništa nije videlo.
-  Test vredi tek kad tvrdi **šta je otišlo serveru** — jer bi zadržan zastareo id pitanje računao kao
-  odgovoreno i tiho ga izbacio iz upozorenja o praznim pitanjima. Pravilo je zapisano u `CLAUDE.md`:
-  kad se testira ponašanje koje se na ekranu ne vidi, pokvari kod namerno i proveri da test padne.
-- **CI:** zaseban posao `Tests · javascript` (`.github/workflows/ci.yml`), a ne korak unutar lintera
-  — kad provera pocrveni, njeno ime je prvo što se pročita.
-- **Vizuelni pregled** — `npm run test:ui` (`@vitest/ui`, dodato na vlasnikov zahtev 2026-08-29):
-  stablo testova u pregledaču, vremena, poruke grešaka, i ponovno pokretanje čim se fajl snimi. Alat
-  za rad, ne za CI — CI i dalje vozi `npm test`.
-  🪤 Skript nosi **izričit `--watch`**. `vitest --ui` bez pravog terminala odradi jedan prolaz i
-  **izađe**, pa bi „server koji stoji" postojao samo onome ko komandu kuca rukom; izmereno, ne
-  pretpostavljeno.
-- **Obim:** 22 testa, ~2 s. Pokriveno je ono što ADR-0072 nosi — vraćanje nacrta po tipu pitanja
-  (uključujući **gap-filling i essay, do kojih ručna šetnja nije mogla**), prekrajanje niza praznina,
-  odbijanje nacrta tuđeg pokušaja, i skladište koje odbija da radi. **Ostatak fronta nije pokriven, i
-  to nije propust nego obim:** ovo je runner, ne kampanja.
+- **Status:** 🔴 **Povučeno (2026-08-29), na vlasnikov zahtev.** Uvedeno i uklonjeno istog dana.
+  Zapis ostaje da se zna da je probano i zašto je odbačeno — ne da bi se za mesec dana predložilo
+  ponovo kao nova ideja.
+- **Šta je bilo uvedeno:** Vitest 4 + @vue/test-utils 2 + happy-dom, 22 testa pod `tests/js/`,
+  komanda `npm test`, zaseban CI posao `Tests · javascript`, i `@vitest/ui` za vizuelni pregled.
+- **Zašto je povučeno — vlasnikovim rečima:** *„pravi test imamo kada se sajt postavi na server"*.
+  Provera koja se broji je sajt na pravoj mašini, ne suite na laptopu.
+- ⚠️ **Šta se time gubi, da niko ne bude iznenađen.** Stanje koje živi **isključivo u pregledaču**
+  ostaje bez ijedne automatske provere — danas je to nacrt odgovora tokom ispita (ADR-0072):
+  `resources/js/utils/attemptDraft.ts` i njegovo vezivanje u `StudentTestPage.vue`. Konkretno je
+  nepokriveno vraćanje nacrta za **gap-filling i essay**: pitanja tog tipa u dev bazi žive samo u
+  takmičarskim testovima, pa se ručnom šetnjom ne mogu proći bez trošenja takmičarskog pokušaja.
+  Ko to dira, proverava ručno: probni ispit → unos → `location.reload()` → odgovori se moraju vratiti.
+- 🪤 **Jedan pravi bug je nađen baš tim putem, i njegova ispravka OSTAJE u kodu:** jedan `try` oko
+  celog prolaza kroz zastarele nacrte značio je da prvi nečitljiv ključ prekine čišćenje za sve
+  ostale (`attemptDraft.ts`). Nađen je Node harness-om, pre nego što je runner uopšte uveden — dakle
+  ne zavisi od njega i ne vraća se sa njim.
+- **Ako se ikad vrati**, ovo je već plaćeno i ne treba ponovo otkrivati:
+  - `jsdom` 30 vuče `undici` koji traži noviji Node nego što projekat vozi (v20.19) i **puca na
+    import pre nego što se ijedan test sakupi**. Rešenje je bio `happy-dom`.
+  - `laravel-vite-plugin` ne sme u test konfiguraciju — piše hot fajl i očekuje Blade ulaze.
+  - `restoreMocks` vraća implementacije, ali **istoriju poziva briše samo `clearMocks`**; bez toga
+    test koji čita `mock.calls[0]` čita poziv prethodnog testa.
+  - `vitest --ui` bez pravog terminala odradi jedan prolaz i izađe — traži izričit `--watch`.
+  - 🔴 **Test za ponašanje koje se na ekranu ne vidi ume da prolazi i kad se kod pokvari.** Prvi
+    „odbaci opciju koju pitanje više ne nudi" prolazio je sa uklonjenom proverom, jer id-ja koji ne
+    postoji nema ni u DOM-u. Vredeo je tek kad je tvrdio **šta je otišlo serveru**.
 
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 

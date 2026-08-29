@@ -33,8 +33,7 @@
     "include": [
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
-        "resources/js/**/*.vue",
-        "tests/js/**/*.ts"
+        "resources/js/**/*.vue"
     ],
     "exclude": [
         "node_modules",
