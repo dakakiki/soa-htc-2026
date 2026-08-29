@@ -1948,6 +1948,21 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   **spali jedan id** pa tvrdi invarijantu — tako pada i na SQLite-u, ne samo na MySQL-u.
   Mutaciono provereno: sa starim `firstOrCreate(['id' => 1])` javlja
   „Failed asserting that 3 is identical to 1" — tri poziva, tri reda.
+- 🔴 **Prvo pokretanje CI-ja oborilo je i četvrtu stvar, koja nije baza nego čist checkout.**
+  `CmsApiTest` i `ExampleTest` su pali sa **500** i `ViteManifestNotFoundException`, jer
+  `app.blade.php` zove `@vite(...)` bez zaštite — što je ispravno za produkciju: stranica bez svojih
+  assets-a je pokvaren deploy i treba da to kaže. Ali `public/build` **nije u repou**, pa je ceo
+  suite ćutke zavisio od toga da li je neko na toj mašini pokrenuo `npm run build`. Lokalno je
+  prolazio slučajno.
+  **Popravka:** `$this->withoutVite()` u `Tests\TestCase::setUp`. Suite ne testira bundle i ne treba
+  da pada zbog njega; ono što bundle stvarno čuva je posao `static`, koji ga gradi.
+  Provereno tako što je `public/build` privremeno sklonjen — `CmsApiTest` prolazi i bez njega.
+- 📎 **Zapaženo, nije popravljeno:** na Linux-u `iconv('UTF-8','CP850', …)` u
+  `LegacyText::looksCorrupted` (`:73`) prijavljuje „Detected an illegal character" i vraća `false`
+  gde na Windows-u vrati bajtove — pa **detekcija mojibake-a radi drugačije na serveru nego na dev
+  mašini**. Notice, ne pad, i istorijski uvoz je vlasnikovom odlukom zaustavljen; ali `soahtc`
+  komanda `FixLegacyEncoding` puštena na Linux-u tiho bi otkrila manje. Menjanje heuristike nije
+  posao za PR o CI-ju — zapisano da se zna.
 - **Suite 650/650 na oba motora**, prvi put. `pint --dirty` i `npm run type-check` čisti.
 
 ---
