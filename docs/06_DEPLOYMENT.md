@@ -129,10 +129,19 @@ dead link.
 | What | Where it goes | What is missing until then |
 | --- | --- | --- |
 | Dark logo (SVG) | Settings → Theme → *Logo (dark)* | the header prints the site name in words |
+| App icon, square, **512×512 or larger** | Settings → Theme → *Logo (icon)* | the tab keeps the stock favicon, and no browser offers to install the site |
 | Hero photograph | Website → Media, then Website → Layout → *Hippo Exams* | the hero has no picture |
 | Coordinator band photograph | Website → Media, then Website → Layout → *Coordinator access* | that band has no picture |
 | Hippo categories PDF | Website → Media, then the category section's button → *A file to download* | the download button is not shown at all |
 | Venue approval form | Website → Media, then Website → Layout → *Register* → button | applicants are not offered the form |
+
+The app icon is the one entry with a size requirement rather than a preference. It
+is the favicon, and it is also the only icon in the web app manifest (ADR-0073),
+which reports the dimensions the uploaded file actually has: a browser is not
+lied to, so an icon under 192 px simply means no install is offered. A square
+PNG of 512 px satisfies every platform. An SVG works for the manifest as well,
+and is declared at any size — but iOS reads `apple-touch-icon`, which wants a
+raster, so a PNG is the one that works everywhere.
 
 The dark logo can be regenerated from the white SVG by replacing `fill="#fff"`
 with `#003758` (palette slot 4) and uploading it — `SvgSanitizer` rewrites it on
@@ -202,6 +211,7 @@ knowing that, which is why the limits are worth setting rather than relying on.
 | **MySQL version and mode** | Dev is **MySQL 8.3 with `ONLY_FULL_GROUP_BY` and `STRICT_TRANS_TABLES` already on**, so everything has been exercised in strict mode. An older MySQL or MariaDB differs in the other direction. | `SELECT VERSION(), @@sql_mode`; then open Reports and Archive, which lean hardest on `GROUP BY` |
 | **PDF** | mPDF needs a writable temp directory, and the certificate and attendance register render in chunks. | Generate a certificate and an attendance register for a real venue |
 | **Timezone** | An attempt's `expires_at` is computed server-side; a wrong `APP_TIMEZONE` ends exams at the wrong moment. | `APP_TIMEZONE` against the competition's own clock |
+| **Installing the app** | A service worker needs a secure context, so it never registers on the plain-HTTP development vhost — installability has never once been exercised (ADR-0073). | Open the site on a phone over HTTPS: the browser should offer *Add to Home Screen*, and the installed window should carry the uploaded icon and the brand colour. `/manifest.webmanifest` must come back as JSON, not as the SPA's page |
 
 ## When somebody says it broke
 

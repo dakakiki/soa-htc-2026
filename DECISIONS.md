@@ -2089,6 +2089,72 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+
+## ADR-0072 — Odgovori se čuvaju na uređaju dok se ispit ne preda
+
+- **Status:** Prihvaćeno (2026-08-29). **IMPLEMENTIRANO.**
+- **Kontekst:** vlasnik je pitao „hoćemo danas PWA?". Pre nego što se išta od PWA napiše, ispraćen je
+  lanac koji odgovara na pitanje *šta bi PWA ovde uopšte dobio* — i našao nešto drugo.
+- 🔴 **Nalaz:** odgovori su u bazu stizali **tačno jednom**, iz `AttemptController::submit`
+  (`AttemptAnswer::updateOrCreate`), i ništa ih pre toga nije držalo. Nastavak pokušaja radi —
+  `start()` vraća otvoren pokušaj sa **serverskim** preostalim vremenom — ali `openPayload` nosi
+  pitanja i beleške, **nijedan dat odgovor**. Ekran je zato zvao `initAnswers()` i crtao prazan list.
+  Osvežen, srušen ili odbačen tab vraćao se **sa satom koji je nastavio da otkucava i svime unetim
+  izgubljenim**.
+- **Odluka:** ekran čuva svoj list na uređaju na kom se polaže, pod **id-jem pokušaja**, i vraća ga
+  kad se pokušaj nastavi. Nacrt je pogodnost na jednom uređaju, nikad izvor istine.
+- 🪤 **Vraćeno se meri, ne veruje mu se.** Opcija koja se više ne nudi se odbacuje, a niz praznina se
+  prekraja na broj praznina koje pitanje **sada** ima. Nacrt napisan pre nego što je urednik dirao
+  test zato vrati *manje* nego što je sačuvao, i nikad nešto što test ne traži.
+- 🪤 **Skladište sme da ne postoji.** Privatni prozor, ugašeni podaci sajta, puna kvota — nijedno ne
+  sme da prekine ispit, pa svaki pristup pada tiho i ekran se ponaša tačno kao pre.
+- **Što se čuva, to se i pušta:** predaja briše nacrt tog pokušaja, odjava briše sve, a sve starije
+  od pola dana se smatra napuštenim. Mašine u venue-u su deljene.
+- 🪤 **Nije „obriši nacrte svih drugih pokušaja".** Prva zamisao je to radila pri pokretanju — dok se
+  nije proverilo da `blocksRestart` gleda **jedan test**, pa takmičar legitimno može da ima dva
+  otvorena ispita. Starost je jedino merilo koje sme da kaže da je nacrt gotov.
+- **Pisanje je odloženo** ~400 ms posle poslednjeg kucanja, i ponovo **na izlasku**.
+  🪤 `beforeunload` je nepouzdana polovina tog para: telefon koji promeni aplikaciju ili kome tab
+  bude odbačen često ga nikad ne pošalje — `visibilitychange` je ono što tamo stvarno stigne.
+- **Auto-predaja na isteku čeka duže između neuspelih pokušaja** (2 s → 30 s) umesto da pokušava
+  svake sekunde zauvek: 50.000 satova istekne unutar istog minuta, a flota koja tuče server koji se
+  muči je način na koji se predaja koja bi prošla pretvori u nulu.
+- ⚠️ **Nema automatske provere, jer projekat nema JS test runner.** Provereno je uživo (probni ispit
+  → unos → `location.reload()` → odgovori se vratili, sat nastavio; predaja obrisala nacrt) i
+  pokretanjem modula **pod Node-om** protiv zamene za `localStorage`. To drugo je odmah našlo grešku:
+  jedan `try` oko celog prolaza kroz zastarele nacrte značio je da prvi nečitljiv ključ prekine
+  čišćenje za sve ostale. Prošetan je **multiple-choice** put; gap-filling i essay nisu, jer u dev
+  bazi žive samo u takmičarskim testovima.
+
+## ADR-0073 — Aplikacija se instalira, ali ništa ne kešira
+
+- **Status:** Prihvaćeno (2026-08-29). **IMPLEMENTIRANO.**
+- **Kontekst:** PWA je dotad bila „svesno nije napravljeno" (ranija vlasnikova odluka). Vlasnik ju je
+  ponovo otvorio. Posao je razdvojen na tri nivoa — trajnost odgovora, instalabilnost, offline — i
+  izabrana su prva dva. Treći nije.
+- **Manifest se servira, ne stoji kao fajl u `public/`.** Sve u njemu je već administrirano: ime iz
+  `site_title`, boja iz palete, **ikona iz Settings → Theme** — isti upload koji SPA već postavlja kao
+  favicon (`stores/theme.ts`). Ikona commit-ovana u repo bila bi jedini deo brendinga koji ignoriše
+  taj ekran, a vlasnikovo pravilo od 2026-08-25 slike ionako drži van repoa.
+- 🪤 **Ikona se meri, ne izjavljuje.** Upload je šta god je administrator izabrao; pregledač kome se
+  kaže 512×512 a dobije 96×64 crta mutno. Rečena mu istina, i našavši ikonu premalom, on prosto ne
+  ponudi instalaciju — pošten ishod, i onaj koji `docs/06` kaže kako da se izbegne. `purpose` ostaje
+  `any`: maskabilna ikona mora da nosi svoju sigurnosnu marginu, a proizvoljan upload je ne obećava.
+- 🔴 **Service worker NE sme da dobije keš.** Ovo je ispitni sajt: worker koji drži app shell
+  servirao bi jučerašnji HTML posle deploy-a, sa hešovanim asetima kojih više nema — **bela strana,
+  usred sezone**, svakome ko je ranije posetio sajt. Ispitne slike i snimci se ionako vuku adresom
+  koja ističe sa pokušajem (ADR-0059). Offline je odluka sa pitanjem integriteta na sebi (namerno
+  isključenje mreže tokom takmičenja), ne optimizacija — i nije doneta.
+- **Prazan `fetch` slušalac je ceo razlog** zašto pregledač sajt broji kao instalabilan, i baš je to
+  jedini red u tom fajlu koji izgleda dovoljno besmisleno da ga neko počisti. Test ga drži, zajedno
+  sa proverom da se `caches.open` tamo ne pojavi.
+- 🪤 **Ruta ide ispred SPA catch-all-a.** Iza njega bi pregledač dobio aplikacijinu HTML stranu sa
+  `200` i prijavio manifest koji ne ume da parsira — umesto onog koji nedostaje. Ista tiha vrsta
+  kvara kao izostavljen `storage:link`.
+- ⚠️ **Instalabilnost se lokalno ne može dokazati:** service worker traži bezbedan kontekst, a dev
+  vhost je običan HTTP, pa registracija tamo tiho padne. Stavka je dopisana u `docs/06`, u spisak
+  koji može da odgovori samo server.
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
