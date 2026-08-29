@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Domain\Organization\Models\Season;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -23,6 +24,13 @@ use Illuminate\Support\Facades\DB;
  * and the competitor-facing screen filters on it — so a row with `active = 0` is
  * a mark that exists and has not been released, which is exactly what a null
  * `published_at` means here.
+ *
+ * 🪤 It writes the attempt as well as the mark, and that is not bookkeeping. A
+ * mark is the proof that somebody sat the test, and the reports count attempts —
+ * so leaving the attempt to {@see ImportLegacyAnswers} would have had the
+ * statistics report 78,106 competitors sitting exams instead of 184,384, because
+ * legacy keeps answers for only some of them. The answers command fills these
+ * rows in; it no longer creates them.
  *
  * Idempotent: one row per (registration, test), the same key the table is unique
  * on. Run it again after a newer dump and republished marks catch up.
@@ -74,9 +82,10 @@ class ImportLegacyResults extends Command
 
         $quizzes = DB::table('quizzes')
             ->whereNotNull('legacy_id')
-            ->pluck('id', 'legacy_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+            ->get(['id', 'legacy_id', 'quiz_type'])
+            ->keyBy('legacy_id');
+
+        $durations = DB::table('tests')->pluck('duration', 'id')->all();
 
         $counts = ['written' => 0, 'published' => 0, 'no_registration' => 0, 'no_test' => 0, 'no_exam' => 0, 'no_score' => 0];
         $now = now();
@@ -87,7 +96,7 @@ class ImportLegacyResults extends Command
         $legacy->table('quiz_results')
             ->orderBy('id')
             ->chunk((int) $this->option('chunk'), function ($rows) use (
-                $season, $registrations, $tests, $exams, $quizzes, $now, $dryRun, &$counts, $bar
+                $season, $registrations, $tests, $exams, $quizzes, $durations, $now, $dryRun, &$counts, $bar
             ) {
                 /*
                  * 🪤 Keyed within the pass as well as written with an upsert.
@@ -96,6 +105,7 @@ class ImportLegacyResults extends Command
                  * and MySQL refuses a batch that names one key more than once.
                  */
                 $write = [];
+                $attempts = [];
 
                 foreach ($rows as $r) {
                     $registrationId = $registrations[(int) $r->student_id] ?? null;
@@ -130,23 +140,24 @@ class ImportLegacyResults extends Command
                         $counts['published']++;
                     }
 
+                    $quiz = $quizzes[(int) $r->quiz_id] ?? null;
+
                     $write[$registrationId.'-'.$test->id] = [
                         'registration_id' => $registrationId,
                         'test_id' => (int) $test->id,
                         'exam_round_id' => $roundId,
                         'test_type_id' => $test->test_type_id === null ? null : (int) $test->test_type_id,
-                        'quiz_id' => $quizzes[(int) $r->quiz_id] ?? null,
+                        'quiz_id' => $quiz?->id,
                         'season_id' => $season->id,
                         'score' => (float) $r->test_result,
                         /*
-                         * 🪤 No maximum, deliberately, and the dump proves why:
-                         * the highest mark legacy awarded on several tests is
-                         * above the points our copy of that test carries (35 on
-                         * a test worth 30). Whatever it scored against, it was
-                         * not this question set — so a maximum computed here
-                         * would be a number nobody earned against. The .xlsx
-                         * importer says the same thing in one line: an import
-                         * carries no max.
+                         * 🪤 No maximum, the same answer the .xlsx importer gives
+                         * in one line: an import carries no max. Our copy of each
+                         * test does carry the same points legacy recorded — that
+                         * was checked — but eight marks in the dump sit above the
+                         * test's own total, so a maximum written here would put
+                         * eight competitors over 100% and imply a denominator
+                         * nobody was actually measured by.
                          */
                         'max_score' => null,
                         'source' => 'import',
@@ -157,9 +168,57 @@ class ImportLegacyResults extends Command
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
+
+                    $sat = $r->created_at ?? $now;
+
+                    $attempts[$registrationId.'-'.$test->id] = [
+                        'registration_id' => $registrationId,
+                        'test_id' => (int) $test->id,
+                        'quiz_id' => $quiz?->id,
+                        'is_practice' => $quiz !== null && (string) $quiz->quiz_type === 'sample',
+                        'status' => 'completed',
+                        'score' => (float) $r->test_result,
+                        'max_score' => null,
+                        'grading_status' => 'graded',
+                        'published_at' => $published ? $r->updated_at : null,
+                        'published_by' => null,
+                        'started_at' => $sat,
+                        // Reconstructed from the test's own length so the row is
+                        // consistent, not because anybody reads it: the exam was
+                        // sat months ago and its window is long closed.
+                        'expires_at' => Carbon::parse($sat)
+                            ->addMinutes(max((int) ($durations[(int) $test->id] ?? 0), 1))
+                            ->format('Y-m-d H:i:s'),
+                        'submitted_at' => $sat,
+                        'channel' => 'web',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
                 }
 
                 if (! $dryRun && $write !== []) {
+                    /*
+                     * The attempt first: a result points at a registration and a
+                     * test, and so does the attempt, but the reports read the
+                     * attempt and the marks screen reads the result.
+                     *
+                     * 🪤 Only the ones that are not there yet are inserted.
+                     * `attempts` has no unique on (registration, test) to upsert
+                     * against — the guarantee it does have runs through a
+                     * generated column that skips practice and voided rows.
+                     */
+                    $known = DB::table('attempts')
+                        ->whereIn('registration_id', array_column($attempts, 'registration_id'))
+                        ->get(['registration_id', 'test_id'])
+                        ->map(fn ($a) => $a->registration_id.'-'.$a->test_id)
+                        ->flip();
+
+                    $fresh = array_values(array_diff_key($attempts, $known->all()));
+
+                    foreach (array_chunk($fresh, 1000) as $batch) {
+                        DB::table('attempts')->insert($batch);
+                    }
+
                     DB::table('registration_results')->upsert(array_values($write), ['registration_id', 'test_id'], [
                         'exam_round_id', 'test_type_id', 'quiz_id', 'season_id',
                         'score', 'max_score', 'source', 'published_at', 'updated_at',
@@ -174,7 +233,22 @@ class ImportLegacyResults extends Command
         $this->newLine(2);
 
         $verb = $dryRun ? 'Would write' : 'Wrote';
-        $this->info("{$verb} {$counts['written']} results ({$counts['published']} of them published).");
+        $this->info("{$verb} {$counts['written']} results, {$counts['published']} of them published.");
+
+        /*
+         * Counted from the table rather than from an accumulator. A competitor's
+         * rows can fall either side of a pass boundary, so anything tallied while
+         * writing over-counts what a key collapses — and a report that is only
+         * nearly true is worse than none.
+         */
+        if (! $dryRun) {
+            $inSeason = DB::table('attempts')
+                ->join('registrations', 'registrations.id', '=', 'attempts.registration_id')
+                ->where('registrations.season_id', $season->id)
+                ->count();
+
+            $this->line("Attempts in the season: {$inSeason}.");
+        }
 
         foreach ([
             'no_registration' => 'no registration of that competitor (the legacy export drops these too)',

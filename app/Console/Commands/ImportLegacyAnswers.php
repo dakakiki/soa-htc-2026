@@ -123,7 +123,7 @@ class ImportLegacyAnswers extends Command
         $this->newLine(2);
 
         $verb = $dryRun ? 'Would write' : 'Wrote';
-        $this->info("{$verb} {$counts['attempts']} attempts and {$counts['answers']} answers.");
+        $this->info("{$verb} {$counts['answers']} answers across {$counts['attempts']} attempts.");
 
         if ($counts['no_question'] > 0) {
             $this->line("Answer rows whose question is not ours: {$counts['no_question']}.");
@@ -283,37 +283,26 @@ class ImportLegacyAnswers extends Command
     }
 
     /**
+     * The attempts these answers belong to, which {@see ImportLegacyResults}
+     * already created — a mark is what says somebody sat the test, and marks
+     * outnumber surviving answers two to one.
+     *
+     * 🪤 It only looks them up. An earlier version also refreshed each attempt's
+     * timestamps from the first and last answer, which is a truer window — and
+     * seventy-eight thousand single-row updates, which took the command past ten
+     * minutes for a detail nothing reads.
+     *
      * @param  array<string, array<string, mixed>>  $attempts
      * @return array<string, int> key => attempt id
      */
     private function writeAttempts(array $attempts): array
     {
-        $existing = DB::table('attempts')
-            ->whereIn('registration_id', array_column($attempts, 'registration_id'))
-            ->get(['id', 'registration_id', 'test_id']);
-
         $ids = [];
-        foreach ($existing as $e) {
+
+        foreach (DB::table('attempts')
+            ->whereIn('registration_id', array_column($attempts, 'registration_id'))
+            ->get(['id', 'registration_id', 'test_id']) as $e) {
             $ids[$e->registration_id.'-'.$e->test_id] = (int) $e->id;
-        }
-
-        $insert = [];
-        foreach ($attempts as $key => $attempt) {
-            if (! isset($ids[$key])) {
-                $insert[] = $attempt;
-            }
-        }
-
-        foreach (array_chunk($insert, 1000) as $batch) {
-            DB::table('attempts')->insert($batch);
-        }
-
-        if ($insert !== []) {
-            foreach (DB::table('attempts')
-                ->whereIn('registration_id', array_column($insert, 'registration_id'))
-                ->get(['id', 'registration_id', 'test_id']) as $e) {
-                $ids[$e->registration_id.'-'.$e->test_id] = (int) $e->id;
-            }
         }
 
         return $ids;
