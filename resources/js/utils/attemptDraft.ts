@@ -201,17 +201,24 @@ export function dropStaleDrafts(): void {
         return;
     }
 
-    try {
-        for (const found of draftKeys(store)) {
+    /*
+     * 🪤 Judged one at a time, and that is the whole point of the shape. Around
+     * the loop instead, a single draft that will not parse would abort the sweep
+     * before it reached the others — and since nothing else removes these keys,
+     * "the rest age out on their own" would not be true: they would sit there for
+     * as long as the browser did.
+     */
+    for (const found of draftKeys(store)) {
+        try {
             const raw = store.getItem(found);
             const savedAt = raw === null ? null : (JSON.parse(raw) as { saved_at?: unknown }).saved_at;
 
             if (typeof savedAt !== 'number' || Date.now() - savedAt > MAX_AGE_MS) {
                 store.removeItem(found);
             }
+        } catch {
+            // Ours by its prefix, and unreadable: nothing can be recovered from it.
+            store.removeItem(found);
         }
-    } catch {
-        // A draft that will not parse is one we cannot judge; leave it to age out
-        // of the browser on its own.
     }
 }
