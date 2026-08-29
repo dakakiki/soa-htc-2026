@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Identity\Models\Permission;
 use App\Domain\Identity\Models\Role;
 use App\Http\Controllers\Controller;
@@ -47,6 +48,9 @@ class RoleController extends Controller
             ]);
             $role->permissions()->sync($this->permissionIds($data['permissions'] ?? []));
 
+            // A new role is a new set of things somebody may do (ADR-0071).
+            AuditTrail::record('role.created', $role, after: AuditTrail::forRole($role));
+
             return $role;
         });
 
@@ -60,12 +64,20 @@ class RoleController extends Controller
         $data = $request->validated();
 
         DB::transaction(function () use ($role, $data) {
+            // 🪤 Read BEFORE the sync. This is the one action in the application
+            // that can quietly widen what everybody holding the role may do, and
+            // the whole value of the record is the pair — what it granted before,
+            // what it grants now (ADR-0071).
+            $before = AuditTrail::forRole($role);
+
             if (array_key_exists('name', $data)) {
                 $role->update(['name' => $data['name']]);
             }
             if (array_key_exists('permissions', $data)) {
                 $role->permissions()->sync($this->permissionIds($data['permissions']));
             }
+
+            AuditTrail::record('role.updated', $role, $before, AuditTrail::forRole($role->refresh()));
         });
 
         return RoleResource::make($role->load('permissions'));
@@ -81,6 +93,9 @@ class RoleController extends Controller
                 'role' => [trans('messages.role.in_use')],
             ]);
         }
+
+        // Recorded before the row is gone; nothing else would know what it held.
+        AuditTrail::record('role.deleted', $role, before: AuditTrail::forRole($role));
 
         $role->delete();
 

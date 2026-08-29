@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Identity\Support\PasswordRecovery;
@@ -86,6 +87,8 @@ class UserController extends Controller
         $user = User::create($data);
         $this->syncRole($user, $request->integer('role_id') ?: null);
 
+        AuditTrail::record('user.created', $user, after: AuditTrail::forUser($user->refresh()));
+
         // Reload so database-default columns (status, student flags) are present
         // in the response rather than null on the freshly-built instance.
         return AdminUserResource::make($user->refresh()->load(self::ASSIGNMENT_RELATIONS));
@@ -113,10 +116,24 @@ class UserController extends Controller
             $data['file_path'] = $request->file('file_upload')->store('users', 'public');
         }
 
+        // 🪤 Read before the write, and note whether a password was among the
+        // changes — an administrator setting somebody else's password is exactly
+        // the act worth recording (ADR-0071). What is recorded is THAT it
+        // happened; the password itself never enters the trail.
+        $before = AuditTrail::forUser($user);
+        $passwordSet = array_key_exists('password', $data);
+
         $user->update($data);
         if ($request->has('role_id')) {
             $this->syncRole($user, $request->integer('role_id') ?: null);
         }
+
+        AuditTrail::record(
+            'user.updated',
+            $user,
+            $before,
+            AuditTrail::forUser($user->refresh(), $passwordSet),
+        );
 
         return AdminUserResource::make($user->refresh()->load(self::ASSIGNMENT_RELATIONS));
     }
@@ -136,6 +153,9 @@ class UserController extends Controller
                 Storage::disk('public')->delete($path);
             }
         }
+
+        // Recorded before the row goes; afterwards nothing knows who this was.
+        AuditTrail::record('user.deleted', $user, before: AuditTrail::forUser($user));
 
         // Season assignments and their school pivots cascade at the DB level.
         $user->delete();
@@ -162,6 +182,8 @@ class UserController extends Controller
     public function sendPasswordResetLink(User $user): JsonResponse
     {
         $this->authorize('sendPasswordResetLink', $user);
+
+        AuditTrail::record('user.password_link_sent', $user);
 
         $status = PasswordRecovery::offer($user->email);
 
