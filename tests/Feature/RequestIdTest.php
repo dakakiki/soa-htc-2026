@@ -39,6 +39,21 @@ class RequestIdTest extends TestCase
     {
         parent::setUp();
         $this->seed();
+
+        /*
+         * 🪤 The `null` channel, for two reasons that are both about the test
+         * being true wherever it runs.
+         *
+         * It writes nothing to `storage/logs`, so a test run does not leave lines
+         * in the file an operator reads. And its handler accepts every level,
+         * which makes these tests independent of `LOG_LEVEL` — the first CI run
+         * failed exactly there: `.env.example` is the production template and
+         * carries `LOG_LEVEL=error`, so `Log::info` below was never handled, no
+         * `MessageLogged` was fired, and four tests asserted against an empty
+         * array. Locally `.env` says `debug` and they passed. The environment was
+         * making the test pass, which is the thing this whole day has been about.
+         */
+        config(['logging.default' => 'null']);
     }
 
     private function admin(): User

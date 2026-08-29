@@ -2014,6 +2014,14 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 - **Testovi (`RequestIdTest`, 8):** odgovor nosi ime; dva zahteva dobijaju dva imena; tuđi id se
   poštuje; napadački se odbacuje (četiri oblika); log kaže koji je zahtev pisao red, ko je radio kad
   se sazna, i **ne kaže ko** dok se ne sazna; komanda kaže koja je komanda bila.
+- 🪤 **Prvi CI prolaz je oborio moje testove, i to je bio isti obrazac kao ceo dan.**
+  `.env.example` je produkcijski šablon i nosi `LOG_LEVEL=error`, a testovi su pisali na `info` — pa
+  `Logger::writeLog` uopšte nije upisivao red niti okidao `MessageLogged`, i četiri testa su tvrdila
+  nad **praznim nizom**. Lokalni `.env` kaže `debug` i prolazili su. **Okruženje je činilo da test
+  prolazi.**
+  Popravka: testovi rade nad kanalom `null` — njegov handler prima svaki nivo (nezavisno od
+  `LOG_LEVEL`) i ne piše ništa u `storage/logs`, pa pokretanje suite-a ne ostavlja redove u fajlu
+  koji operator čita. Provereno u oba smera: `LOG_LEVEL=error` i `LOG_LEVEL=debug`, oba zelena.
 - **Suite 658/658** (bilo 650), `pint --dirty` čist.
 
 ---
