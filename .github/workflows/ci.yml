@@ -1,0 +1,133 @@
+# Continuous integration (ADR-0069).
+#
+# The point of this file is not that the suite runs unattended. It is that the
+# suite finally runs on MYSQL. Everything here has always been tested on SQLite in
+# memory, while dev and production run MySQL — a gap `CLAUDE.md` names as the one
+# standing reason a green suite is not proof, and which had already let three
+# real defects through by the day this was written.
+#
+# So the matrix is the whole design: the same 650 tests, once on the database the
+# developer runs and once on the database the site ships on. Neither is optional.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push supersedes the first: nobody needs the result of a commit that
+# has already been replaced.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests · ${{ matrix.database }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Both results, always. A MySQL-only failure is the interesting one and
+      # stopping the SQLite job would hide which of the two broke.
+      fail-fast: false
+      matrix:
+        database: [sqlite, mysql]
+
+    services:
+      mysql:
+        # 8.3, the version the dev machine runs, with ONLY_FULL_GROUP_BY and
+        # STRICT_TRANS_TABLES on by default — the strictness this code is
+        # written against.
+        image: mysql:8.3
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: true
+          MYSQL_DATABASE: soa_htc_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          # `intl` for locale-aware sorting, `zip`/`gd` for the .xlsx and PDF
+          # writers, `pdo_mysql` for the half of the matrix that needs it.
+          extensions: intl, zip, gd, pdo_mysql, pdo_sqlite, bcmath
+          coverage: none
+
+      - uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+
+      # 🪤 `.env.example` is the PRODUCTION template (ADR-0058), which is exactly
+      # what should be exercised here — but it ships without a key, and signed
+      # URLs (the exam media, ADR-0059) cannot be verified without one. Copied
+      # before `composer install`, because that runs `package:discover` and
+      # artisan should boot against the same file everything else uses.
+      # `phpunit.xml` puts APP_ENV back to `testing` for the test process itself.
+      - run: cp .env.example .env
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - run: php artisan key:generate
+
+      - name: Tests
+        env:
+          DB_CONNECTION: ${{ matrix.database }}
+          DB_DATABASE: ${{ matrix.database == 'mysql' && 'soa_htc_test' || ':memory:' }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USERNAME: root
+          DB_PASSWORD: ''
+        # 🪤 These override `phpunit.xml`, which hardcodes sqlite/:memory:.
+        # PHPUnit's `<env>` does not overwrite a variable that is already set,
+        # which is what makes one configuration serve both halves of the matrix.
+        run: php artisan test
+
+  static:
+    name: Formatting, types and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, zip, gd
+          coverage: none
+
+      - uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+
+      - run: cp .env.example .env
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      # The same three commands the pre-push ritual runs by hand
+      # (`docs/06_DEPLOYMENT.md`, CLAUDE.md), so that forgetting one is caught
+      # rather than merged.
+      - run: vendor/bin/pint --test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run type-check
+
+      # The bundle is not in the repository, so a build that only fails on a
+      # clean checkout would be found by whoever deploys.
+      - run: npm run build

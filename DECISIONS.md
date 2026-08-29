@@ -1909,6 +1909,64 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0069 — Suite vozi i na bazi na kojoj se isporučuje, pa je našao tri stvari koje SQLite krije
+
+- **Status:** Prihvaćeno (2026-08-29). **IMPLEMENTIRANO.**
+- **Kontekst:** CI-ja nije bilo. Ali poenta nije bila „da se suite pokreće sam" nego **da vozi na
+  MySQL-u**: sve je oduvek testirano na SQLite-u u memoriji, dok dev i produkcija rade MySQL —
+  jaz koji `CLAUDE.md` imenuje kao **jedini** razlog zašto zelen suite nije dokaz.
+- ✅ **Prvo pokretanje na MySQL-u odmah je oborilo tri stvari**, i to je ceo argument za ovaj fajl:
+  1. **`Setting::current()` je pravio novi red pri svakom pozivu.** `firstOrCreate(['id' => 1])`, a
+     `id` **nije u `$fillable`** — pa ga `create` odbaci, baza dodeli svoj, sledeći poziv opet traži
+     id 1, ne nađe ga i napravi **još jedan**. Nije „dva reda": nov red na svaki poziv, dok sajt
+     radi. Na svežem SQLite-u u memoriji brojač stoji na 1, prvi red padne baš tamo i bug je
+     nevidljiv — tako je i preživeo. `ThemeApiTest::test_settings_row_is_a_singleton` je sve vreme
+     tvrdio invarijantu koju kod nije držao.
+     **Popravka:** singleton je **jedini red**, ne red sa id-jem 1 (`oldest('id')->first()`).
+  2. **`ResultExporter:161` je jedini score koji je izlazio iz baze neprebačen.** Query builder vrati
+     decimalu kako je drajver formatira — `'2'` sa SQLite-a, `'2.00'` sa MySQL-a — pa se izvezeni
+     `.xlsx` razlikovao po tome koja ga je baza proizvela. `RegistrationResults` sve ostale već
+     kastuje; ovo je usklađeno s tim.
+  3. **Moj test od 2026-08-28 je zakucao `difficulty_level_id => 1`.** Prošao na SQLite-u, pao na
+     MySQL-u sa FK greškom, jer se posle vraćene transakcije `AUTO_INCREMENT` **ne vraća**.
+- 🪤 **Matrica je ceo dizajn:** istih 650 testova, jednom na bazi koju programer vozi i jednom na
+  bazi na kojoj sajt radi. `fail-fast: false` — MySQL-only pad je zanimljiv, a gašenje SQLite posla
+  bi sakrilo koji je od dva pukao.
+- **Kako jedna konfiguracija služi obe polovine:** promenljive okruženja nadjačavaju `phpunit.xml`,
+  jer PHPUnit-ov `<env>` **ne prepisuje** vrednost koja je već postavljena. Isto radi i lokalno;
+  recept je u `CLAUDE.md`.
+- **`.env.example` se kopira kao jeste** — produkcijski šablon (ADR-0058), što je baš ono što treba
+  vežbati — pa `key:generate`, jer bez ključa potpisane adrese ispitnih medija (ADR-0059) ne mogu da
+  se provere. `phpunit.xml` vraća `APP_ENV` na `testing` za sam test proces.
+- **Drugi posao (`static`)** vozi ono što se dosad radilo rukom pred `git push`: `pint --test`,
+  `npm run type-check` i `npm run build`. Bundle nije u repou, pa bi build koji puca samo na čistom
+  checkout-u našao tek onaj ko deployuje.
+- **MySQL 8.3** u servisu, ista verzija kao na dev mašini, sa `ONLY_FULL_GROUP_BY` i
+  `STRICT_TRANS_TABLES` uključenim — strogost prema kojoj je ovaj kod pisan.
+- **Cena:** suite na MySQL-u traje **~2 minuta** naspram ~40 s na SQLite-u. Prihvatljivo za PR.
+- **Testovi:** `ThemeApiTest::test_the_settings_row_is_a_singleton_whatever_id_it_lands_on` prvo
+  **spali jedan id** pa tvrdi invarijantu — tako pada i na SQLite-u, ne samo na MySQL-u.
+  Mutaciono provereno: sa starim `firstOrCreate(['id' => 1])` javlja
+  „Failed asserting that 3 is identical to 1" — tri poziva, tri reda.
+- 🔴 **Prvo pokretanje CI-ja oborilo je i četvrtu stvar, koja nije baza nego čist checkout.**
+  `CmsApiTest` i `ExampleTest` su pali sa **500** i `ViteManifestNotFoundException`, jer
+  `app.blade.php` zove `@vite(...)` bez zaštite — što je ispravno za produkciju: stranica bez svojih
+  assets-a je pokvaren deploy i treba da to kaže. Ali `public/build` **nije u repou**, pa je ceo
+  suite ćutke zavisio od toga da li je neko na toj mašini pokrenuo `npm run build`. Lokalno je
+  prolazio slučajno.
+  **Popravka:** `$this->withoutVite()` u `Tests\TestCase::setUp`. Suite ne testira bundle i ne treba
+  da pada zbog njega; ono što bundle stvarno čuva je posao `static`, koji ga gradi.
+  Provereno tako što je `public/build` privremeno sklonjen — `CmsApiTest` prolazi i bez njega.
+- 📎 **Zapaženo, nije popravljeno:** na Linux-u `iconv('UTF-8','CP850', …)` u
+  `LegacyText::looksCorrupted` (`:73`) prijavljuje „Detected an illegal character" i vraća `false`
+  gde na Windows-u vrati bajtove — pa **detekcija mojibake-a radi drugačije na serveru nego na dev
+  mašini**. Notice, ne pad, i istorijski uvoz je vlasnikovom odlukom zaustavljen; ali `soahtc`
+  komanda `FixLegacyEncoding` puštena na Linux-u tiho bi otkrila manje. Menjanje heuristike nije
+  posao za PR o CI-ju — zapisano da se zna.
+- **Suite 650/650 na oba motora**, prvi put. `pint --dirty` i `npm run type-check` čisti.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

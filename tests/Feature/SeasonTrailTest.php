@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Identity\Models\Role;
@@ -81,7 +82,11 @@ class SeasonTrailTest extends TestCase
             'season_id' => Season::where('round_number', 14)->value('id'),
             'competitor_number' => '14000801', 'sequence' => 801,
             'school_id' => $school->id, 'country_id' => $school->country_id,
-            'difficulty_level_id' => 1, 'name' => 'Student',
+            // 🪤 Looked up, never hardcoded to 1. A test that assumes an id is a
+            // test that only passes on a database whose counter starts there —
+            // SQLite in memory does, MySQL after a rolled-back test does not.
+            'difficulty_level_id' => DifficultyLevel::where('level_short', 'H2')->value('id'),
+            'name' => 'Student',
             'date_of_birth' => '2010-05-01', 'grade' => 6, 'status' => 'active',
         ]);
 

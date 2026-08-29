@@ -74,7 +74,7 @@ class ThemeApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.colors.primary', '#0a0b0c');
 
-        $this->assertDatabaseHas('settings', ['id' => 1, 'color_primary' => '#0a0b0c']);
+        $this->assertDatabaseHas('settings', ['id' => Setting::current()->id, 'color_primary' => '#0a0b0c']);
     }
 
     public function test_site_title_is_saved_and_served_publicly(): void
@@ -236,7 +236,11 @@ class ThemeApiTest extends TestCase
             ->assertJsonPath('body', '<p>Hello [name]</p>')
             ->assertJsonPath('signature_text', 'Jane Doe');
 
-        $this->assertDatabaseHas('settings', ['id' => 1, 'cert_body' => '<p>Hello [name]</p>', 'cert_signature_text' => 'Jane Doe']);
+        $this->assertDatabaseHas('settings', [
+            'id' => Setting::current()->id,
+            'cert_body' => '<p>Hello [name]</p>',
+            'cert_signature_text' => 'Jane Doe',
+        ]);
     }
 
     public function test_certificate_asset_upload_is_stored(): void
@@ -309,12 +313,29 @@ class ThemeApiTest extends TestCase
         $this->actingAs($user)->deleteJson('/api/settings/certificate/assets/logo')->assertForbidden();
     }
 
-    public function test_settings_row_is_a_singleton(): void
+    /**
+     * One row, whatever id it happens to have (ADR-0069).
+     *
+     * 🪤 The counter is deliberately pushed off 1 first. `Setting::current()` used
+     * to ask for the row with `id = 1` while `id` is not fillable — so the create
+     * dropped it, the database assigned its own, and the next call went looking
+     * for id 1 again and made ANOTHER row. Not two: a new one on every call.
+     *
+     * On a fresh SQLite database in memory the counter stands at 1, so the first
+     * row landed there and the bug was invisible — which is exactly how it
+     * survived. Burning an id here makes the test state the invariant on every
+     * database rather than on the lucky one.
+     */
+    public function test_the_settings_row_is_a_singleton_whatever_id_it_lands_on(): void
     {
+        Setting::query()->delete();
+        Setting::query()->create([])->delete();
+
+        $first = Setting::current();
         Setting::current();
         Setting::current();
 
-        $this->assertSame(1, Setting::query()->count());
-        $this->assertSame(1, Setting::current()->id);
+        $this->assertSame(1, Setting::query()->count(), 'A second settings row was created.');
+        $this->assertSame($first->id, Setting::current()->id, 'current() stopped returning the same row.');
     }
 }
