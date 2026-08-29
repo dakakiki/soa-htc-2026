@@ -158,7 +158,12 @@ final class ResultExporter
             foreach ($questions as $q) {
                 $row[] = self::renderAnswer((string) $q->question_type, $byQuestion[(int) $q->id] ?? null, $optionText);
             }
-            $row[] = $attempt->score;
+            // 🪤 Cast, like every other score leaving the results layer
+            // (`RegistrationResults` casts all of them). A query builder hands
+            // back a decimal as the driver formats it — '2' from SQLite, '2.00'
+            // from MySQL — so without this the exported file differs by which
+            // database produced it.
+            $row[] = $attempt->score === null ? null : (float) $attempt->score;
 
             $rows[] = $row;
         }
