@@ -22,6 +22,8 @@
         <meta name="description" content="{{ $description }}">
     @endif
     <link rel="canonical" href="{{ url()->current() }}">
+    {{-- Served by ManifestController, from the same theme settings as the favicon. --}}
+    <link rel="manifest" href="/manifest.webmanifest">
 
     <meta property="og:type" content="{{ $meta['type'] ?? 'website' }}">
     <meta property="og:site_name" content="{{ $meta['site_name'] ?? config('app.name', 'SOA HTC') }}">

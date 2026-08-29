@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import * as studentApi from '@/api/student';
 import type { IdentifyPayload } from '@/api/student';
 import type { StudentRegistrationSummary } from '@/types/models';
+import { dropAllDrafts } from '@/utils/attemptDraft';
 
 const STORAGE_KEY = 'student-token';
 const MODE_KEY = 'student-mode';
@@ -156,6 +157,12 @@ export const useStudentSessionStore = defineStore('studentSession', () => {
         setMode(null);
         registration.value = null;
         expiresAt.value = null;
+        /*
+         * Whatever was typed into an unfinished exam goes with them. The machine
+         * they signed out of is very often a venue's rather than their own, and
+         * the next competitor to sit down at it is a different person.
+         */
+        dropAllDrafts();
     }
 
     return { token, registration, expiresAt, mode, ready, isIdentified, identify, enterSample, enterCompetition, enterResults, ensureLoaded, logout };

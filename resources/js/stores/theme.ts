@@ -55,6 +55,40 @@ function applyFavicon(url: string | null): void {
     link.href = url;
 }
 
+/**
+ * The icon iOS reads when somebody adds the site to their home screen. It is not
+ * covered by the manifest — Safari looks for this link and nothing else — and it
+ * is read from the live page at the moment they add it, which is why setting it
+ * here, after the theme has arrived, works at all.
+ */
+function applyTouchIcon(url: string | null): void {
+    if (!url) {
+        return;
+    }
+    let link = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    if (!link) {
+        link = document.createElement('link');
+        link.rel = 'apple-touch-icon';
+        document.head.appendChild(link);
+    }
+    link.href = url;
+}
+
+/**
+ * The colour a browser paints its own furniture with — the address bar on
+ * Android, the status bar of an installed window. The manifest carries the same
+ * value for the installed app; this is the tab.
+ */
+function applyThemeColor(color: string): void {
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'theme-color';
+        document.head.appendChild(meta);
+    }
+    meta.content = color;
+}
+
 export const useThemeStore = defineStore('theme', () => {
     const theme = ref<Theme | null>(null);
 
@@ -62,6 +96,8 @@ export const useThemeStore = defineStore('theme', () => {
         theme.value = next;
         applyColors(next.colors);
         applyFavicon(next.logo_icon_url ?? next.logo_url);
+        applyTouchIcon(next.logo_icon_url ?? next.logo_url);
+        applyThemeColor(next.colors.primary);
     }
 
     /**
