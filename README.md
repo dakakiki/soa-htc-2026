@@ -17,10 +17,10 @@ while leaving everything that persists across seasons untouched.
 
 | Action | Targets |
 | --- | --- |
-| **Wipe** (delete rows) | `registrations`, the full attempt chain (`attempts`, `attempt_answers`, `attempt_resets`, `grade_revisions`), student sessions (`student_sessions`, `student_session_quiz`), `publication_batches`, and the `audit_logs` trail |
+| **Wipe** (delete rows) | `registrations`, the full attempt chain (`attempts`, `attempt_answers`, `attempt_resets`, `grade_revisions`), student sessions (`student_sessions`, `student_session_quiz`), `publication_batches`, and the **competitor-scoped** part of `audit_logs` |
 | **Delete** (accounts) | users who are **school coordinators** in the active season — their school scope cascades away |
 | **Deactivate** (`status = inactive`) | every remaining non-admin user (e.g. country coordinators) and **all schools** — records are kept, never deleted |
-| **Keep untouched** | content library (quizzes / exams / tests / questions), countries & regions, difficulty, roles & permissions, lookups, seasons, settings |
+| **Keep untouched** | content library (quizzes / exams / tests / questions), countries & regions, difficulty, roles & permissions, lookups, seasons, settings, and the **authority trail** in `audit_logs` — who changed a role, an assignment or an account, and when (ADR-0068, ADR-0071) |
 
 Competitors ("students") are `registrations` rows, so they are wiped. **Admin
 accounts are never touched.** Schools and coordinators arrive via the legacy import,
@@ -40,6 +40,29 @@ php artisan season:reset --force
 
 **Out of scope (Phase 6):** archiving the previous season's results before the wipe,
 and bumping the season round in settings. This command only deletes/deactivates data.
+
+### `season:rehearse` — run the rollover for real, then undo it
+
+Starting a season is the one irreversible thing this application does, it runs
+once a year, and its archive step is an `INSERT … SELECT` across seven joins —
+the shape a green SQLite suite says least about. This runs the **whole** rollover
+against the real data on whatever server you are standing on, inside a
+transaction, prints how long it took and what it did, then rolls it back.
+
+```bash
+php artisan season:rehearse
+```
+
+It changes nothing, and it **refuses to start** if any table it touches is not
+InnoDB — MyISAM ignores a transaction silently, and the rehearsal would become
+the real thing. If the rollback does not restore every row count, it says so as
+an error rather than staying quiet.
+
+What it answers that nothing else can is **how long**. `Settings → Season` runs
+the rollover inside an HTTP request; measured on the dev machine against 50,004
+registrations it takes around a minute. Compare the number it prints against the
+**web** `max_execution_time` and against whatever sits in front of PHP — the
+application can raise neither. See **ADR-0065/0066** in `DECISIONS.md`.
 
 ### `legacy:fix-encoding` — repair legacy mojibake
 

@@ -203,6 +203,75 @@ knowing that, which is why the limits are worth setting rather than relying on.
 | **PDF** | mPDF needs a writable temp directory, and the certificate and attendance register render in chunks. | Generate a certificate and an attendance register for a real venue |
 | **Timezone** | An attempt's `expires_at` is computed server-side; a wrong `APP_TIMEZONE` ends exams at the wrong moment. | `APP_TIMEZONE` against the competition's own clock |
 
+## When somebody says it broke
+
+Every request is given a name. It comes back in the **`X-Request-Id`** response
+header and it goes into the context of every line that request writes to the log —
+the exception handler's report included (ADR-0070).
+
+So the exchange with whoever is reporting the problem is short: ask them for the
+id, then
+
+```bash
+grep <id> storage/logs/laravel-YYYY-MM-DD.log
+```
+
+and you have that request and nothing else. Each line also carries the path, the
+IP, and — once a guard has resolved one — the account that was acting. A line
+written before sign-in names nobody rather than naming the wrong person.
+
+Runs from the command line get a name too, prefixed `cli-`, with the command
+beside it. So the same grep works whether the trouble came through a browser or
+through `season:reset`.
+
+Two things worth knowing before you go looking:
+
+- **`LOG_LEVEL` is `error` in the production template.** That is the right
+  default, but it means an `info` line you expect to find is not there. Lower it
+  temporarily if you are chasing something and it went quiet.
+- **The plain format is the default and JSON is not.** These logs are read with a
+  text editor here, and JSON is worse for that. The day a log collector arrives,
+  `LOG_STACK=structured` in `.env` turns every line into one JSON object carrying
+  the same context — and nothing else has to change.
+
+## What the trail keeps, and what it drops
+
+`audit_logs` records the **authority** surface only (ADR-0071): who created,
+changed or deleted a role and its permissions, who was granted or refused a
+season assignment and over which venues, the account lifecycle, and an
+administrator sending somebody a password link.
+
+It deliberately does **not** record the competition. Fifty thousand competitors
+identifying, starting and handing in would bury all of the above, and `attempts`,
+`attempt_answers` and `student_sessions` already hold it in fuller form.
+
+🪤 Starting a season clears the competitor-scoped part of the trail and **keeps
+the authority part** (ADR-0068, ADR-0071) — because *"who granted them that, last
+season?"* is a question asked after a rollover, not before one. An account row
+survives even though the rollover deletes school coordinators: the id is nulled,
+the name beside it is not.
+
+There is no screen for it yet. It is read with `grep`, or with SQL against
+`audit_logs`, until somebody actually needs one.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on every push to
+`main`: the whole suite **twice** — once on SQLite, once on MySQL 8.3 — plus
+`pint --test`, `npm run type-check` and `npm run build`. Around two and a half
+minutes in total.
+
+The matrix is the point. Everything here is written on SQLite locally and ships
+on MySQL, and the first run of this workflow immediately turned up four defects
+that had been passing locally for months (ADR-0069). Do not merge on a red run,
+and do not assume a green local run says the same thing.
+
+The same second opinion is available without waiting for CI:
+
+```bash
+DB_CONNECTION=mysql DB_DATABASE=soa_htc_test DB_HOST=127.0.0.1 DB_USERNAME=root DB_PASSWORD= php artisan test
+```
+
 ## Setting up for development
 
 The template is aimed at a server, so a laptop turns a handful of lines around
