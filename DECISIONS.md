@@ -2184,6 +2184,12 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   kad se testira ponašanje koje se na ekranu ne vidi, pokvari kod namerno i proveri da test padne.
 - **CI:** zaseban posao `Tests · javascript` (`.github/workflows/ci.yml`), a ne korak unutar lintera
   — kad provera pocrveni, njeno ime je prvo što se pročita.
+- **Vizuelni pregled** — `npm run test:ui` (`@vitest/ui`, dodato na vlasnikov zahtev 2026-08-29):
+  stablo testova u pregledaču, vremena, poruke grešaka, i ponovno pokretanje čim se fajl snimi. Alat
+  za rad, ne za CI — CI i dalje vozi `npm test`.
+  🪤 Skript nosi **izričit `--watch`**. `vitest --ui` bez pravog terminala odradi jedan prolaz i
+  **izađe**, pa bi „server koji stoji" postojao samo onome ko komandu kuca rukom; izmereno, ne
+  pretpostavljeno.
 - **Obim:** 22 testa, ~2 s. Pokriveno je ono što ADR-0072 nosi — vraćanje nacrta po tipu pitanja
   (uključujući **gap-filling i essay, do kojih ručna šetnja nije mogla**), prekrajanje niza praznina,
   odbijanje nacrta tuđeg pokušaja, i skladište koje odbija da radi. **Ostatak fronta nije pokriven, i
