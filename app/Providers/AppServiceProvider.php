@@ -22,12 +22,17 @@ use App\Policies\SchoolPolicy;
 use App\Policies\SeasonUserAssignmentPolicy;
 use App\Policies\SettingPolicy;
 use App\Policies\UserPolicy;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -44,6 +49,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->nameWhatWritesToTheLog();
+
         // Domain models live outside app/Models, so policies are registered explicitly.
         Gate::policy(School::class, SchoolPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
@@ -123,6 +130,44 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(20)->by('ip:'.$request->ip()),
             Limit::perDay(3)->by('mail:'.mb_strtolower(trim((string) $request->input('email')))),
         ]);
+    }
+
+    /**
+     * Put the actor on every line, whichever way the application was entered
+     * (ADR-0070).
+     *
+     * {@see AssignRequestId} names the REQUEST, and it runs before authentication
+     * has happened — so the account is added here instead, the moment a guard
+     * resolves one. A line written before sign-in is then honestly anonymous
+     * rather than wrongly attributed to whoever signs in later.
+     *
+     * The console gets the same treatment for the same reason. This application
+     * does a great deal from the command line — the imports, `season:reset`, the
+     * rollover — and those are exactly the runs somebody reads the log about
+     * afterwards. Without this, a failure in the middle of an import is a stack
+     * trace with nothing saying which command was running.
+     */
+    private function nameWhatWritesToTheLog(): void
+    {
+        Event::listen(Authenticated::class, function (Authenticated $event): void {
+            Log::shareContext([
+                'user_id' => $event->user->getAuthIdentifier(),
+                'guard' => $event->guard,
+            ]);
+        });
+
+        Event::listen(CommandStarting::class, function (CommandStarting $event): void {
+            if ($event->command === null) {
+                return;
+            }
+
+            Log::shareContext([
+                // Named `request_id` and not `command_id` on purpose: one field to
+                // grep for, whether the run came through a browser or a terminal.
+                'request_id' => 'cli-'.Str::lower(Str::random(8)),
+                'command' => $event->command,
+            ]);
+        });
     }
 
     /**

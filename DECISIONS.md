@@ -1967,6 +1967,57 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0070 — Svaki red u logu nosi ime zahteva koji ga je napisao
+
+- **Status:** Prihvaćeno (2026-08-29). **IMPLEMENTIRANO.**
+- **Kontekst:** aplikacija nije mogla da odgovori na jedino pitanje koje operator zaista ima:
+  *„koordinator kaže da je puklo u devet i deset — koji od ovih redova je njegov?"* Stack trace u
+  `laravel.log` kaže **šta** je puklo, a ništa o tome kome, na kom ekranu, i koji od okolnih
+  četrdeset redova pripadaju istom zahtevu.
+- **`AssignRequestId`, prvi u lancu.** Svaki zahtev dobija ime; ime ide u kontekst logera (svaki
+  kasniji red ga nasledi, uključujući izveštaj rukovaoca izuzecima) i vraća se u zaglavlju
+  **`X-Request-Id`**. Čitalac pročita id sa ekrana, operator grep-uje i ima ceo zahtev.
+- **Dvanaest znakova, mala slova — ne UUID.** Ovo je string koji neko čita sa ekrana i prekucava u
+  pretragu; trideset šest znakova heksadecimale sa crticama je string koji ljudi pogreše.
+- 🪤 **Tuđi id se prihvata, ali samo kao oblik id-ja.** Proxy ispred aplikacije obično štancuje svoj
+  i poštovanje tog id-ja je ono što spaja njegove logove sa ovima. Ali to je **zaglavlje**, dakle
+  tuđi tekst koji ulazi u log fajl: nefiltriran, novi red u njemu dozvoljava **falsifikovanje
+  redova** — pošalji `abc\n[2026-08-29 09:00:00] production.ERROR: nema se šta videti` i fajl kaže
+  ono što je pozivalac hteo. Prima se samo `[A-Za-z0-9._-]{1,64}`.
+  Mutaciono provereno: bez filtera pada tačno taj test, sa falsifikovanim redom u poruci.
+- 🪤 **`Log::shareContext`, ne `withContext`.** Na menadžeru je drugo proksovano **samo na
+  podrazumevani kanal**; kontekst mora da stigne do onoga kroz šta zahtev stvarno piše.
+- **Ko je radio dodaje se posebno**, iz slušaoca na `Authenticated`, jer autentifikacija u trenutku
+  kad middleware radi **još nije prošla**. Red napisan pre prijave je zato pošteno anoniman umesto
+  pogrešno pripisan onome ko se prijavi kasnije.
+- **Konzola dobija isto.** Ova aplikacija mnogo toga radi iz komandne linije — uvozi, `season:reset`,
+  prelazak sezone — i baš o tim pokretanjima se posle čita log. Polje se zove `request_id` i za
+  konzolu (prefiks `cli-`), da se grep-uje **jedno** polje bez obzira na to da li je pokretanje
+  došlo kroz pretraživač ili kroz terminal.
+- **JSON kanal postoji, ali nije podrazumevan.** `logging.channels.structured` je isti dnevni fajl
+  sa `JsonFormatter`-om. Danas se ovi logovi čitaju editorom na serveru, a za to je JSON **gori** —
+  čovek čita poruku, ne omotnicu. Postoji da bi, onog dana kad stigne sakupljač logova, uključivanje
+  bilo `LOG_STACK=structured` u `.env` i ništa više; kontekst koji svaki red već nosi je upravo ono
+  što takav alat traži, a što obični format zakopava na kraju reda.
+- 📎 **Metrika NIJE dodata, i to je odluka a ne propust.** `/metrics` endpoint bez sakupljača koji ga
+  skida je pretpostavka o infrastrukturi koje nema; `/up` health check postoji. Kad se pojavi
+  Prometheus ili sličan, dodaje se tada i prema onome što se tada meri.
+- ✅ **Provereno uživo na dev-u:** `curl` na `/api/theme` vraća `X-Request-Id: ee2zkcekrutb`;
+  poslati `edge-abc123` se poštuje; `bad id with spaces` se odbacuje i zamenjuje generisanim.
+  Kroz pravi log fajl, oba kanala: obični red nosi
+  `{"request_id":"probe-live-01","command":"tinker",…}`, a `structured` isti sadržaj kao jedan JSON
+  objekat. Konzolni slušalac je usput sam dodao `command: tinker` — potvrda da se `CommandStarting`
+  u pravom artisan pokretanju okida.
+  🪤 U testu se ne okida: dispečuje ga Symfony slušalac koji `Kernel::handle()` zakači kad artisan
+  radi stvarno, a `$this->artisan()` ide kroz `Kernel::call()`. Zato test koristi
+  `WithConsoleEvents`, trait koji okvir za to i isporučuje.
+- **Testovi (`RequestIdTest`, 8):** odgovor nosi ime; dva zahteva dobijaju dva imena; tuđi id se
+  poštuje; napadački se odbacuje (četiri oblika); log kaže koji je zahtev pisao red, ko je radio kad
+  se sazna, i **ne kaže ko** dok se ne sazna; komanda kaže koja je komanda bila.
+- **Suite 658/658** (bilo 650), `pint --dirty` čist.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

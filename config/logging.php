@@ -1,5 +1,6 @@
 <?php
 
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -77,6 +78,26 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'max_files' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
+        /*
+         * The same daily file, one JSON object per line (ADR-0070).
+         *
+         * Not the default, and deliberately: today these logs are read with a text
+         * editor on the server, and JSON is worse than the plain format for that —
+         * a human reads the message, not the envelope. It exists so that the day a
+         * log collector arrives, turning it on is `LOG_STACK=structured` in `.env`
+         * and nothing else; the context every line already carries (request id,
+         * account, path, command) is what such a tool needs and what the plain
+         * format buries at the end of the line.
+         */
+        'structured' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'max_files' => env('LOG_DAILY_DAYS', 14),
+            'formatter' => JsonFormatter::class,
             'replace_placeholders' => true,
         ],
 

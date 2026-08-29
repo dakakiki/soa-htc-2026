@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\EnsureStudentSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,6 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        /*
+         * First in the stack (ADR-0070): everything a request writes should carry
+         * the request's name, and anything logged before this runs would not.
+         */
+        $middleware->prepend(AssignRequestId::class);
+
         // First-party SPA (Vue) authenticates against the API via Sanctum cookies.
         $middleware->statefulApi();
         // Competitor (student) auth: bearer token from web identification.
