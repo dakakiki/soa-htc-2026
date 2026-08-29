@@ -8,6 +8,10 @@
 #
 # So the matrix is the whole design: the same 650 tests, once on the database the
 # developer runs and once on the database the site ships on. Neither is optional.
+#
+# The front end has its own suite since ADR-0074, and it is a job of its own
+# rather than a step inside the linting one: when a check goes red, its name is
+# the first thing anybody reads.
 name: CI
 
 on:
@@ -90,6 +94,24 @@ jobs:
         # PHPUnit's `<env>` does not overwrite a variable that is already set,
         # which is what makes one configuration serve both halves of the matrix.
         run: php artisan test
+
+  javascript:
+    name: Tests · javascript
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # Vitest under happy-dom. No database and no PHP: everything it covers
+      # happens between a browser and the device it is running on.
+      - run: npm test
 
   static:
     name: Formatting, types and build

@@ -267,9 +267,17 @@ There is no screen for it yet. It is read with `grep`, or with SQL against
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and on every push to
-`main`: the whole suite **twice** — once on SQLite, once on MySQL 8.3 — plus
-`pint --test`, `npm run type-check` and `npm run build`. Around two and a half
-minutes in total.
+`main`: the whole PHP suite **twice** — once on SQLite, once on MySQL 8.3 — the
+front end's own suite, and then `pint --test`, `npm run type-check` and
+`npm run build`. Around two and a half minutes in total, since the jobs run
+alongside each other.
+
+The front end's suite (Vitest under happy-dom, ADR-0074) covers what no PHP test
+can reach: the state that lives between a browser and the device it is running
+on, which today means the exam sheet a competitor's own machine keeps while they
+answer (ADR-0072). It needs neither a database nor PHP, and it is its own job
+rather than a step inside the linting one — when a check goes red, its name is
+the first thing anybody reads.
 
 The matrix is the point. Everything here is written on SQLite locally and ships
 on MySQL, and the first run of this workflow immediately turned up four defects
@@ -280,6 +288,12 @@ The same second opinion is available without waiting for CI:
 
 ```bash
 DB_CONNECTION=mysql DB_DATABASE=soa_htc_test DB_HOST=127.0.0.1 DB_USERNAME=root DB_PASSWORD= php artisan test
+```
+
+The front end's suite is the same command CI runs, and takes about two seconds:
+
+```bash
+npm test
 ```
 
 ## Setting up for development

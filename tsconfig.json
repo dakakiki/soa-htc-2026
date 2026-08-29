@@ -10,21 +10,35 @@
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "useDefineForClassFields": true,
-        "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        "lib": [
+            "ESNext",
+            "DOM",
+            "DOM.Iterable"
+        ],
         "skipLibCheck": true,
         "noEmit": true,
         "noUnusedLocals": true,
         "noUnusedParameters": true,
-        "types": ["vite/client", "node"],
+        "types": [
+            "vite/client",
+            "node"
+        ],
         "baseUrl": ".",
         "paths": {
-            "@/*": ["resources/js/*"]
+            "@/*": [
+                "resources/js/*"
+            ]
         }
     },
     "include": [
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
-        "resources/js/**/*.vue"
+        "resources/js/**/*.vue",
+        "tests/js/**/*.ts"
     ],
-    "exclude": ["node_modules", "public", "vendor"]
+    "exclude": [
+        "node_modules",
+        "public",
+        "vendor"
+    ]
 }

@@ -2155,6 +2155,40 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   vhost je običan HTTP, pa registracija tamo tiho padne. Stavka je dopisana u `docs/06`, u spisak
   koji može da odgovori samo server.
 
+
+## ADR-0074 — Front dobija svoj test runner, jer polovinu ovog koda PHP ne vidi
+
+- **Status:** Prihvaćeno (2026-08-29). **IMPLEMENTIRANO.**
+- **Kontekst:** ADR-0072 je uveo stanje koje živi **isključivo u pregledaču** — nacrt odgovora na
+  uređaju na kom se polaže. Nijedan PHP test ga ne dodiruje: odgovori u bazu stižu tek iz `submit`, a
+  payload za nastavak namerno ne nosi nijedan dat odgovor. Provera je zato bila ručna šetnja kroz
+  ekran plus jednokratni harness pod Node-om — a **baš je taj harness našao pravi bug** (jedan `try`
+  oko celog prolaza kroz zastarele nacrte). Alat koji nađe grešku prvi put kad se pokrene, pa se
+  baci, je alat koji nedostaje.
+- **Odluka:** **Vitest 4** + **@vue/test-utils 2**, testovi u `tests/js/`, komanda `npm test`.
+- 🪤 **happy-dom, ne jsdom** — i ne iz ukusa: `jsdom` 30 vuče `undici` koji traži noviji Node nego što
+  projekat vozi (v20.19) i **puca na import pre nego što se ijedan test sakupi**
+  (`webidl.util.markAsUncloneable is not a function`). happy-dom je čist JS, i uz to brži.
+- 🪤 **Zasebna `vitest.config.ts`.** `laravel-vite-plugin` tamo nema šta da traži — piše hot fajl i
+  očekuje Blade ulaze, a ništa od toga u testu ne postoji. Tailwind takođe ne, jer nijedan test ne
+  pita šta se klasa izračuna. Ostaje Vue kompajler i `@` alias.
+- 🪤 **`tests/js/` je bezbedno** jer `phpunit.xml` imenuje `tests/Unit` i `tests/Feature` izričito.
+  `tsconfig.json` ih uključuje, pa `npm run type-check` pokriva i same testove.
+- 🪤 **`clearMocks` i `restoreMocks` nisu isto.** `restoreMocks` vraća implementacije, ali **istoriju
+  poziva briše samo `clearMocks`** — bez njega je test koji čita `mock.calls[0]` čitao **poziv
+  prethodnog testa** i prolazio na tuđem poslu. Uhvaćeno time što je test pao iz pogrešnog razloga.
+- 🔴 **Testovi su provereni mutacijom, i jedan je na tome pao.** Prvi „odbaci opciju koju pitanje više
+  ne nudi" prolazio je i sa uklonjenom proverom: id-ja `999` nema ni u DOM-u, pa se ništa nije videlo.
+  Test vredi tek kad tvrdi **šta je otišlo serveru** — jer bi zadržan zastareo id pitanje računao kao
+  odgovoreno i tiho ga izbacio iz upozorenja o praznim pitanjima. Pravilo je zapisano u `CLAUDE.md`:
+  kad se testira ponašanje koje se na ekranu ne vidi, pokvari kod namerno i proveri da test padne.
+- **CI:** zaseban posao `Tests · javascript` (`.github/workflows/ci.yml`), a ne korak unutar lintera
+  — kad provera pocrveni, njeno ime je prvo što se pročita.
+- **Obim:** 22 testa, ~2 s. Pokriveno je ono što ADR-0072 nosi — vraćanje nacrta po tipu pitanja
+  (uključujući **gap-filling i essay, do kojih ručna šetnja nije mogla**), prekrajanje niza praznina,
+  odbijanje nacrta tuđeg pokušaja, i skladište koje odbija da radi. **Ostatak fronta nije pokriven, i
+  to nije propust nego obim:** ovo je runner, ne kampanja.
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,
