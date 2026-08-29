@@ -271,3 +271,67 @@ Layer C arhiva (ADR-0027) je kompletna i merge-ovana: denormalizovane `archive_r
 
 **Staging:** sve `el_student_bekap*` tabele su učitane u `soahtc_legacy` (dev-local).
 
+
+## 14. Status — runda u igri (2026-08-29)
+
+Koraci 4 i 6 (student registracije, attempts/odgovori/rezultati) su urađeni za **r14 — aktuelnu
+sezonu**, iz produkcionog dump-a uzetog 2026-08-29 u 12:17. To je prvi put da se u ovaj sistem
+prenosi **takmičenje** a ne konfiguracija; arhiva (§13) je i dalje zaseban, denormalizovan sloj za
+prošle runde.
+
+**Komande, po redosledu:**
+
+```bash
+LEGACY_DB_DATABASE=<staging> php artisan legacy:import-registrations --replace-local
+LEGACY_DB_DATABASE=<staging> php artisan legacy:import-results
+LEGACY_DB_DATABASE=<staging> php -d memory_limit=1G artisan legacy:import-answers
+```
+
+Redosled nije stvar ukusa: rezultat pravi i **attempt** (ocena je dokaz da se izašlo, a izveštaji
+broje attempt-e), a uvoz odgovora te redove samo dopunjava.
+
+**Uneto:**
+
+| Šta | Broj | Napomena |
+|---|--:|---|
+| Registracije | 108.771 | od 108.811 u legacy-ju — vlasnik potvrdio da je 108.811 tačan zbir |
+| Rezultati (Layer B) | 184.384 | 144.765 objavljenih |
+| Attempts | 184.384 | jedan po oceni |
+| Odgovori (Layer A) | ~2,17M | samo tamo gde su preživeli — vidi dole |
+
+**Nije uneto, i zašto:** 35 učenika bez ijedne škole (`school_id` prazan, samo `school_external`;
+kod nas je škola obavezna), 5 bez nivoa (prazan i u legacy-ju), 268 ocena bez učenika (legacy izvoz
+ih i sam odbacuje kroz `has('Student')`). 4 duplirana `competitor_number` renumerisana po OD-8.
+
+🔴 **Objavljivanje rezultata u legacy-ju BRIŠE odgovore po pitanju.** Ukršteno nad ovim dump-om:
+106.294 objavljenih ocena nema nijedan red u `test_results`, a od neobjavljenih nedostaje 10.
+Zato Layer A pokriva **78.347 od 184.651** — sample runde i ocene koje još nisu puštene. Ništa to ne
+vraća; nema ga na izvoru. **Naša aplikacija to ne radi**, pa je tanka preneta istorija, ne ubuduće.
+
+🪤 **Kanonski izvor ocene je `quiz_results`**, i to nije preferenca nego ono što legacy sam čita:
+ekran rezultata bere `test_result` po (quiz, exam, test), a izvoz **računa** `p_r`/`p_u`/`s_r`/`s_w`
+i sve zbirove sabiranjem tih redova. Kolone na `el_student` su izlaz, ne izvor — i jedino
+`quiz_results` imenuje **test**, bez kojeg Layer B ne može.
+
+🪤 **`active` je objavljenost** (postavlja je `TestDataPublishResultsController`, a takmičarski ekran
+po njoj filtrira). Prenosi se legacy `updated_at` kao `published_at`, pa National ocena puštena
+25.08. dolazi datirana 25.08.
+
+🪤 **`max_score` se ne upisuje.** Poeni naših pitanja se poklapaju sa legacy-jem u dinar (provereno),
+ali 8 ocena u dump-u stoji iznad zbira poena svog testa — maksimum bi te takmičare stavio preko 100%
+i podrazumevao imenilac po kom niko nije meren. Isto pravilo koje `.xlsx` uvoz već primenjuje.
+
+🪤 **Škole se razrešavaju kroz `legacy_id_maps`, ne kroz `schools.legacy_id`** — uvoz škola spaja
+duplikate, a pet spojenih id-jeva nosi 124 takmičara.
+
+🪤 **Nivoi:** do 2026-08-29 su kategorije „Regular Default" i „Special Default" postojale samo u
+dev seeder-u i bez `legacy_id`. Zato 84% roster-a nije imalo nivo koji se mapira, a **sveža
+produkcija nije imala nijedan nivo uopšte**. Premešteno u `ContentLookupSeeder` sa legacy id-jevima
+(ADR-0075).
+
+⚠️ **Staging tabele nemaju indekse** (legacy ih nema na business tabelama). Pre uvoza odgovora:
+`ALTER TABLE test_results ADD INDEX (student_id, test_id, question_id)` — bez toga svaki prolaz
+skenira 2,18M redova.
+
+⚠️ **Memorija:** `legacy:import-answers` traži više od podrazumevanih 128 MB; `--chunk` broji
+takmičare (250 ≈ 15.000 redova po prolazu).

@@ -2186,6 +2186,85 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
     „odbaci opciju koju pitanje više ne nudi" prolazio je sa uklonjenom proverom, jer id-ja koji ne
     postoji nema ni u DOM-u. Vredeo je tek kad je tvrdio **šta je otišlo serveru**.
 
+## ADR-0075 — Runda u igri se seli iz legacy baze u aktivnu sezonu
+
+- **Status:** Prihvaćeno (2026-08-29). **IMPLEMENTIRANO.**
+- **Kontekst:** vlasnik traži da nova aplikacija prikazuje ono što produkcija prikazuje danas —
+  ceo roster r14 sa ocenama — i da **sve opcije rade**: statistika, results, izvoz sa i bez odgovora.
+  Do sada su prenošeni samo konfiguracioni entiteti; arhiva (ADR-0027) je zaseban denormalizovan
+  sloj za prošle runde. Ovo je prvi prenos **samog takmičenja**.
+- **Izvor:** produkcioni dump od **2026-08-29 12:17** (phpMyAdmin, MySQL 8.0.43), **neanonimizovan**.
+  🔴 Vlasnikova odluka: uvozi se kako jeste, sa imenima; **ništa od toga ne sme na git**. Dump stoji
+  van repoa, `.gitignore` blokira `*.sql`/`*.zip`, podaci žive samo u MySQL-u.
+- **Tri komande, i redosled nije stvar ukusa:**
+  `legacy:import-registrations` → `legacy:import-results` → `legacy:import-answers`.
+  Uvoz rezultata pravi **i attempt**, jer je ocena dokaz da se izašlo a izveštaji broje attempt-e;
+  uvoz odgovora te redove samo dopunjava. Obrnuto bi statistika prijavila 78.106 izašlih umesto
+  184.384.
+
+### 🔴 Kanonski izvor ocene je `quiz_results`
+Ne po preferenci nego po tome šta legacy sam čita: ekran rezultata bere `test_result` po
+(quiz, exam, test) i **nikad ne gleda** zbirne kolone na `el_student`; izvoz **računa**
+`p_r`/`p_u`/`s_r`/`s_w` i sve zbirove sabiranjem tih redova. Te kolone su izlaz, ne izvor. Uz to je
+`quiz_results` jedini koji imenuje **test**, bez čega Layer B ne postoji.
+
+### 🔴 Objavljivanje u legacy-ju briše odgovore
+Ukršteno nad dump-om: **106.294 objavljene ocene nemaju nijedan red u `test_results`**, a od
+neobjavljenih nedostaje **10**. Layer A zato pokriva **78.347 od 184.651** — sample runde i ocene
+koje još nisu puštene. Ništa to ne vraća; nema ga na izvoru. **Naša aplikacija odgovore ne briše**,
+pa je tanka preneta istorija, ne ono što sledi.
+
+### 🔴 Sveža produkcija nije imala nijedan nivo težine
+BABY HIPPO … HIPPO S5 seed-ovao je **samo `MasterDataSeeder`**, koji odbija da radi van
+`local`/`testing`. To nije dev izmišljotina nego struktura razreda samog takmičenja, ista na svakoj
+instalaciji, a `registrations.difficulty_level_id` je obavezan — bez nje nijedna registracija ne može
+da nastane, ni ručno ni uvozom. Premešteno u `ContentLookupSeeder`, sa legacy id-jevima: roster je sa
+**91.376 nemapiranih nivoa (84%) pao na 5**, a tih pet je prazno i u legacy-ju.
+🪤 Seed se veže po **imenu i kodu**, ne po `legacy_id` — svaka ranije seed-ovana instalacija te
+redove već ima sa praznim id-jem, pa bi ključ po id-ju napravio drugi BABY HIPPO pored onog na koji
+sva pitanja i testovi već pokazuju.
+
+### Ostale zamke, sve plaćene jednom
+- 🪤 **Škole se razrešavaju kroz `legacy_id_maps`**, ne kroz `schools.legacy_id`: uvoz škola spaja
+  duplikate, a pet spojenih id-jeva nosi 124 takmičara.
+- 🪤 **`active` je objavljenost** (postavlja je `TestDataPublishResultsController`, takmičarski ekran
+  po njoj filtrira). Prenosi se legacy `updated_at` kao `published_at` — National ocena puštena
+  25.08. dolazi datirana 25.08, a ne „sada".
+- 🪤 **`max_score` se ne upisuje.** Poeni naših pitanja poklapaju se sa legacy-jem u dinar, ali 8
+  ocena stoji iznad zbira poena svog testa; maksimum bi ih stavio preko 100% i podrazumevao imenilac
+  po kom niko nije meren. Isto pravilo koje `.xlsx` uvoz već primenjuje.
+- 🪤 **48 duplih ocena** u legacy-ju (identičnih u svakoj koloni) — batch se ključuje i pre upsert-a,
+  jer MySQL odbija naredbu koja isti ključ imenuje dvaput.
+- 🪤 **OD-8** primenjen: 4 duplirana `competitor_number`; niži `entry_id` zadržava broj, viši dobija
+  prvi neizdati.
+- 🪤 **`question_answers` je dobio `legacy_id`.** Takmičar je birao `reply_id`; bez te kolone jedini
+  put nazad bila je pozicija u listi — pretpostavka koja pada čim se opcija premesti ili ukloni.
+- 🪤 **Staging tabele nemaju indekse** (legacy ih nema na business tabelama): pre uvoza odgovora
+  `ALTER TABLE test_results ADD INDEX (student_id, test_id, question_id)`, inače svaki prolaz skenira
+  2,18M redova.
+- 🪤 **Memorija:** uvoz odgovora traži više od podrazumevanih 128 MB, i prvi pokušaj je pao **bez
+  ijedne poruke, izlazni kod 255**. `--chunk` broji takmičare, ne redove.
+- 🪤 Odgovori se grupišu **u bazi**, ne u PHP-u: gap pitanje je jedan red po praznini, a grupa ne sme
+  da se prelomi između prolaza — prolaz je skup takmičara, čiji su svi redovi unutra.
+
+### Uneto i provereno
+| Šta | Broj |
+| --- | --: |
+| Registracije | **108.771** od 108.811 (vlasnik potvrdio zbir) |
+| Ocene (Layer B) | **184.384**, od toga 144.765 objavljenih |
+| Attempts | **184.384** |
+| Odgovori (Layer A) | **2.173.611** na 78.106 pokušaja |
+
+Nije uneto i **imenovano je**, ne prećutano: 35 učenika bez ijedne škole, 5 bez nivoa, 268 ocena bez
+učenika (koje legacy izvoz i sam odbacuje kroz `has('Student')`).
+
+Provereno kroz prave klase koje ekrani koriste: `ReportSummary` (prijavljenih 108.771, izašlo
+184.384, objavljeno 144.765), `RegistrationExporter`, `ResultExporter::all` (kolone po rundi i tipu,
+sa zbirovima) i `ResultExporter::withAnswers` (odgovor po pitanju sa oznakom tačnosti).
+
+⚠️ **Uvozne komande nemaju unit-testove**, kao ni ostale `legacy:import-*` — operativne su alatke, a
+provera im je reconciliation nad pravim podatkom. Zbirovi se sabiraju tačno: 108.771 + 35 + 5 = 108.811.
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

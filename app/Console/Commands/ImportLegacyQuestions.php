@@ -107,7 +107,12 @@ class ImportLegacyQuestions extends Command
                     if ($accepted === '') {
                         continue;
                     }
-                    $question->answers()->create(['text' => LegacyText::fix($accepted), 'is_correct' => true, 'position' => $position]);
+                    $question->answers()->create([
+                        'text' => LegacyText::fix($accepted),
+                        'is_correct' => true,
+                        'position' => $position,
+                        'legacy_id' => (int) $a->id,
+                    ]);
 
                     continue;
                 }
@@ -115,6 +120,9 @@ class ImportLegacyQuestions extends Command
                     'text' => LegacyText::fix((string) $a->title),
                     'is_correct' => (bool) $a->correct_answer,
                     'position' => $position,
+                    // What a migrated answer is matched back by: the competitor
+                    // picked a reply id, not a position in a list.
+                    'legacy_id' => (int) $a->id,
                 ]);
             }
 
