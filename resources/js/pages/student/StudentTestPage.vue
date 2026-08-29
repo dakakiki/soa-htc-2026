@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconAlertTriangle, IconCircleCheck } from '@tabler/icons-vue';
@@ -7,6 +7,7 @@ import { startTest, submitAttempt } from '@/api/student';
 import { apiErrorMessage } from '@/api/http';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import { answerMarker } from '@/utils/answerNumbering';
+import { clearDraft, dropStaleDrafts, loadDraft, saveDraft } from '@/utils/attemptDraft';
 import type { AttemptNote, AttemptQuestion, AttemptSession, SubmitAnswer } from '@/types/models';
 
 /**
@@ -47,6 +48,14 @@ const essay = reactive<Record<number, string>>({});
 
 const remaining = ref(0);
 let ticker: ReturnType<typeof setInterval> | undefined;
+
+/*
+ * Draft keeping is armed only once this attempt's answers are in place. Armed
+ * from the start it would fire on `initAnswers` and write an empty sheet over
+ * the very draft it is about to restore.
+ */
+const draftReady = ref(false);
+let draftTimer: ReturnType<typeof setTimeout> | undefined;
 
 const GAP_MARKER = '[answer]';
 
@@ -141,17 +150,95 @@ function initAnswers(list: AttemptQuestion[]): void {
     }
 }
 
+/**
+ * Put back what this device kept, for the questions this attempt actually holds.
+ * Every value is measured against the question in front of it rather than
+ * trusted: an option id that is no longer offered is dropped, and a gap array is
+ * resized to the question's own number of blanks. A draft written before an
+ * editor touched the test therefore restores less than it stored, and never
+ * something the test does not ask for.
+ */
+function restoreDraft(attemptId: number, list: AttemptQuestion[]): void {
+    const draft = loadDraft(attemptId);
+
+    if (draft === null) {
+        return;
+    }
+
+    for (const q of list) {
+        if (q.question_type === 'multiple_choice') {
+            const kept = draft.mc[q.id];
+
+            if (kept !== undefined) {
+                mc[q.id] = kept.filter((id) => q.options.some((option) => option.id === id));
+            }
+        } else if (q.question_type === 'gap_filling') {
+            const kept = draft.gaps[q.id];
+
+            if (kept !== undefined) {
+                gaps[q.id] = Array.from({ length: gapCount(q.description) }, (_, i) => kept[i] ?? '');
+            }
+        } else {
+            const kept = draft.essay[q.id];
+
+            if (kept !== undefined) {
+                essay[q.id] = kept;
+            }
+        }
+    }
+}
+
+/** Write the sheet as it stands, now. */
+function flushDraft(): void {
+    const attempt = session.value?.attempt;
+
+    if (!draftReady.value || submitted.value || attempt === undefined) {
+        return;
+    }
+
+    clearTimeout(draftTimer);
+    saveDraft(attempt.id, { mc: { ...mc }, gaps: { ...gaps }, essay: { ...essay } });
+}
+
+/*
+ * Written a moment after the competitor stops rather than on every keystroke: an
+ * essay would otherwise serialise the whole sheet on each character typed.
+ */
+watch([mc, gaps, essay], () => {
+    if (!draftReady.value || submitted.value) {
+        return;
+    }
+
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(flushDraft, 400);
+});
+
 function pickOption(questionId: number, optionId: number): void {
     // Single correct answer per question (ADR-0019) — a radio replaces the choice.
     mc[questionId] = [optionId];
 }
+
+/*
+ * Once the clock is out the screen hands in by itself, and keeps trying when the
+ * network is not there — an answer sheet that never arrives is a zero. The wait
+ * doubles between tries on purpose: fifty thousand clocks run out inside the same
+ * minute, and a fleet retrying once a second is the last thing a server having a
+ * hard time needs.
+ */
+const RETRY_MIN_MS = 2000;
+const RETRY_MAX_MS = 30000;
+let retryDelay = RETRY_MIN_MS;
+let retryAfter = 0;
 
 function startTicker(): void {
     ticker = setInterval(() => {
         remaining.value -= 1;
         if (remaining.value <= 0) {
             remaining.value = 0;
-            void submit(true);
+
+            if (Date.now() >= retryAfter) {
+                void submit(true);
+            }
         }
     }, 1000);
 }
@@ -231,8 +318,17 @@ async function submit(auto = false): Promise<void> {
         handedInAt.value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         submitted.value = true;
         stopTicker();
+        // The answers belong to the server now, so there is nothing left on this
+        // device worth keeping — and a venue machine should not keep it anyway.
+        clearTimeout(draftTimer);
+        clearDraft(session.value.attempt.id);
     } catch (e) {
         error.value = apiErrorMessage(e, t('student.test.error'));
+
+        if (auto) {
+            retryAfter = Date.now() + retryDelay;
+            retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+        }
     } finally {
         submitting.value = false;
     }
@@ -243,6 +339,9 @@ onMounted(async () => {
         const { data } = await startTest(student.token ?? '', testId);
         session.value = data;
         initAnswers(data.questions);
+        dropStaleDrafts();
+        restoreDraft(data.attempt.id, data.questions);
+        draftReady.value = true;
         remaining.value = data.attempt.remaining_seconds ?? 0;
         startTicker();
     } catch (e) {
@@ -277,8 +376,41 @@ onMounted(async () => {
     }
 });
 
+/**
+ * A competitor who reaches for the wrong tab or the back gesture mid-exam gets
+ * the browser's own "leave site?" question. The draft makes leaving survivable
+ * rather than fatal, but the clock does not stop for it, so one deliberate
+ * confirmation is still worth asking for.
+ */
+function guardUnload(event: BeforeUnloadEvent): void {
+    if (session.value === null || submitted.value) {
+        return;
+    }
+
+    flushDraft();
+    event.preventDefault();
+}
+
+/*
+ * 🪤 `beforeunload` is the unreliable half of this pair. A phone that switches
+ * apps, locks, or has its tab discarded often never fires it — `visibilitychange`
+ * is what actually arrives there, so the last keystrokes are written on the way
+ * out rather than on the way back.
+ */
+function flushOnHide(): void {
+    if (document.visibilityState === 'hidden') {
+        flushDraft();
+    }
+}
+
+window.addEventListener('beforeunload', guardUnload);
+document.addEventListener('visibilitychange', flushOnHide);
+
 onUnmounted(() => {
     stopTicker();
+    clearTimeout(draftTimer);
+    window.removeEventListener('beforeunload', guardUnload);
+    document.removeEventListener('visibilitychange', flushOnHide);
     spy?.disconnect();
     bandWatcher?.disconnect();
 });
