@@ -2,8 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Domain\Assessment\Models\DifficultyCategory;
-use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Cms\Enums\PublicationStatus;
 use App\Domain\Cms\Models\Category;
 use App\Domain\Cms\Models\Page;
@@ -92,30 +90,12 @@ class MasterDataSeeder extends Seeder
             );
         }
 
-        $this->seedDifficulty(
-            'Regular Default',
-            'regular',
-            [
-                ['BH', 'BABY HIPPO', [1, 2]],
-                ['LH', 'LITTLE HIPPO', [3, 4]],
-                ['H1', 'HIPPO 1', [5, 6]],
-                ['H2', 'HIPPO 2', [7]],
-                ['H3', 'HIPPO 3', [8, 9]],
-                ['H4', 'HIPPO 4', [10, 11]],
-                ['H5', 'HIPPO 5', [12, 13]],
-            ],
-        );
-        $this->seedDifficulty(
-            'Special Default',
-            'special',
-            [
-                ['S1', 'HIPPO S1', [5, 6]],
-                ['S2', 'HIPPO S2', [7]],
-                ['S3', 'HIPPO S3', [8, 9]],
-                ['S4', 'HIPPO S4', [10, 11]],
-                ['S5', 'HIPPO S5', [12, 13]],
-            ],
-        );
+        /*
+         * Difficulty is NOT seeded here any more, and must not be: these levels
+         * are the competition's own grade structure rather than development
+         * fiction, and this seeder never runs on a server. They moved to
+         * ContentLookupSeeder on 2026-08-29, where every installation gets them.
+         */
 
         $adminRole = Role::query()->where('key', SystemRole::Admin->value)->firstOrFail();
 
@@ -226,25 +206,5 @@ class MasterDataSeeder extends Seeder
         );
 
         $post->categories()->syncWithoutDetaching([$category->id]);
-    }
-
-    /**
-     * Seed a difficulty category (all countries) with its ordered levels.
-     *
-     * @param  list<array{0: string, 1: string, 2: list<int>}>  $levels  [short, name, grades]
-     */
-    private function seedDifficulty(string $name, string $type, array $levels): void
-    {
-        $category = DifficultyCategory::query()->firstOrCreate(
-            ['name' => $name],
-            ['type' => $type, 'countries_all' => true, 'status' => 'active'],
-        );
-
-        foreach ($levels as $i => [$short, $levelName, $grades]) {
-            DifficultyLevel::query()->firstOrCreate(
-                ['difficulty_category_id' => $category->id, 'level_short' => $short],
-                ['name' => $levelName, 'grades' => $grades, 'position' => $i + 1, 'status' => 'active'],
-            );
-        }
     }
 }
