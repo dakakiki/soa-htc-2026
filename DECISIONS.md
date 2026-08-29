@@ -1544,6 +1544,17 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
   **Dakle beleška nije red u `questions`.** Kad postoji, validacija je ni ne vidi, izuzetak nestaje
   sam od sebe, a pitanje bez ijednog odgovora ponovo postaje ono što i jeste — greška.
   **Nije deo ove runde.**
+- ✅ **ZATVORENO 2026-08-29, i ugasilo se tačno kako je ovde predviđeno — bez stezanja pravila.**
+  Beleške postoje (ADR-0061), onih 20 naslova je preseljeno u `test_notes` (17 beleški u 7 testova)
+  i prazne ljušture su obrisane. Provereno na dev bazi: **nijedno `multiple_choice` ni
+  `gap_filling` pitanje nema nula odgovora.**
+  🪤 **Ali izuzetak se ne sme ukloniti,** i to je razlog koji se pri pisanju ADR-a nije video: ista
+  linija (`ContentCompleteness:111`) propušta i **esej**, a esej po prirodi nema ponuđene odgovore —
+  svih 12 eseja u bazi ima nula. Uklanjanje bi ih oborilo sve. Pravilo „pitanje koje **nosi**
+  odgovore mora da nosi upotrebljive" je zato uže iz razloga koji i dalje važi, nezavisno od legacy
+  ljuštura zbog kojih je nastalo.
+  Stezanje na svestan-tipa oblik (esej sme, MC i gap ne smeju) danas **ne bi promenilo nijedan red**
+  i vlasnik ga nije tražio: *„zatvori kao gotovo"*.
 - ⚠️ **Šta je bilo urađeno pa vraćeno:** onih 20 naslova sam bio postavio na `inactive` (prestaju da
   se isporučuju: `questionsPayload` i `AttemptGrader` oboje filtriraju `status = active`, pa su
   ispali i sa ekrana i iz `max_score` — testovi #17/#22/#27 su pali sa 35/35/34 na 34/30/30).
