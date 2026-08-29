@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domain\Organization\Support;
 
 use App\Domain\Audit\Models\AuditLog;
+use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Enums\SeasonStatus;
 use App\Domain\Organization\Models\Season;
+use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
@@ -66,8 +68,19 @@ final class SeasonRollover
      * cleared is the trail OF the season — rows about competitors and attempts
      * that are being deleted around them. What is kept is the trail of the
      * seasons THEMSELVES. See {@see clearSeasonScopedAuditRows()}.
+     *
+     * ⚡ Widened in ADR-0071, and it had to be. The trail now also records who
+     * changed a ROLE, an ASSIGNMENT or an ACCOUNT — and *"who granted whom what
+     * last season"* is precisely a question asked AFTER a rollover, by somebody
+     * looking at access that surprised them. Left under the old rule those rows
+     * would have been swept away by the very event that makes them worth reading.
      */
-    private const AUDIT_SUBJECT_KEPT = Season::class;
+    private const AUDIT_SUBJECTS_KEPT = [
+        Season::class,
+        Role::class,
+        SeasonUserAssignment::class,
+        User::class,
+    ];
 
     /**
      * What a rollover would touch right now — counts only, no writes.
@@ -247,16 +260,26 @@ final class SeasonRollover
      *
      * A row about a competitor, an attempt or a publication describes something
      * that is being deleted in the same transaction, and a trail pointing at rows
-     * that no longer exist is not history, it is litter. A row about a season is
-     * the opposite: it outlives the season by design, and is the only thing that
-     * can ever answer "when did round 13 start, and who started it".
+     * that no longer exist is not history, it is litter.
+     *
+     * A row about a season, a role, an assignment or an account is the opposite.
+     * It outlives the season by design, and is the only thing that can ever
+     * answer "when did round 13 start, and who started it" — or "who gave them
+     * that permission, and when".
+     *
+     * 🪤 An account row is kept even though the rollover DELETES school
+     * coordinators. That is not an oversight: `actor_id` is nulled by the foreign
+     * key, `actor_label` is not, and the subject id stays a plain string. The
+     * record of an account that no longer exists is exactly the record somebody
+     * needs when they ask what happened to it.
      *
      * @return Builder
      */
     private static function seasonScopedAuditRows()
     {
         return DB::table('audit_logs')->where(
-            fn ($q) => $q->whereNull('subject_type')->orWhere('subject_type', '!=', self::AUDIT_SUBJECT_KEPT),
+            fn ($q) => $q->whereNull('subject_type')
+                ->orWhereNotIn('subject_type', self::AUDIT_SUBJECTS_KEPT),
         );
     }
 

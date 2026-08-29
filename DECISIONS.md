@@ -2037,6 +2037,58 @@ Status vrednosti: `Prihvaćeno` · `Predlog` · `Otvoreno` · `Zamenjeno`.
 
 ---
 
+## ADR-0071 — Audit trag beleži autoritet, ne takmičenje (proširuje ADR-0068)
+
+- **Status:** Prihvaćeno (2026-08-29). **IMPLEMENTIRANO.**
+- **Kontekst:** ADR-0068 je ostavio otvoreno *koliko toga uopšte treba da piše u `audit_logs`* —
+  tabela je imala **jednog pisca** (`season.started`). Vlasnik je pitao šta bih preporučio „s obzirom
+  na priličan broj korisnika".
+- **Brojka koja odlučuje nije broj takmičara nego broj ljudi koji mogu da kliknu nešto
+  administrativno: 135 naloga.** Uz 3.881 venue i 50.004 registracije, audit administrativnih radnji
+  je jeftin — stotine do par hiljada redova po sezoni.
+- 🔴 **Takmičarska putanja se NE auditira**, i to je odluka a ne propust. 50.000 takmičara ×
+  identifikacija/start/predaja zatrpalo bi sve ostalo, a već je zapisano bolje i potpunije u
+  `attempts`, `attempt_answers` i `student_sessions`. Test to i drži: `identify` ne piše nijedan red.
+- **Ne duplira se ono što već ima svoj trag:** poništen pokušaj (`attempt_resets`, sa razlogom),
+  ispravljena ocena (`grade_revisions`), objava (`publication_batches`), odluka o prijavi koordinatora
+  (`coordinator_registrations.reviewed_*`). Dupli zapis jednog čina je dva zapisa slobodna da se
+  razilaze.
+- **Šta se beleži — površina autoriteta:**
+  | Radnja | Zašto |
+  | --- | --- |
+  | `role.created` / `role.updated` / `role.deleted` | jedina radnja koja **tiho proširuje pristup svima** koji tu rolu nose |
+  | `assignment.granted` / `.changed` / `.revoked` | ista porodica: ko šta sme, u kojoj sezoni i u kojim venue-ima |
+  | `user.created` / `user.updated` / `user.deleted` | životni ciklus naloga |
+  | `user.password_link_sent` | administrator koji šalje link (ADR-0063) |
+- 🪤 **Par je zapis.** `before` se čita **pre** upisa, u istoj transakciji. `after` bez `before` ne
+  može da odgovori na „šta je ovo promenilo", a to je jedino pitanje koje se tom redu postavlja.
+- 🪤 **Ništa tajno ne ulazi.** Administrator **sme** da postavi tuđu lozinku (`UserController`), i
+  baš taj čin vredi zabeležiti — ali lozinka ne. `AuditTrail::forUser()` piše `password_set: true`,
+  logičku vrednost i ništa više. Test to drži tražeći u zapisanom i staru i novu lozinku i `$2y$`.
+- **Permisije se pišu KLJUČEVIMA, ne id-jevima** — id ne znači ništa onome ko ovo čita za godinu
+  dana, a ponovo zasejan katalog bi ih ionako prenumerisao.
+- ⚡ **Pravilo zadržavanja iz ADR-0068 je PROŠIRENO, i moralo je da bude.** Ono je čuvalo samo redove
+  o sezoni; ovi novi imaju `subject_type` = `Role` / `SeasonUserAssignment` / `User`, pa bi ih
+  **svaki prelazak sezone obrisao** — a *„ko je kome šta dodelio prošle sezone"* je baš pitanje koje
+  se postavlja **posle** prelaska, kad nekoga iznenadi tuđi pristup. Sada se čuvaju sve četiri vrste
+  subjekta, a briše se i dalje ono što je vezano za takmičare.
+  🪤 Red o **nalogu se čuva iako prelazak briše školske koordinatore**: `actor_id` nulira strani
+  ključ, `actor_label` ne, a `subject_id` je običan string. Zapis o nalogu koji više ne postoji je
+  tačno onaj zapis koji nekome treba kad pita šta se s njim desilo.
+- **Čitanje za sada ostaje `grep`.** Ekran se dodaje kad se vidi da se traži; jedini postojeći
+  čitalac je istorija prelazaka na ekranu Season (ADR-0068).
+- **Nije urađeno, svesno:** brisanja sadržaja i rostera (venue, test, pitanje, grupno brisanje
+  učenika). Vlasnik ih je ostavio za posle ako se pokaže da trebaju.
+- **Testovi (`AuthorityTrailTest`, 9):** oba kraja para na promeni role; nova i obrisana rola;
+  dodela i oduzimanje zaduženja sa venue opsegom; **lozinka zabeležena bez lozinke**; kreiran i
+  obrisan nalog; poslat link; trag autoriteta **preživi prelazak sezone**; takmičarski red se i dalje
+  briše; i takmičarska putanja ne piše ništa.
+  Mutaciono provereno — vraćanje pravila na samo `Season::class` obara tačno jedan test:
+  „The record of a permission change was swept away by the rollover."
+- **Suite 667/667 na oba motora** (bilo 658), `pint --dirty` čist.
+
+---
+
 ## Otvorene odluke (blokiraju odgovarajuće module — ne pretpostavljati)
 
 Voditi ovde; premestiti u ADR čim vlasnik proizvoda potvrdi. Izvor: `00` §7,

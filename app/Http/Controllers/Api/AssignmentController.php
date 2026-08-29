@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
@@ -54,6 +55,14 @@ class AssignmentController extends Controller
 
             $assignment->schools()->sync($data['school_ids'] ?? []);
 
+            // Granting somebody a role in a season is granting them everything
+            // that role holds, inside the venues named here (ADR-0071).
+            AuditTrail::record(
+                'assignment.granted',
+                $assignment,
+                after: AuditTrail::forAssignment($assignment->load('role')),
+            );
+
             return $assignment;
         });
 
@@ -67,12 +76,22 @@ class AssignmentController extends Controller
         $data = $request->validated();
 
         DB::transaction(function () use ($assignment, $data) {
+            // Read before, like the role update: the pair is the record.
+            $before = AuditTrail::forAssignment($assignment->load('role'));
+
             if (array_key_exists('status', $data)) {
                 $assignment->update(['status' => $data['status']]);
             }
             if (array_key_exists('school_ids', $data)) {
                 $assignment->schools()->sync($data['school_ids']);
             }
+
+            AuditTrail::record(
+                'assignment.changed',
+                $assignment,
+                $before,
+                AuditTrail::forAssignment($assignment->refresh()->load('role')),
+            );
         });
 
         return AssignmentResource::make($assignment->load(self::RELATIONS));
@@ -81,6 +100,14 @@ class AssignmentController extends Controller
     public function destroy(SeasonUserAssignment $assignment): HttpResponse
     {
         $this->authorize('delete', $assignment);
+
+        // Taking a role away is the same kind of act as giving one, and the row
+        // is about to stop existing.
+        AuditTrail::record(
+            'assignment.revoked',
+            $assignment,
+            before: AuditTrail::forAssignment($assignment->load('role')),
+        );
 
         $assignment->delete();
 
