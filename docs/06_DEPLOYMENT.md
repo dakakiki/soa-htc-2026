@@ -149,8 +149,8 @@ the way in.
 
 ## Also worth doing before opening the doors
 
-- **`queue:work` must be running.** Without it nothing is graded, publishing
-  announces nothing, and a competitor sees no mark — one cause, four symptoms.
+- **Two cron lines, and the site does not work properly without either.** See
+  *The two cron lines* below — one runs the queue, one runs the scheduler.
 - **Replace the cookie policy.** `WebsiteSeeder` creates the page as an
   unmistakable placeholder so the footer link has somewhere to go; the text is
   the venue's to write, from Website → Pages.
@@ -158,6 +158,52 @@ the way in.
   status strip shows the season but no round.
 - **Publish a sample quiz.** Practice is meant to be available all year (owner,
   2026-08-27); with no active sample quiz the practice entry is shown as closed.
+
+## The two cron lines
+
+```cron
+* * * * * cd /path/to/app && php artisan queue:work --stop-when-empty --max-time=55 >> /dev/null 2>&1
+* * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1
+```
+
+**The first runs the queue.** Without it nothing is graded, publishing announces
+nothing, and a competitor sees no mark — one cause, four symptoms. `--stop-when-empty`
+means it exits the moment there is nothing to do rather than holding a process all
+minute, and `--max-time=55` means it never overlaps the next one. On a host that
+allows a permanent worker, supervisor or a systemd unit is better; this shape
+exists because managed hosting often allows neither, and it works either way.
+
+**The second runs the scheduler**, which today means one thing: closing exams
+nobody came back to. A competitor whose browser or connection dies mid-exam leaves
+the attempt open, and the application finishes it the moment they return — but
+somebody who never returns had their attempt left `in_progress` for good: never
+graded, never published, counted forever as started but not submitted. In the
+legacy data that is 1,743 of 80,287 started tests, a little over two in a hundred.
+
+> 🪤 `routes/console.php` was empty until 2026-08-31, so nothing at all was
+> scheduled and `attempts:finalize-expired` — which says in its own docblock that
+> it is safe to run on a schedule — had never been run by anything. A test now
+> asserts that it is on the schedule, because an empty scheduler fails silently.
+
+## Rolling a season over from the command line
+
+Settings → Season closes the running season and opens the next, and it does the
+whole thing inside one HTTP request. Against 50,000 registrations that took **54
+seconds** on the development machine; the roster is now 108,771. The application
+raises its own ceiling to 300 seconds (ADR-0065) and can raise nothing above it —
+the timeout in front of PHP is the server's, and on managed hosting it may not be
+the administrator's either.
+
+```bash
+php artisan season:start --name="Season 2027" --year=2027 --round=15 --actor=you@example.org
+```
+
+Same work, same archive, same audit entry — it calls what the screen calls — but
+no request exists, so no timeout in front of PHP applies. It prints the full plan
+with row counts and asks before writing anything; `--dry-run` prints and stops.
+
+> `--actor` is the e-mail of whoever is doing it. The audit trail keeps a season
+> start for good (ADR-0068), and without this the entry has no name on it.
 
 ## What only that server can tell you
 
@@ -202,7 +248,7 @@ knowing that, which is why the limits are worth setting rather than relying on.
 
 | What | Why it can only be answered here | The check |
 | --- | --- | --- |
-| **`queue:work` is running** | Without it nothing is graded, publishing announces nothing and no competitor sees a mark — one cause, four symptoms. Needs supervisor or systemd. | Sit a test and watch it reach `graded` |
+| **Both cron lines are running** | Without the queue nothing is graded, publishing announces nothing and no competitor sees a mark. Without the scheduler, an exam nobody came back to is never closed. | Sit a test and watch it reach `graded`; leave one unsubmitted past its clock and watch it complete |
 | **Real SMTP** | Locally `MAIL_MAILER=log`, so no mail has ever actually left. Coordinator registration sends two (ADR-0053), password recovery one (ADR-0063). | Ask for a password link and register a coordinator; then check SPF/DKIM so the three do not land in spam |
 | **Exam media over HTTPS** | Pictures and recordings live on the private disk and are fetched with a signed address (ADR-0059). Behind a proxy that terminates TLS, a wrong scheme breaks the signature — and `TrustProxies` is not configured. | Open a question with a picture and a recording as a competitor: the picture must render and the audio must **seek** (Range) |
 | **`storage:link`** | Without it every uploaded image comes back as the SPA's HTML page — a broken picture with a 200 status. | Upload a logo in Settings → Theme and see it draw |
