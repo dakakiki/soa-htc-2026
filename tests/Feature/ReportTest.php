@@ -18,6 +18,7 @@ use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -120,6 +121,78 @@ class ReportTest extends TestCase
 
         // No group_by → no breakdown rows.
         $response->assertJsonCount(0, 'rows');
+    }
+
+    /**
+     * The median is the one statistic SQL has no single function for, so it is
+     * computed by numbering the ordered scores and keeping the middle one — or
+     * the middle two when the count is even.
+     *
+     * 🪤 Two engines had a say in how that condition is written, and each caught
+     * a version the other accepted. `floor` is not a function SQLite has, and
+     * `abs(rn * 2 - n - 1)` underflows on MySQL, where `row_number()` is BIGINT
+     * UNSIGNED and every row in the lower half makes the subtraction negative.
+     * That is why it is spelled as two comparisons and nothing else, and why
+     * these cases are worth holding: an odd count, an even count, and one score
+     * on its own.
+     *
+     * @param  list<float>  $scores
+     */
+    #[DataProvider('medianCases')]
+    public function test_the_median_holds_for_odd_and_even_counts(array $scores, int|float $expected): void
+    {
+        $c = $this->content();
+
+        foreach ($scores as $score) {
+            $this->attempt($this->registration(), $c, 'completed', $score);
+        }
+
+        $this->actingAs($this->admin())->getJson('/api/reports/summary')->assertOk()
+            ->assertJsonPath('totals.score.count', count($scores))
+            ->assertJsonPath('totals.score.median', $expected);
+    }
+
+    /**
+     * 🪤 A whole median comes back from JSON as an integer, not a float, so the
+     * expectations are written the way the response actually reads.
+     *
+     * @return array<string, array{list<float>, int|float}>
+     */
+    public static function medianCases(): array
+    {
+        return [
+            'one score is its own median' => [[7.0], 7],
+            'two scores meet in the middle' => [[4.0, 9.0], 6.5],
+            'an odd count takes the middle one' => [[1.0, 8.0, 3.0], 3],
+            'an even count averages the middle two' => [[1.0, 8.0, 3.0, 6.0], 4.5],
+            'five scores, unordered' => [[9.0, 2.0, 7.0, 1.0, 5.0], 5],
+            'repeated scores do not shift it' => [[2.0, 2.0, 2.0, 9.0], 2],
+        ];
+    }
+
+    /**
+     * 🪤 The registration and school joins are made only when a filter or a
+     * grouping reads them. That is a real change to the query the report runs, so
+     * the unfiltered totals are worth asserting from both sides: with no joins at
+     * all, and with a country filter that puts them back.
+     */
+    public function test_the_totals_are_the_same_whether_or_not_the_joins_are_needed(): void
+    {
+        $c = $this->content();
+        $registration = $this->registration();
+
+        $this->attempt($registration, $c, 'completed', 4.0);
+        $this->attempt($this->registration(), $c, 'completed', 8.0);
+
+        $unfiltered = $this->actingAs($this->admin())->getJson('/api/reports/summary')->assertOk();
+        $unfiltered->assertJsonPath('totals.submitted', 2)->assertJsonPath('totals.score.median', 6);
+
+        $filtered = $this->actingAs($this->admin())
+            ->getJson('/api/reports/summary?country_id='.$registration->country_id)
+            ->assertOk();
+
+        // Same competitors, same country — the filter changes the query, not the answer.
+        $filtered->assertJsonPath('totals.submitted', 2)->assertJsonPath('totals.score.median', 6);
     }
 
     public function test_group_by_country_splits_the_population_and_attempts(): void
