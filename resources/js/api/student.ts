@@ -44,8 +44,19 @@ export function listCountries() {
     return http.get<{ data: Country[] }>('/api/student/countries');
 }
 
+/** What may be sat right now — the tests screen. */
 export function availability(token: string) {
     return http.get<{ quizzes: AvailabilityQuiz[] }>('/api/student/availability', auth(token));
+}
+
+/**
+ * What has already been sat — Check results. Same shape, but it also carries
+ * rounds that have since been closed: switching a test off ends the sitting of
+ * it, never the marks already given. Reading `availability` here is what made
+ * closing a round take its published marks down with it.
+ */
+export function results(token: string) {
+    return http.get<{ quizzes: AvailabilityQuiz[] }>('/api/student/results', auth(token));
 }
 
 /**

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconCheck } from '@tabler/icons-vue';
-import { availability } from '@/api/student';
+import { results } from '@/api/student';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import type { AvailabilityExam, AvailabilityQuiz, AvailabilityTest } from '@/types/models';
 
@@ -84,7 +84,7 @@ async function load(): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
-        const { data } = await availability(student.token ?? '');
+        const { data } = await results(student.token ?? '');
         quizzes.value = data.quizzes;
     } catch {
         error.value = t('student.results.error');

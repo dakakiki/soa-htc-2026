@@ -150,6 +150,11 @@ Route::prefix('student')->group(function () {
 
         // Level-gated assessment list (CC-06) and the competition password gate.
         Route::get('availability', [StudentAvailabilityController::class, 'index']);
+
+        // The same tree for Check results, widened to rounds already sat and
+        // since closed. Reading `availability` for this made closing a round
+        // retract its published marks.
+        Route::get('results', [StudentAvailabilityController::class, 'history']);
         Route::post('quizzes/{quiz}/unlock', [StudentAvailabilityController::class, 'unlock'])
             ->whereNumber('quiz')
             ->middleware('throttle:8,1');
