@@ -57,7 +57,7 @@ const ATTENTION_ROUTES: Record<string, { name: string; query?: Record<string, st
     essays_pending: { name: 'grading' },
     results_unpublished: { name: 'publishing' },
     venues_without_coordinator: { name: 'venues', query: { missing: 'coordinator', status: 'active' } },
-    venues_without_students: { name: 'venues', query: { status: 'active' } },
+    venues_without_students: { name: 'venues', query: { missing: 'students', status: 'active' } },
     venues_without_city: { name: 'venues', query: { missing: 'city', status: 'active' } },
     students_missing_dob: { name: 'registrations', query: { missing: 'dob' } },
 };

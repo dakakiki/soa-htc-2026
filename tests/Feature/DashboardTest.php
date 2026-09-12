@@ -299,6 +299,55 @@ class DashboardTest extends TestCase
         $this->assertSame(1, $country['published']);
     }
 
+    /**
+     * "Marked and not published yet" must mean marked. The count asked for
+     * anything that was not `pending_grading`, which let `queued` through — and
+     * a queued attempt has not been marked at all, it is waiting for
+     * `queue:work` rather than for a person. One row on the dev roster; the
+     * moment a big exam ends the queue is thousands deep, and the pending list
+     * would be asking an administrator to publish marks that do not exist.
+     */
+    public function test_an_attempt_still_in_the_grading_queue_is_not_waiting_to_be_published(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $registration = $this->competitor('14808081', 808081);
+        $quiz = Quiz::create(['title' => 'Queue quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+
+        $statuses = ['queued' => 0, 'pending_grading' => 0, 'auto_graded' => 1, 'graded' => 1];
+
+        foreach ($statuses as $status => $_) {
+            $test = Test::create(['title' => "Queue test {$status}", 'status' => 'active']);
+            Attempt::create([
+                'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+                'is_practice' => false, 'status' => 'completed', 'grading_status' => $status,
+                'score' => 1, 'max_score' => 10,
+                'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+                'published_at' => null,
+            ]);
+        }
+
+        $attention = collect($this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.attention'));
+
+        // Only the two that carry a mark.
+        $this->assertSame(array_sum($statuses), $attention->firstWhere('key', 'results_unpublished')['count']);
+
+        // The one a human owes work on is counted separately, and it is not this.
+        $this->assertSame(1, $attention->firstWhere('key', 'essays_pending')['count']);
+    }
+
+    private function competitor(string $number, int $sequence): Registration
+    {
+        $school = School::query()->firstOrFail();
+
+        return Registration::create([
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'competitor_number' => $number, 'sequence' => $sequence,
+            'school_id' => $school->id, 'country_id' => $school->country_id,
+            'difficulty_level_id' => DifficultyLevel::where('level_short', 'H2')->value('id'),
+            'name' => 'Fixture Student', 'grade' => 7, 'status' => 'active',
+        ]);
+    }
+
     private function scopedCoordinator(School $school, School ...$more): User
     {
         $season = Season::where('round_number', 14)->firstOrFail();

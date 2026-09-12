@@ -203,11 +203,19 @@ class DashboardController extends Controller
                 ->where('grading_status', GradingStatus::PendingGrading)
                 ->count();
 
+            // Marked and waiting for somebody to publish it.
+            //
+            // 🪤 This asked for "not pending_grading", which is not the same
+            // thing: `queued` passed that test too, and a queued attempt has not
+            // been marked at all — it is waiting for `queue:work`, not for a
+            // person. One row on the dev roster, but the moment a big exam ends
+            // the queue is thousands deep, and the list would be telling an
+            // administrator to publish marks that do not exist yet.
             $items['results_unpublished'] = Attempt::query()
                 ->active()
                 ->whereNotNull('submitted_at')
                 ->whereNull('published_at')
-                ->where('grading_status', '!=', GradingStatus::PendingGrading)
+                ->whereIn('grading_status', [GradingStatus::AutoGraded, GradingStatus::Graded])
                 ->count();
         }
 

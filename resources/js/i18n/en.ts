@@ -695,6 +695,7 @@ export default {
         filterMissing: 'Missing…',
         missingCoordinator: 'No coordinator',
         missingCity: 'No city',
+        missingStudents: 'No students this season',
         filterReset: 'Reset filters',
         empty: 'No venues.',
         error: 'Could not load venues.',
