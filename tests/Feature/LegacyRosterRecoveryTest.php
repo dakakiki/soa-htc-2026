@@ -173,6 +173,13 @@ class LegacyRosterRecoveryTest extends TestCase
         config(['database.connections.legacy' => config('database.connections.'.config('database.default'))]);
         DB::purge('legacy');
 
+        // 🪤 Dropped first, not just created. On SQLite each test gets a fresh
+        // `:memory:` database and this is moot; on MySQL the database outlives
+        // the test and `RefreshDatabase`'s transaction does not roll DDL back,
+        // so the second test in the class met a table that was already there.
+        Schema::connection('legacy')->dropIfExists('el_student');
+        Schema::connection('legacy')->dropIfExists('difficulty_category_levels');
+
         Schema::connection('legacy')->create('el_student', function ($table) {
             $table->unsignedBigInteger('entry_id');
             $table->string('student_id')->nullable();
