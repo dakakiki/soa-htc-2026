@@ -22,10 +22,14 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class SchoolController extends Controller
 {
+    /** Gaps the register can be filtered by \u2014 one per anti-join the dashboard counts with. */
+    private const MISSING = ['city', 'coordinator', 'students'];
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', School::class);
@@ -158,7 +162,10 @@ class SchoolController extends Controller
             $query->where('status', $request->string('status'));
         }
         // Gaps in the register, so the dashboard's pending list can link to the
-        // exact rows it counted rather than to the whole list.
+        // exact rows it counted rather than to the whole list. Validated rather
+        // than ignored: a filter that quietly does nothing shows the whole
+        // register under a heading that promises a subset of it.
+        $request->validate(['missing' => ['nullable', Rule::in(self::MISSING)]]);
         $this->applyMissing($query, $request->string('missing')->value());
 
         // Server-side scope: non-admins see only their allowed schools.
@@ -171,32 +178,42 @@ class SchoolController extends Controller
     }
 
     /**
-     * The "what is missing here" filter. A venue nobody coordinates gets no
-     * students entered; a venue with no city cannot be placed on a map. Both
-     * mirror the anti-joins the dashboard counts with.
+     * The "what is missing here" filter, one entry per anti-join the dashboard's
+     * pending list counts with: a venue nobody coordinates gets no students
+     * entered, a venue with no students has a coordinator who has not started,
+     * and a venue with no city cannot be placed on a map.
+     *
+     * 🪤 `students` was missing here while the dashboard counted it, and an
+     * unrecognised value used to fall through and filter nothing. Clicking
+     * "601 venues with no students" therefore opened all 2,233 active ones —
+     * silently, because nothing rejected the parameter. Unknown values are now
+     * refused ({@see self::MISSING}), so the next such gap fails loudly.
      */
     private function applyMissing(Builder $query, string $missing): void
     {
-        if ($missing === 'city') {
-            $query->where(fn ($q) => $q->whereNull('city')->orWhere('city', ''));
-
-            return;
-        }
-
-        if ($missing !== 'coordinator') {
-            return;
-        }
-
         $seasonId = SeasonContext::active()?->id;
 
-        $query->whereNotExists(function ($sub) use ($seasonId): void {
-            $sub->select(DB::raw(1))
-                ->from('assignment_schools as sas')
-                ->join('season_user_assignments as sa', 'sa.id', '=', 'sas.season_user_assignment_id')
-                ->whereColumn('sas.school_id', 'schools.id')
-                ->where('sa.status', 'active')
-                ->when($seasonId !== null, fn ($q) => $q->where('sa.season_id', $seasonId));
-        });
+        match ($missing) {
+            'city' => $query->where(fn ($q) => $q->whereNull('city')->orWhere('city', '')),
+
+            'coordinator' => $query->whereNotExists(function ($sub) use ($seasonId): void {
+                $sub->select(DB::raw(1))
+                    ->from('assignment_schools as sas')
+                    ->join('season_user_assignments as sa', 'sa.id', '=', 'sas.season_user_assignment_id')
+                    ->whereColumn('sas.school_id', 'schools.id')
+                    ->where('sa.status', 'active')
+                    ->when($seasonId !== null, fn ($q) => $q->where('sa.season_id', $seasonId));
+            }),
+
+            'students' => $query->whereNotExists(function ($sub) use ($seasonId): void {
+                $sub->select(DB::raw(1))
+                    ->from('registrations as r')
+                    ->whereColumn('r.school_id', 'schools.id')
+                    ->when($seasonId !== null, fn ($q) => $q->where('r.season_id', $seasonId));
+            }),
+
+            default => null,
+        };
     }
 
     public function store(StoreSchoolRequest $request): JsonResponse

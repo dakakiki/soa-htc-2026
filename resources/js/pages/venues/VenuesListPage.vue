@@ -229,6 +229,7 @@ onMounted(async () => {
                 <option value="">{{ $t('venue.filterMissing') }}</option>
                 <option value="coordinator">{{ $t('venue.missingCoordinator') }}</option>
                 <option value="city">{{ $t('venue.missingCity') }}</option>
+                <option value="students">{{ $t('venue.missingStudents') }}</option>
             </select>
         </form>
         </div>

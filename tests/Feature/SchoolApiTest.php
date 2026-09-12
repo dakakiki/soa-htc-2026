@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Competition\Models\Registration;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\School;
@@ -139,5 +141,42 @@ class SchoolApiTest extends TestCase
         $this->assertFalse($names->contains($schools[0]->name));
         $this->assertTrue($names->contains($schools[1]->name));
         $this->assertTrue($names->contains($schools[2]->name));
+    }
+
+    /**
+     * The dashboard counts venues with no students this season and links here.
+     * The filter did not exist, so that link opened the whole active register —
+     * 601 counted, 2,233 shown — and nothing said so, because an unrecognised
+     * `missing` value used to fall through and filter nothing.
+     */
+    public function test_the_missing_filter_finds_venues_without_students_this_season(): void
+    {
+        $schools = School::query()->orderBy('name')->get();
+        $season = Season::where('round_number', 14)->firstOrFail();
+
+        Registration::create([
+            'season_id' => $season->id, 'competitor_number' => '14808080', 'sequence' => 808080,
+            'school_id' => $schools[0]->id, 'country_id' => $schools[0]->country_id,
+            'difficulty_level_id' => DifficultyLevel::where('level_short', 'H2')->value('id'),
+            'name' => 'Only Student', 'grade' => 7, 'status' => 'active',
+        ]);
+
+        $names = collect(
+            $this->actingAs($this->admin())->getJson('/api/schools?missing=students')->assertOk()->json('data')
+        )->pluck('name');
+
+        $this->assertFalse($names->contains($schools[0]->name), 'A venue with a roster is not waiting on anyone.');
+        $this->assertTrue($names->contains($schools[1]->name));
+        $this->assertTrue($names->contains($schools[2]->name));
+    }
+
+    public function test_an_unknown_missing_filter_is_refused_rather_than_ignored(): void
+    {
+        // Silence is what made the gap above invisible: the parameter did
+        // nothing, and the page showed every venue under a heading that
+        // promised a subset.
+        $this->actingAs($this->admin())->getJson('/api/schools?missing=nonsense')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('missing');
     }
 }
