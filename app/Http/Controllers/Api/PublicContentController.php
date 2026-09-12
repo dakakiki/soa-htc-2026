@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Assessment\Support\EntryWindow;
 use App\Domain\Cms\Models\Category;
 use App\Domain\Cms\Models\LayoutBlock;
@@ -152,12 +151,10 @@ class PublicContentController extends Controller
         return ['data' => [
             'round' => $season?->round_number,
             'year' => $season?->year,
-            // Which ROUND OF THE CONTEST is being run — Preliminary, National —
-            // as against `round` above, which is the edition (the 14th). Null
-            // between rounds, and that is an answer, not a gap: read directly
-            // rather than through ExamRoundController, which is behind
-            // `content.manage` and this endpoint is public.
-            'exam_round' => ExamRound::query()->where('is_current', true)->value('name'),
+            // 🪤 There is deliberately no "round being run" here. The rounds do
+            // not advance together — the client's countries sit on National and on
+            // Regional Qualifiers at the same time — so one name on a page every
+            // country reads was wrong for about half of them (ADR-0077).
             'season' => $season?->name,
             'competition_open' => EntryWindow::competitionOpen(),
             'sample_open' => EntryWindow::sampleOpen(),

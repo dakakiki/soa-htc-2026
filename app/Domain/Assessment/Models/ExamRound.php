@@ -16,10 +16,10 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ExamRound extends Model
 {
-    protected $fillable = ['name', 'active', 'sort_order', 'is_current', 'is_sample', 'legacy_id'];
+    protected $fillable = ['name', 'active', 'sort_order', 'is_sample', 'legacy_id'];
 
     protected function casts(): array
     {
-        return ['active' => 'boolean', 'sort_order' => 'integer', 'is_current' => 'boolean', 'is_sample' => 'boolean', 'legacy_id' => 'integer'];
+        return ['active' => 'boolean', 'sort_order' => 'integer', 'is_sample' => 'boolean', 'legacy_id' => 'integer'];
     }
 }

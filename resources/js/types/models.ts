@@ -830,11 +830,15 @@ export interface CmsLayoutBlock {
     image_media_id: number | null;
 }
 
-/** Which round is running, and whether it can be entered. */
+/**
+ * The edition of the contest, and whether it can be entered.
+ *
+ * 🪤 No "round being run": the client's countries sit on National round and on
+ * Regional Qualifiers at the same time, so there is no single answer to put on a
+ * page every country reads (ADR-0077).
+ */
 export interface SiteStatus {
     round: number | null;
-    /** The contest round being run right now (Preliminary, National…), if any. */
-    exam_round: string | null;
     year: number | null;
     season: string | null;
     competition_open: boolean;
