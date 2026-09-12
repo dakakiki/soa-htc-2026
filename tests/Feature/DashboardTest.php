@@ -335,6 +335,45 @@ class DashboardTest extends TestCase
         $this->assertSame(1, $attention->firstWhere('key', 'essays_pending')['count']);
     }
 
+    /**
+     * A dead queue worker is otherwise invisible: nothing is marked, nothing is
+     * published, no competitor sees a mark, and every screen looks normal.
+     *
+     * Age is the signal, not count. During an exam thousands pass through
+     * `queued` every minute and that is the system working — counting those
+     * would raise the alarm on the one day it must not.
+     */
+    public function test_the_pending_list_shows_a_grading_queue_that_has_stopped(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $registration = $this->competitor('14808082', 808082);
+        $quiz = Quiz::create(['title' => 'Stall quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+
+        $queue = function (string $title, int $minutesAgo) use ($registration, $quiz) {
+            $test = Test::create(['title' => $title, 'status' => 'active']);
+
+            return Attempt::create([
+                'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+                'is_practice' => false, 'status' => 'completed', 'grading_status' => 'queued',
+                'started_at' => now()->subMinutes($minutesAgo), 'expires_at' => now()->subMinutes($minutesAgo),
+                'submitted_at' => now()->subMinutes($minutesAgo), 'published_at' => null,
+            ]);
+        };
+
+        $queue('Just submitted', 1);
+        $queue('Also just submitted', 5);
+
+        $fresh = fn () => collect($this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.attention'))
+            ->firstWhere('key', 'grading_queue_stalled');
+
+        // A queue that is merely busy is not a fault, so nothing is said.
+        $this->assertNull($fresh(), 'Attempts submitted moments ago are throughput, not a stall.');
+
+        $queue('Stuck since this morning', 90);
+
+        $this->assertSame(1, $fresh()['count']);
+    }
+
     private function competitor(string $number, int $sequence): Registration
     {
         $school = School::query()->firstOrFail();
