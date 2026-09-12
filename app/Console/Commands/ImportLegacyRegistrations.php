@@ -77,7 +77,14 @@ class ImportLegacyRegistrations extends Command
 
         $renumbered = $this->renumberDuplicates($legacy, $season);
 
-        $counts = ['written' => 0, 'no_school' => 0, 'no_level' => 0, 'no_country' => 0, 'bad_date' => 0];
+        // Two ways back for rows the legacy form left incomplete — see where
+        // each is used below.
+        $venuesByName = $this->venuesByName();
+        $categoryByLegacySchool = $this->categoryByLegacySchool($legacy);
+        $levelByGrade = $this->levelByGrade();
+
+        $counts = ['written' => 0, 'no_school' => 0, 'no_level' => 0, 'no_country' => 0, 'bad_date' => 0,
+            'school_by_name' => 0, 'level_by_grade' => 0];
         $quarantine = [];
         $now = now();
         $total = (int) $legacy->table('el_student')->count();
@@ -87,7 +94,8 @@ class ImportLegacyRegistrations extends Command
         $legacy->table('el_student')
             ->orderBy('entry_id')
             ->chunk((int) $this->option('chunk'), function ($rows) use (
-                $season, $schools, $countries, $levels, $renumbered, $now, $dryRun, &$counts, &$quarantine, $bar
+                $season, $schools, $countries, $levels, $renumbered, $now, $dryRun, &$counts, &$quarantine, $bar,
+                $venuesByName, $categoryByLegacySchool, $levelByGrade
             ) {
                 $write = [];
 
@@ -95,14 +103,8 @@ class ImportLegacyRegistrations extends Command
                     $entryId = (int) $s->entry_id;
                     $number = $renumbered[$entryId] ?? trim((string) $s->student_id);
 
-                    $schoolId = $schools[(int) $s->school_id] ?? null;
-                    if ($schoolId === null) {
-                        $counts['no_school']++;
-                        $this->quarantine($quarantine, $number, 'no school (legacy school_id '.($s->school_id ?: 'empty').')');
-
-                        continue;
-                    }
-
+                    // Country first: both fallbacks below are scoped by it, and
+                    // nothing in this roster is missing one.
                     $countryId = $countries[(int) $s->country_id] ?? null;
                     if ($countryId === null) {
                         $counts['no_country']++;
@@ -111,7 +113,39 @@ class ImportLegacyRegistrations extends Command
                         continue;
                     }
 
+                    $schoolId = $schools[(int) $s->school_id] ?? null;
+                    if ($schoolId === null) {
+                        // The venue they typed in, matched by name inside their
+                        // own country. 35 Mongolian competitors carry no
+                        // `school_id` at all while naming a venue that is in the
+                        // register and already has a roster — a gap in the legacy
+                        // form, not a competitor who sat nowhere.
+                        $schoolId = $venuesByName[$countryId.'|'.mb_strtolower(trim((string) $s->school_external))] ?? null;
+                        if ($schoolId !== null) {
+                            $counts['school_by_name']++;
+                        }
+                    }
+                    if ($schoolId === null) {
+                        $counts['no_school']++;
+                        $this->quarantine($quarantine, $number, 'no school (legacy school_id '.($s->school_id ?: 'empty').')');
+
+                        continue;
+                    }
+
                     $levelId = $levels[(int) $s->level] ?? null;
+                    if ($levelId === null) {
+                        // No level recorded, but the grade is — and a grade names
+                        // exactly one level once the scheme is known. The scheme
+                        // is the one the rest of that venue sits under.
+                        $category = $categoryByLegacySchool[(int) $s->school_id] ?? null;
+                        $grade = is_numeric($s->class) ? (int) $s->class : null;
+                        if ($category !== null && $grade !== null) {
+                            $levelId = $levelByGrade[$category.'|'.$grade] ?? null;
+                        }
+                        if ($levelId !== null) {
+                            $counts['level_by_grade']++;
+                        }
+                    }
                     if ($levelId === null) {
                         $counts['no_level']++;
                         $this->quarantine($quarantine, $number, 'level '.($s->level ?: 'empty').' not mapped');
@@ -228,6 +262,89 @@ class ImportLegacyRegistrations extends Command
      *
      * @return array<int, string> legacy entry_id => the number to write
      */
+    /**
+     * `country|lower(venue name)` → our school id, for names that are theirs
+     * alone in that country.
+     *
+     * 🪤 Ambiguous names are left out rather than guessed at. Putting a
+     * competitor in the wrong venue is worse than leaving them out: the venue is
+     * who marks them, who sees them on a register, and who their results are
+     * counted under.
+     *
+     * @return array<string, int>
+     */
+    private function venuesByName(): array
+    {
+        $seen = [];
+
+        foreach (DB::table('schools')->where('status', 'active')->get(['id', 'name', 'country_id']) as $school) {
+            $key = $school->country_id.'|'.mb_strtolower(trim((string) $school->name));
+            $seen[$key][] = (int) $school->id;
+        }
+
+        return array_map(
+            fn (array $ids): int => $ids[0],
+            array_filter($seen, fn (array $ids): bool => count($ids) === 1)
+        );
+    }
+
+    /**
+     * Legacy school id → the legacy difficulty category its roster sits under.
+     *
+     * A country uses one scheme, and a venue follows its country. Read from the
+     * legacy rows rather than from ours, because during a `--replace-local` run
+     * ours are not written yet. The majority decides: the odd row entered under
+     * another scheme does not move the venue.
+     *
+     * @return array<int, int>
+     */
+    private function categoryByLegacySchool(Connection $legacy): array
+    {
+        $best = [];
+        $rows = $legacy->table('el_student as s')
+            ->join('difficulty_category_levels as dcl', 'dcl.id', '=', 's.level')
+            ->whereNotNull('s.school_id')
+            ->groupBy('s.school_id', 'dcl.difficulty_category_id')
+            ->selectRaw('s.school_id, dcl.difficulty_category_id as category, count(*) as n')
+            ->get();
+
+        foreach ($rows as $row) {
+            $schoolId = (int) $row->school_id;
+            if (! isset($best[$schoolId]) || $row->n > $best[$schoolId]['n']) {
+                $best[$schoolId] = ['category' => (int) $row->category, 'n' => (int) $row->n];
+            }
+        }
+
+        return array_map(fn (array $row): int => $row['category'], $best);
+    }
+
+    /**
+     * `legacy category id|grade` → our difficulty level id.
+     *
+     * The grades a level covers are the level's own definition, so a grade names
+     * exactly one level once the scheme is known — which is how a coordinator
+     * fills the form in the first place.
+     *
+     * @return array<string, int>
+     */
+    private function levelByGrade(): array
+    {
+        $map = [];
+
+        $levels = DB::table('difficulty_levels as dl')
+            ->join('difficulty_categories as dc', 'dc.id', '=', 'dl.difficulty_category_id')
+            ->whereNotNull('dc.legacy_id')
+            ->get(['dl.id', 'dl.grades', 'dc.legacy_id as category']);
+
+        foreach ($levels as $level) {
+            foreach ((array) json_decode((string) $level->grades, true) as $grade) {
+                $map[$level->category.'|'.(int) $grade] = (int) $level->id;
+            }
+        }
+
+        return $map;
+    }
+
     private function renumberDuplicates(Connection $legacy, Season $season): array
     {
         $duplicated = $legacy->table('el_student')
@@ -310,6 +427,15 @@ class ImportLegacyRegistrations extends Command
         ] as $key => $why) {
             if ($counts[$key] > 0) {
                 $this->line("Skipped {$counts[$key]}: {$why}.");
+            }
+        }
+
+        foreach ([
+            'school_by_name' => 'venue matched by the name the competitor typed in',
+            'level_by_grade' => 'level read from the grade, under the scheme their venue uses',
+        ] as $key => $how) {
+            if ($counts[$key] > 0) {
+                $this->line("Recovered {$counts[$key]}: {$how}.");
             }
         }
 
