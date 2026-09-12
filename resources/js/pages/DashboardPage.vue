@@ -2,11 +2,11 @@
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useSessionStore } from '@/stores/session';
-import { getDashboard } from '@/api/dashboard';
+import { getDashboard, getDashboardCountries } from '@/api/dashboard';
 import { apiErrorMessage } from '@/api/http';
 import { useScope } from '@/composables/useScope';
 import GlobalSearch from '@/components/GlobalSearch.vue';
-import type { DashboardData } from '@/types/models';
+import type { CountryMapRow, DashboardData } from '@/types/models';
 
 // The map pulls in the world geometry and a projection, so it loads only for
 // the accounts whose payload actually carries country rows.
@@ -17,6 +17,15 @@ const session = useSessionStore();
 const { venueLocked, venue: scopeVenue } = useScope();
 const data = ref<DashboardData | null>(null);
 const error = ref<string | null>(null);
+
+/*
+ * The country breakdown arrives on its own. It was the slowest part of one
+ * combined payload — 903 ms of 2,336 — and it sits below the fold, so the
+ * headline numbers no longer wait behind it. Both requests are fired together,
+ * so the page costs the slower of the two rather than their sum.
+ */
+const countries = ref<CountryMapRow[]>([]);
+const countriesLoading = ref(true);
 
 const kpis = computed(() => data.value?.kpis ?? null);
 
@@ -56,7 +65,7 @@ const ATTENTION_ROUTES: Record<string, { name: string; query?: Record<string, st
 const attention = computed(() => data.value?.attention ?? []);
 
 /** Top of the country table — the whole list of 80+ belongs in Reports. */
-const topCountries = computed(() => (data.value?.by_country ?? []).slice(0, 10));
+const topCountries = computed(() => countries.value.slice(0, 10));
 const topVenues = computed(() => (data.value?.by_venue ?? []).slice(0, 10));
 
 const pct = (part: number, whole: number): string => (whole === 0 ? '—' : `${Math.round((part / whole) * 100)}%`);
@@ -75,13 +84,17 @@ const tableCard = 'rounded-lg border border-gray-200 bg-white';
 const th = 'px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500';
 const td = 'px-4 py-2 text-sm text-gray-600 tabular-nums';
 
-onMounted(async () => {
-    try {
-        const res = await getDashboard();
-        data.value = res.data.data;
-    } catch (e) {
-        error.value = apiErrorMessage(e);
-    }
+onMounted(() => {
+    getDashboard()
+        .then((res) => { data.value = res.data.data; })
+        .catch((e) => { error.value = apiErrorMessage(e); });
+
+    // Its own failure is not the page's failure: the numbers above are still
+    // worth reading without the map, so this only stops the skeleton.
+    getDashboardCountries()
+        .then((res) => { countries.value = res.data.data; })
+        .catch(() => { countries.value = []; })
+        .finally(() => { countriesLoading.value = false; });
 });
 
 const card = 'rounded-lg border border-gray-200 bg-white p-4';
@@ -92,6 +105,23 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
         <h1 class="text-2xl font-semibold tracking-tight">{{ $t('dashboard.title') }}</h1>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+
+        <!-- The shape of the page while its numbers are on the way. Reserving the
+             boxes rather than showing nothing means the screen does not arrive in
+             one jolt, and nothing below it moves once the figures land. -->
+        <div v-if="!data && !error" class="space-y-6" role="status" :aria-label="$t('dashboard.loading')">
+            <div class="h-12 animate-pulse rounded-lg bg-gray-100"></div>
+            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+                <div class="space-y-6">
+                    <div class="h-11 animate-pulse rounded-lg bg-gray-100"></div>
+                    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <div v-for="n in 4" :key="n" class="h-24 animate-pulse rounded-lg bg-gray-100"></div>
+                    </div>
+                    <div class="h-72 animate-pulse rounded-lg bg-gray-100"></div>
+                </div>
+                <div class="h-64 animate-pulse rounded-lg bg-gray-100"></div>
+            </div>
+        </div>
 
         <div v-if="data" class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
             <template v-if="data.season">
@@ -153,15 +183,19 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                     </RouterLink>
                 </div>
 
-                <div v-if="data.by_country?.length" class="rounded-lg border border-gray-200 bg-white">
+                <!-- The card is drawn as soon as we know it is coming, so the
+                     page does not jump when the countries land under it. -->
+                <div v-if="data.has_by_country" class="rounded-lg border border-gray-200 bg-white">
                     <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
                         <h2 class="text-sm font-semibold text-gray-900">{{ $t('dashboard.map.title') }}</h2>
-                        <span class="ml-auto text-xs text-gray-500">
-                            {{ $t('dashboard.map.countries', { count: data.by_country.length }) }}
+                        <span v-if="!countriesLoading" class="ml-auto text-xs text-gray-500">
+                            {{ $t('dashboard.map.countries', { count: countries.length }) }}
                         </span>
                     </div>
                     <div class="p-4">
-                        <WorldChoropleth :rows="data.by_country" />
+                        <div v-if="countriesLoading" class="h-64 animate-pulse rounded bg-gray-100"
+                            role="status" :aria-label="$t('dashboard.loading')"></div>
+                        <WorldChoropleth v-else-if="countries.length" :rows="countries" />
                     </div>
                 </div>
 
@@ -186,7 +220,7 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                 </div>
 
                 <!-- Countries: an admin's table. Rows link to the roster behind them. -->
-                <div v-if="topCountries.length" :class="tableCard">
+                <div v-if="data.has_by_country" :class="tableCard">
                     <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
                         <h2 class="text-sm font-semibold text-gray-900">{{ $t('dashboard.tables.countries') }}</h2>
                         <span class="ml-auto text-xs text-gray-500">{{ $t('dashboard.tables.topTen') }}</span>
@@ -203,6 +237,11 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
+                                <tr v-for="n in (countriesLoading ? 10 : 0)" :key="`skeleton-${n}`">
+                                    <td colspan="5" class="px-4 py-2">
+                                        <div class="h-4 animate-pulse rounded bg-gray-100"></div>
+                                    </td>
+                                </tr>
                                 <tr v-for="row in topCountries" :key="row.iso" class="hover:bg-gray-50">
                                     <td class="px-4 py-2 text-sm">
                                         <RouterLink :to="{ name: 'registrations', query: { country_id: String(row.id) } }"

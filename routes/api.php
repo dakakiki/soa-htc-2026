@@ -173,6 +173,10 @@ Route::prefix('student')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'show']);
 
+    // The per-country breakdown is the slowest thing on the dashboard and the
+    // furthest down it, so the page draws without it and fetches it alongside.
+    Route::get('dashboard/countries', [DashboardController::class, 'countries']);
+
     // One search box over students, venues, countries and staff. Each group is
     // gated and scoped exactly like the screen it leads to (see SearchController).
     Route::get('search', [SearchController::class, 'index']);
