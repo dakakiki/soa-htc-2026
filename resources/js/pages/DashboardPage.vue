@@ -62,6 +62,13 @@ const ATTENTION_ROUTES: Record<string, { name: string; query?: Record<string, st
     students_missing_dob: { name: 'registrations', query: { missing: 'dob' } },
 };
 
+/*
+ * One of these is not a job somebody has not got to yet — it is a fault. A
+ * stalled grading queue means nothing is being marked at all, and it reads
+ * wrong in the same grey as "essays waiting to be graded".
+ */
+const FAULTS = new Set(['grading_queue_stalled']);
+
 const attention = computed(() => data.value?.attention ?? []);
 
 /** Top of the country table — the whole list of 80+ belongs in Reports. */
@@ -363,8 +370,11 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                             :to="ATTENTION_ROUTES[item.key]"
                             class="flex items-start gap-3 px-4 py-3 text-sm"
                             :class="ATTENTION_ROUTES[item.key] ? 'transition hover:bg-gray-50' : ''">
-                            <span class="min-w-[2.5rem] font-medium tabular-nums text-gray-900">{{ item.count.toLocaleString() }}</span>
-                            <span class="text-gray-600">{{ $t(`dashboard.attention.${item.key}`) }}</span>
+                            <span class="min-w-[2.5rem] font-medium tabular-nums"
+                                :class="FAULTS.has(item.key) ? 'text-red-600' : 'text-gray-900'">{{ item.count.toLocaleString() }}</span>
+                            <span :class="FAULTS.has(item.key) ? 'font-medium text-red-600' : 'text-gray-600'">
+                                {{ $t(`dashboard.attention.${item.key}`) }}
+                            </span>
                         </component>
                     </li>
                 </ul>

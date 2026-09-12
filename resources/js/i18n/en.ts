@@ -74,6 +74,7 @@ export default {
         attention: {
             title: 'Waiting on you',
             clear: 'Nothing is waiting.',
+            grading_queue_stalled: 'tests stuck in the grading queue — nothing is running it',
             essays_pending: 'essays waiting to be graded',
             results_unpublished: 'graded tests not published yet',
             venues_without_coordinator: 'active venues with no coordinator',

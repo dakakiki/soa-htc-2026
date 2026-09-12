@@ -23,6 +23,13 @@ use Illuminate\Support\Facades\DB;
 class DashboardController extends Controller
 {
     /**
+     * How long an attempt may sit in the grading queue before that is a fault
+     * rather than throughput. The cron runs the worker every minute, so ten
+     * consecutive misses is not a busy queue — it is a queue nobody is running.
+     */
+    private const STALLED_AFTER = 10;
+
+    /**
      * Scope-appropriate landing metrics. Each metric is included only when the
      * user is allowed to see it; the SPA renders cards by permission.
      */
@@ -198,6 +205,23 @@ class DashboardController extends Controller
         $items = [];
 
         if ($user->hasPermission('results.manage')) {
+            // 🔴 The queue itself has stopped. Submitting sets `queued` and
+            // dispatches the grading job; the cron runs `queue:work` every
+            // minute, so a healthy queue is empty again within one or two. An
+            // attempt still sitting there after STALLED_AFTER minutes means
+            // nothing is running it.
+            //
+            // Age, not count: during an exam thousands pass through `queued`
+            // every minute and that is the system working. Counting them would
+            // raise an alarm on the one day it must not. Without this, a dead
+            // worker is invisible — nothing is graded, nothing is published, no
+            // competitor sees a mark, and every screen looks normal.
+            $items['grading_queue_stalled'] = Attempt::query()
+                ->active()
+                ->where('grading_status', GradingStatus::Queued)
+                ->where('submitted_at', '<', now()->subMinutes(self::STALLED_AFTER))
+                ->count();
+
             $items['essays_pending'] = Attempt::query()
                 ->active()
                 ->where('grading_status', GradingStatus::PendingGrading)
