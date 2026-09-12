@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Assessment\Models\TestType;
+use App\Domain\Assessment\Support\LegacyLevelMap;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -30,27 +31,10 @@ class ImportLegacyTests extends Command
     {
         $legacy = DB::connection('legacy');
 
-        // Map legacy difficulty_category_level id → our difficulty_level id, keyed
-        // by (stream, short) so all country variants collapse onto our Default.
-        $ourLevels = DB::table('difficulty_levels')
-            ->join('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
-            ->get(['difficulty_levels.id', 'difficulty_levels.level_short', 'difficulty_categories.type']);
-        $ourMap = [];
-        foreach ($ourLevels as $l) {
-            $ourMap[$l->type.'|'.$l->level_short] = $l->id;
-        }
-
-        $legToOur = [];
-        $legLevels = $legacy->table('difficulty_category_levels')
-            ->join('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_category_levels.difficulty_category_id')
-            ->get(['difficulty_category_levels.id', 'difficulty_category_levels.level_short', 'difficulty_categories.type_id']);
-        foreach ($legLevels as $l) {
-            $type = ((int) $l->type_id === 2) ? 'special' : 'regular';
-            $key = $type.'|'.$l->level_short;
-            if (isset($ourMap[$key])) {
-                $legToOur[(int) $l->id] = $ourMap[$key];
-            }
-        }
+        // Legacy difficulty_category_level id → our difficulty_level id, one to
+        // one on legacy_id. Every scheme keeps its own levels, so nothing here
+        // collapses — LegacyLevelMap records what collapsing cost us.
+        $legToOur = LegacyLevelMap::make();
 
         $testTypeMap = TestType::query()->whereNotNull('legacy_id')->pluck('id', 'legacy_id'); // legacy test_type => our id
         $questionMap = DB::table('questions')->whereNotNull('legacy_id')->pluck('id', 'legacy_id'); // legacy question id => our id

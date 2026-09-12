@@ -28,6 +28,21 @@ class StudentAvailabilityController extends Controller
     }
 
     /**
+     * The same tree for the results screen, widened to what the competitor has
+     * already sat even where the round has since been closed.
+     *
+     * Separate from `index` on purpose: closing a round must stop a test being
+     * sat without retracting the marks already given for it, and one endpoint
+     * answering both questions is what tied them together
+     * ({@see StudentAvailability::history}). Publication is still the only gate
+     * on a mark.
+     */
+    public function history(Request $request): JsonResponse
+    {
+        return response()->json(StudentAvailability::history($this->session($request)));
+    }
+
+    /**
      * Clear a competition quiz's access code for this session. Every denial —
      * quiz outside the registration's level, quiz not password-gated, or a wrong
      * code — returns the same 422 so a caller learns nothing from the response.

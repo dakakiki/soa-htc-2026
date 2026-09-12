@@ -85,18 +85,71 @@ final class StudentAvailability
         return null;
     }
 
-    /** @return EloquentCollection<int, Quiz> */
-    private static function accessibleQuizzes(int $levelId): EloquentCollection
+    /**
+     * Everything the competitor has already sat, whether or not it is still
+     * open to sit — what the results screen reads.
+     *
+     * `status` answers "may this be taken now", and switching a test off is how
+     * a round is closed. It is not a statement about the past: the legacy site
+     * shows a published mark whatever the test's `active` flag says, and all
+     * seven of its sample quizzes are switched off while still showing their
+     * marks. Reading availability for both questions made closing a round
+     * retract the marks with it — 98,245 of 169,241 published marks were
+     * invisible, and a competitor who had seen theirs would find them gone.
+     *
+     * Publication is untouched and remains the only gate on a mark (ADR-0021):
+     * this decides which tests appear, `published` still decides whether each
+     * one shows a number or "result on the way" (owner, 2026-09-12).
+     *
+     * Starting a test does NOT come through here — {@see startableQuizId} keeps
+     * the strict set — so nothing switched off becomes sittable again.
+     *
+     * @return array{quizzes: list<array<string, mixed>>}
+     */
+    public static function history(StudentSession $session): array
+    {
+        $registration = $session->registration;
+        $unlocked = self::unlockedIds($session);
+        $attempts = self::attemptMap($registration);
+
+        return [
+            'quizzes' => self::accessibleQuizzes($registration->difficulty_level_id, array_keys($attempts))
+                ->map(fn (Quiz $quiz) => self::quizNode($quiz, self::isOpen($quiz, $unlocked), $attempts))
+                ->all(),
+        ];
+    }
+
+    /**
+     * The level-gated tree. By default only what is open to sit; pass the tests
+     * the competitor has attempted and each tier widens to "still open **or**
+     * already sat", which is the results view.
+     *
+     * The level gate never widens. A competitor cannot reach another level's
+     * content either way (PROJECT_CONTEXT §5.7), and the marks that sit outside
+     * it — 216 of them, from competitors whose level was changed after they sat
+     * — are hidden by the legacy site too.
+     *
+     * @param  list<int>  $satTestIds
+     * @return EloquentCollection<int, Quiz>
+     */
+    private static function accessibleQuizzes(int $levelId, array $satTestIds = []): EloquentCollection
     {
         $atLevel = fn ($query) => $query->whereHas('levels', fn ($q) => $q->whereKey($levelId));
 
-        return Quiz::query()
-            ->where('status', 'active')
+        $live = fn (string $table, string $satPath) => fn ($query) => $query
             ->where($atLevel)
+            ->where(fn ($q) => $q
+                ->where($table.'.status', 'active')
+                ->when($satTestIds !== [], fn ($q) => $satPath === ''
+                    ? $q->orWhereIn($table.'.id', $satTestIds)
+                    : $q->orWhereHas($satPath, fn ($t) => $t->whereIn('tests.id', $satTestIds))));
+
+        return Quiz::query()
+            ->where($live('quizzes', 'exams.tests'))
             ->with([
-                'exams' => fn ($q) => $q->where('exams.status', 'active')->where($atLevel),
+                'exams' => $live('exams', 'tests'),
                 'exams.round',
-                'exams.tests' => fn ($q) => $q->where('tests.status', 'active')->where($atLevel),
+                'exams.tests' => $live('tests', ''),
                 'exams.tests.type',
             ])
             ->orderBy('id')

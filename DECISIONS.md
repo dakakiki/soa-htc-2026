@@ -2291,3 +2291,31 @@ Public/Admin navigacija · Android/iOS tehnologija · attempt/timeout state
 machine · grading/publication workflow · migracija/cutover · sezonski model ·
 istorijska analitika · performance SLO i scaling plan · privatnost/retention/audit ·
 deployment/storage/backup.
+
+## ADR-0076 — `active` zatvara polaganje, ne prikaz već datih ocena
+
+- **Status:** Prihvaćeno (2026-09-12). **IMPLEMENTIRANO.**
+- **Kontekst:** ekran „Check results" je čitao isti `student/availability` koji hrani i ekran za
+  polaganje. Taj odgovor gejtuje sve po `status = active`, jer je to odgovor na pitanje „sme li se
+  ovo sada polagati". Gašenje testa je način na koji se runda zatvara — pa je zatvaranje runde
+  **povlačilo i ocene koje su za nju već date**.
+- **Izmereno na dev bazi (r14):** od **144.765** objavljenih ocena bilo je vidljivo **57.605**
+  (39,8 %). Takmičar koji je svoju ocenu već video vratio bi se i ne bi je našao.
+- **Legacy to ne radi.** Isti takmičar (`14017196`) na produkciji vidi Use of English V.1
+  Preliminary sa 30,00, a taj test ima `active = 0`. Jače: **svih sedam sample kvizova u legacy-ju
+  ima `active = 0`** i njihove ocene se i dalje prikazuju. Dakle `active` tamo nikad nije ni bio
+  uslov za prikaz.
+- **Odluka (vlasnik):** razdvojiti to dvoje — *„stim da ostaje da se rezultat vidi tek kada se
+  odobri"*. Dakle:
+  - **polaganje** ostaje na `active`, nepromenjeno;
+  - **prikaz** ide na nov `GET student/results` (`StudentAvailability::history`), koji uz aktivno
+    stablo vraća i ono što je takmičar **već izašao**, bez obzira na `active`;
+  - **objava ostaje jedini uslov za broj** (ADR-0021): `published` i dalje odlučuje da li stoji
+    ocena ili „result on the way".
+- **Nivo se NE širi.** Takmičar i dalje ne može do sadržaja tuđeg nivoa (PROJECT_CONTEXT §5.7).
+  Ostaje **391** ocena van nivoa — takmičari kojima je nivo promenjen posle izlaska; 🪤 **legacy ih
+  takođe sakriva**, provereno na istom takmičaru čiji Hippo 4-S3 pokušaj ne prikazuje nijedan
+  sistem. Posle izmene je vidljivo **144.374 / 144.765 (99,73 %)**.
+- **Posledica:** 🔴 `startableQuizId()` namerno ostaje na **strogom** skupu, pa ugašen test ne može
+  da se polaže iako se ponovo vidi na ekranu rezultata. Drži ga test
+  `test_a_closed_test_cannot_be_sat_again_through_the_widened_tree`.
