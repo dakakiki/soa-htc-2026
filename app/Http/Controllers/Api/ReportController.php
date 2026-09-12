@@ -442,16 +442,14 @@ class ReportController extends Controller
             ])->find($quizId)
             : null;
 
+        // 🪤 Each exam used to carry whether its round was the one being run, so
+        // Publishing could open on it. The rounds do not advance together —
+        // countries sit on National and on Regional Qualifiers at once — so no
+        // such exam exists to open on (ADR-0077). Publishing asks instead.
         $exams = $quiz
-            // `is_current` rides along so Publishing can open on the round being
-            // run without asking a second endpoint — `GET /api/exam-rounds` is
-            // behind `content.manage`, which somebody publishing results need not
-            // hold. Derived here, not the round id: the client has no way to turn
-            // an id into "this is the one" on its own.
             ? $quiz->exams->map(fn (Exam $e) => [
                 'id' => $e->id,
                 'title' => $e->title,
-                'is_current' => (bool) $e->round?->is_current,
             ])->sortBy('title')->values()
             : [];
 

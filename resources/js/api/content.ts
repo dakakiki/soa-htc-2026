@@ -7,8 +7,6 @@ export interface Lookup {
     active?: boolean;
     /** Exam rounds only: the position they run in. */
     sort_order?: number;
-    /** Exam rounds only: the one being run right now, if any. */
-    is_current?: boolean;
     /**
      * Exam rounds only: which round is practice. Read-only — the results domain
      * turns on it, so it is structure rather than something to retype, and the
@@ -20,7 +18,6 @@ export interface Lookup {
 export interface LookupPayload {
     name: string;
     active?: boolean;
-    is_current?: boolean;
 }
 
 /** CRUD helpers bound to a lookup resource path. */

@@ -43,13 +43,11 @@ const label = computed<string>(() => {
             <span v-if="site.round" class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/85">
                 {{ $t('public.status.round', { round: site.round, year: site.year }) }}
             </span>
-            <!-- Its own `v-if`, and never nested in the one above: between rounds
-                 there is no current round, and a season without an active row must
-                 not swallow this too. No `ml-auto` — two of the spans below carry
-                 one already and a third breaks the arrangement. -->
-            <span v-if="site.exam_round" class="font-mono text-[11px] uppercase tracking-[0.16em] text-white/85">
-                {{ $t('public.status.examRound', { round: site.exam_round }) }}
-            </span>
+            <!-- 🪤 The round being run used to be named here. It cannot be: the
+                 client's countries sit on National round and on Regional Qualifiers
+                 at the same time, so one name on a page every country reads was
+                 wrong for about half of them (ADR-0077). The edition above is true
+                 everywhere; which round you are in is not. -->
             <!-- Its own line on a phone, inline from `sm`. -->
             <span class="inline-flex basis-full items-center gap-2 sm:basis-auto">
                 <span class="h-1.5 w-1.5 rounded-full"

@@ -29,7 +29,7 @@ class ExamRoundController extends Controller
             'data' => ExamRound::query()
                 ->orderBy('sort_order')
                 ->orderBy('name')
-                ->get(['id', 'name', 'active', 'sort_order', 'is_current', 'is_sample']),
+                ->get(['id', 'name', 'active', 'sort_order', 'is_sample']),
         ]);
     }
 
@@ -43,7 +43,7 @@ class ExamRoundController extends Controller
         // A new round lands at the end; where it belongs is a move away.
         $data['sort_order'] = (int) ExamRound::query()->max('sort_order') + 1;
 
-        return response()->json(['data' => ExamRound::create($data)->only(['id', 'name', 'active', 'sort_order', 'is_current', 'is_sample'])], 201);
+        return response()->json(['data' => ExamRound::create($data)->only(['id', 'name', 'active', 'sort_order', 'is_sample'])], 201);
     }
 
     public function update(Request $request, ExamRound $examRound): JsonResponse
@@ -52,20 +52,11 @@ class ExamRoundController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('exam_rounds', 'name')->ignore($examRound)],
             'active' => ['sometimes', 'boolean'],
-            'is_current' => ['sometimes', 'boolean'],
         ]);
 
-        // At most one round is being run at a time, so marking one puts the
-        // others down in the same breath. Unmarking leaves none current, which
-        // is a real answer: between rounds, none of them is.
-        DB::transaction(function () use ($examRound, $data): void {
-            if ($data['is_current'] ?? false) {
-                ExamRound::query()->whereKeyNot($examRound->id)->where('is_current', true)->update(['is_current' => false]);
-            }
-            $examRound->update($data);
-        });
+        $examRound->update($data);
 
-        return response()->json(['data' => $examRound->only(['id', 'name', 'active', 'sort_order', 'is_current', 'is_sample'])]);
+        return response()->json(['data' => $examRound->only(['id', 'name', 'active', 'sort_order', 'is_sample'])]);
     }
 
     /**

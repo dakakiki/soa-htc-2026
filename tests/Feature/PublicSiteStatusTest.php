@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Domain\Assessment\Enums\QuizType;
-use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Assessment\Models\Quiz;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -41,7 +40,7 @@ class PublicSiteStatusTest extends TestCase
     {
         $this->getJson('/api/public/site')
             ->assertOk()
-            ->assertJsonStructure(['data' => ['round', 'exam_round', 'year', 'season', 'competition_open', 'sample_open']]);
+            ->assertJsonStructure(['data' => ['round', 'year', 'season', 'competition_open', 'sample_open']]);
     }
 
     public function test_both_entries_are_shut_when_no_quiz_is_active(): void
@@ -113,15 +112,19 @@ class PublicSiteStatusTest extends TestCase
     }
 
     /**
-     * Between rounds there is no round in play, and that is an answer rather
-     * than a gap — the strip drops the span instead of inventing one.
+     * The strip never names a round of the contest (ADR-0077). The client's
+     * countries sit on National round and on Regional Qualifiers at the same
+     * time, so one name on a page every country reads would be wrong for about
+     * half of them. The edition is true everywhere; the round is not.
      */
-    public function test_the_round_in_play_is_null_until_an_administrator_names_one(): void
+    public function test_the_strip_does_not_name_a_round_of_the_contest(): void
     {
-        $this->assertNull($this->siteStatus()['exam_round']);
+        $status = $this->siteStatus();
 
-        ExamRound::query()->firstOrFail()->update(['is_current' => true]);
+        $this->assertArrayNotHasKey('exam_round', $status);
 
-        $this->assertNotNull($this->siteStatus()['exam_round']);
+        // What it does say stays: the edition, and whether the doors are open.
+        $this->assertSame(14, $status['round']);
+        $this->assertArrayHasKey('competition_open', $status);
     }
 }

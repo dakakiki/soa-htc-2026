@@ -2319,3 +2319,37 @@ deployment/storage/backup.
 - **Posledica:** 🔴 `startableQuizId()` namerno ostaje na **strogom** skupu, pa ugašen test ne može
   da se polaže iako se ponovo vidi na ekranu rezultata. Drži ga test
   `test_a_closed_test_cannot_be_sat_again_through_the_widened_tree`.
+
+## ADR-0077 — Runda koja se igra NIJE svojstvo runde (poništava ADR-0057)
+
+- **Status:** Prihvaćeno (2026-09-12). **IMPLEMENTIRANO.**
+- **Kontekst:** ADR-0057 je uveo `exam_rounds.is_current` — jedan globalni prekidač „ova runda se
+  sada igra". Vlasnik je 2026-09-12 iz razgovora sa klijentom saznao da **runde ne napreduju
+  zajedno**: jedna zemlja može biti na National round-u dok je druga na Regional Qualifiers.
+- **Izmereno, ne pretpostavljeno.** Legacy to nosi **po zemlji** — `el_country.round` — i u
+  današnjem snapshot-u stoji:
+
+  | legacy runda | zemalja |
+  | --- | --: |
+  | 2 · National round | **47** |
+  | 3 · Regional Qualifiers | **49** |
+
+  ➡️ Naš `is_current` je bio postavljen na *National round*, dakle **netačan za 49 zemalja** — i to
+  je pisalo na **javnoj naslovnoj strani**, koju svaka od njih čita.
+- **Razmotreno i odbijeno:** preseliti zastavicu na zemlju (`countries.exam_round_id`), kako je u
+  legacy-ju. Vlasnikova odluka: *„ne bih da opterećujemo klijenta da mora da definiše koja runda je
+  aktuelna u kojoj zemlji"*. Devedesetak zemalja koje neko mora da održava tačnim, zarad jednog
+  reda teksta, nije vredno toga.
+- **Odluka: briše se u celini** (*„to želim skroz da se skloni"*). Kolona, prekidač na ekranu
+  **Content → Exam rounds**, i oba potrošača.
+- **Šta je zavisilo od toga, i šta se desilo bez toga:**
+  1. **Javna traka statusa** više ne imenuje rundu takmičenja. Ostaje izdanje (`Round 14 · 2026`) i
+     da li su vrata otvorena — to je tačno **svuda**.
+  2. **Publishing** je time predbirao ispit; sada ne predbira ništa, što se ionako dešavalo kad
+     nijedan ili više njih odgovara. Osoba koja objavljuje bira.
+- 🔴 **Ne dira polaganje.** Provereno: sa studentske strane `ExamRound` se pojavljuje samo kao
+  **oznaka** na redovima rezultata i kvalifikacija. Šta se sme polagati gejtuju **nivo + status**
+  (`StudentAvailability`), nikad runda. Kvizovi, ispiti i testovi rade isto kao pre.
+- 🪤 **Zamka pri brisanju:** originalna migracija je napravila i **indeks** na koloni. MySQL ga
+  obriše zajedno sa kolonom, SQLite ne — `error in index exam_rounds_is_current_index after drop
+  column` oborio je ceo suite. Indeks se briše **prvi i zasebnom naredbom**.

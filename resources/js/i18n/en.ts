@@ -438,7 +438,6 @@ export default {
         },
         status: {
             round: 'Round {round} · {year}',
-            examRound: '· {round} in play',
             open: 'Live exams open',
             // Two closed states, because they are not the same news. The single
             // string this replaced asserted "sample open" whatever the sample was
@@ -1305,11 +1304,8 @@ export default {
         id: 'ID',
         order: 'Order',
         reorderFailed: 'Could not save the new order.',
-        current: 'Running now',
-        setCurrent: 'Mark this as the round being run now',
         practiceRound: 'Practice',
         practiceRoundHint: 'The practice round. Its results publish themselves and never count as official ones, so it cannot be deleted.',
-        clearCurrent: 'No round is being run now',
         name: 'Name',
         active: 'Active',
         toggleActive: 'Toggle active',

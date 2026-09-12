@@ -121,8 +121,9 @@ async function onQuizChange(id: number | null): Promise<void> {
     q.test_id = null;
     await loadOptions();
 
-    const current = opts.value.exams.filter((exam) => exam.is_current);
-    q.exam_id = current.length === 1 ? current[0].id : null;
+    // No exam is preselected: the rounds do not advance together, so there is
+    // no "the one being run" to open on (ADR-0077).
+    q.exam_id = null;
 
     await loadOverview();
 }

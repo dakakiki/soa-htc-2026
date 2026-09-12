@@ -18,12 +18,12 @@ const confirm = useConfirmStore();
 const canManage = computed(() => session.can('content.manage'));
 
 const CONFIG = {
-    testType: { api: testTypesApi, title: 'content.testTypes', add: 'content.addTestType', hasActive: false, ordered: false, hasCurrent: false },
+    testType: { api: testTypesApi, title: 'content.testTypes', add: 'content.addTestType', hasActive: false, ordered: false },
     // Rounds run in an order and everything else reads it from here, so this is
     // the one lookup that shows its position instead of its row id — and the
     // one that says which of them is being run right now.
-    examRound: { api: examRoundsApi, title: 'content.examRounds', add: 'content.addExamRound', hasActive: true, ordered: true, hasCurrent: true },
-    tag: { api: questionTagsApi, title: 'content.tags', add: 'content.addTag', hasActive: false, ordered: false, hasCurrent: false },
+    examRound: { api: examRoundsApi, title: 'content.examRounds', add: 'content.addExamRound', hasActive: true, ordered: true },
+    tag: { api: questionTagsApi, title: 'content.tags', add: 'content.addTag', hasActive: false, ordered: false },
 } as const;
 const cfg = computed(() => CONFIG[props.kind]);
 
@@ -147,24 +147,6 @@ async function onGripKey(i: number, delta: number): Promise<void> {
     await onDragEnd();
 }
 
-/**
- * Mark the round being run right now, or clear it by clicking the one already
- * marked. At most one is current, so the server puts the others down; the list
- * does the same locally rather than waiting a request to look right.
- */
-async function setCurrent(item: Lookup): Promise<void> {
-    const next = !(item.is_current ?? false);
-    const before = items.value.map((i) => i.is_current ?? false);
-    items.value.forEach((i) => { i.is_current = next && i.id === item.id; });
-    error.value = null;
-    try {
-        await cfg.value.api.update(item.id, { name: item.name, is_current: next });
-    } catch (e) {
-        items.value.forEach((i, index) => { i.is_current = before[index]; });
-        error.value = apiErrorMessage(e, t('content.saveFailed'));
-    }
-}
-
 async function remove(item: Lookup): Promise<void> {
     if (!(await confirm.ask({ message: t('content.confirmDelete', { name: item.name }) }))) {
         return;
@@ -205,7 +187,6 @@ onMounted(load);
                     <tr>
                         <th class="px-4 py-3">{{ cfg.ordered ? $t('content.order') : $t('content.id') }}</th>
                         <th class="px-4 py-3">{{ $t('content.name') }}</th>
-                        <th v-if="cfg.hasCurrent" class="px-4 py-3">{{ $t('content.current') }}</th>
                         <th v-if="cfg.hasActive" class="px-4 py-3">{{ $t('content.active') }}</th>
                         <th class="px-4 py-3 text-right">{{ $t('common.actions') }}</th>
                     </tr>
@@ -239,18 +220,6 @@ onMounted(load);
                                 <span class="ml-2 rounded-full bg-brand-primary-soft px-2 py-0.5 text-xs font-medium text-brand-primary">{{ $t('content.practiceRound') }}</span>
                             </Tooltip>
                         </td>
-                        <td v-if="cfg.hasCurrent" class="px-4 py-3">
-                            <!-- The same switch as Active, in the brand blue: the two
-                                 mean different things and must not read as one column
-                                 repeated. Only one round can be on, so switching one on
-                                 puts the rest off; switching the on one off leaves none,
-                                 which is what is true between rounds. -->
-                            <Tooltip :text="item.is_current ? $t('content.clearCurrent') : $t('content.setCurrent')">
-                                <ToggleSwitch :model-value="item.is_current ?? false" :disabled="!canManage"
-                                    on-class="bg-brand-primary" :aria-label="$t('content.setCurrent')"
-                                    @update:model-value="() => setCurrent(item)" />
-                            </Tooltip>
-                        </td>
                         <td v-if="cfg.hasActive" class="px-4 py-3">
                             <Tooltip :text="$t('content.toggleActive')">
                                 <ToggleSwitch :model-value="item.active ?? true" :disabled="!canManage"
@@ -269,7 +238,7 @@ onMounted(load);
                         </td>
                     </tr>
                     <tr v-if="!loading && items.length === 0">
-                        <td :colspan="3 + (cfg.hasActive ? 1 : 0) + (cfg.hasCurrent ? 1 : 0)"
+                        <td :colspan="3 + (cfg.hasActive ? 1 : 0)"
                             class="px-4 py-6 text-center text-gray-400">{{ $t('content.empty') }}</td>
                     </tr>
                 </tbody>

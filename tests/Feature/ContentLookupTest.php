@@ -9,6 +9,7 @@ use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class ContentLookupTest extends TestCase
@@ -134,32 +135,21 @@ class ContentLookupTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_only_one_exam_round_is_being_run_at_a_time(): void
+    /**
+     * There is no "round being run" to mark (ADR-0077). Countries do not advance
+     * together, so the screen offers no such switch and the API refuses the
+     * field rather than storing something no one can keep true.
+     */
+    public function test_an_exam_round_cannot_be_marked_as_the_one_being_run(): void
     {
-        $rounds = ExamRound::query()->orderBy('sort_order')->get();
-
-        // Nothing is marked until somebody says so.
-        $this->assertSame(0, ExamRound::query()->where('is_current', true)->count());
+        $round = ExamRound::query()->orderBy('sort_order')->firstOrFail();
 
         $this->actingAs($this->admin())
-            ->putJson("/api/exam-rounds/{$rounds[0]->id}", ['is_current' => true])
+            ->putJson("/api/exam-rounds/{$round->id}", ['name' => $round->name, 'is_current' => true])
             ->assertOk()
-            ->assertJsonPath('data.is_current', true);
+            ->assertJsonMissingPath('data.is_current');
 
-        // Marking the next one puts the first down; there is only ever one.
-        $this->actingAs($this->admin())
-            ->putJson("/api/exam-rounds/{$rounds[1]->id}", ['is_current' => true])
-            ->assertOk();
-
-        $this->assertSame(1, ExamRound::query()->where('is_current', true)->count());
-        $this->assertTrue(ExamRound::findOrFail($rounds[1]->id)->is_current);
-
-        // And clearing it leaves none, which is what is true between rounds.
-        $this->actingAs($this->admin())
-            ->putJson("/api/exam-rounds/{$rounds[1]->id}", ['is_current' => false])
-            ->assertOk();
-
-        $this->assertSame(0, ExamRound::query()->where('is_current', true)->count());
+        $this->assertFalse(Schema::hasColumn('exam_rounds', 'is_current'));
     }
 
     public function test_an_api_address_opened_in_a_browser_answers_401_not_500(): void
