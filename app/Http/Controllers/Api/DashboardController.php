@@ -58,7 +58,13 @@ class DashboardController extends Controller
 
         // The world map only says something to someone who sees more than one
         // country; a coordinator gets their venues instead (city map comes later).
-        $data['by_country'] = $allowedSchoolIds === null ? $this->byCountry($season?->id) : null;
+        //
+        // It is NOT in this payload. The breakdown is the most expensive thing on
+        // the page and the furthest down it, so it has its own endpoint and the
+        // screen draws without waiting for it ({@see self::countries}). What is
+        // sent here is whether to expect it, so the SPA knows to reserve the
+        // space rather than fetch and find nothing.
+        $data['has_by_country'] = $allowedSchoolIds === null;
 
         // One table per audience: the world for an admin, their venues for a
         // country coordinator, their own roster when the scope is a single venue.
@@ -75,6 +81,29 @@ class DashboardController extends Controller
         $data['attention'] = $this->attention($user, $season, $allowedSchoolIds, $stats);
 
         return ['data' => $data];
+    }
+
+    /**
+     * The per-country breakdown behind the world map and the countries table,
+     * on its own so the rest of the dashboard does not wait for it.
+     *
+     * It was the slowest part of a payload that took 5.7 s to build, and it sits
+     * below the fold: the headline numbers, the pending list and the trend are
+     * what somebody opens this page to read. Split out, they arrive in about a
+     * second and this follows.
+     *
+     * Scoped accounts have no world map — they get their venues instead — so
+     * they get an empty list rather than a country breakdown they may not see.
+     */
+    public function countries(Request $request): array
+    {
+        $user = $request->user();
+
+        if ($user->allowedSchoolIds() !== null) {
+            return ['data' => []];
+        }
+
+        return ['data' => $this->byCountry(SeasonContext::active()?->id)];
     }
 
     /**
@@ -121,13 +150,21 @@ class DashboardController extends Controller
     {
         $seasonId = $season?->id;
 
-        $submitted = DB::table('attempts as a')
+        // Competitors who sat something, not attempts — same shape and the same
+        // reason as the country breakdown: fold the attempts down first so the
+        // inner group is index-only. 1,724 → 583 ms over the r14 roster.
+        $submitted = DB::query()
+            ->fromSub(
+                DB::table('attempts')
+                    ->whereNotNull('submitted_at')
+                    ->groupBy('registration_id')
+                    ->selectRaw('registration_id'),
+                'a'
+            )
             ->join('registrations as r', 'r.id', '=', 'a.registration_id')
-            ->whereNotNull('a.submitted_at')
             ->when($seasonId !== null, fn ($q) => $q->where('r.season_id', $seasonId))
             ->when($allowedSchoolIds !== null, fn ($q) => $q->whereIn('r.school_id', $allowedSchoolIds->all()))
-            ->distinct()
-            ->count('a.registration_id');
+            ->count();
 
         return [
             'students' => $stats['students'],
@@ -365,21 +402,32 @@ class DashboardController extends Controller
             ->selectRaw('country_id, count(*) as n')
             ->pluck('n', 'country_id');
 
-        $submitted = DB::table('attempts as a')
+        // Turnout counts COMPETITORS, not attempts, so folding the attempts down
+        // to one row each first is what makes this affordable: the inner group
+        // reads nothing but the index (`attempts_turnout_index`) and the outer
+        // sum then has 108k rows instead of 184k to deduplicate.
+        //
+        // 🪤 This was two `count(distinct …)` queries, one per column, at 1,777
+        // and 1,684 ms. Folding them into one pass took the pair to 1,851 ms,
+        // and the index took it to 916.
+        $turnout = DB::query()
+            ->fromSub(
+                DB::table('attempts')
+                    ->groupBy('registration_id')
+                    ->selectRaw('registration_id')
+                    ->selectRaw('max(submitted_at is not null) as sat')
+                    ->selectRaw('max(published_at is not null) as marked'),
+                'a'
+            )
             ->join('registrations as r', 'r.id', '=', 'a.registration_id')
-            ->whereNotNull('a.submitted_at')
             ->when($seasonId !== null, fn ($q) => $q->where('r.season_id', $seasonId))
             ->groupBy('r.country_id')
-            ->selectRaw('r.country_id as country_id, count(distinct a.registration_id) as n')
-            ->pluck('n', 'country_id');
+            ->selectRaw('r.country_id as country_id, sum(a.sat) as submitted, sum(a.marked) as published')
+            ->get()
+            ->keyBy('country_id');
 
-        $published = DB::table('attempts as a')
-            ->join('registrations as r', 'r.id', '=', 'a.registration_id')
-            ->whereNotNull('a.published_at')
-            ->when($seasonId !== null, fn ($q) => $q->where('r.season_id', $seasonId))
-            ->groupBy('r.country_id')
-            ->selectRaw('r.country_id as country_id, count(distinct a.registration_id) as n')
-            ->pluck('n', 'country_id');
+        $submitted = $turnout->map(fn ($row) => (int) $row->submitted);
+        $published = $turnout->map(fn ($row) => (int) $row->published);
 
         $merged = [];
 

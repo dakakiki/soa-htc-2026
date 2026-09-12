@@ -52,6 +52,7 @@ export default {
     },
     dashboard: {
         title: 'Dashboard',
+        loading: 'Loading…',
         noSeason: 'No active season',
         round: 'Round {n}',
         closes: 'closes {date}',

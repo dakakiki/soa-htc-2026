@@ -522,8 +522,12 @@ export interface DashboardData {
     venues: { count: number; scoped: boolean };
     users: { count: number } | null;
     coordinators: { count: number } | null;
-    /** Present only for accounts that see beyond one country (the map audience). */
-    by_country: CountryMapRow[] | null;
+    /**
+     * Whether a country breakdown exists for this account (the map audience).
+     * The rows themselves come from `/api/dashboard/countries`, because building
+     * them was the slowest part of this payload and they sit below the fold.
+     */
+    has_by_country: boolean;
     kpis: {
         students: number;
         submitted: number;

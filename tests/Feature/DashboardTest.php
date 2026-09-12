@@ -3,6 +3,10 @@
 namespace Tests\Feature;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Assessment\Models\Quiz;
+use App\Domain\Assessment\Models\Test;
+use App\Domain\Competition\Models\Attempt;
+use App\Domain\Competition\Models\Registration;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Country;
@@ -79,7 +83,7 @@ class DashboardTest extends TestCase
             'grade' => 7,
         ])->assertCreated();
 
-        $rows = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.by_country');
+        $rows = $this->actingAs($admin)->getJson('/api/dashboard/countries')->assertOk()->json('data');
 
         // 688 is Serbia's ISO 3166-1 numeric — the id the world atlas geometry uses.
         $serbia = collect($rows)->firstWhere('iso', 688);
@@ -104,8 +108,11 @@ class DashboardTest extends TestCase
         ]);
         $assignment->schools()->sync([$school->id]);
 
-        // One country is not a map; their venues answer the same question.
-        $this->actingAs($user)->getJson('/api/dashboard')->assertOk()->assertJsonPath('data.by_country', null);
+        // One country is not a map; their venues answer the same question. The
+        // payload says not to expect one, and the endpoint agrees rather than
+        // handing a scoped account the world.
+        $this->actingAs($user)->getJson('/api/dashboard')->assertOk()->assertJsonPath('data.has_by_country', false);
+        $this->actingAs($user)->getJson('/api/dashboard/countries')->assertOk()->assertJsonPath('data', []);
     }
 
     public function test_kpis_are_scoped_and_drop_what_a_coordinator_cannot_use(): void
@@ -178,16 +185,19 @@ class DashboardTest extends TestCase
 
         // Admin: the world, no venue table and no roster preview.
         $adminData = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data');
-        $this->assertNotEmpty($adminData['by_country']);
+        $this->assertTrue($adminData['has_by_country']);
         $this->assertNull($adminData['by_venue']);
         $this->assertNull($adminData['students_preview']);
-        $this->assertArrayHasKey('published', $adminData['by_country'][0]);
-        $this->assertArrayHasKey('id', $adminData['by_country'][0]);
+
+        $adminCountries = $this->actingAs($admin)->getJson('/api/dashboard/countries')->assertOk()->json('data');
+        $this->assertNotEmpty($adminCountries);
+        $this->assertArrayHasKey('published', $adminCountries[0]);
+        $this->assertArrayHasKey('id', $adminCountries[0]);
 
         // More than one venue in scope: the venue table.
         $country = $this->scopedCoordinator($schools[0], $schools[1]);
         $countryData = $this->actingAs($country)->getJson('/api/dashboard')->assertOk()->json('data');
-        $this->assertNull($countryData['by_country']);
+        $this->assertFalse($countryData['has_by_country']);
         $this->assertCount(2, $countryData['by_venue']);
         $this->assertNull($countryData['students_preview']);
 
@@ -247,6 +257,48 @@ class DashboardTest extends TestCase
     }
 
     /** A coordinator bound to the given venues (one venue = the venue level). */
+    /**
+     * Turnout counts COMPETITORS, not attempts. The two queries behind it were
+     * `count(distinct registration_id)` and were rewritten to fold the attempts
+     * down to one row each first — 3,461 ms to 916 on the r14 roster. A
+     * competitor who sat three tests must still count once, here and on the map.
+     */
+    public function test_turnout_counts_a_competitor_once_however_many_tests_they_sat(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $season = Season::where('round_number', 14)->firstOrFail();
+        $school = School::query()->firstOrFail();
+
+        $registration = Registration::create([
+            'season_id' => $season->id, 'competitor_number' => '14909090', 'sequence' => 909090,
+            'school_id' => $school->id, 'country_id' => $school->country_id,
+            'difficulty_level_id' => DifficultyLevel::where('level_short', 'H2')->value('id'),
+            'name' => 'Thrice Sat', 'grade' => 7, 'status' => 'active',
+        ]);
+
+        $quiz = Quiz::create(['title' => 'Turnout quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+
+        foreach ([1, 2, 3] as $i) {
+            $test = Test::create(['title' => "Turnout test {$i}", 'status' => 'active']);
+            Attempt::create([
+                'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+                'is_practice' => false, 'status' => 'completed', 'grading_status' => 'auto_graded',
+                'score' => 1, 'max_score' => 10,
+                'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+                'published_at' => now(),
+            ]);
+        }
+
+        $kpis = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.kpis');
+        $this->assertSame(1, $kpis['submitted'], 'Three attempts by one competitor is one turnout.');
+
+        $rows = $this->actingAs($admin)->getJson('/api/dashboard/countries')->assertOk()->json('data');
+        $country = collect($rows)->firstWhere('id', $school->country_id);
+        $this->assertNotNull($country);
+        $this->assertSame(1, $country['submitted']);
+        $this->assertSame(1, $country['published']);
+    }
+
     private function scopedCoordinator(School $school, School ...$more): User
     {
         $season = Season::where('round_number', 14)->firstOrFail();
