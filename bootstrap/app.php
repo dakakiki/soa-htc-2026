@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\EnsureStudentSession;
+use App\Http\Middleware\RedirectToHttps;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,8 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
         /*
          * First in the stack (ADR-0070): everything a request writes should carry
          * the request's name, and anything logged before this runs would not.
+         *
+         * `RedirectToHttps` comes straight after, and in that order on purpose: a
+         * visitor bounced to HTTPS is still a request somebody may have to find in
+         * the log, so it is named before it is redirected (ADR-0078).
          */
-        $middleware->prepend(AssignRequestId::class);
+        $middleware->prepend([AssignRequestId::class, RedirectToHttps::class]);
 
         // First-party SPA (Vue) authenticates against the API via Sanctum cookies.
         $middleware->statefulApi();

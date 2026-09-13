@@ -2353,3 +2353,39 @@ deployment/storage/backup.
 - 🪤 **Zamka pri brisanju:** originalna migracija je napravila i **indeks** na koloni. MySQL ga
   obriše zajedno sa kolonom, SQLite ne — `error in index exam_rounds_is_current_index after drop
   column` oborio je ceo suite. Indeks se briše **prvi i zasebnom naredbom**.
+
+## ADR-0078 — Ko dođe preko `http://` šalje se na `https://`, i to radi aplikacija a ne `.htaccess`
+
+- **Status:** Prihvaćeno (2026-09-13). **IMPLEMENTIRANO.**
+- **Kontekst:** Prvi put je aplikacija postavljena na server sa pravim HTTPS-om (STAGE,
+  `staging.soa-htc.com`). Do tada je razvoj tekao isključivo preko običnog `http` vhost-a, pa se
+  ovo nije moglo ni primetiti.
+- **Izmereno, ne pretpostavljeno.** Na serveru, pre ove izmene:
+
+  ```
+  http://staging.soa-htc.com/   →  200, bez preusmerenja, cela aplikacija
+  ```
+
+  ➡️ Sajt preko `http`-a **ne pada — poluradi, što je gore**, jer ništa ne kaže da nešto ne valja.
+  Naslovna se iscrta i izgleda gotovo; onda sve što traži sesiju tiho ne radi, zato što
+  `SESSION_SECURE_COOKIE=true` znači da pregledač kolačić sesije nikad ne dobije. Prijava izgleda
+  kao da ne reaguje. Uz to se service worker ne registruje van sigurnog konteksta, pa se aplikacija
+  ne može instalirati (ADR-0073), a potpisane adrese ispitnih medija (ADR-0059) računaju se iz šeme.
+- **Razmotreno i odbijeno: pravilo u `public/.htaccess`**, što je uobičajeno mesto. Dva razloga:
+  1. Taj fajl je **u repou i isti je onaj koji servira razvojni vhost** `http://dev.lcl.soa-htc.wrk`.
+     Bezuslovno pravilo bi oborilo lokalni razvoj, a uslovno bi **ukucalo razvojna imena hostova u
+     produkcijski fajl** — nešto što neko mora da održava tačnim.
+  2. Pravilo tamo bi hvatalo i `/.well-known/acme-challenge/…`. Iz middleware-a ne može: Apache
+     posluži postojeći fajl pre nego što se Laravel uopšte dosegne, pa **obnova sertifikata ostaje
+     van ovog puta**.
+- **Odluka:** `App\Http\Middleware\RedirectToHttps`, drugi u nizu — odmah posle `AssignRequestId`,
+  da preusmeren zahtev i dalje ima ime u logu (ADR-0070). Odgovor je **301**: za ovu aplikaciju je
+  „samo HTTPS" trajno svojstvo a ne detalj postavljanja, jer siguran kolačić čini `http` neupotrebljivim
+  po konstrukciji.
+- 🪤 **Kapija je `APP_URL`, namerno ne okruženje.** Sajt čija je sopstvena adresa `https://` je sajt
+  na kome `http` ne može da radi; onaj čija je `http://` — razvojni vhost — mora da nastavi da radi
+  tačno kako radi. Nigde se ne pominje nijedno ime hosta, pa nema šta da se održava u koraku sa
+  razvojnom mašinom. Test `test_a_site_whose_own_address_is_http_is_not_redirected` čuva baš to.
+- ⚡ **`TrustProxies` nije bio potreban.** Izmereno na serveru: `HTTPS=on`, `SERVER_PORT=443` i
+  `REQUEST_SCHEME=https` stižu tačni, pa Laravel računa ispravnu šemu sam. `X-Forwarded-Proto` jeste
+  postavljen, ali ga nije trebalo verovati da bi ovo radilo.
