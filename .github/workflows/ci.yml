@@ -6,8 +6,15 @@
 # standing reason a green suite is not proof, and which had already let three
 # real defects through by the day this was written.
 #
-# So the matrix is the whole design: the same 650 tests, once on the database the
-# developer runs and once on the database the site ships on. Neither is optional.
+# So the matrix is the whole design: the same suite, once on the database the
+# developer runs and once on each database the site ships on. None is optional.
+#
+# Since 2026-09-13 that is three, not two (ADR-0079). The staging server — and the
+# production server it stands in for — runs **MariaDB**, not MySQL, and Laravel
+# knows the difference: it ships a separate driver and a separate grammar for it
+# (`MariaDbGrammar`, query and schema both), so the SQL this application emits is
+# not the same SQL on the two. Until this file grew a third column, nothing
+# anywhere had ever run a single test against the engine the site is deployed on.
 name: CI
 
 on:
@@ -27,11 +34,11 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
-      # Both results, always. A MySQL-only failure is the interesting one and
-      # stopping the SQLite job would hide which of the two broke.
+      # Every result, always. An engine-specific failure is the interesting one,
+      # and stopping the others would hide which of the three broke.
       fail-fast: false
       matrix:
-        database: [sqlite, mysql]
+        database: [sqlite, mysql, mariadb]
 
     services:
       mysql:
@@ -49,6 +56,26 @@ jobs:
           --health-timeout=5s
           --health-retries=10
 
+      mariadb:
+        # 11.8, the version measured on the staging server 2026-09-13. Its default
+        # sql_mode matches what that server reports — STRICT_TRANS_TABLES without
+        # ONLY_FULL_GROUP_BY — so this job is lenient in exactly the way the
+        # deployed database is, which is the point: a GROUP BY the MySQL job
+        # rejects may pass here, and that difference is now visible rather than
+        # discovered on the server.
+        image: mariadb:11.8
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: true
+          MARIADB_DATABASE: soa_htc_test
+        # 🪤 3307 on the runner: the MySQL service already holds 3306, and both
+        # containers start for every job in the matrix whatever it is testing.
+        ports: ['3307:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -57,7 +84,9 @@ jobs:
         with:
           php-version: '8.3'
           # `intl` for locale-aware sorting, `zip`/`gd` for the .xlsx and PDF
-          # writers, `pdo_mysql` for the half of the matrix that needs it.
+          # writers, `pdo_mysql` for the two columns that need it — MariaDB is
+          # reached through the same PDO driver, with a different Laravel grammar
+          # on top of it.
           extensions: intl, zip, gd, pdo_mysql, pdo_sqlite, bcmath
           coverage: none
 
@@ -80,10 +109,13 @@ jobs:
 
       - name: Tests
         env:
+          # `mariadb` is a connection of its own in `config/database.php`, with
+          # Laravel's MariaDB driver behind it — not `mysql` pointed elsewhere.
+          # Naming it here is what puts the MariaDB grammar under test.
           DB_CONNECTION: ${{ matrix.database }}
-          DB_DATABASE: ${{ matrix.database == 'mysql' && 'soa_htc_test' || ':memory:' }}
+          DB_DATABASE: ${{ matrix.database == 'sqlite' && ':memory:' || 'soa_htc_test' }}
           DB_HOST: 127.0.0.1
-          DB_PORT: 3306
+          DB_PORT: ${{ matrix.database == 'mariadb' && '3307' || '3306' }}
           DB_USERNAME: root
           DB_PASSWORD: ''
         # 🪤 These override `phpunit.xml`, which hardcodes sqlite/:memory:.
