@@ -2389,3 +2389,36 @@ deployment/storage/backup.
 - ⚡ **`TrustProxies` nije bio potreban.** Izmereno na serveru: `HTTPS=on`, `SERVER_PORT=443` i
   `REQUEST_SCHEME=https` stižu tačni, pa Laravel računa ispravnu šemu sam. `X-Forwarded-Proto` jeste
   postavljen, ali ga nije trebalo verovati da bi ovo radilo.
+
+## ADR-0079 — Suite se vozi i na MariaDB, jer se sajt na njoj i prikazuje
+
+- **Status:** Prihvaćeno (2026-09-13). **IMPLEMENTIRANO.**
+- **Kontekst:** ADR-0069 je uveo CI sa dve kolone — SQLite, na kojem se radi, i MySQL, na kojem
+  „sajt radi". Ta druga pretpostavka je 2026-09-13 pala: STAGE na Hetzner-u, i produkcija koju on
+  predstavlja, voze **MariaDB 11.8**, a ne MySQL.
+- **Izmereno, ne pretpostavljeno.** Na serveru:
+
+  ```
+  VERSION()  11.8.6-MariaDB-0+deb13u1
+  sql_mode   STRICT_TRANS_TABLES, ERROR_FOR_DIVISION_BY_ZERO,
+             NO_AUTO_CREATE_USER, NO_ENGINE_SUBSTITUTION
+  ```
+
+  🔴 Nema **`ONLY_FULL_GROUP_BY`**, koji dev MySQL ima. Server je dakle **popustljiviji** od mašine
+  na kojoj se piše: upit koji bi na dev-u pao ovde prolazi tiho. `docs/06` baš zato imenuje
+  **Reports i Archive** kao ekrane koje treba otvoriti posle deploy-a.
+- **A razlika nije samo u `sql_mode`.** Laravel 13 isporučuje **zaseban drajver i zasebnu gramatiku**
+  za MariaDB (`MariaDbGrammar`, i za upite i za šemu), i `config/database.php` već ima punu
+  `mariadb` konekciju. Znači aplikacija **emituje drugačiji SQL** na te dve baze — a do danas
+  nijedan test, nigde, nije prošao nijednom od te dve putanje na engine-u na koji se deploy-uje.
+- **Odluka:** treća kolona u matrici, `mariadb`, na **`mariadb:11.8`** — istoj verziji koja je
+  izmerena na serveru. Imenuje se **`DB_CONNECTION=mariadb`**, ne `mysql` uperen na drugi port:
+  poenta je staviti **gramatiku** pod test, ne samo drugi server.
+- 🪤 **Port 3307 na runner-u.** MySQL servis već drži 3306, a GitHub Actions pokreće **sve** servise
+  za **svaki** posao u matrici, bez obzira šta taj posao testira. Zato `DB_PORT` prati matricu.
+- **Cena:** oko tri minuta po PR-u. Naspram toga: razlika između dev-a i servera se do sada otkrivala
+  **na serveru, ručno** — i to tek ako neko otvori baš onaj ekran.
+- ⏭️ **Šta ovo omogućava, a nije deo ove odluke:** STAGE trenutno stoji na `DB_CONNECTION=mysql`
+  iako je baza MariaDB, dakle gura MySQL gramatiku na MariaDB server. Prebacivanje na
+  `DB_CONNECTION=mariadb` je izmena jedne reči, ali se ne radi na nadu — radi se kad ova kolona
+  bude zelena.
