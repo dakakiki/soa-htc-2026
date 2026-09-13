@@ -36,6 +36,13 @@ class RehearseSeasonRollover extends Command
 {
     use ConfirmableTrait;
 
+    /**
+     * Drivers that give each table its own storage engine, and therefore have
+     * something for `nonTransactionalTables()` to look at. SQLite has none — every
+     * table there is transactional — so the check is skipped rather than failed.
+     */
+    private const ENGINE_AWARE_DRIVERS = ['mysql', 'mariadb'];
+
     protected $signature = 'season:rehearse {--force : Skip the confirmation prompt}';
 
     protected $description = 'Run a full season rollover against the real data inside a transaction, report how long it took, then roll it back. Changes nothing.';
@@ -70,11 +77,18 @@ class RehearseSeasonRollover extends Command
      * database this project imports from used MyISAM for six tables, so a server
      * built by hand from that shape is not a hypothetical.
      *
+     * 🪤 The guard is a LIST of driver names, and MariaDB has to be on it. It is
+     * its own driver in Laravel, so `getDriverName()` answers `mariadb` and a
+     * `!== 'mysql'` test reads that as "no engines here, nothing to check" — and
+     * silently returns the all-clear on the very server this check exists for.
+     * The staging server runs MariaDB; without this the rehearsal would stop being
+     * a rehearsal the moment `DB_CONNECTION` was set to match it.
+     *
      * @return list<string> offending "table (ENGINE)" descriptions
      */
     private function nonTransactionalTables(): array
     {
-        if (DB::connection()->getDriverName() !== 'mysql') {
+        if (! in_array(DB::connection()->getDriverName(), self::ENGINE_AWARE_DRIVERS, true)) {
             return [];
         }
 

@@ -42,6 +42,43 @@ class SeasonRehearsalTest extends TestCase
         return $counts;
     }
 
+    /**
+     * The engine check runs on the databases that have engines — MariaDB included.
+     *
+     * This is the assertion the command's whole safety rests on: `nonTransactionalTables()`
+     * refuses to rehearse on a table a ROLLBACK would not restore, and it is skipped
+     * on drivers that have no per-table engine. 🪤 MariaDB is its own driver in
+     * Laravel, so a guard written as `!== 'mysql'` skips it there too — quietly
+     * returning the all-clear on the very server the check exists for, where the
+     * rehearsal would then write the whole rollover and not undo it.
+     *
+     * Observed through the query it issues rather than by forcing a MyISAM table:
+     * converting one would implicitly commit and break the surrounding transaction,
+     * which would make this test the reason the next one fails.
+     */
+    public function test_the_engine_check_runs_on_a_mysql_family_connection(): void
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            $this->markTestSkipped("Driver [{$driver}] gives tables no engine of their own, so there is nothing to check.");
+        }
+
+        $looked = false;
+        DB::listen(function ($query) use (&$looked): void {
+            if (str_contains($query->sql, 'information_schema.tables')) {
+                $looked = true;
+            }
+        });
+
+        $this->artisan('season:rehearse', ['--force' => true])->assertSuccessful();
+
+        $this->assertTrue(
+            $looked,
+            "On [{$driver}] the rehearsal never looked at any table's engine — on MyISAM it would write the rollover and keep it.",
+        );
+    }
+
     public function test_the_rehearsal_leaves_the_database_exactly_as_it_found_it(): void
     {
         $before = $this->snapshot();
