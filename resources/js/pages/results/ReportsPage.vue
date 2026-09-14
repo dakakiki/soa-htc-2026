@@ -29,13 +29,19 @@ const opts = ref<ReportFilterOptions>({ ...empty });
 
 const q = reactive<ReportQuery>({
     country_id: null, region_id: null, school_id: null, coordinator_user_id: null,
-    difficulty_level_id: null, quiz_id: null, exam_id: null, test_id: null, group_by: null,
+    difficulty_level_id: null, quiz_id: null, exam_id: null, test_id: null,
+    // A breakdown from the start, so the section carries a table instead of an
+    // invitation to pick something. Country is the one dimension every report
+    // has members in, and the one the heatmap already opens on.
+    group_by: 'country',
     // The contest, until somebody asks for practice (ADR-0084).
     mode: 'competition',
 });
 
 const summary = ref<Awaited<ReturnType<typeof reportSummary>>['data'] | null>(null);
 const loading = ref(false);
+// The breakdown table reloads on its own when only its dimension changes.
+const breakdownLoading = ref(false);
 const optionsLoading = ref(false);
 const exporting = ref(false);
 const error = ref<string | null>(null);
@@ -50,9 +56,11 @@ const compareBy = ref<GroupBy>('country');
 const compareRows = ref<ReportRow[]>([]);
 const pinnedIds = ref<number[]>([]);
 
-// Breakdown search + cap so a 50–70 country list stays navigable.
+// Breakdown search + cap so a 50–70 country list stays navigable. Ten rows fit
+// on a screen without scrolling past the sections below; the rest are one search
+// away, and the PDF export prints them all.
 const breakdownSearch = ref('');
-const BREAKDOWN_CAP = 25;
+const BREAKDOWN_CAP = 10;
 
 // Heatmap caps: many countries/venues would blow up the grid, so show the
 // busiest rows/columns and note the rest.
@@ -94,6 +102,28 @@ async function loadSummary(): Promise<void> {
         error.value = t('reports.error');
     } finally {
         loading.value = false;
+    }
+}
+
+/**
+ * The dimension picker reloads its own table and nothing else — so the overlay
+ * belongs to that section, not to the page. Totals, rates and the funnel do not
+ * read `group_by` (they come from `totals`, which is computed ungrouped), and the
+ * heatmap and compare each carry their own dimension. Only `rows` are replaced,
+ * so the numbers above the table do not blink for a change they did not make.
+ */
+async function onGroupByChange(): Promise<void> {
+    breakdownLoading.value = true;
+    error.value = null;
+    try {
+        const { data } = await reportSummary(q);
+        summary.value = summary.value
+            ? { ...summary.value, group_by: data.group_by, rows: data.rows }
+            : data;
+    } catch {
+        error.value = t('reports.error');
+    } finally {
+        breakdownLoading.value = false;
     }
 }
 
@@ -196,9 +226,14 @@ async function exportPdf(): Promise<void> {
 }
 
 function resetFilters(): void {
+    // The breakdown dimension is not a filter and does not reset with them — it
+    // belongs to its own table, like the heatmap's axes and compare's dimension,
+    // neither of which this button touches.
+    const groupBy = q.group_by ?? null;
     (Object.keys(q) as (keyof ReportQuery)[]).forEach((k) => {
         q[k] = null;
     });
+    q.group_by = groupBy;
     // Not a filter to be cleared: cleared, a report would be about nothing in
     // particular. It goes back to the contest (ADR-0084).
     q.mode = 'competition';
@@ -412,15 +447,6 @@ onMounted(async () => {
                         <option value="all">{{ $t('reports.modeAll') }}</option>
                     </select>
                 </label>
-                <label class="block">
-                    <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.groupBy') }}</span>
-                    <select v-model="q.group_by"
-                        class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-link focus:ring-brand-link"
-                        @change="loadSummary">
-                        <option :value="null">{{ $t('reports.groupNone') }}</option>
-                        <option v-for="g in GROUPS" :key="g" :value="g">{{ groupLabel[g] }}</option>
-                    </select>
-                </label>
             </div>
 
             <!-- Footer: reset the filters, mirroring the reset-attempts action position. -->
@@ -494,16 +520,34 @@ onMounted(async () => {
             </div>
 
             <!-- Breakdown -->
-            <div>
-                <div class="mb-2 flex flex-wrap items-center gap-3">
+            <div class="relative">
+                <!-- Its own overlay: a new dimension redraws this table alone. -->
+                <LoadingOverlay v-if="breakdownLoading" />
+                <div class="mb-2 flex flex-wrap items-center gap-2">
                     <h2 class="text-sm font-semibold text-gray-700">{{ $t('reports.breakdown') }}</h2>
-                    <input
-                        v-if="summary.group_by"
-                        v-model="breakdownSearch"
-                        type="search"
-                        :placeholder="$t('reports.searchGroup')"
-                        class="ml-auto w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm sm:w-64"
-                    />
+                    <!--
+                        The dimension picker belongs here, not among the filters: a
+                        filter narrows the whole report, this one only decides how
+                        THIS table is split — totals, rates and the funnel do not
+                        read it. Same place as the heatmap's axes and compare's
+                        dimension, for the same reason.
+                    -->
+                    <div class="ml-auto flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                        <input
+                            v-if="summary.group_by"
+                            v-model="breakdownSearch"
+                            type="search"
+                            :placeholder="$t('reports.searchGroup')"
+                            class="w-full rounded-md border border-gray-300 px-3 py-1 text-sm sm:w-56"
+                        />
+                        <span>{{ $t('reports.groupBy') }}</span>
+                        <select v-model="q.group_by"
+                            class="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-link focus:ring-brand-link"
+                            @change="onGroupByChange">
+                            <option :value="null">{{ $t('reports.groupNone') }}</option>
+                            <option v-for="g in GROUPS" :key="g" :value="g">{{ groupLabel[g] }}</option>
+                        </select>
+                    </div>
                 </div>
                 <p v-if="!summary.group_by" class="text-sm text-gray-500">{{ $t('reports.noGroup') }}</p>
                 <div v-else class="overflow-x-auto rounded-lg border border-gray-200 bg-white">
