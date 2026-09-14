@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconLogout } from '@tabler/icons-vue';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import { useThemeStore } from '@/stores/theme';
+import { getSiteStatus } from '@/api/publicContent';
+import SiteSeasonStrip from '@/components/public/SiteSeasonStrip.vue';
 import Tooltip from '@/components/Tooltip.vue';
+import type { SiteStatus } from '@/types/models';
 
 /**
  * Competitor (student) shell (ADR-0014): a minimal, distraction-free frame for
@@ -13,18 +16,18 @@ import Tooltip from '@/components/Tooltip.vue';
  * routes, which require an identified session, so `registration` is present.
  *
  * In the public site's own language since the redesign: the same off-white, the
- * same navy ink. What it does NOT carry is the site's navigation — a competitor
- * mid-contest has one place to be, and a menu here is an invitation to leave it.
+ * same navy ink, the same season strip. What it does NOT carry is the site's
+ * navigation — a competitor mid-contest has one place to be, and a menu here is
+ * an invitation to leave it.
  *
- * 🪤 Nor a status strip any more (ADR-0081). It read "Live exams open" off one
- * global flag, on screens a competitor reaches between their own tests — and
- * the flag says nothing about whether THIS competitor can enter. That answer is
- * on the dashboard right below it, per quiz. Removing it took the shell's only
- * reason to call `getSiteStatus`, so the request went with it.
+ * 🪤 That strip is the season's round and name and nothing else since ADR-0081.
+ * "Live exams open" stood in it too, inferred from whether any competition quiz
+ * was active — which says nothing about whether THIS competitor can enter. That
+ * answer is on the dashboard right below, per quiz.
  *
- * On a phone the mark goes too and the row is only who is signed in plus the
- * way out: this screen is used through the PWA more than anywhere else, and the
- * vertical space belongs to the tests.
+ * On a phone the strip and the mark both go and the row is only who is signed in
+ * plus the way out: this screen is used through the PWA more than anywhere else,
+ * and the vertical space belongs to the tests.
  */
 const student = useStudentSessionStore();
 const themeStore = useThemeStore();
@@ -35,6 +38,17 @@ const { t } = useI18n();
 /** A test in progress paints its own chrome; the shell steps out of its way. */
 const bare = computed(() => route.meta.bare === true);
 
+const site = ref<SiteStatus | null>(null);
+
+onMounted(async () => {
+    try {
+        const { data } = await getSiteStatus();
+        site.value = data.data;
+    } catch {
+        // The strip is context, not content: without it the shell stands.
+    }
+});
+
 async function signOut(): Promise<void> {
     await student.logout();
     await router.push({ name: 'home' });
@@ -43,6 +57,8 @@ async function signOut(): Promise<void> {
 
 <template>
     <div class="flex min-h-screen flex-col bg-[#fbfaf8] text-brand-palette-4">
+        <SiteSeasonStrip v-if="!bare" :site="site" class="hidden lg:block" />
+
         <header v-if="!bare" class="border-b border-brand-palette-4/12">
             <div class="mx-auto flex w-full max-w-[1240px] items-center gap-4 px-6 py-3 lg:py-5">
                 <!-- The mark stands on the page colour, so it needs the dark
