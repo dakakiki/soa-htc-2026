@@ -437,14 +437,11 @@ export default {
             close: 'Close menu',
         },
         status: {
+            // 🪤 Only the footer's line is left. The three that stood beside it —
+            // "Live exams open" and its two closed forms — went with the strip
+            // that printed them (ADR-0081): they were derived from one global
+            // flag, on pages every country reads.
             round: 'Round {round} · {year}',
-            open: 'Live exams open',
-            // Two closed states, because they are not the same news. The single
-            // string this replaced asserted "sample open" whatever the sample was
-            // doing, and out of season with no sample quiz active that was a lie
-            // the strip told on every page (2026-08-27).
-            closedSample: 'Live exams closed · sample open',
-            closed: 'Live exams closed',
         },
         news: {
             // The mono line above the masthead. The front page numbers its
