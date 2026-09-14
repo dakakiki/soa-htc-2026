@@ -54,9 +54,11 @@ const compareBy = ref<GroupBy>('country');
 const compareRows = ref<ReportRow[]>([]);
 const pinnedIds = ref<number[]>([]);
 
-// Breakdown search + cap so a 50–70 country list stays navigable.
+// Breakdown search + cap so a 50–70 country list stays navigable. Ten rows fit
+// on a screen without scrolling past the sections below; the rest are one search
+// away, and the PDF export prints them all.
 const breakdownSearch = ref('');
-const BREAKDOWN_CAP = 25;
+const BREAKDOWN_CAP = 10;
 
 // Heatmap caps: many countries/venues would blow up the grid, so show the
 // busiest rows/columns and note the rest.
