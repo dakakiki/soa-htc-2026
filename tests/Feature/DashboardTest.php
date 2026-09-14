@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Assessment\Models\Exam;
+use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Attempt;
@@ -297,6 +299,65 @@ class DashboardTest extends TestCase
         $this->assertNotNull($country);
         $this->assertSame(1, $country['submitted']);
         $this->assertSame(1, $country['published']);
+    }
+
+    /**
+     * The tile is about the contest, and practice stands beside it.
+     *
+     * Counted together it read 65.930 on the real roster, and the «of the
+     * roster» line under it said 61% while the Reports screen answered the same
+     * question with 56% (ADR-0085). They are not a partition either: 15.420
+     * children sat both, so the two are never added (ADR-0086).
+     */
+    public function test_sitting_the_contest_and_sitting_a_sample_are_counted_apart(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $round = ExamRound::where('is_sample', true)->first()
+            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
+
+        $quiz = Quiz::create(['title' => 'Split quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+
+        $sit = function (string $number, int $seq, bool $practice) use ($quiz, $round) {
+            $registration = $this->competitor($number, $seq);
+            $test = Test::create(['title' => 'T'.$number, 'status' => 'active']);
+            $exam = Exam::create(['title' => 'E'.$number, 'status' => 'active']);
+            if ($practice) {
+                $exam->update(['exam_round_id' => $round->id]);
+            }
+            $exam->tests()->attach($test->id, ['position' => 1]);
+
+            Attempt::create([
+                'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+                'is_practice' => $practice, 'status' => 'completed', 'grading_status' => 'auto_graded',
+                'score' => 1, 'max_score' => 10,
+                'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+            ]);
+
+            return $registration;
+        };
+
+        $sit('14707070', 707070, practice: false);
+        $sit('14707071', 707071, practice: true);
+
+        $kpis = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.kpis');
+
+        $this->assertSame(1, $kpis['submitted'], 'the contest');
+        $this->assertSame(1, $kpis['submitted_practice'], 'practice, beside it');
+    }
+
+    /** How many of the countries on the roster are broken into regions. */
+    public function test_the_countries_tile_says_how_many_of_them_have_regions(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+
+        $kpis = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.kpis');
+
+        $expected = Country::whereHas('regions')
+            ->whereIn('id', Registration::query()->select('country_id'))
+            ->count();
+
+        $this->assertSame($expected, $kpis['countries_with_regions']);
+        $this->assertLessThanOrEqual($kpis['countries'], $kpis['countries_with_regions']);
     }
 
     /**

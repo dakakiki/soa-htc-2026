@@ -532,11 +532,19 @@ export interface DashboardData {
     has_by_country: boolean;
     kpis: {
         students: number;
+        /**
+         * Competitors who sat a CONTEST test. 🪤 `submitted_practice` is the same
+         * count for practice and the two are not a partition — 15.420 children
+         * sat both — so they are never added together (ADR-0086).
+         */
         submitted: number;
+        submitted_practice: number;
         present: number;
         absent: number;
         /** Null for a scoped account: one country is not a statistic. */
         countries: number | null;
+        /** How many of those countries are broken into regions. */
+        countries_with_regions: number | null;
         venues_active: number | null;
         students_previous_round: number | null;
     };

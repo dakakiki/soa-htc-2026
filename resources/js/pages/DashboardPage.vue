@@ -167,6 +167,9 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                     <div v-if="kpis.countries !== null" :class="card">
                         <div class="text-xs uppercase tracking-wide text-gray-500">{{ $t('dashboard.kpi.countries') }}</div>
                         <div class="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{{ kpis.countries }}</div>
+                        <div v-if="kpis.countries_with_regions !== null" class="text-xs text-gray-500">
+                            {{ $t('dashboard.kpi.withRegions', { count: kpis.countries_with_regions }) }}
+                        </div>
                     </div>
 
                     <div v-if="kpis.venues_active !== null" :class="card">
@@ -179,6 +182,11 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                         <div class="text-xs uppercase tracking-wide text-gray-500">{{ $t('dashboard.kpi.submitted') }}</div>
                         <div class="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{{ kpis.submitted.toLocaleString() }}</div>
                         <div v-if="turnout" class="text-xs text-gray-500">{{ $t('dashboard.kpi.turnout', { pct: turnout }) }}</div>
+                        <!-- 🪤 Beside it, never added to it: 15.420 children sat
+                             both, so a sum of the two counts them twice. -->
+                        <div class="text-xs text-gray-500">
+                            {{ $t('dashboard.kpi.alsoPractice', { count: kpis.submitted_practice.toLocaleString() }) }}
+                        </div>
                     </div>
 
                     <!-- Absentees only mean something inside one's own roster. -->

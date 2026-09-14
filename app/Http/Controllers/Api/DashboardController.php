@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Support\SampleRound;
 use App\Domain\Competition\Enums\GradingStatus;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
@@ -123,6 +124,14 @@ class DashboardController extends Controller
      */
     private function registrationStats(?int $seasonId, ?Collection $allowedSchoolIds): array
     {
+        /*
+         * The countries that have any region at all, read once as a list rather
+         * than asked per registration: there are 28 of them against 108.812
+         * rows, and a correlated EXISTS would ask the same question a hundred
+         * thousand times.
+         */
+        $withRegions = DB::table('regions')->distinct()->pluck('country_id')->all();
+
         $row = DB::table('registrations')
             ->when($seasonId !== null, fn ($q) => $q->where('season_id', $seasonId))
             ->when($allowedSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $allowedSchoolIds->all()))
@@ -131,6 +140,11 @@ class DashboardController extends Controller
                 "sum(attendance = 'present') as present, ".
                 "sum(attendance = 'absent') as absent, ".
                 'count(distinct country_id) as countries, '.
+                // How many of those countries are broken into regions, which is
+                // what says whether a per-region report means anything there.
+                'count(distinct case when country_id in ('.
+                    ($withRegions === [] ? 'null' : implode(',', array_map('intval', $withRegions))).
+                ') then country_id end) as countries_with_regions, '.
                 'sum(date_of_birth is null) as missing_dob'
             )
             ->first();
@@ -140,6 +154,7 @@ class DashboardController extends Controller
             'present' => (int) ($row->present ?? 0),
             'absent' => (int) ($row->absent ?? 0),
             'countries' => (int) ($row->countries ?? 0),
+            'countries_with_regions' => (int) ($row->countries_with_regions ?? 0),
             'missing_dob' => (int) ($row->missing_dob ?? 0),
         ];
     }
@@ -157,13 +172,33 @@ class DashboardController extends Controller
     {
         $seasonId = $season?->id;
 
-        // Competitors who sat something, not attempts — same shape and the same
-        // reason as the country breakdown: fold the attempts down first so the
-        // inner group is index-only. 1,724 → 583 ms over the r14 roster.
-        $submitted = DB::query()
+        /*
+         * Competitors who sat something, not attempts — same shape and the same
+         * reason as the country breakdown: fold the attempts down first so the
+         * inner group is index-only. 1,724 → 583 ms over the r14 roster.
+         *
+         * 🔴 Counted once, for both contests at once, this tile said 65.930 —
+         * and the «of the roster» line under it read 61%, while the Reports
+         * screen answered the same question with 56% (ADR-0085). The difference
+         * was practice. They are not even a partition: 15.420 children sat both,
+         * so the two numbers below do not add up to a third one and are never
+         * presented as if they did (ADR-0086).
+         */
+        $sampleTestIds = SampleRound::testIds()->pluck('test_id')->all();
+
+        $whoSat = fn (bool $practice) => DB::query()
             ->fromSub(
                 DB::table('attempts')
                     ->whereNotNull('submitted_at')
+                    ->when(
+                        $sampleTestIds !== [],
+                        fn ($q) => $practice
+                            ? $q->whereIn('test_id', $sampleTestIds)
+                            : $q->whereNotIn('test_id', $sampleTestIds),
+                        // No practice round configured: nobody sat one, and every
+                        // attempt there is belongs to the contest.
+                        fn ($q) => $practice ? $q->whereRaw('1 = 0') : $q,
+                    )
                     ->groupBy('registration_id')
                     ->selectRaw('registration_id'),
                 'a'
@@ -175,10 +210,12 @@ class DashboardController extends Controller
 
         return [
             'students' => $stats['students'],
-            'submitted' => $submitted,
+            'submitted' => $whoSat(false),
+            'submitted_practice' => $whoSat(true),
             'present' => $stats['present'],
             'absent' => $stats['absent'],
             'countries' => $allowedSchoolIds === null ? $stats['countries'] : null,
+            'countries_with_regions' => $allowedSchoolIds === null ? $stats['countries_with_regions'] : null,
             'venues_active' => $allowedSchoolIds === null
                 ? DB::table('schools')->where('status', 'active')->count()
                 : null,

@@ -2637,3 +2637,32 @@ deployment/storage/backup.
 - 🪤 Ostale dve stope su oduvek bile u redu, jer dele pokušaje pokušajima: `submitted / started` i
   `published / submitted`.
 - **Cena:** jedan `COUNT(DISTINCT)` više u istom upitu — bez dodatnog prolaza kroz tabelu.
+
+## ADR-0086 — Dashboard: „Sat a test" je bio zbir dva takmičenja; i koliko zemalja ima regione
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je tražio dve stvari na dashboard-u: ispis ispod „Countries", i odgovor na
+  pitanje *„da li je razdvojeno ko je radio competition a ko sample — ako nije, razdvoj i ispiši."*
+- **Nije bilo razdvojeno**, i to je bila treća pojava iste greške u istom danu (ADR-0084, ADR-0085).
+
+  | | |
+  | --- | ---: |
+  | Pisalo je (bilo šta) | **65.930** |
+  | takmičenje | **61.309** |
+  | proba | 20.041 |
+  | **oboje** | **15.420** |
+
+- 🔴 **A „of the roster" ispod je visilo o tom broju**, pa je dashboard tvrdio **61 %** dok je Reports
+  na isto pitanje odgovarao **56 %**. Dva ekrana, jedno pitanje, dva odgovora — razlika je tačno proba.
+- **Odluka (vlasnikova):** veliki broj je **takmičenje**, proba stoji **pored njega**, a `turnout` se
+  računa iz takmičenja — čime se dashboard i Reports izjednačavaju.
+- 🪤 **Nikad se ne sabiraju.** 15.420 dece je polagalo i jedno i drugo, pa zbir broji njih dvaput.
+  Zato u prevodu stoji `{count} sat a sample` kao zasebna rečenica, a ne kao sabirak.
+- **Countries dobija podnaslov** `{count} with regions` — **28 od 69**. To je ono što kaže da li
+  izveštaj po regionu u toj zemlji uopšte ima smisla.
+  ⚡ Spisak zemalja koje imaju region čita se **jednom**, pa se koristi kao `IN (…)`; korelisani
+  `EXISTS` bi isto pitanje postavio 108.812 puta.
+- 🪤 **Granica je izvučena u `SampleRound`** i sada se piše na jednom mestu. Reports je jutros dobio
+  sopstvenu kopiju tog join-a i pri tom **ispustio `exams.status = 'active'`** — što `ResultLedger` i
+  `AttemptGrader` oba imaju. Ništa nije puklo jer nijedan ispit danas nije neaktivan; upravo tako
+  četvrti prepis istog pravila i prođe nezapaženo.

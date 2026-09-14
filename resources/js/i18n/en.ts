@@ -63,8 +63,11 @@ export default {
             students: 'Students',
             countries: 'Countries',
             venuesActive: 'Active venues',
-            submitted: 'Sat a test',
+            // 🪤 The contest, and practice beside it — never summed (ADR-0086).
+            submitted: 'Sat the contest',
+            alsoPractice: '{count} sat a sample',
             absent: 'Absent',
+            withRegions: '{count} with regions',
             turnout: '{pct} of the roster',
             vsPreviousRound: '{delta} vs previous round',
             inVenues: 'in {count} venues',
