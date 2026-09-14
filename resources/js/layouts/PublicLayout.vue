@@ -180,9 +180,10 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
 
 <template>
     <div class="flex min-h-screen flex-col bg-[#fbfaf8] text-brand-palette-4">
-        <!-- The season, and deliberately nothing else (ADR-0081). Neither the
-             round being run nor whether exams are open: both were claims this
-             page cannot make truthfully for every country reading it. -->
+        <!-- The round and the season — what an administrator typed, and nothing
+             the application inferred (ADR-0081). "Live exams open" stood here
+             and was inferred, from whether any competition quiz was active,
+             while every one of them sits behind a password. -->
         <SiteSeasonStrip :site="site" />
 
         <header class="border-b border-brand-palette-4/12">
