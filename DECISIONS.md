@@ -2490,20 +2490,37 @@ deployment/storage/backup.
   istovremeno sede na različitim rundama, pa je jedno ime bilo netačno za otprilike pola njih.
   Tačka „otvoreno/zatvoreno" je **jedna globalna tvrdnja o takmičenju koje nije globalno** — ista
   mana, samo je preživela čistku, jer je čistka gledala ime a ne tvrdnju pored njega.
-- **Odluka:** traka se **uklanja sa javne naslovne** (`PublicLayout`). Ništa je ne zamenjuje.
-- **Šta ostaje i zašto:**
+- 🔴 **Prva verzija ove odluke je bila pogrešna i ispravljena je istog dana.** Uklonio sam **celu
+  traku** sa javne naslovne — pročitao sam vlasnikovo *„skloni liniju live exams i top linije"* kao
+  celu traku, i pustio to na STAGE. Vlasnikov odgovor je bio *„gde je top?!"*. Traka mu treba;
+  smetala je **tvrdnja u njoj**. Zapisano da se zna da je greška bila u čitanju naloga, ne u kodu.
+- **Odluka (ispravljena) — i pravilo je vlasnikovo, oštrije od „da li je tačno":**
+  **traka pokazuje ono što je administrator UNEO, ne ono što aplikacija zaključi.**
 
-  | Gde | Ostaje | Zašto |
+  | | Odakle | Ishod |
   | --- | --- | --- |
-  | Podnožje javnog sajta | izdanje (`Round N · godina`) | ne tvrdi ništa o ulasku |
-  | Takmičarska ljuska (`StudentLayout`) | cela traka | ⚠️ vlasnik je tražio **javni deo**, a ta ljuska nije bila u pitanju |
-  | `EntryWindow` i `competition_open` na žici | nedirnuto | `StudentAccessFormPage` time gasi takmičarski ulaz van sezone (ADR-0043) — to je poseban posao i on je tačan |
+  | `Round 14 · 2026` | uneto uz sezonu (`round_number`, `year`) | **ostaje** — vlasnik: *„to se čita iz unetih podataka o sezoni"*, i isti taj red već stoji u podnožju |
+  | `Season 2026` | uneto uz sezonu (`name`) | **ostaje** |
+  | ● `Live exams open` | **izvedeno** — `EntryWindow::competitionOpen()` | **izlazi** — objavljeno ≠ prohodno; svih osam aktivnih takmičarskih kvizova ima lozinku, pa je najavljivalo ulaz koji niko nema |
 
-- ⚠️ **Ista rečenica je i dalje na ekranu** takmičaru koji se identifikovao — `StudentLayout` nosi traku
-  na **takmičarskoj naslovnoj** (`/student`) i na **rezultatima** (`/student/results`), od `lg` naviše.
-  Na samom ispitu ne (`bare: true`). Ulazna forma (`/student/access/…`) je u javnoj zoni, pa je tamo
-  traka pala zajedno sa ovom izmenom. 🪤 Ne tvrditi da je tamo „tačnija" — podatak je ista globalna
-  zastavica; razlika je samo u tome što odluka o toj ljusci **nije donesena**.
+- 🪤 **Zašto je to pravilo bolje od one prve formulacije.** Ja sam prvo tvrdio da `Round 14 · 2026`
+  mora da padne jer je to `round_number` aktivne sezone, dakle „runda koja se igra" iz ADR-0077.
+  Nije isto: ADR-0077 je sklonio **ime runde koja se igra u datoj zemlji** — podatak koji se razlikuje
+  od zemlje do zemlje i koji niko nije uneo. Broj runde sezone je **jedan unos za ceo sajt**, i
+  podnožje ga ispisuje od početka bez ijedne primedbe.
+- 🪤 **Komponenta je preimenovana** u `SiteSeasonStrip`. Ime `SiteStatusStrip` bi lagalo: statusa
+  više nema, ostali su podaci sezone.
+- **Šta se NE dira:**
 
+  | Gde | Zašto |
+  | --- | --- |
+  | `EntryWindow` i `competition_open`/`sample_open` na žici | `StudentAccessFormPage` time gasi takmičarski ulaz van sezone (ADR-0043) — poseban posao, i tačan |
+  | `round` i `year` na žici | podnožje javnog sajta ih i dalje ispisuje |
+
+- **Podnožje ostaje nedirnuto** — isti red, `Round N · godina`, i sada vrh i dno govore istu stvar.
+- **Takmičarska ljuska (`StudentLayout`) ostaje bez trake uopšte** — vlasnikova odluka *„skloni i tamo"*.
+  Time je otpao i jedini razlog da ta ljuska zove `getSiteStatus`, pa je i taj zahtev uklonjen: jedan
+  poziv manje na svakom takmičarskom ekranu. Na samom ispitu trake ionako nije ni bilo (`bare: true`).
 - **Cena:** javna naslovna više ne govori posetiocu da li se ispiti polažu. To nije gubitak: nije ni
-  mogla da kaže tačno, a ko traži ispit ide na takmičarski ulaz, gde odgovor važi baš za njega.
+  mogla da kaže tačno za sve zemlje, a ko traži ispit ide na takmičarski ulaz, gde odgovor važi baš
+  za njega.
