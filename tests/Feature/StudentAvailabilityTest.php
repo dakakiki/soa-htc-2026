@@ -9,10 +9,12 @@ use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Models\StudentSession;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class StudentAvailabilityTest extends TestCase
@@ -355,5 +357,92 @@ class StudentAvailabilityTest extends TestCase
             'published_at' => $published ? now() : null,
             'channel' => 'web',
         ]);
+    }
+
+    /**
+     * 🔴 An exam room is one address, and it must be able to open its papers.
+     *
+     * The gate used to be `throttle:8,1`; a competitor is not a Laravel user, so
+     * that throttle keyed by IP and refused the NINTH CHILD rather than the ninth
+     * guess. Measured on the real endpoint before this changed: eight through,
+     * then 429 — a venue of three hundred would have needed thirty-seven minutes
+     * of waiting to type a password it already had.
+     *
+     * 🪤 The sessions are minted here rather than identified for: identification
+     * carries the same per-address cap, and twenty children cannot sign in from
+     * one room either. That half is not fixed yet.
+     */
+    public function test_a_whole_room_unlocks_from_one_address(): void
+    {
+        $chain = $this->chain('H2', 'competition', 'secret-code');
+
+        foreach (range(1, 20) as $i) {
+            $this->withToken($this->mintedSessionFor('H2'))
+                ->postJson("/api/student/quizzes/{$chain['quiz']->id}/unlock", ['password' => 'secret-code'])
+                ->assertOk()
+                ->assertJsonPath('unlocked', true);
+        }
+    }
+
+    /**
+     * What is capped is guessing, and it is capped per competitor: eight wrong
+     * codes a minute is enough for a misread card and nowhere near enough to work
+     * a password out — and the child at the next desk is unaffected.
+     */
+    public function test_one_competitors_wrong_codes_do_not_reach_the_child_beside_them(): void
+    {
+        $chain = $this->chain('H2', 'competition', 'secret-code');
+        $fumbling = $this->mintedSessionFor('H2');
+        $neighbour = $this->mintedSessionFor('H2');
+
+        for ($i = 0; $i < 8; $i++) {
+            $this->withToken($fumbling)
+                ->postJson("/api/student/quizzes/{$chain['quiz']->id}/unlock", ['password' => 'wrong'])
+                ->assertStatus(422);
+        }
+
+        $this->withToken($fumbling)
+            ->postJson("/api/student/quizzes/{$chain['quiz']->id}/unlock", ['password' => 'wrong'])
+            ->assertStatus(429)
+            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'Too many attempts'));
+
+        // 🔴 Even the right code is refused now — for THAT competitor.
+        $this->withToken($fumbling)
+            ->postJson("/api/student/quizzes/{$chain['quiz']->id}/unlock", ['password' => 'secret-code'])
+            ->assertStatus(429);
+
+        $this->withToken($neighbour)
+            ->postJson("/api/student/quizzes/{$chain['quiz']->id}/unlock", ['password' => 'secret-code'])
+            ->assertOk();
+    }
+
+    /**
+     * A session with its token, without going through identification — which has
+     * a cap of its own that a roomful of children would trip first.
+     */
+    private function mintedSessionFor(string $levelShort): string
+    {
+        $school = School::firstOrFail();
+        $level = DifficultyLevel::where('level_short', $levelShort)->firstOrFail();
+        $this->seq++;
+
+        $registration = Registration::create([
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'competitor_number' => '14'.str_pad((string) $this->seq, 6, '0', STR_PAD_LEFT), 'sequence' => $this->seq,
+            'school_id' => $school->id, 'country_id' => $school->country_id,
+            'difficulty_level_id' => $level->id, 'name' => 'Test Student',
+            'date_of_birth' => '2010-05-01', 'grade' => 6, 'status' => 'active',
+        ]);
+
+        $token = Str::random(64);
+        StudentSession::create([
+            'registration_id' => $registration->id,
+            'token_hash' => hash('sha256', $token),
+            'expires_at' => now()->addMinutes(StudentSession::LIFETIME_MINUTES),
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
+        ]);
+
+        return $token;
     }
 }

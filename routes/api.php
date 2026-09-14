@@ -155,9 +155,15 @@ Route::prefix('student')->group(function () {
         // since closed. Reading `availability` for this made closing a round
         // retract its published marks.
         Route::get('results', [StudentAvailabilityController::class, 'history']);
+        /*
+         * 🔴 Not `throttle:8,1`. A competitor is not a Laravel user, so that
+         * throttle keyed by IP — and an exam room is one IP: the ninth CHILD was
+         * refused, not the ninth guess. The wrong passwords are counted per
+         * session inside the controller; this is the flood ceiling.
+         */
         Route::post('quizzes/{quiz}/unlock', [StudentAvailabilityController::class, 'unlock'])
             ->whereNumber('quiz')
-            ->middleware('throttle:8,1');
+            ->middleware('throttle:student-unlock');
 
         // Attempt engine (Faza 4): start / resume / submit a test.
         Route::post('tests/{test}/start', [AttemptController::class, 'start'])->whereNumber('test');
