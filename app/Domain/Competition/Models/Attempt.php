@@ -69,7 +69,7 @@ class Attempt extends Model
             'submitted_at' => $at,
             'grading_status' => GradingStatus::Queued,
         ]);
-        GradeAttempt::dispatch($this);
+        GradeAttempt::forAttempt($this);
     }
 
     /** True once the deadline plus the grace window has passed. */

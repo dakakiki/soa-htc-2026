@@ -143,8 +143,11 @@ class AttemptController extends Controller
                 );
             }
 
-            // Complete now; auto-grading is deferred to a queued job so the submit
-            // response stays fast and the answers are durably saved beforehand.
+            // Complete now, and grade after the answers are durably saved. A
+            // contest attempt's grading is deferred to the queue so the submit
+            // response stays fast; a practice one is scored inside this request,
+            // because its mark publishes itself and the next screen shows it
+            // ({@see GradeAttempt::forAttempt()}).
             $attempt->update([
                 'status' => AttemptStatus::Completed,
                 'submitted_at' => now(),
@@ -152,7 +155,7 @@ class AttemptController extends Controller
             ]);
         }, 5);
 
-        GradeAttempt::dispatch($attempt);
+        GradeAttempt::forAttempt($attempt);
 
         return response()->json($this->completedPayload($attempt->refresh()));
     }
