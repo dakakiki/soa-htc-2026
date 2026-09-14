@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Competition\Support;
 
 use App\Domain\Assessment\Enums\QuestionType;
+use App\Domain\Assessment\Support\SampleRound;
 use App\Domain\Competition\Enums\GradingStatus;
 use App\Domain\Competition\Models\Attempt;
 use Illuminate\Support\Facades\DB;
@@ -179,10 +180,16 @@ final class AttemptGrader
     }
 
     /**
-     * Whether the attempt's test sits in the practice round of an active exam.
+     * Whether the attempt's test sits in a practice round.
      *
      * The ROUND's own flag, never its name: a name is something an administrator
      * can retype, and this decides whether a result publishes itself.
+     *
+     * 🪤 And never the exam's STATUS either, since 2026-09-14: one spelling of
+     * this rule for the whole application ({@see SampleRound}).
+     * Retiring an exam does not turn the practice somebody already sat into a
+     * contest entry — and an inactive exam cannot be sat again anyway, so the
+     * condition only ever changed the answer for attempts already in the ground.
      */
     private static function inSampleRound(Attempt $attempt): bool
     {
@@ -190,7 +197,6 @@ final class AttemptGrader
             ->join('exams', 'exams.id', '=', 'exam_test.exam_id')
             ->join('exam_rounds', 'exam_rounds.id', '=', 'exams.exam_round_id')
             ->where('exam_test.test_id', $attempt->test_id)
-            ->where('exams.status', 'active')
             ->where('exam_rounds.is_sample', true)
             ->exists();
     }

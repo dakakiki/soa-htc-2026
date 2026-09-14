@@ -816,11 +816,50 @@ class ReportTest extends TestCase
             $this->assertSame(2, $row['registered'], "{$dim}: the two children registered at H2");
         }
 
-        // And it does not move with the test type: the same children either way.
-        $registered = fn (string $mode) => $this->actingAs($this->admin())
-            ->getJson("/api/reports/summary?group_by=quiz&mode={$mode}")->assertOk()->json('rows.0.registered');
+        $rows = fn (string $mode) => $this->actingAs($this->admin())
+            ->getJson("/api/reports/summary?group_by=quiz&mode={$mode}")->assertOk()->json('rows');
 
-        $this->assertSame(2, $registered('competition'));
-        $this->assertSame(2, $registered('sample'));
+        $this->assertSame(2, $rows('competition')[0]['registered']);
+
+        /*
+         * 🪤 And the denominator does not put the quiz in the other table. A
+         * registered count exists for every quiz — it comes from the levels —
+         * so seeding rows from it would have quietly undone ADR-0094 and stood
+         * this contest quiz in the practice table with a denominator and no
+         * competitors. Content rows come from attempts and from the member list.
+         */
+        $this->assertSame([], $rows('sample'), 'a contest quiz is not in the practice table at all');
+    }
+
+    /**
+     * 🔴 Retiring an exam does not turn the practice somebody already sat into a
+     * contest entry.
+     *
+     * Found on the real data: «Hippo S5 Sample» is a retired practice chain —
+     * quiz, exam and both tests inactive — carrying 67 attempts by 67 children,
+     * and every one of them was being counted as CONTEST, because the practice
+     * set asked for an ACTIVE exam. A quiz with "Sample" in its name sat in the
+     * contest table, which is how it was spotted.
+     *
+     * 🪤 `ResultLedger` had always read it the other way (round only), so the two
+     * halves of the application disagreed about the same 67 attempts.
+     */
+    public function test_a_retired_practice_exam_is_still_practice(): void
+    {
+        $practice = $this->content();
+        $round = ExamRound::where('is_sample', true)->first()
+            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
+        $practice['exam']->update(['exam_round_id' => $round->id]);
+
+        $this->attempt($this->registration(), $practice, 'completed', 9.0, published: true);
+
+        // The administrator retires the whole chain afterwards.
+        $practice['exam']->update(['status' => 'inactive']);
+
+        $totals = fn (string $mode) => $this->actingAs($this->admin())
+            ->getJson("/api/reports/summary?mode={$mode}")->assertOk()->json('totals');
+
+        $this->assertSame(1, $totals('sample')['submitted'], 'still practice');
+        $this->assertSame(0, $totals('competition')['submitted'], 'and never the contest');
     }
 }

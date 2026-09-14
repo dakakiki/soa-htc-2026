@@ -30,13 +30,31 @@ use Illuminate\Support\Facades\DB;
  */
 final class SampleRound
 {
-    /** Test ids that sit in a practice round of an active exam. */
+    /**
+     * Test ids that sit in a practice round.
+     *
+     * 🔴 The exam's STATUS is deliberately not part of this (2026-09-14). It used
+     * to be — `exams.status = 'active'` — on the reasoning that an inactive exam
+     * is not in play, and the comment defending it said "no exam is inactive
+     * today". Two are. One of them, «Hippo S5 Sample», is a retired practice
+     * chain carrying **67 attempts by 67 children**, and because retiring it took
+     * its tests out of the practice set, every one of those attempts was being
+     * counted as CONTEST — a quiz with "Sample" in its name sitting in the
+     * contest table, which is how it was noticed.
+     *
+     * What an attempt WAS cannot change because an administrator tidied up
+     * afterwards. `ResultLedger` already read it this way ({@see
+     * \App\Domain\Competition\Support\ResultLedger}) and reports did not, which
+     * is the disagreement this removes.
+     *
+     * 🪤 `active` still belongs in {@see self::idsOfType()} — what may be OFFERED
+     * is a different question from what something IS.
+     */
     public static function testIds(): Builder
     {
         return DB::table('exam_test')
             ->join('exams', 'exams.id', '=', 'exam_test.exam_id')
             ->join('exam_rounds', 'exam_rounds.id', '=', 'exams.exam_round_id')
-            ->where('exams.status', 'active')
             ->where('exam_rounds.is_sample', true)
             ->distinct()
             ->select('exam_test.test_id');

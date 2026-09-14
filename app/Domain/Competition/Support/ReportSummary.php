@@ -94,7 +94,19 @@ final class ReportSummary
                 ? self::members($groupBy, $filters)
                 : [];
 
-            $dataKeys = array_unique([...array_keys($measures), ...array_keys($registered)]);
+            /*
+             * 🪤 A registered count is NOT evidence that this row belongs in this
+             * table. Since a content row reaches the registrations through its
+             * levels (ADR-0095), every quiz has one — including the practice
+             * quizzes, which would then appear in the contest table with a
+             * denominator and no competitors, and that is the mixing ADR-0094
+             * took out. Content rows are seeded from ATTEMPTS and from the member
+             * list; geography and level, whose registered count is the population
+             * itself, are seeded from both.
+             */
+            $dataKeys = in_array($groupBy, self::CONTENT_DIMS, true)
+                ? array_keys($measures)
+                : array_unique([...array_keys($measures), ...array_keys($registered)]);
             $extra = array_values(array_filter($dataKeys, fn ($k) => ! array_key_exists($k, $members)));
 
             $keys = [...array_keys($members), ...$extra];
