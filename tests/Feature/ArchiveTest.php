@@ -195,4 +195,40 @@ class ArchiveTest extends TestCase
         // Alphabetically this would be BH, H1, H2, H3, H5, LH.
         $this->assertSame(['BH', 'LH', 'H1', 'H2', 'H3', 'H5'], $levels);
     }
+
+    /**
+     * Both distributions are drawn along their own axis, never by size. Levels
+     * progress and grades count up: ordering either by how tall its bar is
+     * scrambles the axis the reader is scanning, and neighbouring bars stop being
+     * the ones worth comparing.
+     *
+     * 🪤 The counts are deliberately lopsided — the tallest bar sits in the middle
+     * of each axis — so size order and axis order cannot agree by accident.
+     */
+    public function test_the_distributions_follow_their_own_axis_not_their_size(): void
+    {
+        $this->seedArchive();
+
+        $now = now();
+        $rows = [];
+        $n = 0;
+        // The last pair has no grade: an unlabelled bar belongs at the end of the
+        // axis, never at its head, which is where `(int) null` would otherwise put it.
+        foreach ([['H1', 5, 9], ['BH', 1, 3], ['LH', 2, 1], ['H2', null, 2]] as [$short, $grade, $many]) {
+            for ($k = 0; $k < $many; $k++) {
+                $rows[] = ['season_id' => 1, 'round_number' => 13, 'competitor_number' => sprintf('132%05d', ++$n), 'name' => '', 'country' => 'Serbia', 'region' => 'Vojvodina', 'venue' => 'School A', 'school_external' => null, 'level' => $short, 'grade' => $grade, 'attendance' => null, 'archived_at' => $now];
+            }
+        }
+        DB::table('archive_registrations')->insert($rows);
+
+        $summary = $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13')->assertOk();
+
+        // Counts are H1 9, BH 3, H2 3, then LH/H3 one each — biggest first would
+        // open with H1, and grade 5 leads the other axis the same way.
+        $this->assertSame(['BH', 'LH', 'H1', 'H2', 'H3'], array_column($summary->json('by_level'), 'label'));
+
+        $grades = array_column($summary->json('by_grade'), 'label');
+        $this->assertSame([1, 2, 5, 6, 7], array_map('intval', array_slice($grades, 0, 5)));
+        $this->assertNull($grades[5], 'the unlabelled bar closes the axis, it does not open it');
+    }
 }

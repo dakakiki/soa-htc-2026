@@ -154,8 +154,14 @@ class ArchiveController extends Controller
             ],
             'breakdown' => $breakdown,
             'by_school' => $this->byDimension($round, 'venue', $country, $region, $level, 100, $school),
-            'by_level' => $this->distribution($scoped('archive_registrations'), 'level'),
-            'by_grade' => $this->distribution($scoped('archive_registrations'), 'grade'),
+            'by_level' => $this->distribution($scoped('archive_registrations'), 'level',
+                fn (string $l) => sprintf('%03d|%s', $levelRank[$l] ?? 999, $l)),
+            // A row with no grade recorded is a real count and stays on the chart,
+            // but it sits at the end rather than at the head — `(int) null` is 0,
+            // which would otherwise open the axis with an unlabelled bar. The level
+            // axis puts its unknowns last for the same reason, by rank.
+            'by_grade' => $this->distribution($scoped('archive_registrations'), 'grade',
+                fn (string $g) => $g === '' ? '999999999' : sprintf('%09d', (int) $g)),
             'filters' => [
                 'countries' => DB::table('archive_registrations')->where('round_number', $round)
                     ->whereNotNull('country')->where('country', '!=', '')
@@ -242,18 +248,24 @@ class ArchiveController extends Controller
     }
 
     /**
-     * A [{label, count}] distribution over one roster column, biggest first.
+     * A [{label, count}] distribution over one roster column, in that column's own
+     * order — the order the rest of the application puts it in, never by size.
+     * Both columns this serves are ordinal: levels progress and grades count up, so
+     * sorting by size scrambles the very axis the reader is scanning along, and the
+     * bars stop being comparable to their neighbours.
      *
      * @param  Builder  $query
+     * @param  callable(string): string  $order  sort key for one value of the column
      * @return list<array{label: string|int|null, count: int}>
      */
-    private function distribution($query, string $column): array
+    private function distribution($query, string $column, callable $order): array
     {
         return $query->groupBy($column)
             ->selectRaw("{$column} as label, count(*) as n")
-            ->orderByDesc('n')
             ->get()
             ->map(fn ($row) => ['label' => $row->label, 'count' => (int) $row->n])
+            ->sortBy(fn (array $row) => $order((string) $row['label']))
+            ->values()
             ->all();
     }
 }
