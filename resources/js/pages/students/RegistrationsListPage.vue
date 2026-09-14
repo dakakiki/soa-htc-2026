@@ -378,12 +378,6 @@ onMounted(async () => {
             <input v-model="filters.search" type="search" :placeholder="$t('registration.searchPlaceholder')"
                 class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-1" />
 
-            <!-- Records with something missing — where the dashboard's pending list lands. -->
-            <select v-model="filters.missing" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-1 lg:row-start-2" @change="load(1)">
-                <option value="">{{ $t('registration.filterMissing') }}</option>
-                <option value="dob">{{ $t('registration.missingDob') }}</option>
-            </select>
-
             <!-- Column 2: Country / Region -->
             <LockedField v-if="countryLocked" dense :value="scopeCountry?.name"
                 class="lg:col-start-2 lg:row-start-1" />
@@ -398,7 +392,7 @@ onMounted(async () => {
                 :placeholder="$t('registration.filterRegion')" :search-placeholder="$t('reports.region')"
                 @update:model-value="onRegion" />
 
-            <!-- Column 3: Venue (server-side search — all venues reachable, not just first page) -->
+            <!-- Column 3: Venue (server-side search — all venues reachable, not just first page) / Round -->
             <LockedField v-if="venueLocked" dense :value="scopeVenue?.name"
                 class="lg:col-start-3 lg:row-start-1" />
             <SearchSelect v-else :model-value="filters.school_id" :options="schoolOptions" dense :loading="schoolLoading"
@@ -406,6 +400,11 @@ onMounted(async () => {
                 class="lg:col-start-3 lg:row-start-1" :disabled="filters.country_id === null"
                 :placeholder="$t('registration.filterVenue')" :search-placeholder="$t('registration.venue')"
                 @update:model-value="(v: number | null) => { filters.school_id = v; load(1); }" />
+
+            <select v-model="filters.exam_round_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-3 lg:row-start-2" @change="load(1)">
+                <option :value="null">{{ $t('registration.filterRound') }}</option>
+                <option v-for="r in rounds" :key="r.id" :value="r.id">{{ r.name }}</option>
+            </select>
 
             <!-- Column 4: Grade / Difficulty Category -->
             <select v-model="filters.grade" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-4 lg:row-start-1" @change="load(1)">
@@ -419,15 +418,15 @@ onMounted(async () => {
                 </optgroup>
             </select>
 
-            <!-- Column 5: Round / Attendance -->
-            <select v-model="filters.exam_round_id" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-5 lg:row-start-1" @change="load(1)">
-                <option :value="null">{{ $t('registration.filterRound') }}</option>
-                <option v-for="r in rounds" :key="r.id" :value="r.id">{{ r.name }}</option>
-            </select>
-            <select v-model="filters.attendance" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-5 lg:row-start-2" @change="load(1)">
+            <!-- Column 5: Attendance, then records with something missing — where the dashboard's pending list lands. -->
+            <select v-model="filters.attendance" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-5 lg:row-start-1" @change="load(1)">
                 <option value="">{{ $t('registration.filterAttendance') }}</option>
                 <option value="present">{{ $t('registration.attendancePresent') }}</option>
                 <option value="absent">{{ $t('registration.attendanceAbsent') }}</option>
+            </select>
+            <select v-model="filters.missing" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm lg:col-start-5 lg:row-start-2" @change="load(1)">
+                <option value="">{{ $t('registration.filterMissing') }}</option>
+                <option value="dob">{{ $t('registration.missingDob') }}</option>
             </select>
         </form>
         </div>
