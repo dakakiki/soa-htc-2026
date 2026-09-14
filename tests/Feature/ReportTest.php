@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
+use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Attempt;
@@ -426,5 +427,45 @@ class ReportTest extends TestCase
     {
         $this->actingAs($this->admin())->getJson('/api/reports/summary?group_by=teacher')
             ->assertStatus(422)->assertJsonValidationErrors('group_by');
+    }
+
+    /**
+     * A report is about the contest, and practice is not a smaller version of it.
+     *
+     * On the real population these two were summed: 38.676 of 184.389 submitted
+     * attempts were practice — one in five — and because a practice mark
+     * publishes itself (ADR-0019) its publication rate is 100% by construction,
+     * which flattered the headline rate from 72,8% to 78,5% (ADR-0084).
+     */
+    public function test_the_funnel_counts_the_contest_and_leaves_practice_out_unless_asked(): void
+    {
+        $contest = $this->content();
+        $practice = $this->content();
+        $round = ExamRound::where('is_sample', true)->first()
+            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
+        $practice['exam']->update(['exam_round_id' => $round->id]);
+
+        // Two contest runs, one practice run — all three submitted.
+        $this->attempt($this->registration(), $contest, 'completed', 6.0, published: true);
+        $this->attempt($this->registration(), $contest, 'completed', 4.0);
+        $this->attempt($this->registration(), $practice, 'completed', 9.0, published: true);
+
+        $summary = fn (string $q = '') => $this->actingAs($this->admin())
+            ->getJson('/api/reports/summary'.$q)->assertOk();
+
+        // The default says nothing about practice and counts none of it.
+        $summary()
+            ->assertJsonPath('totals.submitted', 2)
+            ->assertJsonPath('totals.published', 1)
+            ->assertJsonPath('filters.mode', 'competition');
+
+        $summary('?mode=sample')->assertJsonPath('totals.submitted', 1)->assertJsonPath('totals.published', 1);
+        $summary('?mode=all')->assertJsonPath('totals.submitted', 3)->assertJsonPath('totals.published', 2);
+    }
+
+    public function test_an_invalid_mode_is_rejected(): void
+    {
+        $this->actingAs($this->admin())->getJson('/api/reports/summary?mode=practice')
+            ->assertStatus(422)->assertJsonValidationErrors('mode');
     }
 }

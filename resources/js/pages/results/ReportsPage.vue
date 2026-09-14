@@ -30,6 +30,8 @@ const opts = ref<ReportFilterOptions>({ ...empty });
 const q = reactive<ReportQuery>({
     country_id: null, region_id: null, school_id: null, coordinator_user_id: null,
     difficulty_level_id: null, quiz_id: null, exam_id: null, test_id: null, group_by: null,
+    // The contest, until somebody asks for practice (ADR-0084).
+    mode: 'competition',
 });
 
 const summary = ref<Awaited<ReturnType<typeof reportSummary>>['data'] | null>(null);
@@ -179,6 +181,9 @@ function resetFilters(): void {
     (Object.keys(q) as (keyof ReportQuery)[]).forEach((k) => {
         q[k] = null;
     });
+    // Not a filter to be cleared: cleared, a report would be about nothing in
+    // particular. It goes back to the contest (ADR-0084).
+    q.mode = 'competition';
     void loadOptions();
     void loadSummary();
 }
@@ -377,7 +382,17 @@ onMounted(async () => {
                         :placeholder="$t('reports.anyOption')"
                         @update:model-value="(v: number | null) => { q.difficulty_level_id = v; loadSummary(); }" />
                 </div>
-                <label class="block sm:col-span-2">
+                <label class="block">
+                    <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.mode') }}</span>
+                    <select v-model="q.mode"
+                        class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-link focus:ring-brand-link"
+                        @change="loadSummary">
+                        <option value="competition">{{ $t('reports.modeCompetition') }}</option>
+                        <option value="sample">{{ $t('reports.modeSample') }}</option>
+                        <option value="all">{{ $t('reports.modeAll') }}</option>
+                    </select>
+                </label>
+                <label class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.groupBy') }}</span>
                     <select v-model="q.group_by"
                         class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-link focus:ring-brand-link"

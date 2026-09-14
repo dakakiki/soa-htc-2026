@@ -46,11 +46,16 @@ class ReportController extends Controller
             'exam_id' => ['nullable', 'integer'],
             'test_id' => ['nullable', 'integer'],
             'group_by' => ['nullable', Rule::in(['country', 'region', 'school', 'level', 'quiz', 'exam', 'test'])],
+            'mode' => ['nullable', Rule::in(ReportSummary::MODES)],
         ]);
 
         // Default the population to the active season unless one is named.
         $echoedFilters = $validated;
         $echoedFilters['season_id'] = $validated['season_id'] ?? SeasonContext::active()?->id;
+        // The contest unless asked otherwise (ADR-0084): practice is a different
+        // population, publishes itself, and repeats. Echoed back so the screen can
+        // say which of the two it is showing.
+        $echoedFilters['mode'] = $validated['mode'] ?? ReportSummary::MODE_DEFAULT;
 
         $filters = $echoedFilters;
         $filters['coordinator_school_ids'] = $this->populationSchoolIds(
@@ -86,10 +91,12 @@ class ReportController extends Controller
             'quiz_id' => ['nullable', 'integer'],
             'exam_id' => ['nullable', 'integer'],
             'test_id' => ['nullable', 'integer'],
+            'mode' => ['nullable', Rule::in(ReportSummary::MODES)],
         ]);
 
         $filters = $validated;
         $filters['season_id'] = $validated['season_id'] ?? SeasonContext::active()?->id;
+        $filters['mode'] = $validated['mode'] ?? ReportSummary::MODE_DEFAULT;
         $filters['coordinator_school_ids'] = $this->populationSchoolIds(
             isset($validated['coordinator_user_id']) ? (int) $validated['coordinator_user_id'] : null
         );
@@ -119,6 +126,7 @@ class ReportController extends Controller
             'exam_id' => ['nullable', 'integer'],
             'test_id' => ['nullable', 'integer'],
             'group_by' => ['nullable', Rule::in($dims)],
+            'mode' => ['nullable', Rule::in(ReportSummary::MODES)],
             // The on-screen heatmap + compare selections, so the PDF mirrors the page.
             'heat_row_by' => ['nullable', Rule::in($dims)],
             'heat_col_by' => ['nullable', Rule::in($dims)],
@@ -129,6 +137,7 @@ class ReportController extends Controller
 
         $echoed = $validated;
         $echoed['season_id'] = $validated['season_id'] ?? SeasonContext::active()?->id;
+        $echoed['mode'] = $validated['mode'] ?? ReportSummary::MODE_DEFAULT;
 
         $filters = $echoed;
         $filters['coordinator_school_ids'] = $this->populationSchoolIds(
