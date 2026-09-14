@@ -3000,3 +3000,33 @@ proba. Uzrok: njegov exam **„Hippo S5 Sample"** jeste u **probnoj rundi**, ali
 **`status = inactive`** — a `SampleRound::testIds()` traži aktivan exam, pa tih **67 pokušaja** nije u
 probnom skupu i broji se kao takmičenje. Red se **ne skriva**: to bi sakrilo pokušaje koje izveštaj
 broji. ⚠️ Ako je to greška u podacima, popravlja se **na exam-u**, ne u izveštaju.
+
+## ADR-0095 — Registered stoji u svakom redu, a svaka stopa nosi i brojeve od kojih je napravljena
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik: *„bez obzira da li je odabrano sample ili competition, broj registrovanih
+  studenata je uvek isti, tako da u break down kolona registered treba uvek da bude popunjena"*, i
+  *„Participation predstavi i brojkama tipa registered/took part. Procenat je ok da ostane; isto važi
+  i za completion i publish rate"*.
+
+### Registered u redovima sadržaja
+
+- **Bilo je `—`** kad se razlaže po **kvizu · exam-u · testu**, uz obrazloženje da registracija nije
+  vezana za test. Tačno — ali tako je **jedina kolona koja se ne menja između proba i takmičenja**
+  bila prazna u pola tabela, a red je ostajao **bez imenioca**: 15.644 dece je radilo Hippo 1, od
+  koliko njih?
+- **Odluka:** red sadržaja dolazi do registracija **kroz nivoe za koje je taj sadržaj napravljen**
+  (`difficulty_level_quiz` · `difficulty_level_exam` · `difficulty_level_test`). „Registered" za kviz
+  znači **deca registrovana na nivoima koje taj kviz pokriva** — koliko je moglo da ga radi.
+- ✅ Isti broj u obe populacije, kao što vlasnik kaže: Hippo 1 ima **27.134** registrovanih i u
+  takmičarskoj i u probnoj tabeli; radilo ga je 15.644 odnosno 5.894.
+- 🪤 `count(distinct)` — sadržaj koji pokriva više nivoa bi inače brojao istu registraciju jednom po
+  nivou.
+
+### Stope nose i brojke
+
+- Pločice `Participation · Completion · Publish rate` pored procenta pokazuju i **razlomak**:
+  `61.318 / 108.812`, `145.780 / 145.780`, `106.160 / 145.780`. Procenat ostaje krupan, brojevi stoje
+  ispod njega, opis ispod njih. **Isto i u PDF-u.**
+- ⚡ Razlog nije ukras: procenat se ovako **proverava**, i odmah se vidi kad su jedinice različite —
+  56 % je ljudi/ljudi, a 100 % ispod njega je pokušaji/pokušaji.

@@ -195,6 +195,12 @@ class ReportController extends Controller
         $completion = $pct((int) $t['submitted'], (int) $t['started']);
         $publish = $pct((int) $t['published'], (int) $t['submitted']);
 
+        // The two numbers each rate is made of, beside the percentage.
+        $of = fn (int $n, int $d): string => number_format($n).' / '.number_format($d);
+        $participationOf = $of((int) $t['participants'], (int) $t['registered']);
+        $completionOf = $of((int) $t['submitted'], (int) $t['started']);
+        $publishOf = $of((int) $t['published'], (int) $t['submitted']);
+
         $totCells = '';
         // The same five tiles the screen shows, in the same order. Void left both
         // (owner, 14.09): an administrator's reset is not a stage of the contest.
@@ -271,9 +277,9 @@ class ReportController extends Controller
 
                 <h3 style="font-size:10pt;margin:6px 0 4px;page-break-after:avoid;">Rates</h3>
                 <table width="100%" cellspacing="0" cellpadding="0"><tr>
-                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PARTICIPATION</div><div style="font-size:13pt;font-weight:bold;">{$participation}</div><div style="font-size:7pt;color:#9ca3af;">Competitors who started / Registered</div></td>
-                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">COMPLETION</div><div style="font-size:13pt;font-weight:bold;">{$completion}</div><div style="font-size:7pt;color:#9ca3af;">Submitted / Started</div></td>
-                    <td width="34%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PUBLISH RATE</div><div style="font-size:13pt;font-weight:bold;">{$publish}</div><div style="font-size:7pt;color:#9ca3af;">Published / Submitted</div></td>
+                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PARTICIPATION</div><div style="font-size:13pt;font-weight:bold;">{$participation}</div><div style="font-size:8pt;color:#374151;">{$participationOf}</div><div style="font-size:7pt;color:#9ca3af;">Competitors who started / Registered</div></td>
+                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">COMPLETION</div><div style="font-size:13pt;font-weight:bold;">{$completion}</div><div style="font-size:8pt;color:#374151;">{$completionOf}</div><div style="font-size:7pt;color:#9ca3af;">Submitted / Started</div></td>
+                    <td width="34%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PUBLISH RATE</div><div style="font-size:13pt;font-weight:bold;">{$publish}</div><div style="font-size:8pt;color:#374151;">{$publishOf}</div><div style="font-size:7pt;color:#9ca3af;">Published / Submitted</div></td>
                 </tr></table>
 
                 <h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Participation funnel</h3>
