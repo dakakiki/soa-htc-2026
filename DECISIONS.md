@@ -2881,3 +2881,40 @@ deployment/storage/backup.
   jer tamo „Load more" ne postoji.
 - 🪤 **`$s` je u `reportHtml` već bio ukupni skor**; nova petlja ga je preuzela i ispraznila liniju
   „Avg / Min / Max / Median" iznad tabele. Uhvatio postojeći test PDF-a.
+
+## ADR-0092 — Filter ide odozgo nadole: tip testa otvara sadržaj, i kvizovi su kvizovi tog tipa
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je tražio da se filter ispreturа: prvi red ostaje **Country · Region · Venue ·
+  Coordinator**, a drugi red **počinje izborom tipa testa (Competition · Sample)**, pa **Quiz koji se
+  učitava u zavisnosti od tipa**, pa Exam i Test kao do sada; Difficulty ostaje.
+- **Odluka:** „Counting" se zove **Test type**, stoji **na početku reda sa sadržajem**, i **otvara
+  lanac**: tip → kviz → exam → test. Spisak kvizova je spisak kvizova **tog tipa**.
+
+### Zašto je to više od premeštanja
+
+- ⚡ **Bio je poslednji u trećem redu, a bira populaciju o kojoj je ceo izveštaj.** Sad stoji ispred
+  onoga što određuje, pa se i čita tim redom.
+- 🔴 **Spisak kvizova je bio jedan za oba tipa** — 14 aktivnih, od kojih je 6 probnih. Izbor probnog
+  kviza uz „The contest" davao je prazan izveštaj **bez vidljivog uzroka**. Sada takav izbor ne
+  postoji: Competition nudi 8, Sample 6.
+- **Menjanje tipa poništava kviz · exam · test** (isto kao što izbor zemlje poništava region, venue i
+  koordinatora), jer bi zadržan kviz iz drugog tipa sužavao izveštaj na sadržaj koji tip već isključuje.
+- **Tip počinje neizabran, a Quiz je zaključan dok se ne izabere** — isto kao Region i Venue dok nema
+  zemlje. 🪤 **Neizabran nije „oba":** izveštaj i dalje broji **takmičenje**, jer to server radi kad
+  mode ne stigne (vlasnikova odluka 14.09). Zbir dve populacije ne postoji ni ovde.
+- **Opcija „Both together" je izbačena** iz ekrana. Zbir dve populacije ne odgovara ni na jedno
+  pitanje (ADR-0084), a Breakdown ionako pokazuje obe kolone (ADR-0091). API i dalje prima `mode=all`.
+
+### Šta je tip, tačno
+
+- 🔴 **Proba je ono što kaže probna RUNDA, a ne `quizzes.quiz_type`** — ista granica po kojoj se
+  broji (`SampleRound`), i jedina koju administrator ne može da pomeri prekucavanjem polja. Na
+  današnjim podacima se poklapaju: 6 probnih, 8 takmičarskih, nijedan u obe grupe.
+- 🪤 **Asimetrija je namerna:** probni su oni koji imaju aktivan exam u probnoj rundi; **takmičarski
+  su svi ostali — uključujući exam BEZ runde**. Tako broji i `applyMode` (uzme probne testove, sve
+  ostalo je takmičenje), pa bi lista koja traži „rundu koja nije probna" sakrila kviz **čije brojeve
+  izveštaj prikazuje**. Uhvaćeno postojećim testom `test_filters_return_bounded_option_lists`, koji je
+  pao čim je prva verzija tražila rundu sa obe strane.
+- 🪤 **Kviz sa exam-ovima obe vrste je u obe liste** — zato se pita „ima li exam te vrste", a ne
+  „isključi drugu vrstu".

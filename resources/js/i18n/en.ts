@@ -1613,11 +1613,14 @@ export default {
         exam: 'Exam',
         test: 'Test',
         // 🪤 Not "filter by" — practice and the contest are two populations, and
-        // the sum of them was what this screen used to show (ADR-0084).
-        mode: 'Counting',
-        modeCompetition: 'The contest',
-        modeSample: 'Practice only',
-        modeAll: 'Both together',
+        // the sum of them was what this screen used to show (ADR-0084). It heads
+        // the content row because it decides which quizzes exist (ADR-0092).
+        mode: 'Test type',
+        // 🪤 Unchosen, not "all": with no type the report counts the contest, the
+        // way it always has. The two populations are never summed (ADR-0084).
+        modePlaceholder: 'Choose a type…',
+        modeCompetition: 'Competition',
+        modeSample: 'Sample',
         groupBy: 'Break down by',
         // The two columns every measure gets. Beside each other, never added:
         // a child who sat both is one child in each (ADR-0091).
@@ -1641,6 +1644,9 @@ export default {
         ratePublish: 'Publish rate',
         ratePublishHint: 'Published / Submitted',
         funnel: 'Participation funnel',
+        // 🪤 The funnel widens, and the reason is the units: Registered counts
+        // children, the three bars after it count attempts (ADR-0085).
+        funnelNote: 'Registered counts competitors; Started, Submitted and Published count attempts — a competitor sits several tests, so those bars can pass 100%. For competitors rather than attempts, see “Took part” above and the breakdown table below.',
         heatmap: 'Heatmap — average score',
         heatRows: 'Rows',
         heatCols: 'Columns',
