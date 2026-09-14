@@ -138,10 +138,16 @@ dead link.
 The app icon is the one entry with a size requirement rather than a preference. It
 is the favicon, and it is also the only icon in the web app manifest (ADR-0073),
 which reports the dimensions the uploaded file actually has: a browser is not
-lied to, so an icon under 192 px simply means no install is offered. A square
-PNG of 512 px satisfies every platform. An SVG works for the manifest as well,
-and is declared at any size — but iOS reads `apple-touch-icon`, which wants a
-raster, so a PNG is the one that works everywhere.
+lied to, so an icon under 192 px simply means no install is offered.
+
+**Upload a square PNG of 512 px. Not an SVG.** This paragraph used to say an SVG
+worked for the manifest as well, and named iOS as the only reason to prefer a
+raster. Measured on a real Android phone on 2026-09-13, that is wrong twice
+over: with an SVG in the manifest, **Chrome on Android offers no install at
+all** — no prompt, no menu entry, and nothing anywhere to say why. The PNG is
+not the safer of two working options; it is the only one that works. iOS is the
+second reason rather than the first: it reads `apple-touch-icon`, which wants a
+raster too.
 
 The dark logo can be regenerated from the white SVG by replacing `fill="#fff"`
 with `#003758` (palette slot 4) and uploading it — `SvgSanitizer` rewrites it on
