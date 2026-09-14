@@ -33,8 +33,15 @@ const opts = ref<ReportFilterOptions>({ ...empty });
 const q = reactive<ReportQuery>({
     country_id: null, region_id: null, school_id: null, coordinator_user_id: null,
     difficulty_level_id: null, quiz_id: null, exam_id: null, test_id: null,
-    // The contest, until somebody asks for practice (ADR-0084).
-    mode: 'competition',
+    /*
+     * Unchosen, and the quiz picker under it is locked until it is chosen — the
+     * type is what decides which quizzes exist (ADR-0092).
+     *
+     * 🪤 Unchosen is not "both": the report still counts THE CONTEST, which is
+     * what the server does with no mode (ADR-0084). The two populations are never
+     * summed, here or anywhere else.
+     */
+    mode: null,
 });
 
 // Not a filter, and no longer kept among them: the dimension belongs to the
@@ -165,7 +172,7 @@ function cellStyle(avg: number): Record<string, string> {
 async function loadOptions(): Promise<void> {
     optionsLoading.value = true;
     try {
-        const { data } = await reportFilters({ country_id: q.country_id, school_id: q.school_id, quiz_id: q.quiz_id });
+        const { data } = await reportFilters({ country_id: q.country_id, school_id: q.school_id, quiz_id: q.quiz_id, mode: q.mode });
         opts.value = data;
     } finally {
         optionsLoading.value = false;
@@ -196,6 +203,21 @@ async function onSchoolChange(id: number | null): Promise<void> {
     if (q.coordinator_user_id !== null && !opts.value.coordinators.some((c) => c.id === q.coordinator_user_id)) {
         q.coordinator_user_id = null;
     }
+    await loadSummary();
+}
+
+/**
+ * The test type opens the content cascade (ADR-0092): a contest quiz and a
+ * practice quiz are different things to pick from, so the quiz list is reloaded
+ * and the three choices under it are dropped — a quiz from the other type would
+ * narrow the report to content the type filter already excludes, which answers
+ * with an empty report and no visible cause.
+ */
+async function onModeChange(): Promise<void> {
+    q.quiz_id = null;
+    q.exam_id = null;
+    q.test_id = null;
+    await loadOptions();
     await loadSummary();
 }
 
@@ -237,12 +259,11 @@ async function exportPdf(): Promise<void> {
 function resetFilters(): void {
     // The breakdown dimension, the heatmap axes and the compare selection are not
     // filters and this button does not touch any of them.
+    // The type clears with the rest, back to unchosen — and the report goes back
+    // to counting the contest, which is what no type means (ADR-0084/0092).
     (Object.keys(q) as (keyof ReportQuery)[]).forEach((k) => {
         q[k] = null;
     });
-    // Not a filter to be cleared: cleared, a report would be about nothing in
-    // particular. It goes back to the contest (ADR-0084).
-    q.mode = 'competition';
     void loadOptions();
     void loadSummary();
 }
@@ -440,10 +461,25 @@ onMounted(async () => {
                         :placeholder="$t('reports.anyOption')"
                         @update:model-value="(v: number | null) => { q.coordinator_user_id = v; loadSummary(); }" />
                 </div>
+                <!--
+                    The second row is the content, and it begins with the type:
+                    the quizzes under it are that type's quizzes (ADR-0092).
+                -->
+                <label class="block">
+                    <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.mode') }}</span>
+                    <select v-model="q.mode"
+                        class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-link focus:ring-brand-link"
+                        @change="onModeChange">
+                        <option :value="null">{{ $t('reports.modePlaceholder') }}</option>
+                        <option value="competition">{{ $t('reports.modeCompetition') }}</option>
+                        <option value="sample">{{ $t('reports.modeSample') }}</option>
+                    </select>
+                </label>
                 <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.quiz') }}</span>
                     <SearchSelect dense clearable :options="quizOptions" :model-value="q.quiz_id ?? null"
-                        :placeholder="$t('reports.anyOption')" @update:model-value="onQuizChange" />
+                        :disabled="!q.mode" :loading="optionsLoading" :placeholder="$t('reports.anyOption')"
+                        @update:model-value="onQuizChange" />
                 </div>
                 <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.exam') }}</span>
@@ -463,16 +499,6 @@ onMounted(async () => {
                         :placeholder="$t('reports.anyOption')"
                         @update:model-value="(v: number | null) => { q.difficulty_level_id = v; loadSummary(); }" />
                 </div>
-                <label class="block">
-                    <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.mode') }}</span>
-                    <select v-model="q.mode"
-                        class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-link focus:ring-brand-link"
-                        @change="loadSummary">
-                        <option value="competition">{{ $t('reports.modeCompetition') }}</option>
-                        <option value="sample">{{ $t('reports.modeSample') }}</option>
-                        <option value="all">{{ $t('reports.modeAll') }}</option>
-                    </select>
-                </label>
             </div>
 
             <!-- Footer: reset the filters, mirroring the reset-attempts action position. -->

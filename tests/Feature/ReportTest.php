@@ -694,4 +694,41 @@ class ReportTest extends TestCase
         $this->assertSame(['Quiz: Q', 'Exam: E'], $first('test')['sublabels']);
         $this->assertSame('T', $first('test')['label']);
     }
+
+    /**
+     * The test type heads the content cascade: the quizzes offered are that
+     * type's quizzes (ADR-0092).
+     *
+     * 🔴 A quiz is practice because its exam sits in a practice ROUND, never
+     * because `quizzes.quiz_type` says so — the boundary the counting already
+     * uses, and the one an administrator cannot drift by retyping a field.
+     */
+    public function test_the_quiz_list_follows_the_chosen_test_type(): void
+    {
+        $contest = $this->content();
+        $practice = $this->content();
+        $round = ExamRound::where('is_sample', true)->first()
+            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
+        $practice['exam']->update(['exam_round_id' => $round->id]);
+
+        $ids = fn (string $url) => $this->actingAs($this->admin())->getJson($url)->assertOk()->json('quizzes.*.id');
+
+        // 🪤 The contest exam has no round at all, and belongs under the contest
+        // anyway — the counting treats every attempt outside a practice round as
+        // contest, so a picker that dropped it would hide a quiz the report counts.
+        $inContest = $ids('/api/reports/filters?mode=competition');
+        $this->assertContains($contest['quiz']->id, $inContest);
+        $this->assertNotContains($practice['quiz']->id, $inContest, 'a practice quiz is not offered to the contest');
+
+        $inPractice = $ids('/api/reports/filters?mode=sample');
+        $this->assertContains($practice['quiz']->id, $inPractice);
+        $this->assertNotContains($contest['quiz']->id, $inPractice);
+
+        // 🪤 A quiz with exams of both kinds belongs to both lists.
+        $both = $this->content();
+        $both['quiz']->exams()->attach($practice['exam']->id, ['position' => 2]);
+
+        $this->assertContains($both['quiz']->id, $ids('/api/reports/filters?mode=competition'));
+        $this->assertContains($both['quiz']->id, $ids('/api/reports/filters?mode=sample'));
+    }
 }

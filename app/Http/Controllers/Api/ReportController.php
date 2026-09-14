@@ -8,6 +8,7 @@ use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
+use App\Domain\Assessment\Support\SampleRound;
 use App\Domain\Competition\Support\ReportSummary;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
@@ -22,6 +23,8 @@ use App\Support\PdfWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -461,6 +464,50 @@ class ReportController extends Controller
      * keeps those selects disabled until the parent is picked. Everything else is
      * small enough to send in full.
      */
+    /**
+     * The quizzes of one test type (ADR-0092).
+     *
+     * 🔴 A quiz is practice because its exam sits in a practice ROUND, never
+     * because `quizzes.quiz_type` says so — the same boundary the counting uses
+     * ({@see SampleRound}), and the one an
+     * administrator cannot drift by retyping a field. On the current data the
+     * two agree: 6 practice quizzes, 8 contest ones, none in both.
+     *
+     * 🪤 A quiz with exams in both kinds of round belongs to both lists, which is
+     * why this asks "has an exam of that kind" rather than excluding the other.
+     *
+     * @return Collection<int, Quiz>
+     */
+    private function quizzesOfType(string $mode)
+    {
+        /*
+         * 🪤 Practice is what a practice round says it is; everything else is the
+         * contest, an exam with NO round included. That asymmetry is not
+         * sloppiness, it is the counting: `applyMode` takes the practice tests and
+         * treats every other attempt as contest, so a quiz whose exam has no round
+         * is reported under the contest — and a picker that offered it under
+         * neither would hide a quiz whose numbers the report is showing.
+         */
+        $quizzesWithExam = fn (callable $round) => DB::table('exam_quiz')
+            ->join('exams', 'exams.id', '=', 'exam_quiz.exam_id')
+            ->leftJoin('exam_rounds', 'exam_rounds.id', '=', 'exams.exam_round_id')
+            ->where('exams.status', 'active')
+            ->where($round)
+            ->select('exam_quiz.quiz_id');
+
+        $practice = fn ($q) => $q->where('exam_rounds.is_sample', true);
+        $contest = fn ($q) => $q->where(fn ($w) => $w->whereNull('exam_rounds.id')->orWhere('exam_rounds.is_sample', false));
+
+        return Quiz::query()
+            ->where('status', 'active')
+            ->when($mode !== 'all', fn ($q) => $q->whereIn(
+                'id',
+                $quizzesWithExam($mode === 'sample' ? $practice : $contest)
+            ))
+            ->orderBy('title')
+            ->get(['id', 'title']);
+    }
+
     public function filters(Request $request): JsonResponse
     {
         $this->authorize('reports.view');
@@ -471,6 +518,11 @@ class ReportController extends Controller
         $schoolId = $request->integer('school_id') ?: null;
         $quizId = $request->integer('quiz_id') ?: null;
         $examId = $request->integer('exam_id') ?: null;
+        // The test type heads the content cascade: a contest quiz and a practice
+        // quiz are different things to pick from (ADR-0092).
+        $mode = in_array($request->string('mode')->toString(), ReportSummary::MODES, true)
+            ? $request->string('mode')->toString()
+            : ReportSummary::MODE_DEFAULT;
 
         // Exams and tests belong to the chosen quiz (quiz → exams → tests).
         $quiz = $quizId
@@ -583,7 +635,7 @@ class ReportController extends Controller
                 ->orderBy('difficulty_categories.type')->orderBy('difficulty_categories.id')->orderBy('difficulty_levels.position')
                 ->get(['difficulty_levels.id', 'difficulty_levels.level_short', 'difficulty_categories.name as category_name'])
                 ->map(fn (DifficultyLevel $l) => ['id' => $l->id, 'label' => $l->level_short, 'category_name' => $l->category_name]),
-            'quizzes' => Quiz::query()->where('status', 'active')->orderBy('title')->get(['id', 'title']),
+            'quizzes' => $this->quizzesOfType($mode),
             'exams' => $exams,
             'tests' => $tests,
             'coordinators' => $coordinators,

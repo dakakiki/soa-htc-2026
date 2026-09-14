@@ -101,11 +101,15 @@ export interface ReportQuery {
 
 /**
  * Bounded option lists for the filter controls. Pass a country to fill
- * regions/schools, a quiz to fill exams/tests, and an exam to narrow tests to
- * that exam (quiz → exam → test cascade).
+ * regions/schools, the test type to fill the quizzes, a quiz to fill
+ * exams/tests, and an exam to narrow tests to that exam
+ * (type → quiz → exam → test cascade).
  */
-export function reportFilters(scope?: { country_id?: number | null; school_id?: number | null; quiz_id?: number | null; exam_id?: number | null }) {
-    const params: Record<string, number> = {};
+export function reportFilters(scope?: { country_id?: number | null; school_id?: number | null; quiz_id?: number | null; exam_id?: number | null; mode?: ReportMode | null }) {
+    const params: Record<string, number | string> = {};
+    // The test type heads the content cascade: it decides which quizzes exist to
+    // choose from (ADR-0092).
+    if (scope?.mode) params.mode = scope.mode;
     if (scope?.country_id) params.country_id = scope.country_id;
     // Only the coordinator list reads the venue — it lists that country's
     // coordinators, narrowed to the ones the chosen venue is assigned to.
