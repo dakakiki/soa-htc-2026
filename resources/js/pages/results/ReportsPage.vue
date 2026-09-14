@@ -274,7 +274,9 @@ const measureRows: { key: keyof ReportMeasures; label: string; tone?: string }[]
     { key: 'started', label: t('reports.started') },
     { key: 'submitted', label: t('reports.submitted') },
     { key: 'published', label: t('reports.publishedMeasure'), tone: 'text-green-600' },
-    { key: 'void', label: t('reports.void'), tone: 'text-amber-600' },
+    // Void is not a stage of the competition — it is an administrator resetting an
+    // attempt, it reads 0 across the whole population, and as a sixth tile it
+    // started a second row of its own to say so (owner, 14.09).
 ];
 
 const num = (v: number | null | undefined): string => (v === null || v === undefined ? t('common.dash') : String(v));
@@ -331,8 +333,8 @@ const breakdownHidden = computed(() => Math.max(0, breakdownRows.value.length - 
  * The columns the table repeats for each population. The three counts are
  * children — how many competitors started, submitted, had a mark published
  * (ADR-0085) — while the average and median are per attempt, a score having no
- * other unit. Void is not among them: it is an administrator's action on an
- * attempt, it reads 0 across the whole population, and the Totals tiles keep it.
+ * other unit. Void is not among them, nor among the tiles above any more: it is
+ * an administrator's action on an attempt, not a stage of the competition.
  */
 const splitMeasures = computed<{ label: string; tone?: string; raw: (m: ModeMeasures) => number | null }[]>(() => [
     { label: t('reports.started'), raw: (m) => m.participants },
@@ -568,6 +570,14 @@ onMounted(async () => {
                             {{ s.value }} <span class="text-xs text-gray-400">{{ s.pctLabel }}</span>
                         </div>
                     </div>
+                    <!--
+                        Why a stage can pass 100%: the first bar counts children and
+                        the three after it count attempts, and a child sits several
+                        tests. Said here rather than left for the reader to work out
+                        from a funnel that widens (ADR-0085 is about the same two
+                        units, one line higher up the screen).
+                    -->
+                    <p class="border-t border-gray-100 pt-2 text-xs text-gray-500">{{ $t('reports.funnelNote') }}</p>
                 </div>
             </div>
 

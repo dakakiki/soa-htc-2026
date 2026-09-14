@@ -1644,6 +1644,9 @@ export default {
         ratePublish: 'Publish rate',
         ratePublishHint: 'Published / Submitted',
         funnel: 'Participation funnel',
+        // 🪤 The funnel widens, and the reason is the units: Registered counts
+        // children, the three bars after it count attempts (ADR-0085).
+        funnelNote: 'Registered counts competitors; Started, Submitted and Published count attempts — a competitor sits several tests, so those bars can pass 100%. For competitors rather than attempts, see “Took part” above and the breakdown table below.',
         heatmap: 'Heatmap — average score',
         heatRows: 'Rows',
         heatCols: 'Columns',
