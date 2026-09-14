@@ -102,7 +102,15 @@ class LegacyArchiveLevelsTest extends TestCase
         config(['database.connections.legacy' => config('database.connections.'.config('database.default'))]);
         DB::purge('legacy');
 
-        foreach (['el_student_bekap2021', 'el_student_bekap2025', 'el_country', 'difficulty_category_levels', 'schools', 'regions'] as $t) {
+        /*
+         * 🔴 Only tables the legacy schema alone owns. On MySQL this connection is
+         * the application's own database, so dropping `schools` or `regions` here
+         * would drop the application's — and DDL is not inside RefreshDatabase's
+         * transaction, so it would not come back. The import joins both by id and
+         * name, which our own tables already answer; the roster below carries no
+         * school_id, so the join simply yields nothing.
+         */
+        foreach (['el_student_bekap2021', 'el_student_bekap2025', 'el_country', 'difficulty_category_levels'] as $t) {
             Schema::connection('legacy')->dropIfExists($t);
         }
 
@@ -123,15 +131,27 @@ class LegacyArchiveLevelsTest extends TestCase
         });
         DB::connection('legacy')->table('el_country')->insert(['country_id' => 1, 'country_name' => 'Serbia']);
 
-        Schema::connection('legacy')->create('schools', function ($table) {
-            $table->unsignedBigInteger('id');
-            $table->string('name')->nullable();
-            $table->unsignedBigInteger('region_id')->nullable();
-        });
-        Schema::connection('legacy')->create('regions', function ($table) {
-            $table->unsignedBigInteger('id');
-            $table->string('name')->nullable();
-        });
+        /*
+         * The import joins the venue and its region, so both have to exist — but
+         * where they exist differs by engine. On SQLite this connection is its own
+         * `:memory:` database and has neither; on MySQL it IS the application's
+         * database and already has both, with a compatible shape. So: create only
+         * what is missing, and never drop these two — dropping the application's
+         * own tables is not something RefreshDatabase would give back.
+         */
+        if (! Schema::connection('legacy')->hasTable('schools')) {
+            Schema::connection('legacy')->create('schools', function ($table) {
+                $table->unsignedBigInteger('id');
+                $table->string('name')->nullable();
+                $table->unsignedBigInteger('region_id')->nullable();
+            });
+        }
+        if (! Schema::connection('legacy')->hasTable('regions')) {
+            Schema::connection('legacy')->create('regions', function ($table) {
+                $table->unsignedBigInteger('id');
+                $table->string('name')->nullable();
+            });
+        }
 
         // The current scheme, as it has stood since 11.2023: id 2 is Baby Hippo.
         Schema::connection('legacy')->create('difficulty_category_levels', function ($table) {
