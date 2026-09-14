@@ -495,16 +495,17 @@ class ReportTest extends TestCase
     }
 
     /**
-     * A school coordinator bound to one venue, with the account open or closed.
-     * The assignment is active either way — that is the point of the closed case.
+     * A coordinator whose account is open or closed, holding the given venue — or
+     * no venue at all, which is the case the country step has to survive. The
+     * assignment is active either way; that is the point of the closed account.
      */
-    private function coordinatorFor(School $school, string $email, string $status): User
+    private function coordinatorFor(?School $school, int $countryId, string $email, string $status): User
     {
         $user = User::query()->create([
             'name' => 'Coordinator '.(++$this->seq),
             'email' => $email,
             'password' => 'secret-password',
-            'country_id' => $school->country_id,
+            'country_id' => $countryId,
             'status' => $status,
         ]);
 
@@ -514,43 +515,57 @@ class ReportTest extends TestCase
             'role_id' => Role::where('key', SystemRole::SchoolCoordinator->value)->value('id'),
             'status' => 'active',
         ]);
-        $assignment->schools()->sync([$school->id]);
+        $assignment->schools()->sync($school ? [$school->id] : []);
 
         return $user->refresh();
     }
 
     /**
-     * The coordinator picker narrows with the country, and offers only accounts that
-     * are open. Both halves are the rule rather than a description of the data:
+     * The coordinator picker narrows in two steps, and offers only open accounts.
      *
-     * - a coordinator reaches the venues on their active assignments, so the country
-     *   that may offer them is the country those venues are in — not whatever
-     *   `users.country_id` happens to say, which is a second and quieter definition;
-     * - a closed account is never offered, even while its assignment is still live.
+     * - **Country** is simply the country the coordinator belongs to. Deriving it
+     *   from the venues on their assignments reads well until one has no venue yet:
+     *   that path then says nothing, and the picker comes back empty for a country
+     *   that plainly has coordinators in it.
+     * - **Venue** narrows further, to those the chosen venue is assigned to.
+     * - A closed account is never offered, however live its assignment still is.
      *   The two `active` flags are independent and both have to hold.
      */
-    public function test_the_coordinator_picker_follows_the_country_and_skips_closed_accounts(): void
+    public function test_the_coordinator_picker_narrows_by_country_then_venue(): void
     {
         $rs = (int) Country::where('code', 'RS')->value('id');
         $mk = (int) Country::where('code', 'MK')->value('id');
 
         $here = School::where('country_id', $rs)->firstOrFail();
-        $there = School::create(['country_id' => $mk, 'name' => 'Elsewhere Gymnasium', 'status' => 'active']);
+        $other = School::create(['country_id' => $rs, 'name' => 'Another Serbian Venue', 'status' => 'active']);
+        $abroadVenue = School::create(['country_id' => $mk, 'name' => 'Elsewhere Gymnasium', 'status' => 'active']);
 
-        $open = $this->coordinatorFor($here, 'open@soahtc.test', 'active');
-        $closed = $this->coordinatorFor($here, 'closed@soahtc.test', 'inactive');
-        $abroad = $this->coordinatorFor($there, 'abroad@soahtc.test', 'active');
+        $atHere = $this->coordinatorFor($here, $rs, 'here@soahtc.test', 'active');
+        $atOther = $this->coordinatorFor($other, $rs, 'other@soahtc.test', 'active');
+        $noVenue = $this->coordinatorFor(null, $rs, 'novenue@soahtc.test', 'active');
+        $closed = $this->coordinatorFor($here, $rs, 'closed@soahtc.test', 'inactive');
+        $abroad = $this->coordinatorFor($abroadVenue, $mk, 'abroad@soahtc.test', 'active');
 
-        $all = $this->actingAs($this->admin())->getJson('/api/reports/filters')
-            ->assertOk()->json('coordinators.*.id');
-        $this->assertContains($open->id, $all);
+        $ids = fn (string $url) => $this->actingAs($this->admin())->getJson($url)->assertOk()->json('coordinators.*.id');
+
+        $all = $ids('/api/reports/filters');
+        $this->assertContains($atHere->id, $all);
         $this->assertContains($abroad->id, $all);
         $this->assertNotContains($closed->id, $all, 'a closed account is never offered');
 
-        $inSerbia = $this->actingAs($this->admin())->getJson("/api/reports/filters?country_id={$rs}")
-            ->assertOk()->json('coordinators.*.id');
-        $this->assertContains($open->id, $inSerbia);
-        $this->assertNotContains($abroad->id, $inSerbia, 'no venue in the chosen country');
+        $inSerbia = $ids("/api/reports/filters?country_id={$rs}");
+        $this->assertContains($atHere->id, $inSerbia);
+        $this->assertContains($atOther->id, $inSerbia);
+        // The whole point of reading the country off the coordinator: no venue yet
+        // is not the same as belonging nowhere.
+        $this->assertContains($noVenue->id, $inSerbia, 'a coordinator without a venue still belongs to their country');
+        $this->assertNotContains($abroad->id, $inSerbia);
         $this->assertNotContains($closed->id, $inSerbia);
+
+        $atThatVenue = $ids("/api/reports/filters?country_id={$rs}&school_id={$here->id}");
+        $this->assertContains($atHere->id, $atThatVenue);
+        $this->assertNotContains($atOther->id, $atThatVenue, 'assigned to a different venue');
+        $this->assertNotContains($noVenue->id, $atThatVenue, 'assigned to no venue at all');
+        $this->assertNotContains($closed->id, $atThatVenue);
     }
 }

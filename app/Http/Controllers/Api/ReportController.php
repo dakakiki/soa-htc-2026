@@ -439,6 +439,9 @@ class ReportController extends Controller
         $this->authorize('reports.view');
 
         $countryId = $request->integer('country_id') ?: null;
+        // Only the coordinator list reads the venue; the other options already
+        // cascade on country alone.
+        $schoolId = $request->integer('school_id') ?: null;
         $quizId = $request->integer('quiz_id') ?: null;
         $examId = $request->integer('exam_id') ?: null;
 
@@ -501,17 +504,20 @@ class ReportController extends Controller
                 ->whereIn('role_id', $coordinatorRoleIds)))
             ->when(! $seasonId, fn ($q) => $q->whereRaw('1 = 0'))
             /*
-             * Narrowed by the chosen country the same way the report itself is: a
-             * coordinator reaches the venues on their active assignments, so the one
-             * offered here is the one who has a venue in that country. Matching on
-             * `users.country_id` instead would be a second, quieter definition of
-             * where a coordinator belongs, and the two are free to drift apart.
+             * The chosen country is simply the country the coordinator belongs to.
+             * Deriving it from the venues on their assignments instead reads well
+             * until a coordinator has no venue yet: that path then says nothing at
+             * all, and the picker comes back empty for a country that plainly has
+             * coordinators in it.
              */
-            ->when($countryId && $seasonId, fn ($q) => $q->whereHas('seasonAssignments', fn ($a) => $a
+            ->when($countryId, fn ($q) => $q->where('country_id', $countryId))
+            // A chosen venue narrows further: of that country's coordinators, the
+            // ones the venue is actually assigned to.
+            ->when($schoolId && $seasonId, fn ($q) => $q->whereHas('seasonAssignments', fn ($a) => $a
                 ->where('season_id', $seasonId)
                 ->where('status', 'active')
                 ->whereIn('role_id', $coordinatorRoleIds)
-                ->whereHas('schools', fn ($sc) => $sc->where('schools.country_id', $countryId))))
+                ->whereHas('schools', fn ($sc) => $sc->where('schools.id', $schoolId))))
             // A scoped reader is offered the coordinators of their own venues only.
             ->when($callerSchoolIds !== null, fn ($q) => $q->whereHas(
                 'seasonAssignments',

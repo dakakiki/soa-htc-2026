@@ -72,9 +72,12 @@ export interface ReportQuery {
  * regions/schools, a quiz to fill exams/tests, and an exam to narrow tests to
  * that exam (quiz → exam → test cascade).
  */
-export function reportFilters(scope?: { country_id?: number | null; quiz_id?: number | null; exam_id?: number | null }) {
+export function reportFilters(scope?: { country_id?: number | null; school_id?: number | null; quiz_id?: number | null; exam_id?: number | null }) {
     const params: Record<string, number> = {};
     if (scope?.country_id) params.country_id = scope.country_id;
+    // Only the coordinator list reads the venue — it lists that country's
+    // coordinators, narrowed to the ones the chosen venue is assigned to.
+    if (scope?.school_id) params.school_id = scope.school_id;
     if (scope?.quiz_id) params.quiz_id = scope.quiz_id;
     if (scope?.exam_id) params.exam_id = scope.exam_id;
 
