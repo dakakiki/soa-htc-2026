@@ -190,6 +190,7 @@ function resetFilters(): void {
 
 const measureRows: { key: keyof ReportMeasures; label: string; tone?: string }[] = [
     { key: 'registered', label: t('reports.registered') },
+    { key: 'participants', label: t('reports.participants') },
     { key: 'started', label: t('reports.started') },
     { key: 'submitted', label: t('reports.submitted') },
     { key: 'published', label: t('reports.publishedMeasure'), tone: 'text-green-600' },
@@ -203,7 +204,8 @@ const rateTiles = computed(() => {
     const tot = summary.value?.totals;
     const pct = (n: number, d: number): number | null => (d > 0 ? Math.round((n / d) * 100) : null);
     return [
-        { label: t('reports.rateParticipation'), hint: t('reports.rateParticipationHint'), value: tot ? pct(tot.started, tot.registered) : null },
+        // People over people (ADR-0085). Attempts over people read 134%.
+        { label: t('reports.rateParticipation'), hint: t('reports.rateParticipationHint'), value: tot ? pct(tot.participants, tot.registered) : null },
         { label: t('reports.rateCompletion'), hint: t('reports.rateCompletionHint'), value: tot ? pct(tot.submitted, tot.started) : null },
         { label: t('reports.ratePublish'), hint: t('reports.ratePublishHint'), value: tot ? pct(tot.published, tot.submitted) : null },
     ];

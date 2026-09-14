@@ -10,6 +10,12 @@ export interface ScoreStats {
 
 export interface ReportMeasures {
     registered: number | null;
+    /**
+     * Competitors who started, counted as people.  counts attempts, and
+     * a child sits several tests — so dividing that by  gave a
+     * participation rate of 134% (ADR-0085).
+     */
+    participants: number;
     started: number;
     submitted: number;
     published: number;

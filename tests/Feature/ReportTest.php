@@ -463,6 +463,31 @@ class ReportTest extends TestCase
         $summary('?mode=all')->assertJsonPath('totals.submitted', 3)->assertJsonPath('totals.published', 2);
     }
 
+    /**
+     * «Participation» used to divide attempts by children, and on the real
+     * population that read **133,9 %** — 145.713 attempts over 108.812
+     * registrations. Counted as people it is 61.309 of 108.812, **56,3 %**
+     * (ADR-0085).
+     */
+    public function test_participation_counts_competitors_and_not_their_attempts(): void
+    {
+        $c = $this->content();
+        $twice = $this->registration();
+
+        // One child who sat two tests, and one who sat none.
+        $this->attempt($twice, $c, 'completed', 5.0);
+        $this->attempt($twice, $this->content(), 'completed', 7.0);
+        $this->registration();
+
+        $totals = $this->actingAs($this->admin())->getJson('/api/reports/summary')
+            ->assertOk()->json('totals');
+
+        $this->assertSame(2, $totals['started'], 'attempts');
+        $this->assertSame(1, $totals['participants'], 'people');
+        // …so the rate the screen draws is 1 of 2 and not 2 of 2.
+        $this->assertSame(2, $totals['registered']);
+    }
+
     public function test_an_invalid_mode_is_rejected(): void
     {
         $this->actingAs($this->admin())->getJson('/api/reports/summary?mode=practice')

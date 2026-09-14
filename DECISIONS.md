@@ -2611,3 +2611,29 @@ deployment/storage/backup.
 - 🪤 **`resetFilters` ga NE briše** — očišćen, izveštaj ne bi bio ni o čemu. Vraća se na takmičenje.
 - **Ne dira:** `registered` (to su registracije, ne pokušaji) ni sloj rezultata, koji probu ionako
   isključuje od ADR-0027.
+
+## ADR-0085 — „Participation" broji decu, ne njihove pokušaje
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Posle razdvajanja probe od takmičenja (ADR-0084) stopa učešća je pala sa 169 % na
+  **134 %** — i dalje preko sto posto. Vlasnik: *„pogledaj i to."*
+- **Uzrok:** `pct(started, registered)` deli **pokušaje** sa **decom**. To nisu iste jedinice: dete
+  polaže više testova, pa se brojilac i imenilac ne mogu podeliti.
+- **Izmereno nad aktivnom sezonom:**
+
+  | | | |
+  | --- | ---: | ---: |
+  | Registrovano | **108.812** | |
+  | STARTED (pokušaji) | 145.713 | **133,9 %** ← što je pisalo |
+  | **Dece koja su krenula** | **61.309** | **56,3 %** ← što ime obećava |
+  | Pokušaja po detetu | 2,38 | |
+
+- 🔴 **Razlika nije kozmetička.** Ekran je tvrdio da je učešće **iznad sto posto** — dakle „više nego
+  svi" — dok je stvarno **manje od tri petine**. Na pitch-u je to najpogrešniji broj na strani.
+- **Odluka:** uvodi se mera **`participants`** — `COUNT(DISTINCT registration_id)` nad pokušajima koji
+  nisu poništeni — i stopa učešća se računa **iz nje**. Na ekranu stoji kao **„Took part"**, pored
+  „Registered", da se brojilac vidi a ne samo procenat.
+- **`started` ostaje kakav je.** Pokušaji po detetu (2,38) su prava mera; samo nisu **stopa** ničega.
+- 🪤 Ostale dve stope su oduvek bile u redu, jer dele pokušaje pokušajima: `submitted / started` i
+  `published / submitted`.
+- **Cena:** jedan `COUNT(DISTINCT)` više u istom upitu — bez dodatnog prolaza kroz tabelu.

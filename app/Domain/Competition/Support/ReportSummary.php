@@ -157,13 +157,27 @@ final class ReportSummary
      * grouping).
      *
      * @param  array<string, mixed>  $filters
-     * @return array<int|string|null, array{started: int, submitted: int, published: int, void: int}>
+     * @return array<int|string|null, array{participants: int, started: int, submitted: int, published: int, void: int}>
      */
     private static function attemptRows(array $filters, ?string $groupBy): array
     {
         $query = self::attemptBase($filters, $groupBy);
 
         $select = [
+            /*
+             * 🔴 Competitors, not attempts — and the difference is the whole
+             * reason this line exists. «Participation» divided `started` by
+             * `registered`, which is attempts over children: 145.713 over
+             * 108.812 read **133,9 %**, a participation rate above everybody.
+             * Counted as people, 61.309 of 108.812 children ever started, which
+             * is **56,3 %** — the number the label was always promising, and a
+             * very different thing to tell a client (ADR-0085).
+             *
+             * `started` stays as it is. Attempts per child (2,38 in the contest,
+             * because a child sits several tests) is a real measure too; it just
+             * is not a rate of anything.
+             */
+            DB::raw("count(distinct case when attempts.status <> 'void' then attempts.registration_id end) as participants"),
             DB::raw("sum(case when attempts.status <> 'void' then 1 else 0 end) as started"),
             DB::raw("sum(case when attempts.status = 'completed' then 1 else 0 end) as submitted"),
             DB::raw("sum(case when attempts.status = 'completed' and attempts.published_at is not null then 1 else 0 end) as published"),
@@ -175,6 +189,7 @@ final class ReportSummary
         $out = [];
         foreach ($rows as $row) {
             $out[$groupBy === null ? null : $row->gkey] = [
+                'participants' => (int) $row->participants,
                 'started' => (int) $row->started,
                 'submitted' => (int) $row->submitted,
                 'published' => (int) $row->published,
@@ -468,7 +483,7 @@ final class ReportSummary
     /**
      * Turn each group's raw scores into avg/min/max/median/count.
      *
-     * @param  array<int|string|null, array{started: int, submitted: int, published: int, void: int}>  $counts
+     * @param  array<int|string|null, array{participants: int, started: int, submitted: int, published: int, void: int}>  $counts
      * @param  array<int|string|null, list<float>>  $scores
      * @return array<int|string|null, array<string, mixed>>
      */
@@ -490,7 +505,7 @@ final class ReportSummary
 
     private static function emptyMeasures(): array
     {
-        return ['started' => 0, 'submitted' => 0, 'published' => 0, 'void' => 0, 'score' => self::emptyStats()];
+        return ['participants' => 0, 'started' => 0, 'submitted' => 0, 'published' => 0, 'void' => 0, 'score' => self::emptyStats()];
     }
 
     /**
