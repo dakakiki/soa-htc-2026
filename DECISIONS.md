@@ -2422,3 +2422,46 @@ deployment/storage/backup.
   iako je baza MariaDB, dakle gura MySQL gramatiku na MariaDB server. Prebacivanje na
   `DB_CONNECTION=mariadb` je izmena jedne reči, ali se ne radi na nadu — radi se kad ova kolona
   bude zelena.
+
+## ADR-0080 — STAGE se zatvara lozinkom, a prepoznaje je po fajlu koji samo STAGE ima
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** STAGE nosi **prava imena 108.811 dece**, 135 naloga i ceo CMS, i od 13.09 stoji
+  otvoren svetu. `public/robots.txt` pri tom nosi prazan `Disallow:`, što nije „ništa" nego
+  **poziv** — prazna direktiva dozvoljava sve, pa je jedino što je dosad čuvalo podatke bilo to
+  što niko nije probao adresu.
+- **Zašto je zaštita bila uklonjena.** Basic prijava je 13.09 bila podignuta pa skinuta na
+  vlasnikov zahtev, i njegov razlog je bio tačan: `app.blade.php:26` nosi `<link rel="manifest">`
+  bez `crossorigin="use-credentials"`, pa pregledač manifest povlači **bez kredencijala**, iza
+  prijave dobija 401 i **aplikacija se ne može instalirati** (ADR-0073) — a ništa ne kaže zašto.
+- **Odluka:** prijava se vraća, ali sa **četiri izuzetka** koji tačno pokrivaju ono što pregledač
+  i sertifikat traže bez kredencijala, i **bez ijedne izmene u aplikaciji**.
+
+  | Izuzetak | Zašto |
+  | --- | --- |
+  | `/.well-known/` | obnova sertifikata u decembru ide preko HTTP-01 |
+  | `/api/student/` | takmičarski SPA šalje `Authorization: Bearer`, koje **zamenjuje** `Basic` — svaki ispitni poziv bi Apache odbio sa 401 |
+  | `/manifest.webmanifest` | pregledač ga povlači bez kredencijala |
+  | `/storage/branding/` | tu stvarno stoji ikona iz manifesta — izmereno, `…/branding/dCVSHtZe….png`, 512×512 |
+
+- 🪤 **Izuzeci se poklapaju nad `THE_REQUEST`, ne nad `REQUEST_URI`.** `RewriteRule ^ index.php`
+  prepisuje putanju, a dozvola se rešava nad **prepisanom** — pa `REQUEST_URI` i `REDIRECT_URL`
+  pokazuju `/index.php` za svaki zahtev. Sirova linija zahteva je jedino što prepisivanje preživi.
+- 🔴 **A prefiks je širok koliko i putanja koja iz njega može da iskoči.** `GET /api/student/../../`
+  poklapa izuzetak, a servira se sa sasvim drugog mesta — dakle **bez lozinke**. Zato se `NOAUTH`
+  odmah i **oduzima** svakoj liniji zahteva koja nosi `..`, `%2e`, `%2f` ili `%5c`. Bez tog reda
+  četiri izuzetka nisu izuzeci nego rupa.
+- **Zašto u repou, a ne rukom na serveru.** Deploy je `git pull`, a `public/.htaccess` je praćen
+  fajl: ručna izmena gore preživi tačno do prvog `pull`-a koji takne taj fajl, i to u najgorem
+  trenutku. Zato blok stoji u repou, ali pod **`<IfFile>`** — prekidač je **sam fajl sa lozinkom**,
+  `/usr/www/users/dvpjdhdo/.htpasswd`. Gde ga ima, sajt je zatvoren; gde ga nema (produkcija),
+  Apache blok preskače. Konfiguracija time govori istinu: *zatvoreno je tamo gde lozinka postoji*.
+- **Izmereno, ne pretpostavljeno:** `<IfFile>` na ovoj mašini **radi** — blok sa `Require all denied`
+  pod postojećim fajlom vratio je **403**, a posle vraćanja **200**. Fajl sa lozinkom stoji u
+  `~/public_html/`, koji **nije docroot nijednog vhost-a**: `soa-htc.com`, `www` i `legacy` svaki
+  gleda u svoj podfolder (provereno — susedne putanje vraćaju 404).
+- ⚠️ **Cena koja ostaje:** port 80 ne preusmerava na HTTPS na nivou Apache-a (to radi aplikacija,
+  ADR-0078), a 401 pada **pre PHP-a** — pa prijava preko `http://` nosi lozinku u čistom tekstu.
+  Za STAGE je to prihvaćeno; na produkciji se blok ionako ne izvršava.
+- **`robots.txt` se ne dira.** Iza 401 nema šta da indeksira, a fajl je zajednički sa produkcijom,
+  gde javni sajt **treba** da bude indeksiran.

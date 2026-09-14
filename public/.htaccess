@@ -23,3 +23,42 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# ─── Staging asks for a name and a password. Production does not. ────────────
+#
+# The switch is the password file itself (ADR-0080): where it exists the whole
+# site is closed, and where it does not — production — Apache skips these lines
+# without reading them. So the protection survives `git pull`, which is the one
+# thing a hand-edit on the server does not.
+<IfFile "/usr/www/users/dvpjdhdo/.htpasswd">
+
+    # 🪤 The exceptions are matched on THE_REQUEST, not on REQUEST_URI. The
+    # front-controller rule above rewrites the path to `index.php`, authorisation
+    # is settled over the *rewritten* one, and the raw request line is the only
+    # thing that survives the rewrite.
+    #
+    #   /.well-known/       the certificate renews over HTTP-01 in December
+    #   /api/student/       the competitor SPA sends `Authorization: Bearer`,
+    #                       which REPLACES Basic — every exam call would be 401
+    #   /manifest.webmanifest and /storage/branding/
+    #                       a browser fetches both without credentials, and
+    #                       without both of them it offers no install (ADR-0073)
+    SetEnvIf THE_REQUEST "^[A-Z]+ /\.well-known/" NOAUTH
+    SetEnvIf THE_REQUEST "^[A-Z]+ /api/student/" NOAUTH
+    SetEnvIf THE_REQUEST "^[A-Z]+ /manifest\.webmanifest" NOAUTH
+    SetEnvIf THE_REQUEST "^[A-Z]+ /storage/branding/" NOAUTH
+
+    # ...and withdrawn the moment the request line could walk out of the prefix
+    # it was let in by. `GET /api/student/../../` matches the exception above and
+    # is served from somewhere else entirely; the four openings are prefixes, and
+    # a prefix is only as narrow as the path that cannot escape it.
+    SetEnvIfNoCase THE_REQUEST "(\.\.|%2e|%2f|%5c)" !NOAUTH
+
+    AuthType Basic
+    AuthName "SOA HTC staging"
+    AuthUserFile "/usr/www/users/dvpjdhdo/.htpasswd"
+    <RequireAny>
+        Require env NOAUTH
+        Require valid-user
+    </RequireAny>
+</IfFile>
