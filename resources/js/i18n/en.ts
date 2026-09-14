@@ -1608,7 +1608,7 @@ export default {
         totals: 'Totals',
         rates: 'Rates',
         rateParticipation: 'Participation',
-        rateParticipationHint: 'Started / Registered',
+        rateParticipationHint: 'Competitors who started / Registered',
         rateCompletion: 'Completion',
         rateCompletionHint: 'Submitted / Started',
         ratePublish: 'Publish rate',
@@ -1629,6 +1629,8 @@ export default {
         breakdownCapped: 'Showing {shown} of {total}. Search to find others.',
         heatCapped: 'Showing the busiest {rows} rows × {cols} columns.',
         registered: 'Registered',
+        // 🪤 People, where 'started' beside it is attempts (ADR-0085).
+        participants: 'Took part',
         started: 'Started',
         submitted: 'Submitted',
         publishedMeasure: 'Published',
