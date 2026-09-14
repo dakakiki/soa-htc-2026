@@ -24,7 +24,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -50,10 +49,8 @@ class ReportController extends Controller
             'test_id' => ['nullable', 'integer'],
             'group_by' => ['nullable', Rule::in(['country', 'region', 'school', 'level', 'quiz', 'exam', 'test'])],
             'mode' => ['nullable', Rule::in(ReportSummary::MODES)],
-            // The breakdown table asks for both populations at once and for every
-            // member of its dimension; nothing else on the screen does, and the
-            // extra queries are its own (ADR-0091).
-            'split_modes' => ['nullable', 'boolean'],
+            // The breakdown table asks for every member of its dimension, even the
+            // ones nobody sat; nothing else on the screen does (ADR-0091).
             'all_members' => ['nullable', 'boolean'],
         ]);
 
@@ -135,12 +132,9 @@ class ReportController extends Controller
             'test_id' => ['nullable', 'integer'],
             'group_by' => ['nullable', Rule::in($dims)],
             'mode' => ['nullable', Rule::in(ReportSummary::MODES)],
-            // The on-screen heatmap + compare selections, so the PDF mirrors the page.
+            // The on-screen heatmap axes, so the PDF mirrors the page.
             'heat_row_by' => ['nullable', Rule::in($dims)],
             'heat_col_by' => ['nullable', Rule::in($dims)],
-            'compare_by' => ['nullable', Rule::in($dims)],
-            'compare_ids' => ['nullable', 'array'],
-            'compare_ids.*' => ['integer'],
         ]);
 
         $echoed = $validated;
@@ -152,25 +146,15 @@ class ReportController extends Controller
             isset($validated['coordinator_user_id']) ? (int) $validated['coordinator_user_id'] : null
         );
 
-        // The printed breakdown is the one on screen: both populations, every
-        // member (ADR-0091). Compare below keeps the plain shape it reads.
-        $data = ReportSummary::build($filters + ['split_modes' => true, 'all_members' => true]);
+        // The printed breakdown is the one on screen: every member of the
+        // dimension, in the population the type names (ADR-0091/0093/0094).
+        $data = ReportSummary::build($filters + ['all_members' => true]);
 
         $matrix = (! empty($validated['heat_row_by']) && ! empty($validated['heat_col_by']))
             ? ReportSummary::matrix($filters, $validated['heat_row_by'], $validated['heat_col_by'])
             : null;
 
-        // Compare: the chosen dimension, narrowed to the picked members.
-        $compareBy = $validated['compare_by'] ?? null;
-        $compareRows = [];
-        if ($compareBy !== null) {
-            $ids = array_map('intval', $validated['compare_ids'] ?? []);
-            $compareRows = collect(ReportSummary::build($filters + ['group_by' => $compareBy])['rows'])
-                ->when($ids !== [], fn ($rows) => $rows->filter(fn ($r) => in_array($r['key'], $ids, true)))
-                ->values()->all();
-        }
-
-        $html = $this->reportHtml($data, $echoed, $matrix, $compareRows, $compareBy);
+        $html = $this->reportHtml($data, $echoed, $matrix);
         $pdf = PdfWriter::toString($html, 'Competition report', 'L');
 
         $filename = 'report-'.now()->format('Y-m-d_His').'.pdf';
@@ -188,9 +172,8 @@ class ReportController extends Controller
      * @param  array<string, mixed>  $data  ReportSummary::build() output
      * @param  array<string, mixed>  $f  echoed filters (for the scope line)
      * @param  array<string, mixed>|null  $matrix  ReportSummary::matrix() output (heatmap)
-     * @param  list<array<string, mixed>>  $compareRows  the picked members to compare
      */
-    private function reportHtml(array $data, array $f, ?array $matrix = null, array $compareRows = [], ?string $compareBy = null): string
+    private function reportHtml(array $data, array $f, ?array $matrix = null): string
     {
         $setting = Setting::current();
         $brand = $setting->color_primary ?: '#2563eb';
@@ -239,17 +222,13 @@ class ReportController extends Controller
         if (! empty($data['group_by'])) {
             $dim = ucfirst((string) $data['group_by']);
 
-            // Every measure twice — the contest and practice beside each other,
-            // never added up (ADR-0091). Counts are children, scores are per
-            // attempt, and the sub-header says so on the page rather than in a
-            // footnote nobody reads.
-            $pair = fn (string $label): string => '<th colspan="2" style="text-align:center;padding:5px;">'.$label.'</th>';
+            // One population — the one the Test type names, like the screen
+            // (ADR-0093). The three counts are children (ADR-0085); Avg and Median
+            // are per attempt, and the line under the heading says so.
+            $th = fn (string $label): string => '<th style="text-align:right;padding:5px;">'.$label.'</th>';
             $head = '<tr style="background:'.$brand.';color:'.$onBrand.';">'
-                .'<th rowspan="2" style="text-align:left;padding:5px;">'.$dim.'</th>'
-                .'<th rowspan="2" style="text-align:right;padding:5px;">Reg.</th>'
-                .$pair('Started').$pair('Submitted').$pair('Published').$pair('Avg').$pair('Median')
-                .'</tr><tr style="background:'.$brand.';color:'.$onBrand.';font-size:6.5pt;">'
-                .str_repeat('<th style="text-align:right;padding:2px 5px;">Contest</th><th style="text-align:right;padding:2px 5px;">Practice</th>', 5)
+                .'<th style="text-align:left;padding:5px;">'.$dim.'</th>'
+                .$th('Reg.').$th('Started').$th('Submitted').$th('Published').$th('Avg').$th('Median')
                 .'</tr>';
 
             $cell = fn ($v, string $style = ''): string => '<td style="text-align:right;padding:4px 5px;'.$style.'">'.($v ?? '—').'</td>';
@@ -257,10 +236,6 @@ class ReportController extends Controller
             $rows = '';
             foreach ($data['rows'] as $i => $r) {
                 $bg = $i % 2 === 1 ? 'background:#f9fafb;' : '';
-                // 🪤 Not $c/$s — $s is the totals' score block further down, and
-                // borrowing the name emptied the report's own score line.
-                $contest = $r['modes']['competition'];
-                $practice = $r['modes']['sample'];
                 $sub = '';
                 foreach ($r['sublabels'] ?? [] as $line) {
                     $sub .= '<div style="font-size:6.5pt;color:#6b7280;">'.e((string) $line).'</div>';
@@ -269,11 +244,11 @@ class ReportController extends Controller
                 $rows .= '<tr style="'.$bg.'">'
                     .'<td style="padding:4px 5px;">'.e($r['label'] ?? '—').$sub.'</td>'
                     .$cell($r['registered'])
-                    .$cell($contest['participants']).$cell($practice['participants'])
-                    .$cell($contest['submitted']).$cell($practice['submitted'])
-                    .$cell($contest['published'], 'color:#059669;').$cell($practice['published'], 'color:#059669;')
-                    .$cell($contest['score']['avg']).$cell($practice['score']['avg'])
-                    .$cell($contest['score']['median']).$cell($practice['score']['median'])
+                    .$cell($r['participants'])
+                    .$cell($r['submitted_participants'])
+                    .$cell($r['published_participants'], 'color:#059669;')
+                    .$cell($r['score']['avg'])
+                    .$cell($r['score']['median'])
                     .'</tr>';
             }
             $breakdown = '<h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Breakdown — '.$dim.'</h3>'
@@ -284,7 +259,6 @@ class ReportController extends Controller
         $scoreLine = 'Avg: <b>'.($s['avg'] ?? '—').'</b> &nbsp; Min: <b>'.($s['min'] ?? '—').'</b> &nbsp; Max: <b>'.($s['max'] ?? '—').'</b> &nbsp; Median: <b>'.($s['median'] ?? '—').'</b> &nbsp; Scored: '.$s['count'];
 
         $heatmap = $matrix !== null ? $this->heatmapHtml($matrix, $brand) : '';
-        $compare = $this->compareHtml($compareRows, $compareBy, $brand, $onBrand);
 
         return <<<HTML
             <div style="font-size:9pt;color:#111827;">
@@ -309,8 +283,6 @@ class ReportController extends Controller
                 {$breakdown}
 
                 {$heatmap}
-
-                {$compare}
             </div>
             HTML;
     }
@@ -340,21 +312,31 @@ class ReportController extends Controller
         $byBusiest = fn (array $axis, array $tot, int $n) => array_slice(
             collect($axis)->sortByDesc(fn ($a) => $tot[$a['key']] ?? 0)->values()->all(), 0, $n
         );
-        $rows = $byBusiest($matrix['rows'], $rowTot, 12);
-        $cols = $byBusiest($matrix['cols'], $colTot, 8);
+
+        // Difficulty levels are never cut here either — the printed grid says the
+        // same thing as the one on screen, or it is a different report.
+        $rows = $matrix['row_by'] === 'level' ? $matrix['rows'] : $byBusiest($matrix['rows'], $rowTot, 12);
+        $cols = $matrix['col_by'] === 'level' ? $matrix['cols'] : $byBusiest($matrix['cols'], $colTot, 8);
 
         $min = (float) $matrix['min'];
         $max = (float) $matrix['max'];
 
+        // A level's category rides along: `level_short` repeats across categories,
+        // so `BH` is two different columns (ADR-0088).
+        $sub = fn (array $axis, string $size): string => implode('', array_map(
+            fn ($line) => '<div style="font-size:'.$size.';color:#9ca3af;">'.e((string) $line).'</div>',
+            $axis['sublabels'] ?? []
+        ));
+
         $head = '<tr><th style="padding:4px;"></th>';
         foreach ($cols as $col) {
-            $head .= '<th style="padding:4px;text-align:center;font-size:7pt;color:#6b7280;">'.e($col['label'] ?? '—').'</th>';
+            $head .= '<th style="padding:4px;text-align:center;font-size:7pt;color:#6b7280;">'.e($col['label'] ?? '—').$sub($col, '5.5pt').'</th>';
         }
         $head .= '</tr>';
 
         $body = '';
         foreach ($rows as $row) {
-            $body .= '<tr><th style="padding:4px;text-align:left;font-size:8pt;color:#374151;">'.e($row['label'] ?? '—').'</th>';
+            $body .= '<tr><th style="padding:4px;text-align:left;font-size:8pt;color:#374151;">'.e($row['label'] ?? '—').$sub($row, '6pt').'</th>';
             foreach ($cols as $col) {
                 $cell = $cells[$row['key'].':'.$col['key']] ?? null;
                 if ($cell === null) {
@@ -374,58 +356,6 @@ class ReportController extends Controller
         return '<h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Heatmap — average score</h3>'
             .'<table cellspacing="2" cellpadding="0" style="font-size:8pt;"><thead>'.$head.'</thead><tbody>'.$body.'</tbody></table>'
             .'<div style="font-size:7pt;color:#9ca3af;margin-top:2px;">Darker = higher average score.</div>';
-    }
-
-    /**
-     * Compare table: the picked members as rows, measures as columns, with the
-     * leader in each measure highlighted — the flipped on-screen layout.
-     *
-     * @param  list<array<string, mixed>>  $rows
-     */
-    private function compareHtml(array $rows, ?string $compareBy, string $brand, string $onBrand): string
-    {
-        if ($compareBy === null || $rows === []) {
-            return '';
-        }
-
-        $measures = [
-            ['Registered', fn ($r) => $r['registered']],
-            ['Started', fn ($r) => $r['started']],
-            ['Submitted', fn ($r) => $r['submitted']],
-            ['Published', fn ($r) => $r['published']],
-            ['Void', fn ($r) => $r['void']],
-            ['Avg', fn ($r) => $r['score']['avg']],
-            ['Median', fn ($r) => $r['score']['median']],
-        ];
-
-        // Max per measure (for the leader highlight), only when comparing 2+.
-        $maxes = [];
-        foreach ($measures as [$label, $get]) {
-            $vals = array_filter(array_map($get, $rows), fn ($v) => $v !== null);
-            $maxes[$label] = count($rows) > 1 && $vals !== [] ? max($vals) : null;
-        }
-
-        $head = '<tr style="background:'.$brand.';color:'.$onBrand.';"><th style="text-align:left;padding:5px;">'.ucfirst($compareBy).'</th>';
-        foreach ($measures as [$label]) {
-            $head .= '<th style="text-align:center;padding:5px;">'.$label.'</th>';
-        }
-        $head .= '</tr>';
-
-        $body = '';
-        foreach ($rows as $i => $r) {
-            $body .= '<tr style="'.($i % 2 === 1 ? 'background:#f9fafb;' : '').'">'
-                .'<td style="padding:4px 5px;">'.e($r['label'] ?? '—').'</td>';
-            foreach ($measures as [$label, $get]) {
-                $v = $get($r);
-                $lead = $maxes[$label] !== null && $v !== null && $v === $maxes[$label];
-                $style = 'text-align:center;padding:4px 5px;'.($lead ? 'background:'.self::tint($brand, 0.18).';font-weight:bold;' : '');
-                $body .= '<td style="'.$style.'">'.($v ?? '—').'</td>';
-            }
-            $body .= '</tr>';
-        }
-
-        return '<h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Compare — '.ucfirst($compareBy).'</h3>'
-            .'<table width="100%" cellspacing="0" cellpadding="0" style="border:0.6pt solid #e5e7eb;font-size:8pt;"><thead>'.$head.'</thead><tbody>'.$body.'</tbody></table>';
     }
 
     /** Mix a brand hex with white by ratio (1 = full brand, 0 = white). */
@@ -466,57 +396,33 @@ class ReportController extends Controller
     }
 
     /**
-     * Bounded option lists that populate the report's filter controls. Cascades:
-     * regions + schools are returned only for a chosen country; exams for a chosen
-     * quiz; and tests for the chosen quiz — narrowed to a single exam's tests when
-     * an exam is also chosen (quiz → exam → test). Empty otherwise, so the client
-     * keeps those selects disabled until the parent is picked. Everything else is
-     * small enough to send in full.
-     */
-    /**
      * The quizzes of one test type (ADR-0092).
      *
      * 🔴 A quiz is practice because its exam sits in a practice ROUND, never
-     * because `quizzes.quiz_type` says so — the same boundary the counting uses
-     * ({@see SampleRound}), and the one an
-     * administrator cannot drift by retyping a field. On the current data the
-     * two agree: 6 practice quizzes, 8 contest ones, none in both.
-     *
-     * 🪤 A quiz with exams in both kinds of round belongs to both lists, which is
-     * why this asks "has an exam of that kind" rather than excluding the other.
+     * because `quizzes.quiz_type` says so — the same boundary the counting uses,
+     * and the one an administrator cannot drift by retyping a field. It lives in
+     * {@see SampleRound} and nowhere else. On the current data the two agree: 6
+     * practice quizzes, 8 contest ones, none in both.
      *
      * @return Collection<int, Quiz>
      */
     private function quizzesOfType(string $mode)
     {
-        /*
-         * 🪤 Practice is what a practice round says it is; everything else is the
-         * contest, an exam with NO round included. That asymmetry is not
-         * sloppiness, it is the counting: `applyMode` takes the practice tests and
-         * treats every other attempt as contest, so a quiz whose exam has no round
-         * is reported under the contest — and a picker that offered it under
-         * neither would hide a quiz whose numbers the report is showing.
-         */
-        $quizzesWithExam = fn (callable $round) => DB::table('exam_quiz')
-            ->join('exams', 'exams.id', '=', 'exam_quiz.exam_id')
-            ->leftJoin('exam_rounds', 'exam_rounds.id', '=', 'exams.exam_round_id')
-            ->where('exams.status', 'active')
-            ->where($round)
-            ->select('exam_quiz.quiz_id');
-
-        $practice = fn ($q) => $q->where('exam_rounds.is_sample', true);
-        $contest = fn ($q) => $q->where(fn ($w) => $w->whereNull('exam_rounds.id')->orWhere('exam_rounds.is_sample', false));
-
         return Quiz::query()
             ->where('status', 'active')
-            ->when($mode !== 'all', fn ($q) => $q->whereIn(
-                'id',
-                $quizzesWithExam($mode === 'sample' ? $practice : $contest)
-            ))
+            ->when($mode !== 'all', fn ($q) => $q->whereIn('id', SampleRound::idsOfType('quiz', $mode)))
             ->orderBy('title')
             ->get(['id', 'title']);
     }
 
+    /**
+     * Bounded option lists that populate the report's filter controls. Cascades:
+     * regions + schools are returned only for a chosen country; exams for a chosen
+     * quiz; and tests for the chosen quiz — narrowed to a single exam's tests when
+     * an exam is also chosen (type → quiz → exam → test). Empty otherwise, so the
+     * client keeps those selects disabled until the parent is picked. Everything
+     * else is small enough to send in full.
+     */
     public function filters(Request $request): JsonResponse
     {
         $this->authorize('reports.view');

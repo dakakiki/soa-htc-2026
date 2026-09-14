@@ -2824,7 +2824,7 @@ deployment/storage/backup.
 
 ## ADR-0091 — Breakdown je tabela poređenja: takmičenje i proba jedno uz drugo, brojevi su deca, i lista je potpuna
 
-- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Status:** Prihvaćeno (2026-09-14), **izmenjeno istog dana — vidi ADR-0093**: kolone jedna uz drugu su pale, sve ostalo (deca, potpune liste, roditelj ispod naziva, bez Void-a) važi.
 - **Kontekst:** Vlasnik je prvo tražio da „Break down by" izađe iz filtera (PR #54), pa je zadao
   kolone: *Registered ostaje; Started competition (unique) i Started sample (unique); Submitted,
   Published, Avg i Median isto tako* — „drugim rečima uvek imamo competition / Sample". Uz to: region
@@ -2918,3 +2918,85 @@ deployment/storage/backup.
   pao čim je prva verzija tražila rundu sa obe strane.
 - 🪤 **Kviz sa exam-ovima obe vrste je u obe liste** — zato se pita „ima li exam te vrste", a ne
   „isključi drugu vrstu".
+
+## ADR-0093 — Reports: ceo ekran govori o jednoj populaciji; Compare, izvoz u PDF i filter nivoa odlaze
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.** Menja **ADR-0091** (kolone jedna uz drugu).
+- **Kontekst:** Pošto je Breakdown dobio dve kolone po meri (ADR-0091), vlasnik je gledao ekran i
+  rekao: *„ako se u filteru odabere competition onda break down treba da pokazuje samo competition
+  rezultate i obrnuto… biće lepša tabela"*, pa *„i by default u filteru je selektovan Competition"*.
+  Uz to: **Compare** sekcija *„nema nekog smisla sada kad imamo break down i heat map"*, **Export PDF
+  dugme** da se skloni, **Difficulty level** da izađe iz filtera, i da se, kao na dashboard-u, stave
+  **placeholderi dok se sadržaj učitava**.
+- **Odluka:** **Test type je jedna odluka za ceo ekran.** Pločice, stope, levak, Breakdown i Heatmap
+  broje **istu** populaciju — onu koju filter imenuje, podrazumevano **Competition**.
+
+### Šta pada od ADR-0091, a šta ostaje
+
+- ❌ **Dve kolone po meri** — tabela je imala 12 kolona da bi poredila dve populacije koje se na tom
+  mestu i ne porede; čita se po zemljama i nivoima. Sada ih ima 7.
+- ✅ **Ostaje sve ostalo iz 0091:** brojevi su **deca** (`Started · Submitted · Published`), ocene su
+  **po pokušaju**, **Void** nije kolona, liste su **potpune**, i svaki red nosi **roditelja ispod
+  naziva**. Ostaje i pravilo da se dve populacije **nikad ne sabiraju** — sada se ne sabiraju zato što
+  se nikad i ne nađu u istoj tabeli.
+- 🪤 Time je otpao i prekidač `split_modes`: jedan prolaz manje kroz 145.780 pokušaja po tabeli.
+
+### Šta je sklonjeno sa ekrana
+
+- **Compare** — birao je članove jedne dimenzije i stavljao ih jedne uz druge. Breakdown to danas radi
+  za **sve** članove, sa pretragom i „Load more", a Heatmap za dve dimenzije odjednom.
+- **Export PDF dugme** — vlasnikova odluka. ⚠️ **Endpoint i njegov kod ostaju** (i ispravljeni su,
+  vidi dole), samo ga ekran više ne nudi.
+- **Difficulty level filter** — nivo je ovde **dimenzija**, ne sužavanje: Breakdown izlista sve nivoe,
+  a Heatmap svakom daje osu. Jedan izabran nivo govori manje od oba prikaza.
+- **Void pločica** iz Totals-a — administratorova radnja nad pokušajem, na celoj populaciji **0**, a
+  kao šesta pločica je otvarala drugi red.
+
+### Heatmap
+
+- **Obe ose drže sve članove i grid se skroluje**, umesto da tiho odbaci višak. 🔴 Pre ovoga je držao
+  **12 redova i 8 kolona**: izbor „quiz × country" je pokazivao **osam zemalja** i fusnotu — vlasnik
+  je to i primetio („imam samo 8 zemalja?").
+- **Svi nivoi stoje na osi**, i oni koje niko nije radio, **redom kojim se uče**, sa **kategorijom
+  ispod naziva** (`BH` je inače dve iste kolone, ADR-0088).
+- **Zaglavlje i leva kolona su zamrznuti** (`sticky`), pa se u mreži 24 × 49 vidi na šta se broj
+  odnosi. Grid ima **svoj preloader**, kao i Breakdown.
+
+### Učitavanje
+
+- **Placeholderi kao na dashboard-u:** oblik stranice se rezerviše dok brojevi stižu, a sekcije
+  stižu **jedna po jedna** (pločice ~5 s, tabela ~7 s, grid svojim tempom). Kad sadržaj već postoji,
+  osvežava ga **overlay** nad tom sekcijom; prvi put stoje placeholderi.
+
+### 🔴 Usput nađeno u PDF-u
+
+`Participation` je u PDF-u i dalje delio **pokušaje** brojem **dece** — štampani izveštaj je pisao
+**134 %** tamo gde ekran piše **56 %**. Popravljeno, dodata je i pločica „Took part", a test sada čita
+**HTML od kog se PDF pravi** (sam PDF je komprimovan — zato je ovo i prošlo pored testa koji je
+gledao status i zaglavlje).
+
+## ADR-0094 — Sadržaj se ne meša: kviz, exam i test su uvek iz izabranog tipa
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik, gledajući Heatmap: *„ako je odabran competition u filteru, onda samo mogu da
+  se izlistaju competition quiz/exam/test. isto važi i za sample. **nema mešanja**"* — i isto za
+  Breakdown i za pretragu pored njega.
+- **Odluka:** svaka lista sadržaja — birač kvizova, redovi Breakdown-a, ose Heatmap-a — nosi **samo
+  sadržaj izabranog tipa**. Pretraga gleda te iste redove, pa ni ona ne može da nađe tuđi.
+- **Zašto:** takmičarska tabela je nosila **šest probnih kvizova** koji su po definiciji prazni, a
+  prazan red treba da znači **„niko nije radio"**, ne „pogrešna populacija".
+- **Kako:** granica je **na jednom mestu** — `SampleRound::idsOfType($dimension, $mode)` — i koriste
+  je i `ReportController` (birač) i `ReportSummary::members()` (redovi i ose). 🪤 Pre ovoga su
+  postojale **dve kopije** istog pravila, a upravo od toga upozorava `SampleRound`: četvrto pisanje
+  istog pravila je ono koje se tiho ne slaže sa ostala tri.
+- 🔴 **Asimetrija je namerna:** proba je ono što kaže **probna runda**, a takmičenje je **sve
+  ostalo — uključujući exam bez runde**, jer tako broji `applyMode`.
+- **Nivoi nisu tipizirani** i uvek se listaju svi.
+
+### 🪤 Nalaz iz podataka: neaktivan probni exam pada u takmičenje
+
+Kviz **„Hippo S5 Sample CEFR C1"** stoji u takmičarskoj tabeli sa **36 takmičara** iako mu ime kaže
+proba. Uzrok: njegov exam **„Hippo S5 Sample"** jeste u **probnoj rundi**, ali mu je
+**`status = inactive`** — a `SampleRound::testIds()` traži aktivan exam, pa tih **67 pokušaja** nije u
+probnom skupu i broji se kao takmičenje. Red se **ne skriva**: to bi sakrilo pokušaje koje izveštaj
+broji. ⚠️ Ako je to greška u podacima, popravlja se **na exam-u**, ne u izveštaju.

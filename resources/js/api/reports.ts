@@ -16,6 +16,9 @@ export interface ReportMeasures {
      * participation rate of 134% (ADR-0085).
      */
     participants: number;
+    /** Children who submitted at least one attempt, and who had one published. */
+    submitted_participants: number;
+    published_participants: number;
     started: number;
     submitted: number;
     published: number;
@@ -26,44 +29,18 @@ export interface ReportMeasures {
 export interface ReportRow extends ReportMeasures {
     key: number | null;
     label: string | null;
+    /**
+     * What identifies the row — its country, its category, its quiz and exam.
+     * A name is not an identification: "Region 2" exists in four countries and
+     * `level_short` repeats across categories (ADR-0088).
+     */
+    sublabels: string[];
 }
 
 export interface ReportSummary {
     group_by: string | null;
     totals: ReportMeasures & { registered: number };
     rows: ReportRow[];
-}
-
-/**
- * One population's cell values in the breakdown table (ADR-0091).
- *
- * 🔴 All three counts are CHILDREN: how many competitors started, submitted,
- * had a mark published — never how many attempts did. The scores stay per
- * attempt, because a score has no other unit.
- */
-export interface ModeMeasures {
-    participants: number;
-    submitted: number;
-    published: number;
-    score: ScoreStats;
-}
-
-/**
- * A breakdown row: the contest and practice side by side, never added up — a
- * child who sat both is one child in each column.
- */
-export interface ReportSplitRow {
-    key: number | null;
-    label: string | null;
-    /** What identifies the row: its country, its category, its quiz and exam. */
-    sublabels: string[];
-    registered: number | null;
-    modes: { competition: ModeMeasures; sample: ModeMeasures };
-}
-
-export interface ReportBreakdown {
-    group_by: string | null;
-    rows: ReportSplitRow[];
 }
 
 export interface ReportFilterOptions {
@@ -129,17 +106,17 @@ export function reportSummary(query: ReportQuery) {
 }
 
 /**
- * The breakdown table's own request: both populations, and every member of the
- * dimension whether or not anybody sat it. Nothing else on the screen wants
- * either, which is why it asks separately (ADR-0091).
+ * The breakdown table's own request: every member of the dimension, whether or
+ * not anybody sat it. It counts the population the Test type names, like the
+ * rest of the screen (ADR-0093).
  */
 export function reportBreakdown(query: ReportQuery, groupBy: GroupBy) {
-    const params: Record<string, unknown> = { group_by: groupBy, split_modes: 1, all_members: 1 };
+    const params: Record<string, unknown> = { group_by: groupBy, all_members: 1 };
     for (const [k, v] of Object.entries(query)) {
         if (k !== 'group_by' && v !== null && v !== undefined && v !== '') params[k] = v;
     }
 
-    return http.get<ReportBreakdown>('/api/reports/summary', { params });
+    return http.get<ReportSummary>('/api/reports/summary', { params });
 }
 
 // --- Heatmap cross-tab (CC-12+) ---
@@ -147,6 +124,11 @@ export function reportBreakdown(query: ReportQuery, groupBy: GroupBy) {
 export interface MatrixAxis {
     key: number;
     label: string | null;
+    /**
+     * What identifies it — a level's category above all, since `level_short`
+     * repeats across categories and `BH` is otherwise two identical columns.
+     */
+    sublabels: string[];
 }
 
 export interface MatrixCell {

@@ -573,14 +573,16 @@ class ReportTest extends TestCase
     }
 
     /**
-     * The breakdown table answers the question the rest of the screen cannot: how
-     * the contest and practice did, beside each other.
+     * The breakdown counts the population the Test type names — and it counts
+     * CHILDREN, not attempts (ADR-0085): a child who sat five tests is one child
+     * in each of the three columns.
      *
-     * 🔴 Beside, never added. The counts are children (ADR-0085), and a child who
-     * sat both populations is one child in each column — a total would count them
-     * twice, which is the second half of why ADR-0084 keeps the two apart.
+     * 🔴 It showed both populations side by side for half a day (ADR-0091) and
+     * the owner asked for one: the table is read to compare countries or levels,
+     * and doubling every column to compare two populations nobody asked to
+     * compare there cost twelve columns for it (ADR-0093).
      */
-    public function test_the_breakdown_reports_both_populations_side_by_side_and_counts_children(): void
+    public function test_the_breakdown_follows_the_test_type_and_counts_children(): void
     {
         $contest = $this->content();
         $practice = $this->content();
@@ -597,46 +599,26 @@ class ReportTest extends TestCase
         $this->attempt($both, $practice, 'completed', 9.0, published: true);
         $this->attempt($this->registration(), $practice, 'completed', 7.0);
 
-        $row = $this->actingAs($this->admin())
-            ->getJson('/api/reports/summary?group_by=country&split_modes=1')
-            ->assertOk()->json('rows.0');
+        $row = fn (string $mode) => $this->actingAs($this->admin())
+            ->getJson("/api/reports/summary?group_by=country&mode={$mode}")->assertOk()->json('rows.0');
 
         // Two submitted contest attempts, one child.
-        $this->assertSame(1, $row['modes']['competition']['participants']);
-        $this->assertSame(1, $row['modes']['competition']['submitted']);
-        $this->assertSame(1, $row['modes']['competition']['published']);
-        $this->assertEquals(5.0, $row['modes']['competition']['score']['avg'], 'scores stay per attempt');
+        $contestRow = $row('competition');
+        $this->assertSame(1, $contestRow['participants']);
+        $this->assertSame(1, $contestRow['submitted_participants']);
+        $this->assertSame(1, $contestRow['published_participants']);
+        $this->assertEquals(5.0, $contestRow['score']['avg'], 'scores stay per attempt');
 
-        $this->assertSame(2, $row['modes']['sample']['participants']);
-        $this->assertSame(2, $row['modes']['sample']['submitted']);
-        $this->assertSame(1, $row['modes']['sample']['published']);
-        $this->assertEquals(8.0, $row['modes']['sample']['score']['avg']);
+        $practiceRow = $row('sample');
+        $this->assertSame(2, $practiceRow['participants']);
+        $this->assertSame(2, $practiceRow['submitted_participants']);
+        $this->assertSame(1, $practiceRow['published_participants']);
+        $this->assertEquals(8.0, $practiceRow['score']['avg']);
 
         // Registration belongs to the child, not to either population, so it is
-        // counted once and carries no split.
-        $this->assertSame(2, $row['registered']);
-        $this->assertArrayNotHasKey('submitted', $row, 'no summed column to misread');
-    }
-
-    /**
-     * The Counting filter picks one population for every number that can only be
-     * about one. The breakdown has a column for each, so it keeps showing both —
-     * otherwise choosing "The contest" would empty half the table it exists for.
-     */
-    public function test_the_breakdown_shows_practice_even_when_the_report_counts_the_contest(): void
-    {
-        $practice = $this->content();
-        $round = ExamRound::where('is_sample', true)->first()
-            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
-        $practice['exam']->update(['exam_round_id' => $round->id]);
-        $this->attempt($this->registration(), $practice, 'completed', 9.0);
-
-        $response = $this->actingAs($this->admin())
-            ->getJson('/api/reports/summary?group_by=country&split_modes=1&mode=competition')->assertOk();
-
-        $response->assertJsonPath('totals.submitted', 0)
-            ->assertJsonPath('rows.0.modes.competition.submitted', 0)
-            ->assertJsonPath('rows.0.modes.sample.submitted', 1);
+        // the same on both sides and never split.
+        $this->assertSame(2, $contestRow['registered']);
+        $this->assertSame(2, $practiceRow['registered']);
     }
 
     /**
@@ -650,22 +632,22 @@ class ReportTest extends TestCase
         $this->attempt($this->registration(), $this->content(), 'completed', 5.0);
 
         $rows = $this->actingAs($this->admin())
-            ->getJson('/api/reports/summary?group_by=level&split_modes=1&all_members=1')
+            ->getJson('/api/reports/summary?group_by=level&all_members=1')
             ->assertOk()->json('rows');
 
         $this->assertCount(DifficultyLevel::count(), $rows);
 
-        $sat = collect($rows)->firstWhere('modes.competition.submitted', 1);
+        $sat = collect($rows)->firstWhere('submitted_participants', 1);
         $this->assertNotNull($sat, 'the level that was sat');
 
-        $empty = collect($rows)->first(fn (array $r) => $r['modes']['competition']['submitted'] === 0);
+        $empty = collect($rows)->first(fn (array $r) => $r['submitted_participants'] === 0);
         $this->assertNotNull($empty, 'and the ones that were not');
-        $this->assertSame(0, $empty['modes']['sample']['submitted']);
-        $this->assertNull($empty['modes']['competition']['score']['avg']);
+        $this->assertSame(0, $empty['participants']);
+        $this->assertNull($empty['score']['avg']);
 
         // Without the flag the table is still only what the data holds.
         $this->assertCount(1, $this->actingAs($this->admin())
-            ->getJson('/api/reports/summary?group_by=level&split_modes=1')->assertOk()->json('rows'));
+            ->getJson('/api/reports/summary?group_by=level')->assertOk()->json('rows'));
     }
 
     /**
@@ -685,7 +667,7 @@ class ReportTest extends TestCase
         $this->attempt($this->registration($school), $content, 'completed', 5.0);
 
         $first = fn (string $dim) => $this->actingAs($this->admin())
-            ->getJson("/api/reports/summary?group_by={$dim}&split_modes=1")->assertOk()->json('rows.0');
+            ->getJson("/api/reports/summary?group_by={$dim}")->assertOk()->json('rows.0');
 
         $this->assertSame([$country->name], $first('region')['sublabels']);
         $this->assertSame([$country->name], $first('school')['sublabels']);
@@ -769,5 +751,37 @@ class ReportTest extends TestCase
         // And the tiles say the same as the screen's: no Void, and people beside attempts.
         $this->assertStringContainsString('Took part', $html);
         $this->assertStringNotContainsString('>Void<', $html);
+    }
+
+    /**
+     * 🔴 A level with no scores is a column, not an absence. The grid used to be
+     * built from the data alone, so a level nobody sat was simply not drawn — and
+     * a reader comparing levels cannot see a gap that is not there.
+     *
+     * 🪤 Each column carries its category, because `level_short` repeats across
+     * categories: `BH` is two different columns, and without the category it
+     * reads as the same column twice (ADR-0088).
+     */
+    public function test_the_heatmap_keeps_every_difficulty_level_on_its_axis(): void
+    {
+        $level = DifficultyLevel::where('level_short', 'H2')->firstOrFail();
+        $this->attempt($this->registration(), $this->content(), 'completed', 5.0);
+
+        $matrix = $this->actingAs($this->admin())
+            ->getJson('/api/reports/matrix?row_by=country&col_by=level')->assertOk()->json();
+
+        $this->assertCount(DifficultyLevel::count(), $matrix['cols']);
+
+        $sat = collect($matrix['cols'])->firstWhere('key', $level->id);
+        $this->assertSame($level->level_short, $sat['label']);
+        $this->assertSame([$level->category->name], $sat['sublabels']);
+
+        // The ones nobody sat are there, and simply have no cell.
+        $empty = collect($matrix['cols'])->first(fn (array $c) => $c['key'] !== $level->id);
+        $this->assertNotNull($empty);
+        $this->assertEmpty(collect($matrix['cells'])->where('col_key', $empty['key'])->all());
+
+        // Geography is not listed in full — only the countries that carry scores.
+        $this->assertCount(1, $matrix['rows']);
     }
 }
