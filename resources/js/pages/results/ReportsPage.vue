@@ -40,6 +40,8 @@ const q = reactive<ReportQuery>({
 
 const summary = ref<Awaited<ReturnType<typeof reportSummary>>['data'] | null>(null);
 const loading = ref(false);
+// The breakdown table reloads on its own when only its dimension changes.
+const breakdownLoading = ref(false);
 const optionsLoading = ref(false);
 const exporting = ref(false);
 const error = ref<string | null>(null);
@@ -100,6 +102,28 @@ async function loadSummary(): Promise<void> {
         error.value = t('reports.error');
     } finally {
         loading.value = false;
+    }
+}
+
+/**
+ * The dimension picker reloads its own table and nothing else — so the overlay
+ * belongs to that section, not to the page. Totals, rates and the funnel do not
+ * read `group_by` (they come from `totals`, which is computed ungrouped), and the
+ * heatmap and compare each carry their own dimension. Only `rows` are replaced,
+ * so the numbers above the table do not blink for a change they did not make.
+ */
+async function onGroupByChange(): Promise<void> {
+    breakdownLoading.value = true;
+    error.value = null;
+    try {
+        const { data } = await reportSummary(q);
+        summary.value = summary.value
+            ? { ...summary.value, group_by: data.group_by, rows: data.rows }
+            : data;
+    } catch {
+        error.value = t('reports.error');
+    } finally {
+        breakdownLoading.value = false;
     }
 }
 
@@ -496,7 +520,9 @@ onMounted(async () => {
             </div>
 
             <!-- Breakdown -->
-            <div>
+            <div class="relative">
+                <!-- Its own overlay: a new dimension redraws this table alone. -->
+                <LoadingOverlay v-if="breakdownLoading" />
                 <div class="mb-2 flex flex-wrap items-center gap-2">
                     <h2 class="text-sm font-semibold text-gray-700">{{ $t('reports.breakdown') }}</h2>
                     <!--
@@ -517,7 +543,7 @@ onMounted(async () => {
                         <span>{{ $t('reports.groupBy') }}</span>
                         <select v-model="q.group_by"
                             class="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-link focus:ring-brand-link"
-                            @change="loadSummary">
+                            @change="onGroupByChange">
                             <option :value="null">{{ $t('reports.groupNone') }}</option>
                             <option v-for="g in GROUPS" :key="g" :value="g">{{ groupLabel[g] }}</option>
                         </select>
