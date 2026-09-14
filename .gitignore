@@ -33,3 +33,6 @@ Thumbs.db
 *.zip
 /database/*.sqlite
 /docs/legacy-dump/
+
+# Load-test fixtures: session tokens, never committed
+/storage/app/loadtest
