@@ -2778,3 +2778,46 @@ deployment/storage/backup.
   a ocene rastu od 1.
 - `distribution()` zato više ne sortira u SQL-u nego prima **ključ za redosled** po koloni: nivoi
   dele istu rang-mapu sa filterom iznad, ocene idu numerički. Jedno pravilo, jedno mesto.
+
+## ADR-0090 — Nivoi u arhivi za runde 9–11: stara šema se čita po imenu, ne po id-u
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je pitao mogu li se difficulty levels izvući za stare sezone. Merenje je
+  pokazalo da je **polovina arhive bez nivoa** — r9 49 %, r10 51 %, r11 54 % — dok r13 nema rupa.
+
+### 🔴 Nije bilo nepotpuno nego pogrešno
+
+- Runde do 2023 imenuju nivo **kodom stare šeme**, a ne id-em iz `difficulty_category_levels` —
+  ta tabela je napravljena **11.2023**. Uvoz je spajao `dl.id = e.level`, što se **ne ruši**, nego
+  tiho odgovara pogrešno:
+
+  | Stari kod | Znači | Uvoz je upisao |
+  | --- | --- | --- |
+  | `1` | HIPPO 1 | **NULL** — id 1 ne postoji |
+  | `2` | HIPPO 2 | `BH` ❌ |
+  | `3` | HIPPO 3 | `LH` ❌ |
+  | `4` | HIPPO 4 | `H1` ❌ |
+  | `5` | HIPPO 5 | `H2` ❌ |
+  | `L1` · `Little` · `S10` · `S15` · `S19` | Little / Special | **NULL** |
+
+- Obim: **199.350 registracija** u r9–r11 — 103.376 praznih i **95.974 pogrešno označenih**, pomerenih
+  za dva nivoa naniže. Uz to je arhiva pripisivala **28.401 dete nivou `BH`, koji tada nije postojao**
+  (stara šema počinje od „Little").
+- Izvor mapiranja nije pogađanje: stoji u kodu starog sajta, `app/DifficultyLevel.php` i formular za
+  unos učenika. 🪤 Razred **ne** razrešava nivo — stara šema je išla po **godištu**, pa se svaka
+  vrednost prostire skoro celim opsegom razreda (`1` pokriva razrede 1–10).
+
+### Odluka
+
+- `L1`/`Little` → **LH**; `1`…`5` → **H1**…**H5**; `S10`/`S15`/`S19` **ostaju pod svojim imenima**
+  (vlasnik, 14.09): bile su definisane po godištu, a današnjih pet S-nivoa nisu iste tri grupe —
+  preimenovanje bi izmislilo preciznost koju arhiva nikad nije imala.
+- 🪤 **Šema se prepoznaje po tabeli, ne po redu.** `2` je legalno u obe i znači različit nivo, pa
+  jedna vrednost ne odlučuje ništa; prisustvo koda koji **samo** stara šema koristi (`L1`, `S10`…)
+  odlučuje sve. Opcija `--levels=legacy|current` postoji za slučaj da prepoznavanje ikad promaši.
+- Posle ponovnog uvoza r9–r11: **0 redova bez nivoa** (bilo 103.376), roster i rezultati nepromenjeni
+  do reda. Filter na Archive za te runde daje `LH · H1…H5 · S10 · S15 · S19` — stari kodovi padaju na
+  kraj po pravilu iz ADR-0089 za kod koji tabela nivoa više ne poznaje.
+- 🪤 **STAGE nema legacy izvor** (i ne treba da ga ima), a prazan nivo se **ne može rekonstruisati iz
+  same arhive** — pogrešna polovina je povratna pravilom, prazna nije. Zato ispravka na STAGE ide
+  kao prenos vrednosti sa dev-a, ne kao migracija.
