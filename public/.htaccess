@@ -35,7 +35,12 @@
     # A password is asked for everything except four openings, matched on the
     # raw request line:
     #
-    #   /.well-known/       the certificate renews over HTTP-01 in December
+    #   /.well-known/acme-challenge/
+    #                       the certificate renews over HTTP-01 in December.
+    #                       Only that one path: anything else under
+    #                       `/.well-known/` is not a real file, so it reaches
+    #                       the front controller and answers 200 with the SPA's
+    #                       own shell — an open door that renews nothing
     #   /api/student/       the competitor SPA sends `Authorization: Bearer`,
     #                       which REPLACES Basic — every exam call would be 401
     #   /manifest.webmanifest and /storage/branding/
@@ -57,7 +62,7 @@
     # `GET /api/student/../../login` matches the opening and is served from
     # somewhere else entirely. An opening is only as narrow as the path that
     # cannot escape it.
-    <If "%{THE_REQUEST} !~ m#^[A-Z]+ /(\.well-known/|api/student/|manifest\.webmanifest|storage/branding/)# || %{THE_REQUEST} =~ m#(\.\.|%2e|%2f|%5c)#i">
+    <If "%{THE_REQUEST} !~ m#^[A-Z]+ /(\.well-known/acme-challenge/|api/student/|manifest\.webmanifest|storage/branding/)# || %{THE_REQUEST} =~ m#(\.\.|%2e|%2f|%5c)#i">
         AuthType Basic
         AuthName "SOA HTC staging"
         AuthUserFile "/usr/www/users/dvpjdhdo/.htpasswd"
