@@ -3106,3 +3106,42 @@ to unutra: **8 neuspelih prijava/min po IP** (u kontroleru), **20/sat po broju t
 deset promašaja sa iste adrese → osam puta 422, pa **429**.
 🪤 Uspeh **ne briše** potrošene promašaje — skripta ne može da kupi nove pokušaje time što jednom
 pogodi između njih.
+
+## ADR-0098 — Penzionisan probni exam ostaje proba: status exam-a ne ulazi u to ŠTA je pokušaj bio
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je rekao „popravi taj exam Hippo S5 Sample" — kviz sa rečju *Sample* u imenu
+  stajao je u **takmičarskoj** tabeli sa 36 takmičara (ADR-0094 nalaz).
+- 🔴 **Exam nije bio pogrešno podešen.** Cela grana je **namerno penzionisana**: kviz #7, exam #7 i
+  testovi #12 i #14 su svi `inactive`, a **67 pokušaja (67 dece)** su stara probna sedanja. Aktivirati
+  ga značilo bi **vratiti ga deci na ekran** — a to niko nije tražio.
+- **Odluka:** pravilo se ispravlja, ne podatak. **Proba je ono što sedi u probnoj RUNDI**, bez obzira
+  na `exams.status`. Ono što je pokušaj **bio** ne menja se zato što je administrator posle pospremio.
+
+### Tri pisanja istog pravila, i ono koje je bilo tačno
+
+| gde | šta je zvalo probom |
+| --- | --- |
+| `SampleRound::testIds()` (Reports, Dashboard) | probna runda **+ `exams.status = active`** |
+| `AttemptGrader::inSampleRound()` | probna runda **+ `exams.status = active`** |
+| `ResultLedger` | **samo** probna runda ✅ |
+
+Ledger je te pokušaje već držao van takmičarskih rezultata, a izveštaj ih je brojao u takmičenje —
+**dva dela aplikacije o istih 67 pokušaja nisu se slagala.** Sada sva tri kažu isto.
+
+🪤 Komentar koji je branio `active` tvrdio je „nijedan exam danas nije neaktivan". **Dva jesu**
+(#7 „Hippo S5 Sample" i #8 „Proba H2 Semi") — brojka u komentaru je bila tačna kad je pisana i niko je
+posle nije proverio.
+
+- **`active` ostaje tamo gde mu je mesto** — u `SampleRound::idsOfType()` i u vidljivosti: šta se sme
+  **ponuditi** je drugo pitanje od toga šta nešto **jeste**.
+- **Izmereno posle:** takmičenje **145.780 → 145.713** predatih, proba **38.605 → 38.672**; tačno tih
+  67. U takmičarskoj tabeli kvizova ostaje **8 kvizova**, u probnoj **7** (šest aktivnih + penzionisani,
+  jer tamo njegovi pokušaji i pripadaju).
+
+### 🪤 Posledica koju je trebalo doterati istog trena
+
+Otkad red sadržaja ima **Registered** kroz nivoe (ADR-0095), **svaki kviz ima imenilac** — pa je
+seme redova iz `registered` vraćalo probne kvizove u takmičarsku tabelu, sa imeniocem i bez ijednog
+takmičara. To je tiho poništavalo ADR-0094. Redovi sadržaja se sada seju **iz pokušaja i iz spiska
+članova**, nikad iz imenioca; geografija i nivo, kojima je `registered` sama populacija, i dalje iz oba.
