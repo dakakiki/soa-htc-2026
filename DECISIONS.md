@@ -3030,3 +3030,45 @@ broji. ⚠️ Ako je to greška u podacima, popravlja se **na exam-u**, ne u izv
   ispod njega, opis ispod njih. **Isto i u PDF-u.**
 - ⚡ Razlog nije ukras: procenat se ovako **proverava**, i odmah se vidi kad su jedinice različite —
   56 % je ljudi/ljudi, a 100 % ispod njega je pokušaji/pokušaji.
+
+## ADR-0096 — Test opterećenja ispita: sintetički takmičari sa dva markera, generator na samom serveru
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO** (alat; merenja se vode odvojeno).
+- **Kontekst:** Vlasnik je tražio test **istovremenog pristupa ispitima za 100 · 300 · 500 · 1000 ·
+  3000 · 5000 takmičara na STAGE-u**, pred pitch.
+- **Odluka:** alat je u repou — `php artisan loadtest:students` pravi i briše sintetičke takmičare,
+  `node scripts/loadtest.mjs` vozi ispitni tok. Meri se **motor ispita**, ne prijava.
+
+### Zašto se prijava zaobilazi
+
+🔴 `POST /api/student/identify` je ograničen na **8 u minuti po IP adresi** (namerna brana protiv
+prolaska kroz listu datuma rođenja). Pet hiljada prijava sa jedne adrese nije test nego **dvonedeljno
+čekanje**, i vratilo bi 429. Sesije se zato **kuju u bazi** (isti `token_hash` kao pravi `identify`), a
+sama prijava se meri odvojeno, u malom rafalu ispod granice.
+
+🪤 **Isto važi za otključavanje kviza:** svaki kviz ima lozinku, a `unlock` je 8/min. Priprema upisuje
+otključanje u `student_session_quiz` — vrata se mere zasebno, ne u toku od 3000 ljudi.
+
+### Zašto se ovo sme pustiti na server sa pravim imenima
+
+Sve što alat napravi nosi **dva markera**: venue se zove po tagu, a broj takmičara počinje sa **`99`**
+— blok koji nijedna runda ne izdaje (pravi broj počinje rundom, `14…`). `--cleanup` briše **samo redove
+koji nose oba**, i **ostavlja venue** ako je u njemu ostalo nešto tuđe. Test to drži: pravo dete u istom
+venue-u preživi čišćenje.
+
+🪤 `sequence` je jedinstven po sezoni i pravi roster broji od 1, pa sintetički redovi kreću od
+**9.000.000** — inače prvi `insert` pada na duplikat.
+
+### Kako se meri
+
+- **Generator ide na samom STAGE serveru** (vlasnikova odluka): nema kućnog interneta u merenju i nema
+  rizika da hosting blokira adresu — ista mašina, 16 jezgara. ⚠️ Generator deli procesor sa
+  aplikacijom, pa su brojevi **konzervativni**.
+- Tok po takmičaru: `availability → start → otvaranje papira → predaja`, sa odgovorima onog oblika koji
+  ekran zaista šalje (`selected` · `gaps` · `text`).
+- ⚠️ **„Istovremeno" je ograničeno brojem web procesa** (30 na ovom zakupu): 3000 zahteva ne izvršava
+  se paralelno nego se **redi**. Zato se ne meri „da li puca", nego **p50/p95/p99, propusnost i greške**
+  — i gde počinje da se zasićuje.
+- 🪤 **Proba i takmičenje se ne ponašaju isto u predaji:** probni pokušaj se ocenjuje **u zahtevu**
+  (ADR-0082), takmičarski ide **u red** — pa kod takmičenja deo troška pada na `queue:work`, a ne na
+  web proces.
