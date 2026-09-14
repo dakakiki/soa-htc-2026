@@ -2518,9 +2518,10 @@ deployment/storage/backup.
   | `round` i `year` na žici | podnožje javnog sajta ih i dalje ispisuje |
 
 - **Podnožje ostaje nedirnuto** — isti red, `Round N · godina`, i sada vrh i dno govore istu stvar.
-- **Takmičarska ljuska (`StudentLayout`) ostaje bez trake uopšte** — vlasnikova odluka *„skloni i tamo"*.
-  Time je otpao i jedini razlog da ta ljuska zove `getSiteStatus`, pa je i taj zahtev uklonjen: jedan
-  poziv manje na svakom takmičarskom ekranu. Na samom ispitu trake ionako nije ni bilo (`bare: true`).
+- **Takmičarska ljuska (`StudentLayout`) nosi istu traku.** Vlasnik ju je prvo sklonio i tamo — ali ta
+  odluka je pala dok je traka još nosila „Live exams open"; čim je ostala bez izvedene tvrdnje, vratio ju je
+  (*„vrati traku i tamo"*). Isti podatak, ista komponenta, od `lg` naviše. Na samom ispitu je nema
+  (`bare: true`) — tamo ekran pripada pitanjima.
 - **Cena:** javna naslovna više ne govori posetiocu da li se ispiti polažu. To nije gubitak: nije ni
   mogla da kaže tačno za sve zemlje, a ko traži ispit ide na takmičarski ulaz, gde odgovor važi baš
   za njega.
