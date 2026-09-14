@@ -2658,11 +2658,44 @@ deployment/storage/backup.
   računa iz takmičenja — čime se dashboard i Reports izjednačavaju.
 - 🪤 **Nikad se ne sabiraju.** 15.420 dece je polagalo i jedno i drugo, pa zbir broji njih dvaput.
   Zato u prevodu stoji `{count} sat a sample` kao zasebna rečenica, a ne kao sabirak.
-- **Countries dobija podnaslov** `{count} with regions` — **28 od 69**. To je ono što kaže da li
-  izveštaj po regionu u toj zemlji uopšte ima smisla.
-  ⚡ Spisak zemalja koje imaju region čita se **jednom**, pa se koristi kao `IN (…)`; korelisani
-  `EXISTS` bi isto pitanje postavio 108.812 puta.
+- **Countries dobija podnaslov** `{count} regions took part` — **79**. Vlasnikova formulacija:
+  *„koliko ukupno regiona je imalo studente koji su radili competition."* Dakle **ne** koliko regiona
+  postoji, nego u koliko njih je neko stvarno izašao na takmičenje.
+
+  | | |
+  | --- | ---: |
+  | regiona u registru | 126 |
+  | regiona sa bilo kim na rosteru | 91 |
+  | **regiona sa takmičarem na ispitu** | **79** |
+
+  🪤 Venue bez regiona ne doprinosi ničim umesto da pravi `null` grupu — `region_id` je nullable.
+- 🪤 **Dva reda ispod „Sat the contest" nose podebljanu jednu reč** (`roster`, `sample`), i to kroz
+  `<i18n-t>` sa slotom umesto markupa u prevodu: rečenica ostaje cela za prevodioca, a reč koja kaže
+  **o kojoj populaciji je red** može da se izdvoji. Isti obrazac koji `RegisterPage` već koristi.
 - 🪤 **Granica je izvučena u `SampleRound`** i sada se piše na jednom mestu. Reports je jutros dobio
   sopstvenu kopiju tog join-a i pri tom **ispustio `exams.status = 'active'`** — što `ResultLedger` i
   `AttemptGrader` oba imaju. Ništa nije puklo jer nijedan ispit danas nije neaktivan; upravo tako
   četvrti prepis istog pravila i prođe nezapaženo.
+
+## ADR-0087 — Mapa i tabela zemalja govore isto što i pločice: takmičenje i proba odvojeno
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Posle ADR-0086 pločice su razdvajale probu od takmičenja, ali **mapa i tabela zemalja
+  nisu** — njihov `turnout` je i dalje bio „ko je predao bilo šta". Vlasnik je tražio da prozor na
+  mapi i tabela nose isti rastav.
+- **Prozor na mapi** sada nosi: ime zemlje · **Regions** · **Venues** · **Students** · **Competition**
+  sa učešćem · **Sample** sa učešćem.
+- **Tabela zemalja** dobija dve kolone umesto jedne `Turnout`: `Competition` i `Sample`, svaka kao
+  **broj · procenat roster-a**.
+- 🔴 **Oba broja su UNIQUE takmičari, ne pokušaji** — isti fold po `registration_id`
+  (`max(submitted_at is not null and …)`) koji je i pre koristila mapa. Dete koje je polagalo tri
+  testa uđe jednom. Zato Srbija ima 4.376 a ne oko 8.700.
+- 🪤 **Isti imenilac, nikad zbir.** Oba procenta se dele **celim roster-om** te zemlje, i ne sabiraju
+  se međusobno: dete može da polaže oboje (15.420 ih jeste).
+- **Šta se odmah videlo, a ranije se nije moglo:** Rusija je radila **više probu (63 %) nego
+  takmičenje (33 %)**, a Mongolija **samo probu** (1.005 naspram 0). Pod jednim zbirnim `turnout`-om
+  te dve zemlje su izgledale kao da su izašle na takmičenje.
+- 🪤 `published` je takođe sveden na **takmičenje** — proba se objavljuje sama, pa bi inače dizala
+  stopu objave po zemlji na isti način na koji je dizala naslovnu (ADR-0084).
+- 🪤 **Procenti u prozoru su bili napisani belim na belom** (`text-white/60`) — nevidljivi. Prozor
+  je beo; sada su sivi. Uhvaćeno na ekranu, ne u kodu.

@@ -167,8 +167,8 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                     <div v-if="kpis.countries !== null" :class="card">
                         <div class="text-xs uppercase tracking-wide text-gray-500">{{ $t('dashboard.kpi.countries') }}</div>
                         <div class="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{{ kpis.countries }}</div>
-                        <div v-if="kpis.countries_with_regions !== null" class="text-xs text-gray-500">
-                            {{ $t('dashboard.kpi.withRegions', { count: kpis.countries_with_regions }) }}
+                        <div v-if="kpis.regions_in_contest !== null" class="text-xs text-gray-500">
+                            {{ $t('dashboard.kpi.regionsInContest', { count: kpis.regions_in_contest }) }}
                         </div>
                     </div>
 
@@ -181,12 +181,20 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                     <div :class="card">
                         <div class="text-xs uppercase tracking-wide text-gray-500">{{ $t('dashboard.kpi.submitted') }}</div>
                         <div class="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{{ kpis.submitted.toLocaleString() }}</div>
-                        <div v-if="turnout" class="text-xs text-gray-500">{{ $t('dashboard.kpi.turnout', { pct: turnout }) }}</div>
+                        <!-- `<i18n-t>` rather than `$t`, for the same reason the
+                             register screen uses it: the one word that says which
+                             population the line is about has to be an element to
+                             be set apart, and `$t` gives back one flat string. -->
+                        <i18n-t v-if="turnout" keypath="dashboard.kpi.turnout" tag="div" class="text-xs text-gray-500">
+                            <template #pct>{{ turnout }}</template>
+                            <template #roster><strong class="font-semibold text-gray-700">{{ $t('dashboard.kpi.turnoutWord') }}</strong></template>
+                        </i18n-t>
                         <!-- 🪤 Beside it, never added to it: 15.420 children sat
                              both, so a sum of the two counts them twice. -->
-                        <div class="text-xs text-gray-500">
-                            {{ $t('dashboard.kpi.alsoPractice', { count: kpis.submitted_practice.toLocaleString() }) }}
-                        </div>
+                        <i18n-t keypath="dashboard.kpi.alsoPractice" tag="div" class="text-xs text-gray-500">
+                            <template #count>{{ kpis.submitted_practice.toLocaleString() }}</template>
+                            <template #sample><strong class="font-semibold text-gray-700">{{ $t('dashboard.kpi.alsoPracticeWord') }}</strong></template>
+                        </i18n-t>
                     </div>
 
                     <!-- Absentees only mean something inside one's own roster. -->
@@ -247,13 +255,18 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                                     <th :class="th">{{ $t('dashboard.tables.country') }}</th>
                                     <th :class="[th, 'text-right']">{{ $t('dashboard.tables.studentsCol') }}</th>
                                     <th :class="[th, 'text-right']">{{ $t('dashboard.tables.venuesCol') }}</th>
-                                    <th :class="[th, 'text-right']">{{ $t('dashboard.tables.turnout') }}</th>
+                                    <!-- How many of those students sat each, and what
+                                         share of the roster that is. 🪤 Two columns
+                                         rather than one turnout, and never a sum:
+                                         a child can sit both (ADR-0086). -->
+                                    <th :class="[th, 'text-right']">{{ $t('dashboard.tables.competition') }}</th>
+                                    <th :class="[th, 'text-right']">{{ $t('dashboard.tables.sample') }}</th>
                                     <th :class="[th, 'text-right']">{{ $t('dashboard.tables.published') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 <tr v-for="n in (countriesLoading ? 10 : 0)" :key="`skeleton-${n}`">
-                                    <td colspan="5" class="px-4 py-2">
+                                    <td colspan="6" class="px-4 py-2">
                                         <div class="h-4 animate-pulse rounded bg-gray-100"></div>
                                     </td>
                                 </tr>
@@ -264,7 +277,14 @@ const card = 'rounded-lg border border-gray-200 bg-white p-4';
                                     </td>
                                     <td :class="[td, 'text-right']">{{ row.students.toLocaleString() }}</td>
                                     <td :class="[td, 'text-right']">{{ row.venues.toLocaleString() }}</td>
-                                    <td :class="[td, 'text-right']">{{ pct(row.submitted, row.students) }}</td>
+                                    <td :class="[td, 'text-right']">
+                                        {{ row.submitted.toLocaleString() }}
+                                        <span class="text-gray-400">· {{ pct(row.submitted, row.students) }}</span>
+                                    </td>
+                                    <td :class="[td, 'text-right']">
+                                        {{ row.submitted_practice.toLocaleString() }}
+                                        <span class="text-gray-400">· {{ pct(row.submitted_practice, row.students) }}</span>
+                                    </td>
                                     <td :class="[td, 'text-right']">{{ pct(row.published, row.submitted) }}</td>
                                 </tr>
                             </tbody>

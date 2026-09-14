@@ -65,10 +65,16 @@ export default {
             venuesActive: 'Active venues',
             // 🪤 The contest, and practice beside it — never summed (ADR-0086).
             submitted: 'Sat the contest',
-            alsoPractice: '{count} sat a sample',
+            // `{sample}` and `{roster}` are slots rather than words in the string:
+            // the sentence stays whole for a translator, and the one word that
+            // says WHICH population this line is about can be set in bold.
+            alsoPractice: '{count} sat a {sample}',
+            alsoPracticeWord: 'sample',
             absent: 'Absent',
-            withRegions: '{count} with regions',
-            turnout: '{pct} of the roster',
+            // Regions that had somebody sit the contest — not how many exist.
+            regionsInContest: '{count} regions took part',
+            turnout: '{pct} of the {roster}',
+            turnoutWord: 'roster',
             vsPreviousRound: '{delta} vs previous round',
             inVenues: 'in {count} venues',
             ofRegister: 'of {count} in the register',
@@ -113,6 +119,10 @@ export default {
             city: 'City',
             studentsCol: 'Students',
             venuesCol: 'Venues',
+            // 🪤 Each column is «how many sat it · what share of the roster», and
+            // the two are never added: a child can sit both (ADR-0086).
+            competition: 'Competition',
+            sample: 'Sample',
             turnout: 'Turnout',
             published: 'Published',
             absent: 'Absent',
@@ -133,8 +143,13 @@ export default {
         },
         map: {
             title: 'Students by country',
+            regions: 'Regions',
             students: 'Students',
             venues: 'Venues',
+            // 🪤 Two populations against the same roster, never added to each
+            // other: a child can sit both (ADR-0086).
+            competition: 'Competition',
+            sample: 'Sample',
             turnout: 'turnout',
             legend: 'Students:',
             none: 'no students',

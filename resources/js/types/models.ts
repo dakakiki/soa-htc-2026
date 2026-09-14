@@ -493,9 +493,15 @@ export interface CountryMapRow {
     /** The country row behind it — the table links with this. */
     id: number;
     name: string;
+    regions: number;
     students: number;
     venues: number;
+    /**
+     * Competitors who sat the CONTEST, and beside it those who sat a sample —
+     * counted apart and never added, the same as the tiles above (ADR-0086).
+     */
     submitted: number;
+    submitted_practice: number;
     published: number;
 }
 
@@ -543,8 +549,8 @@ export interface DashboardData {
         absent: number;
         /** Null for a scoped account: one country is not a statistic. */
         countries: number | null;
-        /** How many of those countries are broken into regions. */
-        countries_with_regions: number | null;
+        /** How many regions had a competitor sit the CONTEST (ADR-0086). */
+        regions_in_contest: number | null;
         venues_active: number | null;
         students_previous_round: number | null;
     };

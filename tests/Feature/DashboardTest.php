@@ -345,19 +345,26 @@ class DashboardTest extends TestCase
         $this->assertSame(1, $kpis['submitted_practice'], 'practice, beside it');
     }
 
-    /** How many of the countries on the roster are broken into regions. */
-    public function test_the_countries_tile_says_how_many_of_them_have_regions(): void
+    /** How many regions had a competitor sit the contest — not how many exist. */
+    public function test_the_countries_tile_counts_the_regions_that_took_part(): void
     {
         $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $school = School::whereNotNull('region_id')->firstOrFail();
+        $registration = $this->competitor('14606060', 606060);
+        $registration->update(['school_id' => $school->id, 'country_id' => $school->country_id]);
 
-        $kpis = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.kpis');
+        // A region with nobody sitting anything is not a region that took part.
+        $this->assertSame(0, $this->actingAs($admin)->getJson('/api/dashboard')->json('data.kpis.regions_in_contest'));
 
-        $expected = Country::whereHas('regions')
-            ->whereIn('id', Registration::query()->select('country_id'))
-            ->count();
+        $quiz = Quiz::create(['title' => 'Region quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+        $test = Test::create(['title' => 'Region test', 'status' => 'active']);
+        Attempt::create([
+            'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+            'is_practice' => false, 'status' => 'completed', 'grading_status' => 'auto_graded',
+            'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+        ]);
 
-        $this->assertSame($expected, $kpis['countries_with_regions']);
-        $this->assertLessThanOrEqual($kpis['countries'], $kpis['countries_with_regions']);
+        $this->assertSame(1, $this->actingAs($admin)->getJson('/api/dashboard')->json('data.kpis.regions_in_contest'));
     }
 
     /**
