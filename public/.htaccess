@@ -32,10 +32,8 @@
 # thing a hand-edit on the server does not.
 <IfFile "/usr/www/users/dvpjdhdo/.htpasswd">
 
-    # 🪤 The exceptions are matched on THE_REQUEST, not on REQUEST_URI. The
-    # front-controller rule above rewrites the path to `index.php`, authorisation
-    # is settled over the *rewritten* one, and the raw request line is the only
-    # thing that survives the rewrite.
+    # A password is asked for everything except four openings, matched on the
+    # raw request line:
     #
     #   /.well-known/       the certificate renews over HTTP-01 in December
     #   /api/student/       the competitor SPA sends `Authorization: Bearer`,
@@ -43,22 +41,26 @@
     #   /manifest.webmanifest and /storage/branding/
     #                       a browser fetches both without credentials, and
     #                       without both of them it offers no install (ADR-0073)
-    SetEnvIf THE_REQUEST "^[A-Z]+ /\.well-known/" NOAUTH
-    SetEnvIf THE_REQUEST "^[A-Z]+ /api/student/" NOAUTH
-    SetEnvIf THE_REQUEST "^[A-Z]+ /manifest\.webmanifest" NOAUTH
-    SetEnvIf THE_REQUEST "^[A-Z]+ /storage/branding/" NOAUTH
-
-    # ...and withdrawn the moment the request line could walk out of the prefix
-    # it was let in by. `GET /api/student/../../` matches the exception above and
-    # is served from somewhere else entirely; the four openings are prefixes, and
-    # a prefix is only as narrow as the path that cannot escape it.
-    SetEnvIfNoCase THE_REQUEST "(\.\.|%2e|%2f|%5c)" !NOAUTH
-
-    AuthType Basic
-    AuthName "SOA HTC staging"
-    AuthUserFile "/usr/www/users/dvpjdhdo/.htpasswd"
-    <RequireAny>
-        Require env NOAUTH
+    #
+    # 🪤 THE_REQUEST, not REQUEST_URI: the front-controller rule above rewrites
+    # the path to `index.php` and authorisation is settled over the *rewritten*
+    # one, so REQUEST_URI reads `/index.php` for every request that matters.
+    #
+    # 🪤 And `<If>`, not `SetEnvIf`: THE_REQUEST is a variable of mod_rewrite and
+    # of the expression parser, and is not one of the attribute names SetEnvIf
+    # knows. A name SetEnvIf does not recognise it looks for among the request
+    # *headers* — so `SetEnvIf THE_REQUEST` matches nothing, quietly, and every
+    # opening stays shut. Measured on the server, not reasoned about.
+    #
+    # 🔴 The second half of the condition asks for the password back the moment
+    # the request line could walk out of the prefix it was let in by:
+    # `GET /api/student/../../login` matches the opening and is served from
+    # somewhere else entirely. An opening is only as narrow as the path that
+    # cannot escape it.
+    <If "%{THE_REQUEST} !~ m#^[A-Z]+ /(\.well-known/|api/student/|manifest\.webmanifest|storage/branding/)# || %{THE_REQUEST} =~ m#(\.\.|%2e|%2f|%5c)#i">
+        AuthType Basic
+        AuthName "SOA HTC staging"
+        AuthUserFile "/usr/www/users/dvpjdhdo/.htpasswd"
         Require valid-user
-    </RequireAny>
+    </If>
 </IfFile>

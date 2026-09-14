@@ -2447,9 +2447,17 @@ deployment/storage/backup.
 - 🪤 **Izuzeci se poklapaju nad `THE_REQUEST`, ne nad `REQUEST_URI`.** `RewriteRule ^ index.php`
   prepisuje putanju, a dozvola se rešava nad **prepisanom** — pa `REQUEST_URI` i `REDIRECT_URL`
   pokazuju `/index.php` za svaki zahtev. Sirova linija zahteva je jedino što prepisivanje preživi.
-- 🔴 **A prefiks je širok koliko i putanja koja iz njega može da iskoči.** `GET /api/student/../../`
-  poklapa izuzetak, a servira se sa sasvim drugog mesta — dakle **bez lozinke**. Zato se `NOAUTH`
-  odmah i **oduzima** svakoj liniji zahteva koja nosi `..`, `%2e`, `%2f` ili `%5c`. Bez tog reda
+- 🪤 **I to kroz `<If>`, ne kroz `SetEnvIf` — prva verzija je baš tu pala.** `THE_REQUEST` je
+  promenljiva `mod_rewrite`-a i parsera izraza, a **nije** među imenima koja `SetEnvIf` poznaje;
+  ime koje ne prepozna on traži među **zaglavljima zahteva**. `SetEnvIf THE_REQUEST` zato ne
+  poklapa ništa — **tiho**, bez greške u logu — pa su sva četiri izuzetka ostala zatvorena.
+  Izmereno na serveru: manifest, ikona, `/.well-known/` i `/api/student/` vraćali su **401**,
+  isto kao i `/login`. Da se nije merilo, otišlo bi u `main` kao „radi".
+  🪤 `mod_rewrite` sa `[E=…]` ovde ne pomaže: per-directory prepisivanje ide u **fixup** fazi,
+  posle provere dozvole. `<If>` se računa u obilasku direktorijuma, dakle **pre** nje.
+- 🔴 **A prefiks je širok koliko i putanja koja iz njega može da iskoči.** `GET /api/student/../../login`
+  poklapa izuzetak, a servira se sa sasvim drugog mesta — dakle **bez lozinke**. Zato drugi deo uslova
+  lozinku **vraća** svakoj liniji zahteva koja nosi `..`, `%2e`, `%2f` ili `%5c`. Bez tog dela
   četiri izuzetka nisu izuzeci nego rupa.
 - **Zašto u repou, a ne rukom na serveru.** Deploy je `git pull`, a `public/.htaccess` je praćen
   fajl: ručna izmena gore preživi tačno do prvog `pull`-a koji takne taj fajl, i to u najgorem
