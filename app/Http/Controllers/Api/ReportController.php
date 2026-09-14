@@ -202,12 +202,20 @@ class ReportController extends Controller
         $scope = $this->filterSummary($f);
 
         $pct = fn (int $n, int $d): string => $d > 0 ? round($n / $d * 100).'%' : '—';
-        $participation = $pct((int) $t['started'], (int) $t['registered']);
+        /*
+         * 🔴 People over people, as on the screen (ADR-0085). This line kept the
+         * old division after the screen stopped using it, so the printed report —
+         * the one that reaches a client — went on saying **134%** where the page
+         * said 56%: `started` counts attempts and a child sits several tests.
+         */
+        $participation = $pct((int) $t['participants'], (int) $t['registered']);
         $completion = $pct((int) $t['submitted'], (int) $t['started']);
         $publish = $pct((int) $t['published'], (int) $t['submitted']);
 
         $totCells = '';
-        foreach ([['Registered', $t['registered'], '#111827'], ['Started', $t['started'], '#111827'], ['Submitted', $t['submitted'], '#111827'], ['Published', $t['published'], '#059669'], ['Void', $t['void'], '#d97706']] as [$label, $val, $color]) {
+        // The same five tiles the screen shows, in the same order. Void left both
+        // (owner, 14.09): an administrator's reset is not a stage of the contest.
+        foreach ([['Registered', $t['registered'], '#111827'], ['Took part', $t['participants'], '#111827'], ['Started', $t['started'], '#111827'], ['Submitted', $t['submitted'], '#111827'], ['Published', $t['published'], '#059669']] as [$label, $val, $color]) {
             $totCells .= '<td width="20%" style="border:0.6pt solid #e5e7eb;padding:6px;">'
                 .'<div style="font-size:7pt;color:#6b7280;">'.$label.'</div>'
                 .'<div style="font-size:15pt;font-weight:bold;color:'.$color.';">'.$val.'</div></td>';
@@ -289,13 +297,14 @@ class ReportController extends Controller
 
                 <h3 style="font-size:10pt;margin:6px 0 4px;page-break-after:avoid;">Rates</h3>
                 <table width="100%" cellspacing="0" cellpadding="0"><tr>
-                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PARTICIPATION</div><div style="font-size:13pt;font-weight:bold;">{$participation}</div><div style="font-size:7pt;color:#9ca3af;">Started / Registered</div></td>
+                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PARTICIPATION</div><div style="font-size:13pt;font-weight:bold;">{$participation}</div><div style="font-size:7pt;color:#9ca3af;">Competitors who started / Registered</div></td>
                     <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">COMPLETION</div><div style="font-size:13pt;font-weight:bold;">{$completion}</div><div style="font-size:7pt;color:#9ca3af;">Submitted / Started</div></td>
                     <td width="34%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PUBLISH RATE</div><div style="font-size:13pt;font-weight:bold;">{$publish}</div><div style="font-size:7pt;color:#9ca3af;">Published / Submitted</div></td>
                 </tr></table>
 
                 <h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Participation funnel</h3>
                 <table width="100%" cellspacing="0" cellpadding="0">{$funnel}</table>
+                <div style="font-size:7pt;color:#6b7280;margin:3px 0 0;">Registered counts competitors; Started, Submitted and Published count attempts &mdash; a competitor sits several tests, so those bars can pass 100%.</div>
 
                 {$breakdown}
 

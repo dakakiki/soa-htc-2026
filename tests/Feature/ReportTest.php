@@ -9,6 +9,7 @@ use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\ReportSummary;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Country;
@@ -16,9 +17,11 @@ use App\Domain\Organization\Models\Region;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
+use App\Http\Controllers\Api\ReportController;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -730,5 +733,41 @@ class ReportTest extends TestCase
 
         $this->assertContains($both['quiz']->id, $ids('/api/reports/filters?mode=competition'));
         $this->assertContains($both['quiz']->id, $ids('/api/reports/filters?mode=sample'));
+    }
+
+    /**
+     * 🔴 The printed report is the one that reaches a client, and it went on
+     * dividing attempts by children long after the screen stopped: `started`
+     * counts attempts and a child sits several tests. Here one child of two sat
+     * two tests, so the page says **50%** and the old PDF said **100%** — on the
+     * real population, 56% against 134% (ADR-0085).
+     *
+     * 🪤 Asserted on the HTML the PDF is built from — the PDF itself is
+     * compressed, which is how this survived a test that only checked its status
+     * and its header.
+     */
+    public function test_the_printed_participation_counts_children_like_the_screen(): void
+    {
+        $twice = $this->registration();
+        $this->attempt($twice, $this->content(), 'completed', 5.0);
+        $this->attempt($twice, $this->content(), 'completed', 7.0);
+        $this->registration();
+
+        $data = ReportSummary::build(['season_id' => $this->seasonId, 'mode' => 'competition']);
+
+        $method = new ReflectionMethod(ReportController::class, 'reportHtml');
+        $html = $method->invoke(new ReportController, $data, ['mode' => 'competition']);
+
+        // 🪤 Read the participation tile itself, not any "50%" on the page: the
+        // completion rate beside it is legitimately 100%, and the funnel prints
+        // percentages of its own.
+        $this->assertMatchesRegularExpression(
+            '/PARTICIPATION<\/div><div[^>]*>50%</',
+            $html,
+            'one of two children took part; the old division read 100%',
+        );
+        // And the tiles say the same as the screen's: no Void, and people beside attempts.
+        $this->assertStringContainsString('Took part', $html);
+        $this->assertStringNotContainsString('>Void<', $html);
     }
 }
