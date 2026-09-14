@@ -6,7 +6,6 @@ import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
 import { getPublicLayout, getSiteStatus } from '@/api/publicContent';
 import PublicMenuLink from '@/components/PublicMenuLink.vue';
-import SiteStatusStrip from '@/components/public/SiteStatusStrip.vue';
 import type { PublicMenu, SiteStatus } from '@/types/models';
 
 /** One link column of the footer, as the footer block stores it. */
@@ -180,9 +179,16 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
 
 <template>
     <div class="flex min-h-screen flex-col bg-[#fbfaf8] text-brand-palette-4">
-        <!-- Which round, and whether it can be entered. Shared with the
-             competitor shell, which shows the same strip over the same data. -->
-        <SiteStatusStrip :site="site" />
+        <!-- 🪤 No status strip over the masthead (ADR-0081). It said "Live exams
+             open" from one fact — that some competition quiz is active — and on
+             a page every country reads, that is the mistake ADR-0077 already
+             removed the round's NAME for: the client's countries sit on
+             different rounds at the same time, so one sentence about whether
+             exams are open is wrong for about half of them. The edition still
+             prints in the footer, where it claims nothing about entry.
+             🪤 `StudentLayout` still mounts the strip, so the same sentence is
+             still on screen for a competitor who has identified — the owner
+             asked for the public site, and that shell was not part of it. -->
 
         <header class="border-b border-brand-palette-4/12">
             <div class="mx-auto flex h-[78px] w-full max-w-[1240px] items-center gap-10 px-6">

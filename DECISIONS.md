@@ -2473,3 +2473,37 @@ deployment/storage/backup.
   Za STAGE je to prihvaćeno; na produkciji se blok ionako ne izvršava.
 - **`robots.txt` se ne dira.** Iza 401 nema šta da indeksira, a fajl je zajednički sa produkcijom,
   gde javni sajt **treba** da bude indeksiran.
+
+## ADR-0081 — Javna naslovna ne tvrdi da su ispiti otvoreni (nastavak ADR-0077)
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je 14.09 na STAGE-u video da traka iznad zaglavlja kaže **„Live exams open"**,
+  i prijavio da to nije istina — uz tačnu primedbu da u adminu **nema obeležavanja aktuelne runde**,
+  jer je ADR-0077 to i uklonio.
+- **Traka nije ni čitala rundu.** Čitala je jednu činjenicu — `EntryWindow::competitionOpen()`,
+  dakle *postoji li ijedan kviz tipa `competition` sa `status = active`*.
+- **Izmereno nad bazom koja stoji i na STAGE-u:** **osam** aktivnih takmičarskih kvizova (Baby Hippo,
+  Hippo Little, Hippo 1–5, S5) i **svih osam ima lozinku**. Rečenica je dakle stajala na istinitoj
+  činjenici, ali je tvrdila više od nje: ispiti su **objavljeni**, nisu **prohodni** — bez lozinke
+  od dežurnog niko ne ulazi.
+- 🔴 **A ispod toga je ista greška zbog koje je ADR-0077 sklonio ime runde.** Klijentove zemlje
+  istovremeno sede na različitim rundama, pa je jedno ime bilo netačno za otprilike pola njih.
+  Tačka „otvoreno/zatvoreno" je **jedna globalna tvrdnja o takmičenju koje nije globalno** — ista
+  mana, samo je preživela čistku, jer je čistka gledala ime a ne tvrdnju pored njega.
+- **Odluka:** traka se **uklanja sa javne naslovne** (`PublicLayout`). Ništa je ne zamenjuje.
+- **Šta ostaje i zašto:**
+
+  | Gde | Ostaje | Zašto |
+  | --- | --- | --- |
+  | Podnožje javnog sajta | izdanje (`Round N · godina`) | ne tvrdi ništa o ulasku |
+  | Takmičarska ljuska (`StudentLayout`) | cela traka | ⚠️ vlasnik je tražio **javni deo**, a ta ljuska nije bila u pitanju |
+  | `EntryWindow` i `competition_open` na žici | nedirnuto | `StudentAccessFormPage` time gasi takmičarski ulaz van sezone (ADR-0043) — to je poseban posao i on je tačan |
+
+- ⚠️ **Ista rečenica je i dalje na ekranu** takmičaru koji se identifikovao — `StudentLayout` nosi traku
+  na **takmičarskoj naslovnoj** (`/student`) i na **rezultatima** (`/student/results`), od `lg` naviše.
+  Na samom ispitu ne (`bare: true`). Ulazna forma (`/student/access/…`) je u javnoj zoni, pa je tamo
+  traka pala zajedno sa ovom izmenom. 🪤 Ne tvrditi da je tamo „tačnija" — podatak je ista globalna
+  zastavica; razlika je samo u tome što odluka o toj ljusci **nije donesena**.
+
+- **Cena:** javna naslovna više ne govori posetiocu da li se ispiti polažu. To nije gubitak: nije ni
+  mogla da kaže tačno, a ko traži ispit ide na takmičarski ulaz, gde odgovor važi baš za njega.
