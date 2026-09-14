@@ -13,9 +13,12 @@ import { useI18n } from 'vue-i18n';
 export interface CountryMapRow {
     iso: number;
     name: string;
+    regions: number;
     students: number;
     venues: number;
+    /** Competitors — the contest and practice apart, never added (ADR-0086). */
     submitted: number;
+    submitted_practice: number;
 }
 
 const props = defineProps<{ rows: CountryMapRow[] }>();
@@ -89,8 +92,15 @@ function onMove(event: MouseEvent): void {
     hover.value = { ...hover.value, x: event.clientX - box.left, y: event.clientY - box.top };
 }
 
-const turnout = (row: CountryMapRow): string =>
-    row.students === 0 ? '—' : `${Math.round((row.submitted / row.students) * 100)}%`;
+/**
+ * Share of this country's roster, counted as competitors.
+ *
+ * 🪤 Each population against the SAME denominator — everybody registered — and
+ * never against each other. 15.420 children sat both, so the two shares do not
+ * add to a third one (ADR-0086).
+ */
+const share = (part: number, students: number): string =>
+    students === 0 ? '—' : `${Math.round((part / students) * 100)}%`;
 
 onMounted(async () => {
     try {
@@ -139,9 +149,22 @@ onMounted(async () => {
 
             <!-- Tooltip rides the pointer inside the map box. -->
             <div v-if="hover" class="tip" :style="{ left: `${hover.x}px`, top: `${hover.y}px` }">
-                <p class="font-medium">{{ hover.row.name }}</p>
-                <p>{{ t('dashboard.map.students') }}: <b>{{ n(hover.row.students) }}</b></p>
-                <p>{{ t('dashboard.map.venues') }}: {{ n(hover.row.venues) }} · {{ t('dashboard.map.turnout') }}: {{ turnout(hover.row) }}</p>
+                <p class="name">{{ hover.row.name }}</p>
+                <p>{{ t('dashboard.map.regions') }}: {{ n(hover.row.regions) }}</p>
+                <p>{{ t('dashboard.map.venues') }}: {{ n(hover.row.venues) }}</p>
+                <!-- The roster and what was done with it belong together, and
+                     apart from the register above them: regions and venues are
+                     the country's shape, these three are its contest. -->
+                <p class="roster">{{ t('dashboard.map.students') }}: <b>{{ n(hover.row.students) }}</b></p>
+                <!-- Two populations, one denominator, no sum: see `share`. -->
+                <p>
+                    {{ t('dashboard.map.competition') }}: {{ n(hover.row.submitted) }}
+                    <span class="muted">· {{ share(hover.row.submitted, hover.row.students) }} {{ t('dashboard.map.turnout') }}</span>
+                </p>
+                <p>
+                    {{ t('dashboard.map.sample') }}: {{ n(hover.row.submitted_practice) }}
+                    <span class="muted">· {{ share(hover.row.submitted_practice, hover.row.students) }} {{ t('dashboard.map.turnout') }}</span>
+                </p>
             </div>
 
             <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
@@ -194,4 +217,10 @@ onMounted(async () => {
     border-radius: 6px; box-shadow: 0 6px 20px -8px rgba(13, 36, 48, .35);
     padding: 8px 10px; font-size: 12px; line-height: 1.45; white-space: nowrap; color: #1f2937;
 }
+
+/* The country and its roster carry the box; the rest is detail around them. */
+.tip .name { font-size: 14px; font-weight: 600; }
+.tip .roster { margin-top: 7px; font-size: 13px; }
+/* 🪤 Grey, not white: this tooltip is on white paper. */
+.tip .muted { color: #9ca3af; }
 </style>

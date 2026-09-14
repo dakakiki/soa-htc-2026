@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Assessment\Models\Exam;
+use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Attempt;
@@ -297,6 +299,72 @@ class DashboardTest extends TestCase
         $this->assertNotNull($country);
         $this->assertSame(1, $country['submitted']);
         $this->assertSame(1, $country['published']);
+    }
+
+    /**
+     * The tile is about the contest, and practice stands beside it.
+     *
+     * Counted together it read 65.930 on the real roster, and the «of the
+     * roster» line under it said 61% while the Reports screen answered the same
+     * question with 56% (ADR-0085). They are not a partition either: 15.420
+     * children sat both, so the two are never added (ADR-0086).
+     */
+    public function test_sitting_the_contest_and_sitting_a_sample_are_counted_apart(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $round = ExamRound::where('is_sample', true)->first()
+            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
+
+        $quiz = Quiz::create(['title' => 'Split quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+
+        $sit = function (string $number, int $seq, bool $practice) use ($quiz, $round) {
+            $registration = $this->competitor($number, $seq);
+            $test = Test::create(['title' => 'T'.$number, 'status' => 'active']);
+            $exam = Exam::create(['title' => 'E'.$number, 'status' => 'active']);
+            if ($practice) {
+                $exam->update(['exam_round_id' => $round->id]);
+            }
+            $exam->tests()->attach($test->id, ['position' => 1]);
+
+            Attempt::create([
+                'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+                'is_practice' => $practice, 'status' => 'completed', 'grading_status' => 'auto_graded',
+                'score' => 1, 'max_score' => 10,
+                'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+            ]);
+
+            return $registration;
+        };
+
+        $sit('14707070', 707070, practice: false);
+        $sit('14707071', 707071, practice: true);
+
+        $kpis = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.kpis');
+
+        $this->assertSame(1, $kpis['submitted'], 'the contest');
+        $this->assertSame(1, $kpis['submitted_practice'], 'practice, beside it');
+    }
+
+    /** How many regions had a competitor sit the contest — not how many exist. */
+    public function test_the_countries_tile_counts_the_regions_that_took_part(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $school = School::whereNotNull('region_id')->firstOrFail();
+        $registration = $this->competitor('14606060', 606060);
+        $registration->update(['school_id' => $school->id, 'country_id' => $school->country_id]);
+
+        // A region with nobody sitting anything is not a region that took part.
+        $this->assertSame(0, $this->actingAs($admin)->getJson('/api/dashboard')->json('data.kpis.regions_in_contest'));
+
+        $quiz = Quiz::create(['title' => 'Region quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+        $test = Test::create(['title' => 'Region test', 'status' => 'active']);
+        Attempt::create([
+            'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+            'is_practice' => false, 'status' => 'completed', 'grading_status' => 'auto_graded',
+            'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+        ]);
+
+        $this->assertSame(1, $this->actingAs($admin)->getJson('/api/dashboard')->json('data.kpis.regions_in_contest'));
     }
 
     /**

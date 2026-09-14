@@ -493,9 +493,15 @@ export interface CountryMapRow {
     /** The country row behind it — the table links with this. */
     id: number;
     name: string;
+    regions: number;
     students: number;
     venues: number;
+    /**
+     * Competitors who sat the CONTEST, and beside it those who sat a sample —
+     * counted apart and never added, the same as the tiles above (ADR-0086).
+     */
     submitted: number;
+    submitted_practice: number;
     published: number;
 }
 
@@ -532,11 +538,19 @@ export interface DashboardData {
     has_by_country: boolean;
     kpis: {
         students: number;
+        /**
+         * Competitors who sat a CONTEST test. 🪤 `submitted_practice` is the same
+         * count for practice and the two are not a partition — 15.420 children
+         * sat both — so they are never added together (ADR-0086).
+         */
         submitted: number;
+        submitted_practice: number;
         present: number;
         absent: number;
         /** Null for a scoped account: one country is not a statistic. */
         countries: number | null;
+        /** How many regions had a competitor sit the CONTEST (ADR-0086). */
+        regions_in_contest: number | null;
         venues_active: number | null;
         students_previous_round: number | null;
     };

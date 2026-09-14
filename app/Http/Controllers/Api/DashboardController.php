@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Assessment\Support\SampleRound;
 use App\Domain\Competition\Enums\GradingStatus;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
@@ -157,13 +158,33 @@ class DashboardController extends Controller
     {
         $seasonId = $season?->id;
 
-        // Competitors who sat something, not attempts — same shape and the same
-        // reason as the country breakdown: fold the attempts down first so the
-        // inner group is index-only. 1,724 → 583 ms over the r14 roster.
-        $submitted = DB::query()
+        /*
+         * Competitors who sat something, not attempts — same shape and the same
+         * reason as the country breakdown: fold the attempts down first so the
+         * inner group is index-only. 1,724 → 583 ms over the r14 roster.
+         *
+         * 🔴 Counted once, for both contests at once, this tile said 65.930 —
+         * and the «of the roster» line under it read 61%, while the Reports
+         * screen answered the same question with 56% (ADR-0085). The difference
+         * was practice. They are not even a partition: 15.420 children sat both,
+         * so the two numbers below do not add up to a third one and are never
+         * presented as if they did (ADR-0086).
+         */
+        $sampleTestIds = SampleRound::testIds()->pluck('test_id')->all();
+
+        $whoSat = fn (bool $practice) => DB::query()
             ->fromSub(
                 DB::table('attempts')
                     ->whereNotNull('submitted_at')
+                    ->when(
+                        $sampleTestIds !== [],
+                        fn ($q) => $practice
+                            ? $q->whereIn('test_id', $sampleTestIds)
+                            : $q->whereNotIn('test_id', $sampleTestIds),
+                        // No practice round configured: nobody sat one, and every
+                        // attempt there is belongs to the contest.
+                        fn ($q) => $practice ? $q->whereRaw('1 = 0') : $q,
+                    )
                     ->groupBy('registration_id')
                     ->selectRaw('registration_id'),
                 'a'
@@ -173,12 +194,33 @@ class DashboardController extends Controller
             ->when($allowedSchoolIds !== null, fn ($q) => $q->whereIn('r.school_id', $allowedSchoolIds->all()))
             ->count();
 
+        /*
+         * How many regions actually had somebody sit the contest — which is a
+         * smaller and more useful number than how many exist. Measured on r14:
+         * 126 regions in the register, 91 with anybody on the roster, and 79
+         * where a competitor sat a contest test.
+         *
+         * 🪤 A venue with no region contributes nothing rather than a null
+         * group: `region_id` is nullable, and 18 venues have no city either.
+         */
+        $regionsInContest = fn () => DB::table('attempts as a')
+            ->join('registrations as r', 'r.id', '=', 'a.registration_id')
+            ->join('schools as s', 's.id', '=', 'r.school_id')
+            ->whereNotNull('a.submitted_at')
+            ->whereNotNull('s.region_id')
+            ->when($sampleTestIds !== [], fn ($q) => $q->whereNotIn('a.test_id', $sampleTestIds))
+            ->when($seasonId !== null, fn ($q) => $q->where('r.season_id', $seasonId))
+            ->distinct()
+            ->count('s.region_id');
+
         return [
             'students' => $stats['students'],
-            'submitted' => $submitted,
+            'submitted' => $whoSat(false),
+            'submitted_practice' => $whoSat(true),
             'present' => $stats['present'],
             'absent' => $stats['absent'],
             'countries' => $allowedSchoolIds === null ? $stats['countries'] : null,
+            'regions_in_contest' => $allowedSchoolIds === null ? $regionsInContest() : null,
             'venues_active' => $allowedSchoolIds === null
                 ? DB::table('schools')->where('status', 'active')->count()
                 : null,
@@ -434,6 +476,11 @@ class DashboardController extends Controller
             ->selectRaw('country_id, count(*) as n')
             ->pluck('n', 'country_id');
 
+        $regions = DB::table('regions')
+            ->groupBy('country_id')
+            ->selectRaw('country_id, count(*) as n')
+            ->pluck('n', 'country_id');
+
         // Turnout counts COMPETITORS, not attempts, so folding the attempts down
         // to one row each first is what makes this affordable: the inner group
         // reads nothing but the index (`attempts_turnout_index`) and the outer
@@ -442,23 +489,39 @@ class DashboardController extends Controller
         // 🪤 This was two `count(distinct …)` queries, one per column, at 1,777
         // and 1,684 ms. Folding them into one pass took the pair to 1,851 ms,
         // and the index took it to 916.
+        /*
+         * 🪤 The contest and practice are counted apart here too (ADR-0086), so
+         * the map, the table under it and the tiles above all answer the same
+         * question the same way. Counted together, a country's turnout counted
+         * children who only ever opened a sample.
+         */
+        $sampleTestIds = SampleRound::testIds()->pluck('test_id')->all();
+        $isSample = $sampleTestIds === []
+            ? '0'
+            : 'test_id in ('.implode(',', array_map('intval', $sampleTestIds)).')';
+
         $turnout = DB::query()
             ->fromSub(
                 DB::table('attempts')
                     ->groupBy('registration_id')
                     ->selectRaw('registration_id')
-                    ->selectRaw('max(submitted_at is not null) as sat')
-                    ->selectRaw('max(published_at is not null) as marked'),
+                    ->selectRaw("max(submitted_at is not null and not ($isSample)) as sat")
+                    ->selectRaw("max(submitted_at is not null and ($isSample)) as sat_sample")
+                    ->selectRaw("max(published_at is not null and not ($isSample)) as marked"),
                 'a'
             )
             ->join('registrations as r', 'r.id', '=', 'a.registration_id')
             ->when($seasonId !== null, fn ($q) => $q->where('r.season_id', $seasonId))
             ->groupBy('r.country_id')
-            ->selectRaw('r.country_id as country_id, sum(a.sat) as submitted, sum(a.marked) as published')
+            ->selectRaw(
+                'r.country_id as country_id, sum(a.sat) as submitted, '.
+                'sum(a.sat_sample) as submitted_practice, sum(a.marked) as published'
+            )
             ->get()
             ->keyBy('country_id');
 
         $submitted = $turnout->map(fn ($row) => (int) $row->submitted);
+        $practice = $turnout->map(fn ($row) => (int) $row->submitted_practice);
         $published = $turnout->map(fn ($row) => (int) $row->published);
 
         $merged = [];
@@ -471,12 +534,15 @@ class DashboardController extends Controller
             // keeps the first of the two, which is what the table links to.
             $merged[$iso] ??= [
                 'iso' => $iso, 'id' => $country->id, 'name' => $country->name,
-                'venues' => 0, 'students' => 0, 'submitted' => 0, 'published' => 0,
+                'regions' => 0, 'venues' => 0, 'students' => 0,
+                'submitted' => 0, 'submitted_practice' => 0, 'published' => 0,
             ];
 
+            $merged[$iso]['regions'] += (int) ($regions[$country->id] ?? 0);
             $merged[$iso]['venues'] += (int) ($venues[$country->id] ?? 0);
             $merged[$iso]['students'] += (int) ($students[$country->id] ?? 0);
             $merged[$iso]['submitted'] += (int) ($submitted[$country->id] ?? 0);
+            $merged[$iso]['submitted_practice'] += (int) ($practice[$country->id] ?? 0);
             $merged[$iso]['published'] += (int) ($published[$country->id] ?? 0);
         }
 

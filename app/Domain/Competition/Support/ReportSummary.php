@@ -8,6 +8,7 @@ use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
+use App\Domain\Assessment\Support\SampleRound;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Organization\Models\Country;
@@ -354,13 +355,9 @@ final class ReportSummary
      * publication behaves differently, and practice REPEATS while the contest is
      * one attempt (ADR-0016). A sum over the two answers no question anybody has.
      *
-     * 🪤 Keyed on the ROUND's `is_sample`, like {@see ResultLedger} and
-     * {@see AttemptGrader} — never on `attempts.is_practice`. The two agree on
-     * all 184.389 rows today (measured, in both directions), and the column is
-     * marginally cheaper (29 ms against 32 ms over the whole table), but the
-     * column is stamped from the QUIZ's type while every results decision is
-     * made on the round. Keyed differently, Reports could one day disagree with
-     * the ledger about the same attempt, and three milliseconds is not a reason.
+     * 🪤 The boundary is {@see SampleRound} and nothing written here: this used
+     * to carry its own copy of the join, which dropped `exams.status = active`
+     * and so disagreed with the ledger in a case no data has reached yet.
      */
     private static function applyMode($query, array $filters): void
     {
@@ -370,14 +367,9 @@ final class ReportSummary
             return;
         }
 
-        $inSample = fn ($q) => $q->selectRaw('1')
-            ->from('exam_test as mt')
-            ->join('exams as me', 'me.id', '=', 'mt.exam_id')
-            ->join('exam_rounds as mr', 'mr.id', '=', 'me.exam_round_id')
-            ->whereColumn('mt.test_id', 'attempts.test_id')
-            ->where('mr.is_sample', true);
-
-        $mode === 'sample' ? $query->whereExists($inSample) : $query->whereNotExists($inSample);
+        $mode === 'sample'
+            ? $query->whereIn('attempts.test_id', SampleRound::testIds())
+            : $query->whereNotIn('attempts.test_id', SampleRound::testIds());
     }
 
     /** Filters and groupings that read a column on `registrations` (or on `schools`, which hangs off it). */
