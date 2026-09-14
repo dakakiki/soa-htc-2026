@@ -50,9 +50,6 @@ final class ReportSummary
      */
     private const COMPLETE_DIMS = ['level', 'quiz', 'exam', 'test'];
 
-    /** The two populations the breakdown always shows side by side. */
-    private const SPLIT_MODES = ['competition', 'sample'];
-
     /** What a report counts unless it is told otherwise: the contest (ADR-0084). */
     public const MODE_DEFAULT = 'competition';
 
@@ -73,135 +70,50 @@ final class ReportSummary
         $totals['registered'] = self::registeredRows($filters, null)[null] ?? 0;
 
         $rows = [];
-        if ($groupBy !== null && ! empty($filters['split_modes'])) {
-            return [
-                'group_by' => $groupBy,
-                'totals' => $totals,
-                'rows' => self::splitRows($filters, $groupBy, ! empty($filters['all_members'])),
-            ];
-        }
-
         if ($groupBy !== null) {
             $measures = self::measures(self::attemptRows($filters, $groupBy), self::scoreStats($filters, $groupBy));
             $registered = in_array($groupBy, self::REGISTRATION_DIMS, true)
                 ? self::registeredRows($filters, $groupBy)
                 : [];
 
-            $keys = array_unique([...array_keys($measures), ...array_keys($registered)]);
-            $labels = self::labels($groupBy, $keys);
+            /*
+             * Members first, in their own order, so the table reads as the list it
+             * describes; keys that carry data but are not on that list (an archived
+             * quiz with attempts, say) follow rather than vanish. Only the
+             * dimensions an administrator builds are listed in full (ADR-0091).
+             */
+            $members = ! empty($filters['all_members']) && in_array($groupBy, self::COMPLETE_DIMS, true)
+                ? self::members($groupBy, $filters)
+                : [];
+
+            $dataKeys = array_unique([...array_keys($measures), ...array_keys($registered)]);
+            $extra = array_values(array_filter($dataKeys, fn ($k) => ! array_key_exists($k, $members)));
+
+            $keys = [...array_keys($members), ...$extra];
+            $described = self::describe($groupBy, $keys);
 
             foreach ($keys as $key) {
                 $row = $measures[$key] ?? self::emptyMeasures();
                 $row['key'] = $key;
-                $row['label'] = $labels[$key] ?? null;
+                $row['label'] = $members[$key]['label'] ?? ($described[$key]['label'] ?? null);
+                $row['sublabels'] = $members[$key]['sublabels'] ?? ($described[$key]['sublabels'] ?? []);
                 $row['registered'] = in_array($groupBy, self::REGISTRATION_DIMS, true)
                     ? ($registered[$key] ?? 0)
                     : null;
                 $rows[] = $row;
             }
 
-            usort($rows, fn ($a, $b) => ($b['submitted'] <=> $a['submitted']) ?: strcmp((string) $a['label'], (string) $b['label']));
+            // Without a member list to follow, the busiest row leads — counted as
+            // children, which is what the table shows (ADR-0085).
+            if ($members === []) {
+                usort($rows, fn ($a, $b) => ($b['participants'] <=> $a['participants']) ?: strcmp((string) $a['label'], (string) $b['label']));
+            }
         }
 
         return [
             'group_by' => $groupBy,
             'totals' => $totals,
             'rows' => $rows,
-        ];
-    }
-
-    /**
-     * The breakdown table's rows: every measure given twice, once for the contest
-     * and once for practice, side by side.
-     *
-     * 🔴 The `mode` filter is deliberately NOT applied here. Everywhere else on
-     * the screen it picks one of the two populations, because a number can only
-     * be about one thing; a table with room for two columns does not have to
-     * choose, and seeing them beside each other is the whole point (ADR-0084 says
-     * do not SUM them, not do not show them). What it must never do is add them
-     * up — `participants` is children, and a child who sat both would be counted
-     * once in each column and twice in any total, which is why no total column
-     * exists.
-     *
-     * Counts are children throughout (ADR-0085): started, submitted and published
-     * each ask how many competitors reached that stage, never how many attempts
-     * did. Averages and medians are per attempt — a score has no other unit.
-     *
-     * @param  array<string, mixed>  $filters
-     * @return list<array<string, mixed>>
-     */
-    private static function splitRows(array $filters, string $groupBy, bool $allMembers): array
-    {
-        $byMode = [];
-        foreach (self::SPLIT_MODES as $mode) {
-            $scoped = array_merge($filters, ['mode' => $mode]);
-            $byMode[$mode] = self::measures(
-                self::attemptRows($scoped, $groupBy),
-                self::scoreStats($scoped, $groupBy),
-            );
-        }
-
-        $registered = in_array($groupBy, self::REGISTRATION_DIMS, true)
-            ? self::registeredRows($filters, $groupBy)
-            : [];
-
-        // Members first, in their own order, so the table reads as the list it is
-        // describing; keys that carry data but are not in that list (an archived
-        // quiz with attempts, say) follow rather than vanish.
-        $members = $allMembers && in_array($groupBy, self::COMPLETE_DIMS, true)
-            ? self::members($groupBy, $filters)
-            : [];
-
-        $dataKeys = array_values(array_unique([
-            ...array_keys($byMode[self::MODE_DEFAULT]),
-            ...array_keys($byMode['sample']),
-            ...array_keys($registered),
-        ]));
-
-        $extra = array_values(array_filter($dataKeys, fn ($k) => $k !== null && ! array_key_exists($k, $members)));
-        usort($extra, fn ($a, $b) => (
-            ($byMode[self::MODE_DEFAULT][$b]['participants'] ?? 0) <=> ($byMode[self::MODE_DEFAULT][$a]['participants'] ?? 0)
-        ));
-
-        $keys = [...array_keys($members), ...$extra];
-        $described = self::describe($groupBy, $keys);
-
-        $rows = [];
-        foreach ($keys as $key) {
-            $rows[] = [
-                'key' => $key,
-                'label' => $members[$key]['label'] ?? ($described[$key]['label'] ?? null),
-                'sublabels' => $members[$key]['sublabels'] ?? ($described[$key]['sublabels'] ?? []),
-                'registered' => in_array($groupBy, self::REGISTRATION_DIMS, true) ? ($registered[$key] ?? 0) : null,
-                'modes' => [
-                    self::MODE_DEFAULT => self::splitMeasures($byMode[self::MODE_DEFAULT][$key] ?? null),
-                    'sample' => self::splitMeasures($byMode['sample'][$key] ?? null),
-                ],
-            ];
-        }
-
-        // Without a member list to follow, the busiest contest row leads.
-        if ($members === []) {
-            usort($rows, fn ($a, $b) => ($b['modes'][self::MODE_DEFAULT]['participants'] <=> $a['modes'][self::MODE_DEFAULT]['participants'])
-                ?: strcmp((string) $a['label'], (string) $b['label']));
-        }
-
-        return $rows;
-    }
-
-    /**
-     * One population's cell values: three counts of children and the score stats.
-     *
-     * @param  array<string, mixed>|null  $m
-     * @return array<string, mixed>
-     */
-    private static function splitMeasures(?array $m): array
-    {
-        return [
-            'participants' => (int) ($m['participants'] ?? 0),
-            'submitted' => (int) ($m['submitted_participants'] ?? 0),
-            'published' => (int) ($m['published_participants'] ?? 0),
-            'score' => $m['score'] ?? self::emptyStats(),
         ];
     }
 
@@ -246,27 +158,55 @@ final class ReportSummary
             $max = $max === null ? $avg : max($max, $avg);
         }
 
-        $rowKeyList = array_keys($rowKeys);
-        $colKeyList = array_keys($colKeys);
-        $rowLabels = self::labels($rowBy, $rowKeyList);
-        $colLabels = self::labels($colBy, $colKeyList);
-
-        $axis = function (array $keys, array $labels): array {
-            $out = array_map(fn ($k) => ['key' => $k, 'label' => $labels[$k] ?? null], $keys);
-            usort($out, fn ($a, $b) => strcmp((string) $a['label'], (string) $b['label']));
-
-            return $out;
-        };
-
         return [
             'row_by' => $rowBy,
             'col_by' => $colBy,
-            'rows' => $axis($rowKeyList, $rowLabels),
-            'cols' => $axis($colKeyList, $colLabels),
+            'rows' => self::axis($rowBy, array_keys($rowKeys), $filters),
+            'cols' => self::axis($colBy, array_keys($colKeys), $filters),
             'cells' => $cells,
             'min' => $min,
             'max' => $max,
         ];
+    }
+
+    /**
+     * One side of the heatmap: its members, and what each is called.
+     *
+     * 🔴 A level with no scores is a column, not an absence. The grid used to be
+     * built from the data alone, so a difficulty level nobody sat simply was not
+     * there — and a reader comparing levels cannot see the gap that is not drawn.
+     * Levels, quizzes, exams and tests are things an administrator built, so all
+     * of them stand on the axis, in the order they are taught or built, and the
+     * ones with data follow. Geography keeps the old behaviour: the countries in
+     * the data, alphabetically.
+     *
+     * 🪤 The labels carry their parent (a level its category), because
+     * `level_short` repeats across categories — `BH` is two different columns
+     * here, and without the category they are the same column twice (ADR-0088).
+     *
+     * @param  list<int>  $keys  members that actually carry scores
+     * @param  array<string, mixed>  $filters
+     * @return list<array{key: int, label: string|null, sublabels: list<string>}>
+     */
+    private static function axis(string $dim, array $keys, array $filters): array
+    {
+        $members = in_array($dim, self::COMPLETE_DIMS, true) ? self::members($dim, $filters) : [];
+        $extra = array_values(array_filter($keys, fn ($k) => ! array_key_exists($k, $members)));
+        $described = self::describe($dim, $extra);
+
+        $tail = array_map(fn ($k) => [
+            'key' => $k,
+            'label' => $described[$k]['label'] ?? null,
+            'sublabels' => $described[$k]['sublabels'] ?? [],
+        ], $extra);
+        usort($tail, fn ($a, $b) => strcmp((string) $a['label'], (string) $b['label']));
+
+        $head = [];
+        foreach ($members as $key => $member) {
+            $head[] = ['key' => $key, 'label' => $member['label'], 'sublabels' => $member['sublabels']];
+        }
+
+        return [...$head, ...$tail];
     }
 
     /**
@@ -777,19 +717,35 @@ final class ReportSummary
      */
     private static function members(string $dim, array $filters): array
     {
+        /*
+         * 🔴 No mixing (ADR-0094): a contest report lists contest quizzes, exams
+         * and tests, a practice report lists practice ones. The rows used to be
+         * every active quiz whatever the report was about, so a contest table
+         * carried six practice rows that could only ever be empty — and an empty
+         * row is supposed to mean "nobody sat it", not "wrong population".
+         * Difficulty levels are not of either type and are always listed in full.
+         */
+        $mode = $filters['mode'] ?? self::MODE_DEFAULT;
+        $ofType = fn ($query, string $dimension) => $query->when(
+            $mode !== 'all',
+            fn ($q) => $q->whereIn($dimension === 'quiz' ? 'quizzes.id' : ($dimension === 'exam' ? 'exams.id' : 'tests.id'),
+                SampleRound::idsOfType($dimension, $mode))
+        );
+
         $ids = match ($dim) {
             'level' => DifficultyLevel::query()
                 ->leftJoin('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
                 ->orderBy('difficulty_categories.type')->orderBy('difficulty_categories.id')->orderBy('difficulty_levels.position')
                 ->pluck('difficulty_levels.id')->all(),
-            'quiz' => Quiz::query()->where('status', 'active')->orderBy('title')->pluck('id')->all(),
-            'exam' => Exam::query()->where('exams.status', 'active')
+            'quiz' => $ofType(Quiz::query()->where('quizzes.status', 'active'), 'quiz')
+                ->orderBy('title')->pluck('quizzes.id')->all(),
+            'exam' => $ofType(Exam::query()->where('exams.status', 'active'), 'exam')
                 ->when($filters['quiz_id'] ?? null, fn ($q, $v) => $q->whereIn(
                     'exams.id',
                     DB::table('exam_quiz')->where('quiz_id', $v)->select('exam_id')
                 ))
                 ->orderBy('title')->pluck('exams.id')->all(),
-            'test' => Test::query()->where('tests.status', 'active')
+            'test' => $ofType(Test::query()->where('tests.status', 'active'), 'test')
                 ->when($filters['exam_id'] ?? null, fn ($q, $v) => $q->whereIn(
                     'tests.id',
                     DB::table('exam_test')->where('exam_id', $v)->select('test_id')

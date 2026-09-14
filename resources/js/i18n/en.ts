@@ -1622,10 +1622,8 @@ export default {
         modeCompetition: 'Competition',
         modeSample: 'Sample',
         groupBy: 'Break down by',
-        // The two columns every measure gets. Beside each other, never added:
-        // a child who sat both is one child in each (ADR-0091).
-        colContest: 'Contest',
-        colPractice: 'Practice',
+        // 🪤 The table counts the population the type names, and counts children
+        // — said above the table, not in a footnote (ADR-0085/0093).
         breakdownCounts: 'Started, Submitted and Published count competitors; Avg and Median are per attempt.',
         loadMore: 'Load 10 more',
         groupCountry: 'Country',
@@ -1652,15 +1650,8 @@ export default {
         heatCols: 'Columns',
         heatLegend: 'Darker = higher average score. Hover a cell for the number of scores.',
         noScores: 'No scored attempts in this scope yet.',
-        compare: 'Compare',
-        compareBy: 'Compare by',
-        compareMeasure: 'Measure',
-        comparePick: 'Pick members above to compare them side by side.',
-        comparePlaceholder: 'Add members to compare…',
-        compareSelected: '{n} selected',
         searchGroup: 'Search…',
         breakdownCapped: 'Showing {shown} of {total}.',
-        heatCapped: 'Showing the busiest {rows} rows × {cols} columns.',
         registered: 'Registered',
         // 🪤 People, where 'started' beside it is attempts (ADR-0085).
         participants: 'Took part',
@@ -1677,8 +1668,6 @@ export default {
         breakdown: 'Breakdown',
         error: 'Could not load the report.',
         anyOption: 'All',
-        exportPdf: 'Export PDF',
-        exportPdfTooltip: 'Download this report as a PDF with the SOA HTC header.',
     },
     reset: {
         title: 'Reset attempts',
