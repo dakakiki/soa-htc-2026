@@ -127,7 +127,7 @@ function cellStyle(avg: number): Record<string, string> {
 async function loadOptions(): Promise<void> {
     optionsLoading.value = true;
     try {
-        const { data } = await reportFilters({ country_id: q.country_id, quiz_id: q.quiz_id });
+        const { data } = await reportFilters({ country_id: q.country_id, school_id: q.school_id, quiz_id: q.quiz_id });
         opts.value = data;
     } finally {
         optionsLoading.value = false;
@@ -136,15 +136,28 @@ async function loadOptions(): Promise<void> {
 
 async function onCountryChange(id: number | null): Promise<void> {
     q.country_id = id;
-    // Region, school and coordinator are country-scoped — reset and reload their
-    // options. The coordinator goes with them: a chosen one who has no venue in the
-    // new country is gone from the list, and left set it would keep narrowing the
-    // report to venues the country filter already excludes — an empty answer with
-    // no visible cause.
+    // Region, venue and coordinator all belong to the country — reset and reload
+    // their options. The coordinator goes with them: left set, one from the old
+    // country would keep narrowing the report to venues the country filter already
+    // excludes, which answers with an empty report and no visible cause.
     q.region_id = null;
     q.school_id = null;
     q.coordinator_user_id = null;
     await loadOptions();
+    await loadSummary();
+}
+
+/**
+ * The venue narrows the coordinator list further — that country's coordinators, of
+ * whom the chosen venue is assigned to some. A coordinator already chosen is kept
+ * when the new list still holds them, and dropped when it does not.
+ */
+async function onSchoolChange(id: number | null): Promise<void> {
+    q.school_id = id;
+    await loadOptions();
+    if (q.coordinator_user_id !== null && !opts.value.coordinators.some((c) => c.id === q.coordinator_user_id)) {
+        q.coordinator_user_id = null;
+    }
     await loadSummary();
 }
 
@@ -358,7 +371,7 @@ onMounted(async () => {
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.school') }}</span>
                     <SearchSelect dense clearable :options="schoolOptions" :model-value="q.school_id ?? null"
                         :disabled="!q.country_id" :loading="optionsLoading" :placeholder="$t('reports.anyOption')"
-                        @update:model-value="(v: number | null) => { q.school_id = v; loadSummary(); }" />
+                        @update:model-value="onSchoolChange" />
                 </div>
                 <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.coordinator') }}</span>

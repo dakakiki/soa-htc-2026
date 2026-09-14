@@ -2741,17 +2741,21 @@ deployment/storage/backup.
   živom dodelom je i dalje bio u ponudi. Sada se traže oba.
   🪤 Izmereno 14.09: danas to **ne menja nijedan red** — svih 97 koordinatora ima otvoren nalog.
   Pravilo ipak ulazi u upit, jer ga podatak trenutno ispunjava slučajno a ne po konstrukciji.
-- **Zemlja se čita kroz venue-e, ne kroz `users.country_id`.** Koordinator doseže venue-e svojih
-  aktivnih dodela (`allowedSchoolIds()`), i izveštaj se po njemu sužava upravo tako. Da se picker
-  vodio poljem `users.country_id`, postojale bi **dve definicije** iste stvari koje slobodno mogu da
-  se raziđu.
-  ⚡ Provereno nad pravom bazom: dve definicije se **nigde ne razilaze** (87 poklapanja, 0 razlika,
-  0 koordinatora preko više zemalja).
-- 🪤 **Deset koordinatora nema nijedan venue** i zato ispadaju čim se izabere zemlja. To je tačno:
-  njihov opseg je **prazan**, pa izbor bilo kog od njih i danas daje **prazan izveštaj**. Bez
-  izabrane zemlje i dalje stoje u spisku — ponašanje se nije menjalo.
-- **Izabrani koordinator se čisti kad se promeni zemlja**, uz region i venue. Ostavljen, sužavao bi
-  populaciju na venue-e koje filter zemlje ionako isključuje — prazan odgovor bez vidljivog uzroka.
+- **Suženje ide u dva koraka**, kako je vlasnik precizirao istog dana:
+  **samo zemlja** → svi koordinatori te zemlje (`users.country_id`);
+  **zemlja + venue** → od njih, oni kojima je taj venue dodeljen.
+- 🔴 **Prva verzija je čitala zemlju kroz venue-e i to je bilo pogrešno.** Obrazloženje je bilo da se
+  izbegnu dve definicije iste stvari, i rizik je bio stvaran — ali taj put **ne kaže ništa** za
+  koordinatora koji još nema nijedan venue. Umesto dve definicije dobije se **prazna lista**:
+  izmereno, **Tajikistan je pokazivao 0 koordinatora, a dva su tamo registrovana**. Razlike po
+  zemljama: Italia 5→7, Mongolia 4→5, India 2→3, Tajikistan 0→2; Srbija i Rusija nepromenjene.
+  ⚡ Tamo gde su obe definicije određene, **nigde se ne razilaze** (87 poklapanja, 0 razlika) — pa
+  prelazak na `users.country_id` ništa ne lomi, a pokriva i slučaj u kom venue put ćuti.
+- 🪤 **„Country coordinator" ne nosi sve venue-e svoje zemlje** — medijana je **3** (min 0, max 875),
+  a Srbija ima 257 venue-a. Zato izbor venue-a ume da izbaci i koordinatora koji „pokriva" tu zemlju.
+  To je dosledno sa izveštajem: izbor tog koordinatora uz taj venue ionako daje prazan rezultat.
+- **Izabrani koordinator se čisti kad se promeni zemlja**, uz region i venue. Na promeni venue-a se
+  **ne čisti slepo** — ostaje ako je i dalje u novoj listi, ispada ako nije.
   Ovo **nije** kršenje pravila „filteri se ne čiste sami": to pravilo zabranjuje da `load()` dira
   filtere, a ovde kaskadu pokreće sam korisnik, isto kao što region i venue već rade.
 

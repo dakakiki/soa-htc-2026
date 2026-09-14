@@ -61,7 +61,7 @@ const testOptions = computed(() => titled(opts.value.tests));
 async function loadOptions(): Promise<void> {
     optionsLoading.value = true;
     try {
-        const { data } = await reportFilters({ country_id: q.country_id, quiz_id: q.quiz_id, exam_id: q.exam_id });
+        const { data } = await reportFilters({ country_id: q.country_id, school_id: q.school_id, quiz_id: q.quiz_id, exam_id: q.exam_id });
         opts.value = data;
     } finally {
         optionsLoading.value = false;
@@ -98,13 +98,27 @@ async function loadCandidates(): Promise<void> {
 
 async function onCountryChange(id: number | null): Promise<void> {
     q.country_id = id;
-    // Coordinator is country-scoped like region and venue, and goes with them: left
-    // set, one with no venue in the new country would keep narrowing the candidates
-    // to venues the country filter already excludes.
+    // Coordinator belongs to the country like region and venue, and goes with them:
+    // left set, one from the old country would keep narrowing the candidates to
+    // venues the country filter already excludes.
     q.region_id = null;
     q.school_id = null;
     q.coordinator_user_id = null;
     await loadOptions();
+    await loadCandidates();
+}
+
+/**
+ * The venue narrows the coordinator list further — that country's coordinators, of
+ * whom the chosen venue is assigned to some. A coordinator already chosen is kept
+ * when the new list still holds them, and dropped when it does not.
+ */
+async function onSchoolChange(id: number | null): Promise<void> {
+    q.school_id = id;
+    await loadOptions();
+    if (q.coordinator_user_id !== null && !opts.value.coordinators.some((c) => c.id === q.coordinator_user_id)) {
+        q.coordinator_user_id = null;
+    }
     await loadCandidates();
 }
 
@@ -246,7 +260,7 @@ onMounted(async () => {
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.school') }}</span>
                     <SearchSelect dense clearable :options="schoolOptions" :model-value="q.school_id ?? null"
                         :disabled="!q.country_id" :loading="optionsLoading" :placeholder="$t('reports.anyOption')"
-                        @update:model-value="(v: number | null) => { q.school_id = v; loadCandidates(); }" />
+                        @update:model-value="onSchoolChange" />
                 </div>
                 <div class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('reports.coordinator') }}</span>
