@@ -218,9 +218,11 @@ onMounted(async () => {
     padding: 8px 10px; font-size: 12px; line-height: 1.45; white-space: nowrap; color: #1f2937;
 }
 
-/* The country and its roster carry the box; the rest is detail around them. */
-.tip .name { font-size: 14px; font-weight: 600; }
-.tip .roster { margin-top: 7px; font-size: 13px; }
+/* The country and its roster carry the box; the rest is detail around them —
+   so those two lines share one type, and everything else sits below it. */
+.tip .name,
+.tip .roster { font-size: 14px; font-weight: 600; }
+.tip .roster { margin-top: 7px; }
 /* 🪤 Grey, not white: this tooltip is on white paper. */
 .tip .muted { color: #9ca3af; }
 </style>

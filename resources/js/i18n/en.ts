@@ -88,7 +88,11 @@ export default {
             results_unpublished: 'graded tests not published yet',
             venues_without_coordinator: 'active venues with no coordinator',
             venues_without_students: 'active venues with no students this season',
-            venues_without_city: 'venues with no city — they cannot be placed on a map',
+            // 🪤 "active venues", like the two above it. The query has always
+            // filtered `status = active` and the link passes it on, so the number
+            // was right — but the word promised every venue. 18 of the 34 without
+            // a city are active; the other 16 are not going on a map either way.
+            venues_without_city: 'active venues with no city — they cannot be placed on a map',
             students_missing_dob: 'students with no date of birth — they cannot sit a test',
         },
         search: {
