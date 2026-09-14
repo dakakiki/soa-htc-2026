@@ -2821,3 +2821,63 @@ deployment/storage/backup.
 - 🪤 **STAGE nema legacy izvor** (i ne treba da ga ima), a prazan nivo se **ne može rekonstruisati iz
   same arhive** — pogrešna polovina je povratna pravilom, prazna nije. Zato ispravka na STAGE ide
   kao prenos vrednosti sa dev-a, ne kao migracija.
+
+## ADR-0091 — Breakdown je tabela poređenja: takmičenje i proba jedno uz drugo, brojevi su deca, i lista je potpuna
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je prvo tražio da „Break down by" izađe iz filtera (PR #54), pa je zadao
+  kolone: *Registered ostaje; Started competition (unique) i Started sample (unique); Submitted,
+  Published, Avg i Median isto tako* — „drugim rečima uvek imamo competition / Sample". Uz to: region
+  i venue nose **zemlju ispod naziva**, nivoi · kvizovi · exam-i · testovi se **izlistaju svi**, exam
+  nosi svoj kviz, test nosi i kviz i exam.
+- **Odluka:** Breakdown prestaje da bude smanjena kopija gornjih pločica i postaje **tabela
+  poređenja**. Svaka mera ima dve kolone — **Contest** i **Practice** — i nijedan zbir.
+
+### Zašto dve kolone, a ne zbir i ne izbor
+
+- 🔴 **Proba i takmičenje nisu jedna populacija** (ADR-0084), pa zbir ne odgovara ni na jedno pitanje.
+  Ali tabela ima mesta za obe kolone — a **„nemoj da sabiraš" nije isto što i „nemoj da pokažeš"**.
+- 🔴 **Zbir bi ovde bio i aritmetički pogrešan**, ne samo pojmovno: brojevi su **deca**, a dete koje je
+  i vežbalo i izašlo na takmičenje je jedno dete u svakoj koloni — i **dva deteta u zbiru**. Zato
+  kolone „ukupno" nema, ni u PDF-u.
+- ⚡ **Filter „Counting" namerno ne važi za ovu tabelu.** Svuda drugde on bira jednu populaciju jer
+  jedan broj može da bude samo o jednoj stvari; ovde bi izbor „The contest" ispraznio polovinu tabele
+  zbog koje tabela postoji. Test to drži.
+
+### Brojevi su deca, ocene su po pokušaju
+
+- **Started · Submitted · Published broje takmičare** (`count(distinct registration_id)`), ne pokušaje
+  — ista mera koja je „Participation" popravila sa 134% na 56% (ADR-0085). Dete koje je sedelo pet
+  testova je **jedno dete** u svakoj od tri kolone.
+- **Avg i Median ostaju po pokušaju** — ocena nema drugu jedinicu. To piše **iznad tabele**, ne u
+  fusnoti.
+- 🪤 **Red u kome stoje deca pored pokušaja poziva na oduzimanje koje nema smisla:** 61.318 „started"
+  i 145.780 „submitted" čita se kao da je takmičenje usput dobilo ljude.
+- **Void je izbačen** iz tabele (vlasnikova odluka): to je administratorova radnja nad pokušajem, na
+  celoj populaciji je 0, i ostaje u pločicama gore.
+
+### Potpuna lista, i ime koje se da prepoznati
+
+- **Nivoi · kvizovi · exam-i · testovi se listaju svi**, i oni koje niko nije radio — prazan red je
+  odgovor („niko"), a red kog nema nije. Geografija nije na toj listi: 69 zemalja plus one koje nisu
+  ni registrovale nikog je duža tabela, ne bolja.
+- **Redosled je njihov sopstveni**, ne po veličini: nivoi po kategoriji i poziciji (🪤 `LH` abecedno
+  pada iza `H5`, ADR-0089), ostali po naslovu. Zemlje i venue-i i dalje idu **najveći prvi**.
+- 🔴 **Ime nije prepoznavanje.** „Region 2" postoji u više zemalja, `level_short` se ponavlja kroz
+  kategorije (ADR-0088), a dva venue-a se zovu isto čim dve zemlje imaju „Gymnasium 1". Zato svaki red
+  nosi **roditelja ispod naziva**: region i venue → zemlja, nivo → kategorija, exam → `Quiz: …`,
+  test → `Quiz: …` i `Exam: …`. Pretraga gleda i te redove, pa kucanje zemlje nalazi njene regione.
+
+### Kako
+
+- `ReportSummary::build` dobija dva prekidača — `split_modes` i `all_members` — i **samo Breakdown ih
+  traži**. Compare čita isti endpoint bez njih i dobija oblik koji je oduvek imao; heatmap svoj.
+- 🪤 **Mere po deci su dopisane u postojeći upit** (`count(distinct case when …)`), a razdvajanje ide
+  kroz **dva prolaza istog, provereno tačnog puta** (`mode=competition` pa `mode=sample`) umesto
+  novog `case`-a nad `test_id`-em. Granica ostaje `SampleRound` i nigde drugde.
+- ⏱️ **Cena:** tabela na punoj bazi stiže za **~12 s**, prethodna (jedna populacija) je stizala za
+  ~10 s. Traži je **sopstveni zahtev sa sopstvenim overlay-em**, pa ostatak stranice ne čeka.
+- **PDF izvoz štampa istu tabelu** — iste dve kolone po meri, isti podnaslovi — i **sve redove**,
+  jer tamo „Load more" ne postoji.
+- 🪤 **`$s` je u `reportHtml` već bio ukupni skor**; nova petlja ga je preuzela i ispraznila liniju
+  „Avg / Min / Max / Median" iznad tabele. Uhvatio postojeći test PDF-a.

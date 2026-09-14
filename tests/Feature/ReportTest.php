@@ -568,4 +568,130 @@ class ReportTest extends TestCase
         $this->assertNotContains($noVenue->id, $atThatVenue, 'assigned to no venue at all');
         $this->assertNotContains($closed->id, $atThatVenue);
     }
+
+    /**
+     * The breakdown table answers the question the rest of the screen cannot: how
+     * the contest and practice did, beside each other.
+     *
+     * 🔴 Beside, never added. The counts are children (ADR-0085), and a child who
+     * sat both populations is one child in each column — a total would count them
+     * twice, which is the second half of why ADR-0084 keeps the two apart.
+     */
+    public function test_the_breakdown_reports_both_populations_side_by_side_and_counts_children(): void
+    {
+        $contest = $this->content();
+        $practice = $this->content();
+        $round = ExamRound::where('is_sample', true)->first()
+            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
+        $practice['exam']->update(['exam_round_id' => $round->id]);
+
+        // One child who sat the contest twice and practised once, plus a second
+        // child who only practised.
+        $both = $this->registration();
+        $this->attempt($both, $contest, 'completed', 6.0, published: true);
+        // 🪤 A child sits a given test once — the second contest run is a second test.
+        $this->attempt($both, $this->content(), 'completed', 4.0);
+        $this->attempt($both, $practice, 'completed', 9.0, published: true);
+        $this->attempt($this->registration(), $practice, 'completed', 7.0);
+
+        $row = $this->actingAs($this->admin())
+            ->getJson('/api/reports/summary?group_by=country&split_modes=1')
+            ->assertOk()->json('rows.0');
+
+        // Two submitted contest attempts, one child.
+        $this->assertSame(1, $row['modes']['competition']['participants']);
+        $this->assertSame(1, $row['modes']['competition']['submitted']);
+        $this->assertSame(1, $row['modes']['competition']['published']);
+        $this->assertEquals(5.0, $row['modes']['competition']['score']['avg'], 'scores stay per attempt');
+
+        $this->assertSame(2, $row['modes']['sample']['participants']);
+        $this->assertSame(2, $row['modes']['sample']['submitted']);
+        $this->assertSame(1, $row['modes']['sample']['published']);
+        $this->assertEquals(8.0, $row['modes']['sample']['score']['avg']);
+
+        // Registration belongs to the child, not to either population, so it is
+        // counted once and carries no split.
+        $this->assertSame(2, $row['registered']);
+        $this->assertArrayNotHasKey('submitted', $row, 'no summed column to misread');
+    }
+
+    /**
+     * The Counting filter picks one population for every number that can only be
+     * about one. The breakdown has a column for each, so it keeps showing both —
+     * otherwise choosing "The contest" would empty half the table it exists for.
+     */
+    public function test_the_breakdown_shows_practice_even_when_the_report_counts_the_contest(): void
+    {
+        $practice = $this->content();
+        $round = ExamRound::where('is_sample', true)->first()
+            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
+        $practice['exam']->update(['exam_round_id' => $round->id]);
+        $this->attempt($this->registration(), $practice, 'completed', 9.0);
+
+        $response = $this->actingAs($this->admin())
+            ->getJson('/api/reports/summary?group_by=country&split_modes=1&mode=competition')->assertOk();
+
+        $response->assertJsonPath('totals.submitted', 0)
+            ->assertJsonPath('rows.0.modes.competition.submitted', 0)
+            ->assertJsonPath('rows.0.modes.sample.submitted', 1);
+    }
+
+    /**
+     * A level nobody sat is an answer — "nobody sat it" — and a missing row is
+     * not. Levels, quizzes, exams and tests are built by an administrator, so the
+     * table lists what was built, in the order it was built, and never
+     * alphabetically (ADR-0089).
+     */
+    public function test_every_level_is_listed_even_the_ones_nobody_sat(): void
+    {
+        $this->attempt($this->registration(), $this->content(), 'completed', 5.0);
+
+        $rows = $this->actingAs($this->admin())
+            ->getJson('/api/reports/summary?group_by=level&split_modes=1&all_members=1')
+            ->assertOk()->json('rows');
+
+        $this->assertCount(DifficultyLevel::count(), $rows);
+
+        $sat = collect($rows)->firstWhere('modes.competition.submitted', 1);
+        $this->assertNotNull($sat, 'the level that was sat');
+
+        $empty = collect($rows)->first(fn (array $r) => $r['modes']['competition']['submitted'] === 0);
+        $this->assertNotNull($empty, 'and the ones that were not');
+        $this->assertSame(0, $empty['modes']['sample']['submitted']);
+        $this->assertNull($empty['modes']['competition']['score']['avg']);
+
+        // Without the flag the table is still only what the data holds.
+        $this->assertCount(1, $this->actingAs($this->admin())
+            ->getJson('/api/reports/summary?group_by=level&split_modes=1')->assertOk()->json('rows'));
+    }
+
+    /**
+     * 🔴 A name is not an identification: "Region 2" exists in several countries,
+     * `level_short` repeats across difficulty categories by design (ADR-0088), and
+     * a test says nothing about which quiz it belongs to. Each row carries its
+     * parent underneath so the reader can tell which row is theirs.
+     */
+    public function test_a_row_says_where_it_belongs(): void
+    {
+        $country = Country::firstOrFail();
+        $region = Region::create(['country_id' => $country->id, 'name' => 'Region 2']);
+        $school = School::create([
+            'name' => 'Venue', 'country_id' => $country->id, 'region_id' => $region->id, 'status' => 'active',
+        ]);
+        $content = $this->content();
+        $this->attempt($this->registration($school), $content, 'completed', 5.0);
+
+        $first = fn (string $dim) => $this->actingAs($this->admin())
+            ->getJson("/api/reports/summary?group_by={$dim}&split_modes=1")->assertOk()->json('rows.0');
+
+        $this->assertSame([$country->name], $first('region')['sublabels']);
+        $this->assertSame([$country->name], $first('school')['sublabels']);
+
+        $level = DifficultyLevel::where('level_short', 'H2')->firstOrFail();
+        $this->assertSame([$level->category->name], $first('level')['sublabels']);
+
+        $this->assertSame(['Quiz: Q'], $first('exam')['sublabels']);
+        $this->assertSame(['Quiz: Q', 'Exam: E'], $first('test')['sublabels']);
+        $this->assertSame('T', $first('test')['label']);
+    }
 }

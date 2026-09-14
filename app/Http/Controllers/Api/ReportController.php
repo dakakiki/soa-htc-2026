@@ -47,6 +47,11 @@ class ReportController extends Controller
             'test_id' => ['nullable', 'integer'],
             'group_by' => ['nullable', Rule::in(['country', 'region', 'school', 'level', 'quiz', 'exam', 'test'])],
             'mode' => ['nullable', Rule::in(ReportSummary::MODES)],
+            // The breakdown table asks for both populations at once and for every
+            // member of its dimension; nothing else on the screen does, and the
+            // extra queries are its own (ADR-0091).
+            'split_modes' => ['nullable', 'boolean'],
+            'all_members' => ['nullable', 'boolean'],
         ]);
 
         // Default the population to the active season unless one is named.
@@ -144,7 +149,9 @@ class ReportController extends Controller
             isset($validated['coordinator_user_id']) ? (int) $validated['coordinator_user_id'] : null
         );
 
-        $data = ReportSummary::build($filters);
+        // The printed breakdown is the one on screen: both populations, every
+        // member (ADR-0091). Compare below keeps the plain shape it reads.
+        $data = ReportSummary::build($filters + ['split_modes' => true, 'all_members' => true]);
 
         $matrix = (! empty($validated['heat_row_by']) && ! empty($validated['heat_col_by']))
             ? ReportSummary::matrix($filters, $validated['heat_row_by'], $validated['heat_col_by'])
@@ -220,26 +227,46 @@ class ReportController extends Controller
         $breakdown = '';
         if (! empty($data['group_by'])) {
             $dim = ucfirst((string) $data['group_by']);
+
+            // Every measure twice — the contest and practice beside each other,
+            // never added up (ADR-0091). Counts are children, scores are per
+            // attempt, and the sub-header says so on the page rather than in a
+            // footnote nobody reads.
+            $pair = fn (string $label): string => '<th colspan="2" style="text-align:center;padding:5px;">'.$label.'</th>';
             $head = '<tr style="background:'.$brand.';color:'.$onBrand.';">'
-                .'<th style="text-align:left;padding:5px;">'.$dim.'</th>'
-                .'<th style="text-align:right;padding:5px;">Reg.</th><th style="text-align:right;padding:5px;">Started</th>'
-                .'<th style="text-align:right;padding:5px;">Submitted</th><th style="text-align:right;padding:5px;">Published</th>'
-                .'<th style="text-align:right;padding:5px;">Void</th><th style="text-align:right;padding:5px;">Avg</th><th style="text-align:right;padding:5px;">Median</th></tr>';
+                .'<th rowspan="2" style="text-align:left;padding:5px;">'.$dim.'</th>'
+                .'<th rowspan="2" style="text-align:right;padding:5px;">Reg.</th>'
+                .$pair('Started').$pair('Submitted').$pair('Published').$pair('Avg').$pair('Median')
+                .'</tr><tr style="background:'.$brand.';color:'.$onBrand.';font-size:6.5pt;">'
+                .str_repeat('<th style="text-align:right;padding:2px 5px;">Contest</th><th style="text-align:right;padding:2px 5px;">Practice</th>', 5)
+                .'</tr>';
+
+            $cell = fn ($v, string $style = ''): string => '<td style="text-align:right;padding:4px 5px;'.$style.'">'.($v ?? '—').'</td>';
+
             $rows = '';
             foreach ($data['rows'] as $i => $r) {
                 $bg = $i % 2 === 1 ? 'background:#f9fafb;' : '';
+                // 🪤 Not $c/$s — $s is the totals' score block further down, and
+                // borrowing the name emptied the report's own score line.
+                $contest = $r['modes']['competition'];
+                $practice = $r['modes']['sample'];
+                $sub = '';
+                foreach ($r['sublabels'] ?? [] as $line) {
+                    $sub .= '<div style="font-size:6.5pt;color:#6b7280;">'.e((string) $line).'</div>';
+                }
+
                 $rows .= '<tr style="'.$bg.'">'
-                    .'<td style="padding:4px 5px;">'.e($r['label'] ?? '—').'</td>'
-                    .'<td style="text-align:right;padding:4px 5px;">'.($r['registered'] ?? '—').'</td>'
-                    .'<td style="text-align:right;padding:4px 5px;">'.$r['started'].'</td>'
-                    .'<td style="text-align:right;padding:4px 5px;">'.$r['submitted'].'</td>'
-                    .'<td style="text-align:right;padding:4px 5px;color:#059669;">'.$r['published'].'</td>'
-                    .'<td style="text-align:right;padding:4px 5px;color:#d97706;">'.$r['void'].'</td>'
-                    .'<td style="text-align:right;padding:4px 5px;">'.($r['score']['avg'] ?? '—').'</td>'
-                    .'<td style="text-align:right;padding:4px 5px;">'.($r['score']['median'] ?? '—').'</td>'
+                    .'<td style="padding:4px 5px;">'.e($r['label'] ?? '—').$sub.'</td>'
+                    .$cell($r['registered'])
+                    .$cell($contest['participants']).$cell($practice['participants'])
+                    .$cell($contest['submitted']).$cell($practice['submitted'])
+                    .$cell($contest['published'], 'color:#059669;').$cell($practice['published'], 'color:#059669;')
+                    .$cell($contest['score']['avg']).$cell($practice['score']['avg'])
+                    .$cell($contest['score']['median']).$cell($practice['score']['median'])
                     .'</tr>';
             }
             $breakdown = '<h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Breakdown — '.$dim.'</h3>'
+                .'<div style="font-size:7pt;color:#6b7280;margin-bottom:3px;">Started, Submitted and Published count competitors; Avg and Median are per attempt.</div>'
                 .'<table width="100%" cellspacing="0" cellpadding="0" style="border:0.6pt solid #e5e7eb;font-size:8pt;"><thead>'.$head.'</thead><tbody>'.$rows.'</tbody></table>';
         }
 

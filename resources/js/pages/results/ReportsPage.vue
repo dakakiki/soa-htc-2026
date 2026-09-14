@@ -10,14 +10,17 @@ import Tooltip from '@/components/Tooltip.vue';
 import {
     reportFilters,
     reportSummary,
+    reportBreakdown,
     reportMatrix,
     exportReportPdf,
     type GroupBy,
+    type ModeMeasures,
     type ReportFilterOptions,
     type ReportMatrix,
     type ReportMeasures,
     type ReportQuery,
     type ReportRow,
+    type ReportSplitRow,
 } from '@/api/reports';
 
 const { t } = useI18n();
@@ -30,17 +33,19 @@ const opts = ref<ReportFilterOptions>({ ...empty });
 const q = reactive<ReportQuery>({
     country_id: null, region_id: null, school_id: null, coordinator_user_id: null,
     difficulty_level_id: null, quiz_id: null, exam_id: null, test_id: null,
-    // A breakdown from the start, so the section carries a table instead of an
-    // invitation to pick something. Country is the one dimension every report
-    // has members in, and the one the heatmap already opens on.
-    group_by: 'country',
     // The contest, until somebody asks for practice (ADR-0084).
     mode: 'competition',
 });
 
+// Not a filter, and no longer kept among them: the dimension belongs to the
+// breakdown table the way the axes belong to the heatmap. Country from the
+// start, so the section carries a table rather than an invitation to pick one.
+const groupBy = ref<GroupBy>('country');
+
 const summary = ref<Awaited<ReturnType<typeof reportSummary>>['data'] | null>(null);
 const loading = ref(false);
-// The breakdown table reloads on its own when only its dimension changes.
+// The breakdown table has its own request and reloads on its own.
+const breakdown = ref<ReportSplitRow[]>([]);
 const breakdownLoading = ref(false);
 const optionsLoading = ref(false);
 const exporting = ref(false);
@@ -56,11 +61,12 @@ const compareBy = ref<GroupBy>('country');
 const compareRows = ref<ReportRow[]>([]);
 const pinnedIds = ref<number[]>([]);
 
-// Breakdown search + cap so a 50–70 country list stays navigable. Ten rows fit
-// on a screen without scrolling past the sections below; the rest are one search
-// away, and the PDF export prints them all.
+// Breakdown search + a page of ten, because the table sits above three more
+// sections and a full country list pushes them off the screen. "Load more" adds
+// another ten; search reaches any row directly; the PDF prints them all.
 const breakdownSearch = ref('');
-const BREAKDOWN_CAP = 10;
+const BREAKDOWN_PAGE = 10;
+const breakdownShown = ref(BREAKDOWN_PAGE);
 
 // Heatmap caps: many countries/venues would blow up the grid, so show the
 // busiest rows/columns and note the rest.
@@ -74,9 +80,7 @@ const groupLabel: Record<GroupBy, string> = {
 };
 
 // The breakdown table's first column is named after the active dimension.
-const groupHeader = computed(() =>
-    summary.value?.group_by ? groupLabel[summary.value.group_by as GroupBy] : t('reports.group')
-);
+const groupHeader = computed(() => groupLabel[groupBy.value]);
 
 const named = (rows: { id: number; name: string }[]): SearchSelectOption[] => rows.map((r) => ({ id: r.id, label: r.name }));
 const titled = (rows: { id: number; title: string }[]): SearchSelectOption[] => rows.map((r) => ({ id: r.id, label: r.title }));
@@ -96,6 +100,7 @@ async function loadSummary(): Promise<void> {
     try {
         const { data } = await reportSummary(q);
         summary.value = data;
+        void loadBreakdown();
         void loadMatrix();
         void loadCompare();
     } catch {
@@ -106,25 +111,28 @@ async function loadSummary(): Promise<void> {
 }
 
 /**
- * The dimension picker reloads its own table and nothing else — so the overlay
- * belongs to that section, not to the page. Totals, rates and the funnel do not
- * read `group_by` (they come from `totals`, which is computed ungrouped), and the
- * heatmap and compare each carry their own dimension. Only `rows` are replaced,
- * so the numbers above the table do not blink for a change they did not make.
+ * The breakdown asks for itself: both populations and every member of the
+ * dimension (ADR-0091), which nothing else on the screen wants. So the overlay
+ * belongs to that section too — totals, rates and the funnel do not read the
+ * dimension and have no reason to blink when it changes.
  */
-async function onGroupByChange(): Promise<void> {
+async function loadBreakdown(): Promise<void> {
     breakdownLoading.value = true;
-    error.value = null;
     try {
-        const { data } = await reportSummary(q);
-        summary.value = summary.value
-            ? { ...summary.value, group_by: data.group_by, rows: data.rows }
-            : data;
+        const { data } = await reportBreakdown(q, groupBy.value);
+        breakdown.value = data.rows;
     } catch {
-        error.value = t('reports.error');
+        breakdown.value = [];
     } finally {
         breakdownLoading.value = false;
     }
+}
+
+async function onGroupByChange(): Promise<void> {
+    // A new dimension is a new list; the page of ten starts again. The search
+    // term is the reader's and stays where they put it.
+    breakdownShown.value = BREAKDOWN_PAGE;
+    await loadBreakdown();
 }
 
 async function loadMatrix(): Promise<void> {
@@ -206,6 +214,7 @@ async function exportPdf(): Promise<void> {
     try {
         const { data } = await exportReportPdf({
             ...q,
+            group_by: groupBy.value,
             heat_row_by: rowBy.value,
             heat_col_by: colBy.value,
             compare_by: compareBy.value,
@@ -226,14 +235,11 @@ async function exportPdf(): Promise<void> {
 }
 
 function resetFilters(): void {
-    // The breakdown dimension is not a filter and does not reset with them — it
-    // belongs to its own table, like the heatmap's axes and compare's dimension,
-    // neither of which this button touches.
-    const groupBy = q.group_by ?? null;
+    // The breakdown dimension, the heatmap axes and the compare selection are not
+    // filters and this button does not touch any of them.
     (Object.keys(q) as (keyof ReportQuery)[]).forEach((k) => {
         q[k] = null;
     });
-    q.group_by = groupBy;
     // Not a filter to be cleared: cleared, a report would be about nothing in
     // particular. It goes back to the contest (ADR-0084).
     q.mode = 'competition';
@@ -283,17 +289,37 @@ const funnel = computed(() => {
     ];
 });
 
-// Per-row breakdown bars compare group size (submitted) against the largest group.
-const maxSubmitted = computed(() => Math.max(1, ...(summary.value?.rows ?? []).map((r) => r.submitted)));
+// Per-row bars compare group size (contest competitors) against the largest group.
+const maxParticipants = computed(() =>
+    Math.max(1, ...breakdown.value.map((r) => r.modes.competition.participants))
+);
 
-// Breakdown: client-side search + a cap so a long country list stays navigable.
+// Breakdown: client-side search over the name AND what identifies it, so typing
+// a country finds its regions and venues.
 const breakdownRows = computed(() => {
-    const rows = summary.value?.rows ?? [];
     const term = breakdownSearch.value.trim().toLowerCase();
-    return term ? rows.filter((r) => (r.label ?? '').toLowerCase().includes(term)) : rows;
+    if (!term) return breakdown.value;
+    return breakdown.value.filter((r) =>
+        [r.label ?? '', ...r.sublabels].some((s) => s.toLowerCase().includes(term))
+    );
 });
-const breakdownVisible = computed(() => breakdownRows.value.slice(0, BREAKDOWN_CAP));
-const breakdownHidden = computed(() => Math.max(0, breakdownRows.value.length - BREAKDOWN_CAP));
+const breakdownVisible = computed(() => breakdownRows.value.slice(0, breakdownShown.value));
+const breakdownHidden = computed(() => Math.max(0, breakdownRows.value.length - breakdownShown.value));
+
+/**
+ * The columns the table repeats for each population. The three counts are
+ * children — how many competitors started, submitted, had a mark published
+ * (ADR-0085) — while the average and median are per attempt, a score having no
+ * other unit. Void is not among them: it is an administrator's action on an
+ * attempt, it reads 0 across the whole population, and the Totals tiles keep it.
+ */
+const splitMeasures = computed<{ label: string; tone?: string; raw: (m: ModeMeasures) => number | null }[]>(() => [
+    { label: t('reports.started'), raw: (m) => m.participants },
+    { label: t('reports.submitted'), raw: (m) => m.submitted },
+    { label: t('reports.publishedMeasure'), tone: 'text-green-600', raw: (m) => m.published },
+    { label: t('reports.scoreAvg'), raw: (m) => m.score.avg },
+    { label: t('reports.scoreMedian'), raw: (m) => m.score.median },
+]);
 
 // Heatmap: keep the busiest rows/cols so the grid stays legible at 50–70 members.
 const heatTotals = (pick: (c: { row_key: number; col_key: number; count: number }) => number) =>
@@ -534,61 +560,82 @@ onMounted(async () => {
                     -->
                     <div class="ml-auto flex flex-wrap items-center gap-2 text-xs text-gray-500">
                         <input
-                            v-if="summary.group_by"
                             v-model="breakdownSearch"
                             type="search"
                             :placeholder="$t('reports.searchGroup')"
                             class="w-full rounded-md border border-gray-300 px-3 py-1 text-sm sm:w-56"
                         />
                         <span>{{ $t('reports.groupBy') }}</span>
-                        <select v-model="q.group_by"
+                        <select v-model="groupBy"
                             class="rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-brand-link focus:ring-brand-link"
                             @change="onGroupByChange">
-                            <option :value="null">{{ $t('reports.groupNone') }}</option>
                             <option v-for="g in GROUPS" :key="g" :value="g">{{ groupLabel[g] }}</option>
                         </select>
                     </div>
                 </div>
-                <p v-if="!summary.group_by" class="text-sm text-gray-500">{{ $t('reports.noGroup') }}</p>
-                <div v-else class="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+                <!--
+                    Every measure twice: the contest and practice beside each
+                    other, never added up — a child who sat both is one child in
+                    each column, and one child too many in any total (ADR-0091).
+                -->
+                <p class="mb-2 text-xs text-gray-400">{{ $t('reports.breakdownCounts') }}</p>
+                <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white">
                     <table class="w-full text-sm">
                         <thead class="bg-brand-primary text-left text-xs uppercase tracking-wide text-brand-on-primary">
                             <tr>
-                                <th class="px-4 py-3">{{ groupHeader }}</th>
-                                <th class="px-4 py-3 text-right">{{ $t('reports.registered') }}</th>
-                                <th class="px-4 py-3 text-right">{{ $t('reports.started') }}</th>
-                                <th class="px-4 py-3 text-right">{{ $t('reports.submitted') }}</th>
-                                <th class="px-4 py-3 text-right">{{ $t('reports.publishedMeasure') }}</th>
-                                <th class="px-4 py-3 text-right">{{ $t('reports.void') }}</th>
-                                <th class="px-4 py-3 text-right">{{ $t('reports.scoreAvg') }}</th>
-                                <th class="px-4 py-3 text-right">{{ $t('reports.scoreMedian') }}</th>
+                                <th rowspan="2" class="px-4 py-3 align-bottom">{{ groupHeader }}</th>
+                                <th rowspan="2" class="px-4 py-3 text-right align-bottom">{{ $t('reports.registered') }}</th>
+                                <th v-for="m in splitMeasures" :key="m.label" colspan="2" class="border-l border-white/20 px-4 pt-3 pb-1 text-center">
+                                    {{ m.label }}
+                                </th>
+                            </tr>
+                            <tr class="text-[10px]">
+                                <template v-for="m in splitMeasures" :key="m.label">
+                                    <th class="border-l border-white/20 px-4 pb-2 text-right font-medium">{{ $t('reports.colContest') }}</th>
+                                    <th class="px-4 pb-2 text-right font-medium opacity-80">{{ $t('reports.colPractice') }}</th>
+                                </template>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             <tr v-for="row in breakdownVisible" :key="String(row.key)" class="hover:bg-gray-50">
                                 <td class="px-4 py-2">
                                     <div>{{ row.label ?? $t('common.dash') }}</div>
+                                    <!-- Which one this is: its country, its category, its quiz and exam. -->
+                                    <div v-for="line in row.sublabels" :key="line" class="text-xs text-gray-500">{{ line }}</div>
                                     <div class="mt-1 h-1.5 w-32 overflow-hidden rounded bg-gray-100">
-                                        <div class="h-1.5 rounded bg-brand-primary" :style="{ width: (row.submitted / maxSubmitted) * 100 + '%' }"></div>
+                                        <div class="h-1.5 rounded bg-brand-primary"
+                                            :style="{ width: (row.modes.competition.participants / maxParticipants) * 100 + '%' }"></div>
                                     </div>
                                 </td>
                                 <td class="px-4 py-2 text-right tabular-nums">{{ num(row.registered) }}</td>
-                                <td class="px-4 py-2 text-right tabular-nums">{{ row.started }}</td>
-                                <td class="px-4 py-2 text-right tabular-nums">{{ row.submitted }}</td>
-                                <td class="px-4 py-2 text-right tabular-nums text-green-600">{{ row.published }}</td>
-                                <td class="px-4 py-2 text-right tabular-nums text-amber-600">{{ row.void }}</td>
-                                <td class="px-4 py-2 text-right tabular-nums">{{ num(row.score.avg) }}</td>
-                                <td class="px-4 py-2 text-right tabular-nums">{{ num(row.score.median) }}</td>
+                                <template v-for="m in splitMeasures" :key="m.label">
+                                    <td class="border-l border-gray-100 px-4 py-2 text-right tabular-nums" :class="m.tone">
+                                        {{ num(m.raw(row.modes.competition)) }}
+                                    </td>
+                                    <td class="bg-gray-50/60 px-4 py-2 text-right tabular-nums text-gray-500">
+                                        {{ num(m.raw(row.modes.sample)) }}
+                                    </td>
+                                </template>
                             </tr>
                             <tr v-if="breakdownRows.length === 0">
-                                <td colspan="8" class="px-4 py-6 text-center text-sm text-gray-500">{{ $t('common.dash') }}</td>
+                                <td colspan="12" class="px-4 py-6 text-center text-sm text-gray-500">{{ $t('common.dash') }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <p v-if="summary.group_by && breakdownHidden > 0" class="mt-1 text-xs text-gray-400">
-                    {{ $t('reports.breakdownCapped', { shown: breakdownVisible.length, total: breakdownRows.length }) }}
-                </p>
+                <div v-if="breakdownRows.length > 0" class="mt-2 flex flex-wrap items-center gap-3">
+                    <button
+                        v-if="breakdownHidden > 0"
+                        type="button"
+                        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        @click="breakdownShown += BREAKDOWN_PAGE"
+                    >
+                        {{ $t('reports.loadMore') }}
+                    </button>
+                    <span class="text-xs text-gray-400">
+                        {{ $t('reports.breakdownCapped', { shown: breakdownVisible.length, total: breakdownRows.length }) }}
+                    </span>
+                </div>
             </div>
 
             <!-- Heatmap: average score across two dimensions (defaults country × level) -->
