@@ -40,6 +40,19 @@ final class ReportSummary
     /** Dimensions that describe the registration population. */
     private const REGISTRATION_DIMS = ['country', 'region', 'school', 'level'];
 
+    /**
+     * Dimensions the breakdown lists in full, member by member, whether or not a
+     * child ever sat them. These are the ones an administrator builds — levels,
+     * quizzes, exams, tests — and the empty row is the answer to "did anybody sit
+     * this?", which a missing row does not give. Geography is not on the list:
+     * sixty-nine countries with rows for the ones that never registered is a
+     * longer table, not a better one.
+     */
+    private const COMPLETE_DIMS = ['level', 'quiz', 'exam', 'test'];
+
+    /** The two populations the breakdown always shows side by side. */
+    private const SPLIT_MODES = ['competition', 'sample'];
+
     /** What a report counts unless it is told otherwise: the contest (ADR-0084). */
     public const MODE_DEFAULT = 'competition';
 
@@ -60,6 +73,14 @@ final class ReportSummary
         $totals['registered'] = self::registeredRows($filters, null)[null] ?? 0;
 
         $rows = [];
+        if ($groupBy !== null && ! empty($filters['split_modes'])) {
+            return [
+                'group_by' => $groupBy,
+                'totals' => $totals,
+                'rows' => self::splitRows($filters, $groupBy, ! empty($filters['all_members'])),
+            ];
+        }
+
         if ($groupBy !== null) {
             $measures = self::measures(self::attemptRows($filters, $groupBy), self::scoreStats($filters, $groupBy));
             $registered = in_array($groupBy, self::REGISTRATION_DIMS, true)
@@ -86,6 +107,101 @@ final class ReportSummary
             'group_by' => $groupBy,
             'totals' => $totals,
             'rows' => $rows,
+        ];
+    }
+
+    /**
+     * The breakdown table's rows: every measure given twice, once for the contest
+     * and once for practice, side by side.
+     *
+     * 🔴 The `mode` filter is deliberately NOT applied here. Everywhere else on
+     * the screen it picks one of the two populations, because a number can only
+     * be about one thing; a table with room for two columns does not have to
+     * choose, and seeing them beside each other is the whole point (ADR-0084 says
+     * do not SUM them, not do not show them). What it must never do is add them
+     * up — `participants` is children, and a child who sat both would be counted
+     * once in each column and twice in any total, which is why no total column
+     * exists.
+     *
+     * Counts are children throughout (ADR-0085): started, submitted and published
+     * each ask how many competitors reached that stage, never how many attempts
+     * did. Averages and medians are per attempt — a score has no other unit.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<array<string, mixed>>
+     */
+    private static function splitRows(array $filters, string $groupBy, bool $allMembers): array
+    {
+        $byMode = [];
+        foreach (self::SPLIT_MODES as $mode) {
+            $scoped = array_merge($filters, ['mode' => $mode]);
+            $byMode[$mode] = self::measures(
+                self::attemptRows($scoped, $groupBy),
+                self::scoreStats($scoped, $groupBy),
+            );
+        }
+
+        $registered = in_array($groupBy, self::REGISTRATION_DIMS, true)
+            ? self::registeredRows($filters, $groupBy)
+            : [];
+
+        // Members first, in their own order, so the table reads as the list it is
+        // describing; keys that carry data but are not in that list (an archived
+        // quiz with attempts, say) follow rather than vanish.
+        $members = $allMembers && in_array($groupBy, self::COMPLETE_DIMS, true)
+            ? self::members($groupBy, $filters)
+            : [];
+
+        $dataKeys = array_values(array_unique([
+            ...array_keys($byMode[self::MODE_DEFAULT]),
+            ...array_keys($byMode['sample']),
+            ...array_keys($registered),
+        ]));
+
+        $extra = array_values(array_filter($dataKeys, fn ($k) => $k !== null && ! array_key_exists($k, $members)));
+        usort($extra, fn ($a, $b) => (
+            ($byMode[self::MODE_DEFAULT][$b]['participants'] ?? 0) <=> ($byMode[self::MODE_DEFAULT][$a]['participants'] ?? 0)
+        ));
+
+        $keys = [...array_keys($members), ...$extra];
+        $described = self::describe($groupBy, $keys);
+
+        $rows = [];
+        foreach ($keys as $key) {
+            $rows[] = [
+                'key' => $key,
+                'label' => $members[$key]['label'] ?? ($described[$key]['label'] ?? null),
+                'sublabels' => $members[$key]['sublabels'] ?? ($described[$key]['sublabels'] ?? []),
+                'registered' => in_array($groupBy, self::REGISTRATION_DIMS, true) ? ($registered[$key] ?? 0) : null,
+                'modes' => [
+                    self::MODE_DEFAULT => self::splitMeasures($byMode[self::MODE_DEFAULT][$key] ?? null),
+                    'sample' => self::splitMeasures($byMode['sample'][$key] ?? null),
+                ],
+            ];
+        }
+
+        // Without a member list to follow, the busiest contest row leads.
+        if ($members === []) {
+            usort($rows, fn ($a, $b) => ($b['modes'][self::MODE_DEFAULT]['participants'] <=> $a['modes'][self::MODE_DEFAULT]['participants'])
+                ?: strcmp((string) $a['label'], (string) $b['label']));
+        }
+
+        return $rows;
+    }
+
+    /**
+     * One population's cell values: three counts of children and the score stats.
+     *
+     * @param  array<string, mixed>|null  $m
+     * @return array<string, mixed>
+     */
+    private static function splitMeasures(?array $m): array
+    {
+        return [
+            'participants' => (int) ($m['participants'] ?? 0),
+            'submitted' => (int) ($m['submitted_participants'] ?? 0),
+            'published' => (int) ($m['published_participants'] ?? 0),
+            'score' => $m['score'] ?? self::emptyStats(),
         ];
     }
 
@@ -179,6 +295,15 @@ final class ReportSummary
              * is not a rate of anything.
              */
             DB::raw("count(distinct case when attempts.status <> 'void' then attempts.registration_id end) as participants"),
+            /*
+             * The same question asked of the two stages after it: how many
+             * CHILDREN got that far, not how many attempts did. A breakdown row
+             * that puts children beside attempts invites the subtraction nobody
+             * should make — 61.318 started and 145.780 submitted reads like the
+             * contest gained people halfway through.
+             */
+            DB::raw("count(distinct case when attempts.status = 'completed' then attempts.registration_id end) as submitted_participants"),
+            DB::raw("count(distinct case when attempts.status = 'completed' and attempts.published_at is not null then attempts.registration_id end) as published_participants"),
             DB::raw("sum(case when attempts.status <> 'void' then 1 else 0 end) as started"),
             DB::raw("sum(case when attempts.status = 'completed' then 1 else 0 end) as submitted"),
             DB::raw("sum(case when attempts.status = 'completed' and attempts.published_at is not null then 1 else 0 end) as published"),
@@ -191,6 +316,8 @@ final class ReportSummary
         foreach ($rows as $row) {
             $out[$groupBy === null ? null : $row->gkey] = [
                 'participants' => (int) $row->participants,
+                'submitted_participants' => (int) $row->submitted_participants,
+                'published_participants' => (int) $row->published_participants,
                 'started' => (int) $row->started,
                 'submitted' => (int) $row->submitted,
                 'published' => (int) $row->published,
@@ -497,7 +624,10 @@ final class ReportSummary
 
     private static function emptyMeasures(): array
     {
-        return ['participants' => 0, 'started' => 0, 'submitted' => 0, 'published' => 0, 'void' => 0, 'score' => self::emptyStats()];
+        return [
+            'participants' => 0, 'submitted_participants' => 0, 'published_participants' => 0,
+            'started' => 0, 'submitted' => 0, 'published' => 0, 'void' => 0, 'score' => self::emptyStats(),
+        ];
     }
 
     /**
@@ -508,23 +638,180 @@ final class ReportSummary
      */
     private static function labels(string $groupBy, array $keys): array
     {
+        return array_map(fn (array $d) => (string) $d['label'], self::describe($groupBy, $keys));
+    }
+
+    /**
+     * Label plus the lines that go under it.
+     *
+     * 🔴 A name is not always an identification. "Region 2" is the name of a
+     * region in four different countries, `level_short` repeats across difficulty
+     * categories by design (ADR-0088), and two venues share a name as soon as two
+     * countries both have a "Gymnasium 1". A table listing them without saying
+     * where they belong is not untidy, it is unreadable: the reader cannot tell
+     * which row is theirs. So each of those carries its parent underneath, and a
+     * test — which hangs off an exam, which hangs off a quiz — carries both.
+     *
+     * @param  list<int|string|null>  $keys
+     * @return array<int|string, array{label: string|null, sublabels: list<string>}>
+     */
+    private static function describe(string $dim, array $keys): array
+    {
         $ids = array_values(array_filter($keys, fn ($k) => $k !== null));
         if ($ids === []) {
             return [];
         }
 
-        [$model, $labelColumn] = match ($groupBy) {
-            'country' => [Country::class, 'name'],
-            'region' => [Region::class, 'name'],
-            'school' => [School::class, 'name'],
-            'level' => [DifficultyLevel::class, 'level_short'],
-            'quiz' => [Quiz::class, 'title'],
-            'exam' => [Exam::class, 'title'],
-            'test' => [Test::class, 'title'],
-            default => [Country::class, 'name'],
+        $out = [];
+
+        if ($dim === 'region') {
+            $rows = Region::query()->leftJoin('countries', 'countries.id', '=', 'regions.country_id')
+                ->whereIn('regions.id', $ids)
+                ->get(['regions.id as id', 'regions.name as name', 'countries.name as parent']);
+        } elseif ($dim === 'school') {
+            $rows = School::query()->leftJoin('countries', 'countries.id', '=', 'schools.country_id')
+                ->whereIn('schools.id', $ids)
+                ->get(['schools.id as id', 'schools.name as name', 'countries.name as parent']);
+        } elseif ($dim === 'level') {
+            $rows = DifficultyLevel::query()
+                ->leftJoin('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
+                ->whereIn('difficulty_levels.id', $ids)
+                ->get(['difficulty_levels.id as id', 'difficulty_levels.level_short as name', 'difficulty_categories.name as parent']);
+        } else {
+            [$model, $labelColumn] = match ($dim) {
+                'country' => [Country::class, 'name'],
+                'quiz' => [Quiz::class, 'title'],
+                'exam' => [Exam::class, 'title'],
+                'test' => [Test::class, 'title'],
+                default => [Country::class, 'name'],
+            };
+
+            /** @var QueryBuilder $q */
+            $rows = $model::query()->whereIn('id', $ids)->get(['id', $labelColumn.' as name']);
+        }
+
+        foreach ($rows as $row) {
+            $parent = $row->parent ?? null;
+            $out[(int) $row->id] = [
+                'label' => $row->name,
+                'sublabels' => $parent === null || $parent === '' ? [] : [(string) $parent],
+            ];
+        }
+
+        // An exam belongs to its quiz, a test to both — and the pivots are
+        // many-to-many, so the titles are grouped here rather than concatenated in
+        // SQL (`group_concat` takes a separator on SQLite and a SEPARATOR keyword
+        // on MySQL; the two spellings do not meet).
+        if ($dim === 'exam' || $dim === 'test') {
+            foreach (self::ancestry($dim, $ids) as $id => $lines) {
+                if (isset($out[$id])) {
+                    $out[$id]['sublabels'] = $lines;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * "Quiz: …" for an exam; "Quiz: …" and "Exam: …" for a test.
+     *
+     * @param  list<int|string>  $ids
+     * @return array<int, list<string>>
+     */
+    private static function ancestry(string $dim, array $ids): array
+    {
+        $quizzes = [];
+        $exams = [];
+
+        if ($dim === 'exam') {
+            $rows = DB::table('exam_quiz')
+                ->join('quizzes', 'quizzes.id', '=', 'exam_quiz.quiz_id')
+                ->whereIn('exam_quiz.exam_id', $ids)
+                ->get(['exam_quiz.exam_id as id', 'quizzes.title as quiz_title']);
+        } else {
+            $rows = DB::table('exam_test')
+                ->join('exams', 'exams.id', '=', 'exam_test.exam_id')
+                ->leftJoin('exam_quiz', 'exam_quiz.exam_id', '=', 'exams.id')
+                ->leftJoin('quizzes', 'quizzes.id', '=', 'exam_quiz.quiz_id')
+                ->whereIn('exam_test.test_id', $ids)
+                ->get(['exam_test.test_id as id', 'exams.title as exam_title', 'quizzes.title as quiz_title']);
+        }
+
+        foreach ($rows as $row) {
+            $id = (int) $row->id;
+            if (! empty($row->quiz_title)) {
+                $quizzes[$id][$row->quiz_title] = true;
+            }
+            if (! empty($row->exam_title)) {
+                $exams[$id][$row->exam_title] = true;
+            }
+        }
+
+        $out = [];
+        foreach (array_unique([...array_keys($quizzes), ...array_keys($exams)]) as $id) {
+            $lines = [];
+            if (isset($quizzes[$id])) {
+                $lines[] = 'Quiz: '.implode(', ', array_keys($quizzes[$id]));
+            }
+            if (isset($exams[$id])) {
+                $lines[] = 'Exam: '.implode(', ', array_keys($exams[$id]));
+            }
+            $out[$id] = $lines;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Every member of a dimension, in the order it is taught or built rather than
+     * the order the data happens to fall in.
+     *
+     * 🪤 Levels go by category and position, never alphabetically — `LH` sorts
+     * after `H5` and before `H1` in a list nobody reads that way (ADR-0089).
+     * Exams and tests follow the quiz/exam the filters already narrow to, so the
+     * table lists what the rest of the screen is talking about.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array{label: string|null, sublabels: list<string>}>
+     */
+    private static function members(string $dim, array $filters): array
+    {
+        $ids = match ($dim) {
+            'level' => DifficultyLevel::query()
+                ->leftJoin('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
+                ->orderBy('difficulty_categories.type')->orderBy('difficulty_categories.id')->orderBy('difficulty_levels.position')
+                ->pluck('difficulty_levels.id')->all(),
+            'quiz' => Quiz::query()->where('status', 'active')->orderBy('title')->pluck('id')->all(),
+            'exam' => Exam::query()->where('exams.status', 'active')
+                ->when($filters['quiz_id'] ?? null, fn ($q, $v) => $q->whereIn(
+                    'exams.id',
+                    DB::table('exam_quiz')->where('quiz_id', $v)->select('exam_id')
+                ))
+                ->orderBy('title')->pluck('exams.id')->all(),
+            'test' => Test::query()->where('tests.status', 'active')
+                ->when($filters['exam_id'] ?? null, fn ($q, $v) => $q->whereIn(
+                    'tests.id',
+                    DB::table('exam_test')->where('exam_id', $v)->select('test_id')
+                ))
+                ->when(empty($filters['exam_id']) && ! empty($filters['quiz_id']), fn ($q) => $q->whereIn(
+                    'tests.id',
+                    DB::table('exam_test')
+                        ->join('exam_quiz', 'exam_quiz.exam_id', '=', 'exam_test.exam_id')
+                        ->where('exam_quiz.quiz_id', $filters['quiz_id'])
+                        ->select('exam_test.test_id')
+                ))
+                ->orderBy('title')->pluck('tests.id')->all(),
+            default => [],
         };
 
-        /** @var QueryBuilder $q */
-        return $model::query()->whereIn('id', $ids)->pluck($labelColumn, 'id')->all();
+        $described = self::describe($dim, $ids);
+
+        $out = [];
+        foreach ($ids as $id) {
+            $out[(int) $id] = $described[(int) $id] ?? ['label' => null, 'sublabels' => []];
+        }
+
+        return $out;
     }
 }

@@ -1619,7 +1619,12 @@ export default {
         modeSample: 'Practice only',
         modeAll: 'Both together',
         groupBy: 'Break down by',
-        groupNone: 'No breakdown (totals only)',
+        // The two columns every measure gets. Beside each other, never added:
+        // a child who sat both is one child in each (ADR-0091).
+        colContest: 'Contest',
+        colPractice: 'Practice',
+        breakdownCounts: 'Started, Submitted and Published count competitors; Avg and Median are per attempt.',
+        loadMore: 'Load 10 more',
         groupCountry: 'Country',
         groupRegion: 'Region',
         groupSchool: 'Venue',
@@ -1648,7 +1653,7 @@ export default {
         comparePlaceholder: 'Add members to compare…',
         compareSelected: '{n} selected',
         searchGroup: 'Search…',
-        breakdownCapped: 'Showing {shown} of {total}. Search to find others.',
+        breakdownCapped: 'Showing {shown} of {total}.',
         heatCapped: 'Showing the busiest {rows} rows × {cols} columns.',
         registered: 'Registered',
         // 🪤 People, where 'started' beside it is attempts (ADR-0085).
@@ -1664,8 +1669,6 @@ export default {
         scoreMedian: 'Median',
         scoreCount: 'Scored',
         breakdown: 'Breakdown',
-        group: 'Group',
-        noGroup: 'Choose a “break down by” dimension to see a per-group table.',
         error: 'Could not load the report.',
         anyOption: 'All',
         exportPdf: 'Export PDF',
