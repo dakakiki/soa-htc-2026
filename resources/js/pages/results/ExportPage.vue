@@ -24,7 +24,7 @@ const titled = (rows: { id: number; title: string }[]): SearchSelectOption[] => 
 const countryOptions = computed(() => named(opts.value.countries));
 const regionOptions = computed(() => named(opts.value.regions));
 const venueOptions = computed(() => named(opts.value.schools));
-const levelOptions = computed<SearchSelectOption[]>(() => opts.value.levels.map((l) => ({ id: l.id, label: l.label })));
+const levelOptions = computed<SearchSelectOption[]>(() => opts.value.levels.map((l) => ({ id: l.id, label: l.label, group: l.category_name })));
 const quizOptions = computed(() => titled(opts.value.quizzes));
 const examOptions = computed(() => titled(opts.value.exams));
 const testOptions = computed(() => titled(opts.value.tests));

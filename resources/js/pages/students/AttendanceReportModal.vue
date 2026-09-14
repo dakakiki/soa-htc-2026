@@ -41,7 +41,7 @@ const error = ref<string | null>(null);
 
 const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
 const schoolOptions = computed<SearchSelectOption[]>(() => schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })));
-const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: l.category_name })));
+const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, group: l.category_name })));
 
 const canGenerate = computed(() => schoolId.value !== null && levelIds.value.length > 0 && !working.value);
 

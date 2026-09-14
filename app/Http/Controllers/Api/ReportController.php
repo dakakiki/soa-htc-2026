@@ -528,8 +528,13 @@ class ReportController extends Controller
                     ->when($callerSchoolIds !== null, fn ($q) => $q->whereIn('id', $callerSchoolIds ?? []))
                     ->orderBy('name')->get(['id', 'name'])
                 : [],
-            'levels' => DifficultyLevel::query()->orderBy('position')->get(['id', 'level_short'])
-                ->map(fn (DifficultyLevel $l) => ['id' => $l->id, 'label' => $l->level_short]),
+            // Joined, ordered and named exactly as /api/difficulty-level-options does,
+            // so a level falls under the same heading here as in the Students filter.
+            'levels' => DifficultyLevel::query()
+                ->join('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
+                ->orderBy('difficulty_categories.type')->orderBy('difficulty_categories.id')->orderBy('difficulty_levels.position')
+                ->get(['difficulty_levels.id', 'difficulty_levels.level_short', 'difficulty_categories.name as category_name'])
+                ->map(fn (DifficultyLevel $l) => ['id' => $l->id, 'label' => $l->level_short, 'category_name' => $l->category_name]),
             'quizzes' => Quiz::query()->where('status', 'active')->orderBy('title')->get(['id', 'title']),
             'exams' => $exams,
             'tests' => $tests,

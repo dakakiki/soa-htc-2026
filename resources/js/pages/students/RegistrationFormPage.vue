@@ -51,7 +51,7 @@ const levelOptions = computed<SearchSelectOption[]>(() => {
     }
     return levels.value
         .filter((l) => l.grades.includes(form.grade as number))
-        .map((l) => ({ id: l.id, label: l.level_short, sub: `${l.name} · ${l.category_name}` }));
+        .map((l) => ({ id: l.id, label: l.level_short, sub: l.name, group: l.category_name }));
 });
 const statusOptions = computed(() => [
     { value: 'active', label: t('registration.statusActive'), activeClass: 'bg-green-500 text-white' },

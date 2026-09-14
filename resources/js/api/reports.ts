@@ -38,7 +38,7 @@ export interface ReportFilterOptions {
     countries: { id: number; name: string }[];
     regions: { id: number; name: string }[];
     schools: { id: number; name: string }[];
-    levels: { id: number; label: string }[];
+    levels: { id: number; label: string; category_name: string }[];
     quizzes: { id: number; title: string }[];
     exams: { id: number; title: string }[];
     tests: { id: number; title: string }[];

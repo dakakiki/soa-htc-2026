@@ -7,6 +7,14 @@ export interface MultiSelectOption {
     id: number;
     label: string;
     sub?: string | null;
+    /**
+     * Heading this option belongs under. When any option carries one the list is
+     * drawn in headed sections — the <optgroup> shape the native filter selects
+     * use, so a difficulty level reads the same here as it does there. Sections
+     * keep the order their first option arrives in; with no groups at all the
+     * list renders flat, exactly as before.
+     */
+    group?: string | null;
 }
 
 const props = withDefaults(
@@ -82,10 +90,36 @@ const matches = computed(() => {
     }
     const term = search.value.trim().toLowerCase();
     return term
-        ? props.options.filter((o) => o.label.toLowerCase().includes(term) || (o.sub ?? '').toLowerCase().includes(term))
+        ? props.options.filter(
+            (o) => o.label.toLowerCase().includes(term)
+                || (o.sub ?? '').toLowerCase().includes(term)
+                // Typing a heading keeps that whole section: on a grouped list the
+                // heading is part of what the reader sees, so it is searchable too.
+                || (o.group ?? '').toLowerCase().includes(term),
+        )
         : props.options;
 });
 const filtered = computed(() => matches.value.slice(0, props.limit));
+
+/**
+ * `filtered` split into headed sections. Options are gathered under the heading
+ * they name rather than into runs, so a heading appears once even if its options
+ * arrive apart — the same grouping the native <optgroup> filters build. Without
+ * groups this is a single unnamed section, which renders as the plain list.
+ */
+const sections = computed(() => {
+    const out: { label: string | null; options: MultiSelectOption[] }[] = [];
+    for (const o of filtered.value) {
+        const label = o.group ?? null;
+        let s = out.find((x) => x.label === label);
+        if (!s) {
+            s = { label, options: [] };
+            out.push(s);
+        }
+        s.options.push(o);
+    }
+    return out;
+});
 const hiddenCount = computed(() =>
     props.remote
         ? Math.max(0, (props.total ?? props.options.length) - props.options.length)
@@ -211,16 +245,20 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
             </div>
             <ul class="max-h-56 overflow-y-auto py-1 text-sm">
                 <li v-if="filtered.length === 0" class="px-3 py-2 text-gray-400">{{ remote && searching ? t('common.loading') : t('common.dash') }}</li>
-                <li
-                    v-for="opt in filtered"
-                    :key="opt.id"
-                    class="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-brand-primary-soft"
-                    @click="toggle(opt.id)"
-                >
-                    <input type="checkbox" :checked="isSelected(opt.id)" class="pointer-events-none h-4 w-4" tabindex="-1" />
-                    <span class="flex-1 text-gray-800">{{ opt.label }}</span>
-                    <span v-if="opt.sub" class="text-xs text-gray-400">{{ opt.sub }}</span>
-                </li>
+                <template v-for="sec in sections" :key="sec.label ?? ''">
+                    <li v-if="sec.label" class="bg-gray-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ sec.label }}</li>
+                    <li
+                        v-for="opt in sec.options"
+                        :key="opt.id"
+                        class="flex cursor-pointer items-center gap-2 py-1.5 pr-3 hover:bg-brand-primary-soft"
+                        :class="sec.label ? 'pl-6' : 'pl-3'"
+                        @click="toggle(opt.id)"
+                    >
+                        <input type="checkbox" :checked="isSelected(opt.id)" class="pointer-events-none h-4 w-4" tabindex="-1" />
+                        <span class="flex-1 text-gray-800">{{ opt.label }}</span>
+                        <span v-if="opt.sub" class="text-xs text-gray-400">{{ opt.sub }}</span>
+                    </li>
+                </template>
                 <li v-if="hiddenCount > 0" class="px-3 py-1.5 text-xs text-gray-400">+{{ hiddenCount }} — {{ t('common.search') }}…</li>
             </ul>
             <div v-if="!single && selectedOptions.length" class="flex justify-end border-t border-gray-100 p-2">

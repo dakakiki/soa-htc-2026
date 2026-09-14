@@ -36,7 +36,7 @@ const selected = ref<ExamTestRef[]>([]);
 const rounds = ref<Lookup[]>([]);
 const levels = ref<LevelOption[]>([]);
 const roundOptions = computed<SearchSelectOption[]>(() => rounds.value.map((r) => ({ id: r.id, label: r.name })));
-const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: `${l.name} · ${l.category_name}` })));
+const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: l.name, group: l.category_name })));
 
 const search = ref('');
 const results = ref<Test[]>([]);

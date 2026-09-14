@@ -2699,3 +2699,30 @@ deployment/storage/backup.
   stopu objave po zemlji na isti način na koji je dizala naslovnu (ADR-0084).
 - 🪤 **Procenti u prozoru su bili napisani belim na belom** (`text-white/60`) — nevidljivi. Prozor
   je beo; sada su sivi. Uhvaćeno na ekranu, ne u kodu.
+
+## ADR-0088 — Difficulty Category je svuda naslov grupe, u svakom selectu nivoa
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je na Students-u pokazao kako su nivoi prikazani — pod naslovom svoje
+  difficulty category, kroz `<optgroup>` — i tražio da tako bude **svuda gde se taj select koristi**.
+  Presek je našao **tri različita oblika** iste kontrole: native `<select>` sa `<optgroup>` (Students,
+  Exams, Quizzes, Tests), `SearchSelect` (Register student, Reports, Export, Reset) i `MultiSelect`
+  (Exam, Question, Quiz, Test, Attendance report, SOA Cert).
+- **Odluka:** kategorija se **uvek** vidi kao **naslov grupe**, nikad kao podnaslov opcije i nikad
+  udvojena. Opcija nosi `level_short`, a podnaslov — gde ga ima — **samo pun naziv nivoa**.
+- 🔴 **Zašto nije kozmetika:** `level_short` se **ponavlja kroz kategorije** — `BH · LH · H1…H5`
+  postoje i u „Regular Default" i u „Regular 7", `S1…S5` u obe Special šeme. Reports · Export · Reset
+  su prikazivali **24 stavke u kojima se svaka vidi dvaput**, bez ijednog načina da se razlikuju.
+  Lista nije bila nedosledna nego **neupotrebljiva za izbor**.
+- **Kako:** `SearchSelect` i `MultiSelect` dobijaju **opcioni `group` na opciji**. Ko ga ne postavi,
+  dobija tačno ono što je imao — ista ravna lista, isti `pl-3`. Sekcije se grade **po imenu naslova**,
+  ne po uzastopnim nizovima, pa se naslov pojavi jednom i kad opcije stignu razdvojeno — isto
+  grupisanje koje pravi `levelGroups` na native filterima.
+- ⚡ **Naslov je i pretraživ:** kucanje „special" zadrži obe Special grupe. Važi samo za liste koje
+  imaju grupe, pa nijedan drugi select ne menja ponašanje.
+- 🪤 **Server je morao da se dopiše:** `ReportController` je za `levels` slao samo
+  `['id', 'label']` — kategorija nije ni stizala do fronta. Sada ide isti `join` i **isti redosled**
+  (`categories.type · categories.id · levels.position`) koji koristi `/api/difficulty-level-options`,
+  jer bi inače iste grupe ispale drugačije poređane na dva mesta.
+- **Nedirano:** četiri native `<optgroup>` filtera (Students, Exams, Quizzes, Tests) — oni su bili
+  uzor i već su bili međusobno identični.
