@@ -2525,3 +2525,35 @@ deployment/storage/backup.
 - **Cena:** javna naslovna više ne govori posetiocu da li se ispiti polažu. To nije gubitak: nije ni
   mogla da kaže tačno za sve zemlje, a ko traži ispit ide na takmičarski ulaz, gde odgovor važi baš
   za njega.
+
+## ADR-0082 — Probni ispit se ocenjuje u samoj predaji, jer se sam i objavljuje
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je na STAGE-u predao probni ispit, vratio se na spisak testova i **nije video
+  ocenu** — pitao je zašto, pošto ADR-0019 kaže da se sample rezultati objavljuju sami.
+- **Izmereno na njegovom pokušaju (`184388`), ne prepričano:**
+
+  | | |
+  | --- | --- |
+  | predao | `08:07:35` |
+  | objavljeno | `08:08:01` |
+  | **razmak** | **26 s** |
+
+  Ocenjivanje je posao u redu, a red se pokreće iz cron-a **svakog minuta**
+  (`queue:work --stop-when-empty --max-time=55`), pa je najgori slučaj do minut.
+- 🪤 **I drugi deo odgovora:** spisak se **ne osvežava sam**. Dok ocene nema, red piše „Done" i
+  „Result on the way" — i tako ostaje dok se strana ne učita ponovo. Dva uzroka, jedan simptom.
+- **Odluka:** pokušaj **koji se sam objavljuje** ocenjuje se **unutar predaje**, sinhrono. Takmičarski
+  ostaje u redu: teži je, ocena se ionako ne pokazuje dok je administrator ne objavi (ADR-0021), a
+  ponavljanje koje red daje je ono što garantuje da predaja pod opterećenjem bude ocenjena uopšte.
+- 🪤 **Granica je ista kao za objavu** — `exam_rounds.is_sample`, **ne** `quizzes.quiz_type`. Ključ na
+  bilo čemu drugom znači da se ocenjivanje i objava mogu ne složiti oko istog pokušaja.
+- **Eseji se ne diraju.** `AttemptGrader::grade()` ih i dalje ostavlja na ručnu ocenu i **ne objavljuje**
+  ništa — sinhrono ocenjivanje menja *kada* se izvršava, ne *šta* radi.
+- 🔴 **Zamka koja je oborila prvu verziju:** `dispatchSync()` na poslu koji je `ShouldQueue`
+  **ne izvršava ga odmah** — Laravel ga prosledi `sync` **vezi**. U radu to jeste trenutno, ali pod
+  `Queue::fake()` lažni red to proguta, pa bi ponašanje držalo a **nijedan test ga ne bi video**.
+  Zato se posao poziva direktno (`(new self($attempt))->handle()`), čime zadržava sopstvenu proveru
+  statusa i idempotentnost, a red ostaje van priče.
+- **Cena:** predaja probnog ispita nosi i ocenjivanje. Za nekoliko pitanja sa ponuđenim odgovorima to
+  su milisekunde — jeftinije od minuta čekanja na ekranu koji se ne osvežava.

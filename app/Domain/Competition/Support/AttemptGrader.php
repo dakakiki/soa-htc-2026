@@ -166,6 +166,19 @@ final class AttemptGrader
     }
 
     /**
+     * Whether this attempt's mark publishes itself the moment it is final —
+     * which is to say, whether anybody is waiting on the next screen for it.
+     *
+     * Public because the answer decides more than publication: {@see GradeAttempt}
+     * asks it to know whether grading may wait for the queue's next tick, or
+     * whether the competitor is about to look at the result and find it missing.
+     */
+    public static function publishesItself(Attempt $attempt): bool
+    {
+        return self::inSampleRound($attempt);
+    }
+
+    /**
      * Whether the attempt's test sits in the practice round of an active exam.
      *
      * The ROUND's own flag, never its name: a name is something an administrator

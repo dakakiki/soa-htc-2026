@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
+use App\Domain\Assessment\Models\ExamRound;
 use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\QuestionAnswer;
 use App\Domain\Assessment\Models\Quiz;
@@ -19,6 +20,7 @@ use App\Domain\Organization\Models\Season;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -650,5 +652,46 @@ class AttemptTest extends TestCase
         $this->assertSame(GradingStatus::Queued, $attempt->grading_status);
         $this->assertNull($attempt->score);
         Queue::assertPushed(GradeAttempt::class, fn (GradeAttempt $job) => $job->attempt->id === $attemptId);
+    }
+
+    /**
+     * The other half of the test above, and the difference between them is NOT
+     * the quiz's type — both fixtures are `sample`. It is the round.
+     *
+     * A practice mark publishes itself the moment scoring is final (ADR-0019),
+     * and the screen a competitor lands on after handing in is the one that
+     * shows it. Left to the queue, that mark arrives a cron tick later —
+     * measured on staging at 26 seconds, up to a minute at worst — on a row
+     * that reads «Result on the way» and does not refresh itself. So a run in
+     * the practice round is scored inside the hand-in.
+     */
+    public function test_a_practice_attempt_is_graded_inside_the_hand_in_rather_than_on_the_queue(): void
+    {
+        Queue::fake();
+
+        $token = $this->tokenFor('H2');
+        $c = $this->quizWithTests('H2', 1);
+        $this->putInSampleRound($c['quiz']->id);
+
+        $attemptId = $this->submitAttempt($token, $c['tests'][0], []);
+
+        $attempt = Attempt::findOrFail($attemptId);
+        $this->assertSame(AttemptStatus::Completed, $attempt->status);
+        $this->assertSame(GradingStatus::AutoGraded, $attempt->grading_status);
+        $this->assertNotNull($attempt->score);
+        $this->assertNotNull($attempt->published_at, 'a practice mark publishes itself');
+
+        // And nothing was left for the queue to do afterwards.
+        Queue::assertNotPushed(GradeAttempt::class);
+    }
+
+    /** Put the fixture's exam in the practice round — the flag publication is keyed on. */
+    private function putInSampleRound(int $quizId): void
+    {
+        $round = ExamRound::where('is_sample', true)->first()
+            ?? tap(ExamRound::firstOrFail(), fn (ExamRound $r) => $r->update(['is_sample' => true]));
+
+        Exam::whereKey(DB::table('exam_quiz')->where('quiz_id', $quizId)->value('exam_id'))
+            ->update(['exam_round_id' => $round->id]);
     }
 }
