@@ -98,6 +98,8 @@ class LoadTestStudents extends Command
             return self::SUCCESS;
         }
 
+        $this->waitForGrading();
+
         $attempts = DB::table('attempts')->whereIn('registration_id', $registrations)->pluck('id');
         $answers = DB::table('attempt_answers')->whereIn('attempt_id', $attempts)->delete();
         $count = DB::table('attempts')->whereIn('id', $attempts)->delete();
@@ -105,6 +107,38 @@ class LoadTestStudents extends Command
         $this->info("Reset {$count} attempts and {$answers} answers; {$registrations->count()} competitors kept.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Let the queued grading finish before the attempts are taken away.
+     *
+     * 🔴 Measured the hard way (2026-09-14): a contest attempt's grading is
+     * queued, not done in the request (ADR-0082), and resetting between the
+     * levels of a ramp pulled 1.849 attempts out from under jobs that were still
+     * waiting for them. Every one of them landed in `failed_jobs` as "no query
+     * results for model [Attempt]" — a mess made by the measuring, not by the
+     * thing being measured, and one that looks exactly like a real failure the
+     * next morning.
+     */
+    private function waitForGrading(int $seconds = 120): void
+    {
+        $pending = fn (): int => DB::table('jobs')->where('payload', 'like', '%GradeAttempt%')->count();
+
+        if (($left = $pending()) === 0) {
+            return;
+        }
+
+        $this->line("Waiting for {$left} queued gradings to finish…");
+
+        for ($waited = 0; $waited < $seconds; $waited++) {
+            sleep(1);
+
+            if (($left = $pending()) === 0) {
+                return;
+            }
+        }
+
+        $this->warn("{$left} gradings are still queued and will fail when their attempts go. Is the queue worker running?");
     }
 
     /**
@@ -286,6 +320,8 @@ class LoadTestStudents extends Command
         }
 
         $registrations = $this->syntheticRegistrationIds($tag);
+
+        $this->waitForGrading();
 
         $attempts = DB::table('attempts')->whereIn('registration_id', $registrations)->pluck('id');
 
