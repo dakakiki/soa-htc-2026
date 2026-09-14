@@ -41,7 +41,7 @@ const password = ref('');
 const clearPassword = ref(false);
 
 const levels = ref<LevelOption[]>([]);
-const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: `${l.name} · ${l.category_name}` })));
+const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: l.name, group: l.category_name })));
 
 const search = ref('');
 const results = ref<Exam[]>([]);

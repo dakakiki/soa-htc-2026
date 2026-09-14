@@ -48,7 +48,7 @@ const currentAudio = ref<string | null>(null);
 const tags = ref<Lookup[]>([]);
 const levels = ref<LevelOption[]>([]);
 const tagOptions = computed<SearchSelectOption[]>(() => tags.value.map((tg) => ({ id: tg.id, label: tg.name })));
-const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: `${l.name} · ${l.category_name}` })));
+const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: l.name, group: l.category_name })));
 const showAnswers = computed(() => form.question_type !== 'essay');
 const isGap = computed(() => form.question_type === 'gap_filling');
 

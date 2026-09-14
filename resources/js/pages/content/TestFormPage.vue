@@ -56,7 +56,7 @@ const previewId = ref<number | null>(null);
 const types = ref<Lookup[]>([]);
 const levels = ref<LevelOption[]>([]);
 const typeOptions = computed<SearchSelectOption[]>(() => types.value.map((ty) => ({ id: ty.id, label: ty.name })));
-const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: `${l.name} · ${l.category_name}` })));
+const levelOptions = computed<MultiSelectOption[]>(() => levels.value.map((l) => ({ id: l.id, label: l.level_short, sub: l.name, group: l.category_name })));
 
 const search = ref('');
 const results = ref<Question[]>([]);
