@@ -279,6 +279,18 @@ class AttemptController extends Controller
                 'id' => $attempt->id,
                 'status' => $attempt->status->value,
                 'submitted_at' => $attempt->submitted_at?->toIso8601String(),
+                /*
+                 * Whether the mark is already out. A practice run is graded
+                 * inside this very request (ADR-0082), so by the time this is
+                 * built its result is published and waiting on the tests screen
+                 * — and the hand-in screen must not tell the competitor to come
+                 * back after the round closes for something already there.
+                 *
+                 * The mark itself is deliberately NOT here: this screen is the
+                 * end of a test, and a score beside «Handed in» is the results
+                 * screen's job.
+                 */
+                'published' => $attempt->published_at !== null,
             ],
         ];
     }

@@ -40,6 +40,8 @@ const showConfirm = ref(false);
 const submitted = ref(false);
 const autoSubmitted = ref(false);
 const handedInAt = ref('');
+/** Whether the mark was already out when this was handed in (practice: ADR-0082). */
+const markPublished = ref(false);
 
 // Local answer state, keyed by question id and shaped by the question type.
 const mc = reactive<Record<number, number[]>>({});
@@ -314,7 +316,10 @@ async function submit(auto = false): Promise<void> {
     showConfirm.value = false;
     autoSubmitted.value = auto;
     try {
-        await submitAttempt(student.token ?? '', session.value.attempt.id, buildAnswers());
+        const { data } = await submitAttempt(student.token ?? '', session.value.attempt.id, buildAnswers());
+        // A practice run comes back already marked and published (ADR-0082), and
+        // then the screen must not send the competitor away to wait for it.
+        markPublished.value = data.attempt.published === true;
         handedInAt.value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         submitted.value = true;
         stopTicker();
@@ -428,7 +433,11 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     {{ $t('student.test.done') }}
                 </h1>
                 <p class="mt-4 max-w-[340px] text-[17px] leading-relaxed text-pretty text-white/70">
-                    {{ autoSubmitted ? $t('student.test.timeUp') : $t('student.test.doneBody') }}
+                    <!-- Three lines, not two: the clock running out is one story,
+                         and whether the mark is already out is another. -->
+                    {{ autoSubmitted
+                        ? $t('student.test.timeUp')
+                        : (markPublished ? $t('student.test.doneBodyPublished') : $t('student.test.doneBody')) }}
                 </p>
             </div>
 
