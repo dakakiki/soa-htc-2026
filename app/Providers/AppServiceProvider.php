@@ -107,6 +107,25 @@ class AppServiceProvider extends ServiceProvider
                 ->response(fn (Request $r, array $headers) => $this->tooManyAttempts($headers)),
         ]);
 
+        /*
+         * The quiz password gate. What has to be capped is WRONG PASSWORDS, and
+         * they are counted per session in {@see \App\Http\Controllers\Api\StudentAvailabilityController::unlock()}
+         * — one competitor fumbling their code must not lock out the child beside
+         * them, and a whole exam room typing the RIGHT code is not an attack.
+         *
+         * 🔴 Measured before this existed: the gate was `throttle:8,1`, keyed by
+         * address because a competitor's session is not a Laravel user. Eight
+         * requests a minute per address stops the ninth CHILD, not the ninth
+         * guess — and a venue of three hundred sits behind one router.
+         *
+         * This is the flood ceiling behind the real cap: ten a second from one
+         * address is nobody's exam room.
+         */
+        RateLimiter::for('student-unlock', fn (Request $request): array => [
+            Limit::perMinute(600)->by('ip:'.$request->ip())
+                ->response(fn (Request $r, array $headers) => $this->tooManyAttempts($headers)),
+        ]);
+
         // Coordinator registration (ADR-0053) is the only public endpoint that
         // writes a row AND stores a file, so an unattended script gets a disk
         // bill as well as a queue full of noise. Capped per address as well as

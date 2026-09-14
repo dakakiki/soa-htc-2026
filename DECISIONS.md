@@ -3072,3 +3072,33 @@ venue-u preživi čišćenje.
 - 🪤 **Proba i takmičenje se ne ponašaju isto u predaji:** probni pokušaj se ocenjuje **u zahtevu**
   (ADR-0082), takmičarski ide **u red** — pa kod takmičenja deo troška pada na `queue:work`, a ne na
   web proces.
+
+## ADR-0097 — Lozinka kviza: broje se pogrešne lozinke po takmičaru, ne zahtevi po IP adresi
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO** za `unlock`. ⏳ Ista bolest stoji i na
+  `identify` — čeka vlasnikovu odluku (vidi dole).
+- **Kontekst:** Dok se pripremao test opterećenja (ADR-0096) ispostavilo se da granica koja treba da
+  zaustavi pogađanje zapravo zaustavlja **učionicu**. Vlasnik: *„ako ne može test, kako će ići realna
+  prijava ako svi sede u školi i iza su iste IP?"*
+- 🔴 **Izmereno na živom endpoint-u pre izmene:** prvih osam prolazi, **deveto dete** dobija
+  `429 Too many attempts`. Venue od 300 dece iza jednog rutera: **~37 minuta** samo da otključa
+  lozinku koju već ima u ruci.
+- **Uzrok:** ruta je nosila `throttle:8,1`. Takmičarska sesija **nije** Laravel korisnik, pa se
+  Laravel-ov throttle vraća na **IP adresu** — a učionica je jedna adresa. Granica je merila **ko
+  dolazi**, a trebalo je da meri **ko promašuje**.
+- **Odluka:** broje se **pogrešne lozinke, osam u minuti po SESIJI**, u kontroleru. Iza toga stoji
+  tavanica protiv poplave — **600/min po IP** (`student-unlock`).
+- **Zašto nije slabije:** pogađanje lozinke je po prirodi niz **promašaja** i i dalje staje na osam u
+  minuti; učionica je niz **pogodaka** i više ne staje. Dete koje pogrešno prekuca kod plaća to samo
+  sebi — ne susedu.
+- **Izmereno posle izmene:** 20 različite dece sa jedne adrese, po jedna pogrešna lozinka → **20 × 422,
+  nijedan 429**; jedno dete sa devet promašaja → osam puta 422, pa **429**, i tada mu ni tačna lozinka
+  ne prolazi do isteka minuta.
+
+### ⏳ Ostaje otvoreno: ista stvar na `identify`
+
+`POST /api/student/identify` ima **8 pokušaja u minuti po IP adresi** — ista aritmetika, isti venue,
+ista posledica (~37 minuta za 300 dece, plus ovih ovde). Predlog je isti oblik: **8 _neuspelih_
+prijava/min po IP**, uz **20/sat po broju takmičara** (to je brana za konkretno dete, i nju rotacija
+adrese ne može da zaobiđe) i tavanicu **600/min po IP**. Vlasnik je 14.09 tražio da se prvo pusti
+`unlock` pa da se vidi kako ide.

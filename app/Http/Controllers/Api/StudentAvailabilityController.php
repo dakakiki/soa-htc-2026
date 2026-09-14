@@ -14,9 +14,17 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 
 class StudentAvailabilityController extends Controller
 {
+    /**
+     * Wrong access codes a single competitor may try in a minute. Enough for a
+     * misread card, far too few to work a password out with — and counted per
+     * session, so the room is not punished for one child's typing.
+     */
+    private const WRONG_PASSWORDS_PER_MINUTE = 8;
+
     /**
      * The assessment tree the current competitor may see (CC-06), gated by the
      * registration's difficulty level. The client renders these statuses but is
@@ -52,6 +60,24 @@ class StudentAvailabilityController extends Controller
         $session = $this->session($request);
         $password = (string) $request->input('password', '');
 
+        /*
+         * 🔴 The cap is on WRONG passwords, and it is counted per session
+         * (2026-09-14). The gate used to be `throttle:8,1`, and because a
+         * competitor is not a Laravel user that throttle keyed by address: an
+         * exam room is one address, so the ninth CHILD was refused rather than
+         * the ninth guess, and a venue of three hundred could not open its
+         * papers. Counted here, one competitor mistyping their code costs
+         * nobody else anything, and eight guesses a minute is still nothing to
+         * work a password out with.
+         */
+        $failures = 'unlock-fail:'.$session->id;
+
+        if (RateLimiter::tooManyAttempts($failures, self::WRONG_PASSWORDS_PER_MINUTE)) {
+            return response()->json([
+                'message' => __('Too many attempts. Please wait :minutes minutes and try again.', ['minutes' => 1]),
+            ], 429);
+        }
+
         $quiz = Quiz::query()
             ->where('status', 'active')
             ->whereKey((int) $request->route('quiz'))
@@ -59,6 +85,8 @@ class StudentAvailabilityController extends Controller
             ->first();
 
         if ($quiz === null || ! $quiz->requiresPassword() || ! $quiz->passwordMatches($password)) {
+            RateLimiter::hit($failures, 60);
+
             return response()->json(['message' => __('We could not unlock this quiz. Please check the password and try again.')], 422);
         }
 
