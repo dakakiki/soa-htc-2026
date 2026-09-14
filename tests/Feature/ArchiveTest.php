@@ -167,4 +167,32 @@ class ArchiveTest extends TestCase
         $this->actingAs(User::factory()->create())->getJson('/api/archive/rounds')->assertForbidden();
         $this->actingAs(User::factory()->create())->getJson('/api/archive/summary?round=13')->assertForbidden();
     }
+
+    /**
+     * The level list comes back in the order the levels are taught, not the order
+     * they spell. Sorted as text, LH — the second level a child meets — lands after
+     * H5, and the list reads as broken rather than as alphabetical. The archive
+     * keeps a level as a bare short code, so the order can only come from matching
+     * those codes against the levels we still hold.
+     *
+     * 🪤 The rows go in deliberately out of order, so neither insertion order nor
+     * the alphabet can carry this test by accident.
+     */
+    public function test_the_level_filter_is_in_taught_order_not_alphabetical(): void
+    {
+        $this->seedArchive();
+
+        $now = now();
+        $rows = [];
+        foreach (['H5', 'BH', 'H1', 'LH'] as $i => $short) {
+            $rows[] = ['season_id' => 1, 'round_number' => 13, 'competitor_number' => '1310000'.$i, 'name' => '', 'country' => 'Serbia', 'region' => 'Vojvodina', 'venue' => 'School A', 'school_external' => null, 'level' => $short, 'grade' => 6, 'attendance' => null, 'archived_at' => $now];
+        }
+        DB::table('archive_registrations')->insert($rows);
+
+        $levels = $this->actingAs($this->admin())->getJson('/api/archive/summary?round=13')
+            ->assertOk()->json('filters.levels');
+
+        // Alphabetically this would be BH, H1, H2, H3, H5, LH.
+        $this->assertSame(['BH', 'LH', 'H1', 'H2', 'H3', 'H5'], $levels);
+    }
 }

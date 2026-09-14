@@ -126,6 +126,25 @@ class ArchiveController extends Controller
         $breakdown = $this->byDimension($round, $hasCountry ? 'region' : 'country', $hasCountry ? $country : null, $region, $level, null, $school);
         $breakdown['dimension'] = $hasCountry ? 'region' : 'country';
 
+        /*
+         * The order the levels are taught in, keyed by the short code the archive
+         * stores. The archive keeps a level as a bare string, so this is the only
+         * way to put the list in a sensible order — and it has to be put in one:
+         * sorted as text, LH (Little Hippo, the second level a child meets) lands
+         * after H5, which reads as a broken list rather than an alphabetical one.
+         * A code the archive holds but the level table no longer does keeps its
+         * place, alphabetically, after the ones we still know.
+         */
+        $levelRank = DB::table('difficulty_levels')
+            ->join('difficulty_categories', 'difficulty_categories.id', '=', 'difficulty_levels.difficulty_category_id')
+            ->orderBy('difficulty_categories.type')
+            ->orderBy('difficulty_categories.id')
+            ->orderBy('difficulty_levels.position')
+            ->pluck('difficulty_levels.level_short')
+            ->unique()
+            ->values()
+            ->flip();
+
         return response()->json([
             'round' => $round,
             'totals' => [
@@ -151,7 +170,9 @@ class ArchiveController extends Controller
                     ->distinct()->orderBy('venue')->pluck('venue'),
                 'levels' => DB::table('archive_registrations')->where('round_number', $round)
                     ->whereNotNull('level')->where('level', '!=', '')
-                    ->distinct()->pluck('level')->unique()->values(),
+                    ->distinct()->pluck('level')->unique()
+                    ->sortBy(fn (string $l) => sprintf('%03d|%s', $levelRank[$l] ?? 999, $l))
+                    ->values(),
             ],
         ]);
     }

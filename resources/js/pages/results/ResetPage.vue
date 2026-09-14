@@ -98,8 +98,12 @@ async function loadCandidates(): Promise<void> {
 
 async function onCountryChange(id: number | null): Promise<void> {
     q.country_id = id;
+    // Coordinator is country-scoped like region and venue, and goes with them: left
+    // set, one with no venue in the new country would keep narrowing the candidates
+    // to venues the country filter already excludes.
     q.region_id = null;
     q.school_id = null;
+    q.coordinator_user_id = null;
     await loadOptions();
     await loadCandidates();
 }

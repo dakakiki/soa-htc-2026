@@ -492,11 +492,26 @@ class ReportController extends Controller
         $callerSchoolIds = $this->callerSchoolIds();
 
         $coordinators = User::query()
+            // Two separate `active`s, and both have to hold: the season assignment
+            // may be live while the account behind it is closed.
+            ->where('status', 'active')
             ->when($seasonId, fn ($q) => $q->whereHas('seasonAssignments', fn ($a) => $a
                 ->where('season_id', $seasonId)
                 ->where('status', 'active')
                 ->whereIn('role_id', $coordinatorRoleIds)))
             ->when(! $seasonId, fn ($q) => $q->whereRaw('1 = 0'))
+            /*
+             * Narrowed by the chosen country the same way the report itself is: a
+             * coordinator reaches the venues on their active assignments, so the one
+             * offered here is the one who has a venue in that country. Matching on
+             * `users.country_id` instead would be a second, quieter definition of
+             * where a coordinator belongs, and the two are free to drift apart.
+             */
+            ->when($countryId && $seasonId, fn ($q) => $q->whereHas('seasonAssignments', fn ($a) => $a
+                ->where('season_id', $seasonId)
+                ->where('status', 'active')
+                ->whereIn('role_id', $coordinatorRoleIds)
+                ->whereHas('schools', fn ($sc) => $sc->where('schools.country_id', $countryId))))
             // A scoped reader is offered the coordinators of their own venues only.
             ->when($callerSchoolIds !== null, fn ($q) => $q->whereHas(
                 'seasonAssignments',

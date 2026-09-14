@@ -2726,3 +2726,45 @@ deployment/storage/backup.
   jer bi inače iste grupe ispale drugačije poređane na dva mesta.
 - **Nedirano:** četiri native `<optgroup>` filtera (Students, Exams, Quizzes, Tests) — oni su bili
   uzor i već su bili međusobno identični.
+
+## ADR-0089 — Koordinator se bira po zemlji i mora da bude otvoren nalog; arhivski nivoi idu redom kojim se uče
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je na Results-u tražio tri stvari: da se na **Reports** i **Reset attempts**
+  spisak koordinatora učitava prema izabranoj zemlji i da nosi samo aktivne, i pitao jesu li nivoi
+  na **Archive** dobri.
+
+### Koordinatori (Reports · Reset attempts)
+
+- **Dva `active`-a, oba moraju da važe.** Upit je do sada gledao samo status **dodele**
+  (`season_user_assignments.status`), a ne i status **naloga** (`users.status`) — zatvoren nalog sa
+  živom dodelom je i dalje bio u ponudi. Sada se traže oba.
+  🪤 Izmereno 14.09: danas to **ne menja nijedan red** — svih 97 koordinatora ima otvoren nalog.
+  Pravilo ipak ulazi u upit, jer ga podatak trenutno ispunjava slučajno a ne po konstrukciji.
+- **Zemlja se čita kroz venue-e, ne kroz `users.country_id`.** Koordinator doseže venue-e svojih
+  aktivnih dodela (`allowedSchoolIds()`), i izveštaj se po njemu sužava upravo tako. Da se picker
+  vodio poljem `users.country_id`, postojale bi **dve definicije** iste stvari koje slobodno mogu da
+  se raziđu.
+  ⚡ Provereno nad pravom bazom: dve definicije se **nigde ne razilaze** (87 poklapanja, 0 razlika,
+  0 koordinatora preko više zemalja).
+- 🪤 **Deset koordinatora nema nijedan venue** i zato ispadaju čim se izabere zemlja. To je tačno:
+  njihov opseg je **prazan**, pa izbor bilo kog od njih i danas daje **prazan izveštaj**. Bez
+  izabrane zemlje i dalje stoje u spisku — ponašanje se nije menjalo.
+- **Izabrani koordinator se čisti kad se promeni zemlja**, uz region i venue. Ostavljen, sužavao bi
+  populaciju na venue-e koje filter zemlje ionako isključuje — prazan odgovor bez vidljivog uzroka.
+  Ovo **nije** kršenje pravila „filteri se ne čiste sami": to pravilo zabranjuje da `load()` dira
+  filtere, a ovde kaskadu pokreće sam korisnik, isto kao što region i venue već rade.
+
+### Arhivski nivoi (Archive)
+
+- 🔴 **Bili su abecedni, i to se čitalo kao pokvarena lista.** Arhiva pamti nivo kao **go string**,
+  a filter ga je vraćao bez ijednog `orderBy` (jedini od četiri filtera bez njega). Ispadalo je
+  `BH · H1 · H2 · H3 · H4 · H5 · LH · S1…`, dakle **LH — drugi nivo koji dete sretne — sedmi**.
+- **Sada se ređa po redosledu kojim se nivoi uče**, dobijenom iz `difficulty_levels` po istom
+  `join`-u i istom redosledu koji koristi `/api/difficulty-level-options`:
+  `BH · LH · H1…H5 · S1…S5`. Kod koji arhiva ima a tabela nivoa više ne — ostaje na kraju, abecedno.
+- ❌ **Grupisanje po kategoriji ovde NIJE uvedeno** (za razliku od ADR-0088): isti kod postoji u dve
+  Regular šeme, pa se iz arhivskog stringa **ne može znati** kojoj kategoriji pripada. Grupisati bi
+  značilo izmisliti podatak.
+- 🪤 **Raspodele `by_level` i `by_grade` i dalje idu „najveći prvi"** — nisu dirane. Posledica je da
+  se ose čitaju izmešano (ocene ispadnu `6, 5, 4, 3, 7…`). Ostavljeno vlasniku na odluku.

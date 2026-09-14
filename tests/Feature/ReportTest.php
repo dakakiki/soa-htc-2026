@@ -493,4 +493,64 @@ class ReportTest extends TestCase
         $this->actingAs($this->admin())->getJson('/api/reports/summary?mode=practice')
             ->assertStatus(422)->assertJsonValidationErrors('mode');
     }
+
+    /**
+     * A school coordinator bound to one venue, with the account open or closed.
+     * The assignment is active either way — that is the point of the closed case.
+     */
+    private function coordinatorFor(School $school, string $email, string $status): User
+    {
+        $user = User::query()->create([
+            'name' => 'Coordinator '.(++$this->seq),
+            'email' => $email,
+            'password' => 'secret-password',
+            'country_id' => $school->country_id,
+            'status' => $status,
+        ]);
+
+        $assignment = SeasonUserAssignment::create([
+            'season_id' => $this->seasonId,
+            'user_id' => $user->id,
+            'role_id' => Role::where('key', SystemRole::SchoolCoordinator->value)->value('id'),
+            'status' => 'active',
+        ]);
+        $assignment->schools()->sync([$school->id]);
+
+        return $user->refresh();
+    }
+
+    /**
+     * The coordinator picker narrows with the country, and offers only accounts that
+     * are open. Both halves are the rule rather than a description of the data:
+     *
+     * - a coordinator reaches the venues on their active assignments, so the country
+     *   that may offer them is the country those venues are in — not whatever
+     *   `users.country_id` happens to say, which is a second and quieter definition;
+     * - a closed account is never offered, even while its assignment is still live.
+     *   The two `active` flags are independent and both have to hold.
+     */
+    public function test_the_coordinator_picker_follows_the_country_and_skips_closed_accounts(): void
+    {
+        $rs = (int) Country::where('code', 'RS')->value('id');
+        $mk = (int) Country::where('code', 'MK')->value('id');
+
+        $here = School::where('country_id', $rs)->firstOrFail();
+        $there = School::create(['country_id' => $mk, 'name' => 'Elsewhere Gymnasium', 'status' => 'active']);
+
+        $open = $this->coordinatorFor($here, 'open@soahtc.test', 'active');
+        $closed = $this->coordinatorFor($here, 'closed@soahtc.test', 'inactive');
+        $abroad = $this->coordinatorFor($there, 'abroad@soahtc.test', 'active');
+
+        $all = $this->actingAs($this->admin())->getJson('/api/reports/filters')
+            ->assertOk()->json('coordinators.*.id');
+        $this->assertContains($open->id, $all);
+        $this->assertContains($abroad->id, $all);
+        $this->assertNotContains($closed->id, $all, 'a closed account is never offered');
+
+        $inSerbia = $this->actingAs($this->admin())->getJson("/api/reports/filters?country_id={$rs}")
+            ->assertOk()->json('coordinators.*.id');
+        $this->assertContains($open->id, $inSerbia);
+        $this->assertNotContains($abroad->id, $inSerbia, 'no venue in the chosen country');
+        $this->assertNotContains($closed->id, $inSerbia);
+    }
 }

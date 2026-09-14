@@ -136,9 +136,14 @@ async function loadOptions(): Promise<void> {
 
 async function onCountryChange(id: number | null): Promise<void> {
     q.country_id = id;
-    // Region and school are country-scoped — reset and reload their options.
+    // Region, school and coordinator are country-scoped — reset and reload their
+    // options. The coordinator goes with them: a chosen one who has no venue in the
+    // new country is gone from the list, and left set it would keep narrowing the
+    // report to venues the country filter already excludes — an empty answer with
+    // no visible cause.
     q.region_id = null;
     q.school_id = null;
+    q.coordinator_user_id = null;
     await loadOptions();
     await loadSummary();
 }
