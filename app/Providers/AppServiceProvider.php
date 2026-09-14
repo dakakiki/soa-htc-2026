@@ -100,8 +100,23 @@ class AppServiceProvider extends ServiceProvider
         // little against someone with a date-of-birth list. Both caps say WHY
         // they refused; the screen showed "check your details and try again",
         // which sent people to re-read a number that was right all along.
+        /*
+         * 🔴 The per-address cap counts FAILED identifications, and it is counted
+         * in {@see \App\Http\Controllers\Api\StudentAuthController::identify()}
+         * rather than here (2026-09-14). Eight ARRIVALS a minute per address was
+         * measured against the thing it exists for — an exam room — and it closed
+         * the door on it: a venue of three hundred sits behind one router, so the
+         * ninth CHILD was told "Too many attempts" and the room needed
+         * thirty-seven minutes to sign in. A sweep down a list of dates of birth
+         * is almost all failures; a room is all successes. That is the difference
+         * worth counting, and it was not the one being counted.
+         *
+         * What stays here: a flood ceiling — ten a second from one address is
+         * nobody's exam room — and the per-number cap, which is the guard for a
+         * targeted child and the one thing address rotation cannot dodge.
+         */
         RateLimiter::for('student-identify', fn (Request $request): array => [
-            Limit::perMinute(8)->by('ip:'.$request->ip())
+            Limit::perMinute(600)->by('ip:'.$request->ip())
                 ->response(fn (Request $r, array $headers) => $this->tooManyAttempts($headers)),
             Limit::perMinutes(60, 20)->by('num:'.(string) $request->input('competitor_number'))
                 ->response(fn (Request $r, array $headers) => $this->tooManyAttempts($headers)),

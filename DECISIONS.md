@@ -3095,10 +3095,14 @@ venue-u preživi čišćenje.
   nijedan 429**; jedno dete sa devet promašaja → osam puta 422, pa **429**, i tada mu ni tačna lozinka
   ne prolazi do isteka minuta.
 
-### ⏳ Ostaje otvoreno: ista stvar na `identify`
+### ✅ Dopuna istog dana: isto i na `identify`
 
 `POST /api/student/identify` ima **8 pokušaja u minuti po IP adresi** — ista aritmetika, isti venue,
 ista posledica (~37 minuta za 300 dece, plus ovih ovde). Predlog je isti oblik: **8 _neuspelih_
 prijava/min po IP**, uz **20/sat po broju takmičara** (to je brana za konkretno dete, i nju rotacija
-adrese ne može da zaobiđe) i tavanicu **600/min po IP**. Vlasnik je 14.09 tražio da se prvo pusti
-`unlock` pa da se vidi kako ide.
+adrese ne može da zaobiđe) i tavanicu **600/min po IP**. Vlasnik je 14.09 prvo pustio `unlock`, video kako ide, pa rekao „uradi isto i za identify" — pa je i
+to unutra: **8 neuspelih prijava/min po IP** (u kontroleru), **20/sat po broju takmičara** i tavanica
+**600/min po IP**. Izmereno posle: **25 dece sa tačnim podacima sa jedne adrese → 25 × 200**;
+deset promašaja sa iste adrese → osam puta 422, pa **429**.
+🪤 Uspeh **ne briše** potrošene promašaje — skripta ne može da kupi nove pokušaje time što jednom
+pogodi između njih.

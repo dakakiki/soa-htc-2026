@@ -324,4 +324,61 @@ class StudentIdentifyTest extends TestCase
 
         $this->withToken($token)->getJson('/api/student/me')->assertUnauthorized();
     }
+
+    /**
+     * 🔴 An exam room is one address, and all of it has to be able to sign in.
+     *
+     * The per-address cap used to count arrivals: eight a minute, so the ninth
+     * CHILD was refused rather than the ninth guess. Measured on the endpoint
+     * before this changed — a venue of three hundred behind one router needed
+     * thirty-seven minutes to identify, and the competitors who were refused were
+     * told to go back and re-read details that were right all along.
+     */
+    public function test_a_whole_room_identifies_from_one_address(): void
+    {
+        foreach (range(1, 20) as $i) {
+            // 🪤 The helper hands out one fixed number; a room needs twenty.
+            $registration = $this->registration([
+                'competitor_number' => '14'.str_pad((string) $i, 6, '0', STR_PAD_LEFT), 'sequence' => $i,
+            ]);
+
+            $this->postJson('/api/student/identify', $this->payload($registration))
+                ->assertOk()
+                ->assertJsonStructure(['token']);
+        }
+    }
+
+    /**
+     * And the sweep it exists to stop is unaffected: wrong details from one
+     * address still run out after eight in a minute — counted on the failures,
+     * which is what a sweep is made of.
+     *
+     * 🪤 A success does not clear the count. The eight failures already spent
+     * stay spent for the minute, so a script cannot buy itself more guesses by
+     * getting one right in between.
+     */
+    public function test_failures_still_run_out_even_between_successful_arrivals(): void
+    {
+        $wrong = $this->payload(
+            $this->registration(['competitor_number' => '14000009', 'sequence' => 9]),
+            ['date_of_birth' => '2000-01-01'],
+        );
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->postJson('/api/student/identify', $wrong)->assertStatus(422);
+        }
+
+        // A real child signs in from the same room, between the guesses.
+        $this->postJson('/api/student/identify', $this->payload(
+            $this->registration(['competitor_number' => '14000010', 'sequence' => 10]),
+        ))->assertOk();
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->postJson('/api/student/identify', $wrong)->assertStatus(422);
+        }
+
+        $this->postJson('/api/student/identify', $wrong)
+            ->assertStatus(429)
+            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'Too many attempts'));
+    }
 }

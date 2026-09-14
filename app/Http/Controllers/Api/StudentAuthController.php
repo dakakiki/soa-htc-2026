@@ -16,10 +16,19 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
 class StudentAuthController extends Controller
 {
+    /**
+     * Failed identifications a single address may make in a minute. Enough for a
+     * room re-reading a card, nowhere near enough to work down a list of dates of
+     * birth — and successes do not count against it, because a roomful of
+     * children signing in correctly is not an attack.
+     */
+    private const FAILED_IDENTIFICATIONS_PER_MINUTE = 8;
+
     /**
      * Web identification: competitor_number + country + date of birth. All three
      * must match one active registration in the active season. Any mismatch is
@@ -48,6 +57,25 @@ class StudentAuthController extends Controller
             return response()->json(['message' => $shut], Response::HTTP_CONFLICT);
         }
 
+        /*
+         * 🔴 What has to be capped per address is FAILED identifications. Working
+         * down a list of dates of birth is a run of failures; an exam room is a
+         * run of successes, and the two used to be counted together — eight a
+         * minute per address, which is the ninth CHILD refused rather than the
+         * ninth guess. Measured on a venue of three hundred behind one router:
+         * thirty-seven minutes to sign a room in (2026-09-14).
+         *
+         * The guard for one targeted child is elsewhere and untouched: twenty an
+         * hour per competitor_number, which address rotation cannot dodge.
+         */
+        $failures = 'identify-fail:'.$request->ip();
+
+        if (RateLimiter::tooManyAttempts($failures, self::FAILED_IDENTIFICATIONS_PER_MINUTE)) {
+            return response()->json([
+                'message' => __('Too many attempts. Please wait :minutes minutes and try again.', ['minutes' => 1]),
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         $registration = Registration::query()
             ->where('status', 'active')
             ->when(SeasonContext::active(), fn ($q, $season) => $q->where('season_id', $season->id))
@@ -57,6 +85,8 @@ class StudentAuthController extends Controller
             ->first();
 
         if ($registration === null) {
+            RateLimiter::hit($failures, 60);
+
             return response()->json(['message' => __('We could not verify your details. Please check and try again.')], 422);
         }
 
