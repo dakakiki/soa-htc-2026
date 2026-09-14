@@ -2557,3 +2557,16 @@ deployment/storage/backup.
   statusa i idempotentnost, a red ostaje van priče.
 - **Cena:** predaja probnog ispita nosi i ocenjivanje. Za nekoliko pitanja sa ponuđenim odgovorima to
   su milisekunde — jeftinije od minuta čekanja na ekranu koji se ne osvežava.
+
+## ADR-0083 — Ekran posle predaje ne šalje takmičara da čeka ocenu koju već ima
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** ADR-0082 je probni ispit počeo da ocenjuje u samoj predaji. Time je ekran „Handed in"
+  počeo da laže: tekst je bezuslovan i glasi *„Marks are published after the round closes, and they
+  appear on your tests screen"* — a kod probnog ispita ocena je **već objavljena**, u istoj sekundi.
+  Uhvaćeno **na ekranu**, odmah posle puštanja ADR-0082 na STAGE.
+- **Odluka:** `completedPayload` nosi i **`published`**, a ekran bira rečenicu prema njemu. Takmičarski
+  tekst ostaje netaknut — tamo je i dalje tačan (ADR-0021).
+- 🪤 **Ocena sama NIJE na tom ekranu, i to je namerno.** Ekran posle predaje je kraj ispita; broj pored
+  „Handed in" je posao ekrana sa rezultatima, gde stoji uz sve ostale. Zato `published` da, `score` ne.
+- **Cena:** jedan podatak više na žici i jedan tekst više u prevodu.

@@ -673,7 +673,14 @@ class AttemptTest extends TestCase
         $c = $this->quizWithTests('H2', 1);
         $this->putInSampleRound($c['quiz']->id);
 
-        $attemptId = $this->submitAttempt($token, $c['tests'][0], []);
+        $attemptId = (int) $this->withToken($token)
+            ->postJson("/api/student/tests/{$c['tests'][0]->id}/start")->json('attempt.id');
+
+        // The hand-in itself says the mark is already out, so the screen it
+        // returns to does not send the competitor away to wait for it.
+        $this->withToken($token)->postJson("/api/student/attempts/{$attemptId}/submit", ['answers' => []])
+            ->assertOk()
+            ->assertJsonPath('attempt.published', true);
 
         $attempt = Attempt::findOrFail($attemptId);
         $this->assertSame(AttemptStatus::Completed, $attempt->status);

@@ -571,6 +571,10 @@ export default {
             done: 'Handed in',
             doneBody: 'Your answers are with us. Marks are published after the round closes,'
                 + ' and they appear on your tests screen.',
+            // 🪤 The line above is the contest's, and it is wrong for practice:
+            // a sample run is marked inside the hand-in and published with it
+            // (ADR-0082), so there is nothing to wait for.
+            doneBodyPublished: 'Your answers are marked. Your result is waiting on your tests screen.',
             timeUp: 'Time ran out, so your answers were handed in for you.',
             summaryTest: 'Test',
             summaryAnswered: 'Answered',

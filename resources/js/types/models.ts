@@ -105,6 +105,8 @@ export interface AttemptSummary {
     expires_at?: string;
     remaining_seconds?: number;
     submitted_at?: string | null;
+    /** Set on a completed attempt: whether its mark is already out (ADR-0082). */
+    published?: boolean;
 }
 
 /**
