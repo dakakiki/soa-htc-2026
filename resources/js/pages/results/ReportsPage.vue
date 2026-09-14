@@ -247,15 +247,25 @@ const measureRows: { key: keyof ReportMeasures; label: string; tone?: string }[]
 
 const num = (v: number | null | undefined): string => (v === null || v === undefined ? t('common.dash') : String(v));
 
-// Derived rates turn raw counts into insight (guard division by zero → null = dash).
+/**
+ * Derived rates turn raw counts into insight (guard division by zero → null =
+ * dash) — and carry the two numbers they are made of, so the percentage can be
+ * checked rather than taken on trust (owner, 14.09).
+ */
 const rateTiles = computed(() => {
     const tot = summary.value?.totals;
     const pct = (n: number, d: number): number | null => (d > 0 ? Math.round((n / d) * 100) : null);
+    const tile = (label: string, hint: string, n?: number, d?: number) => ({
+        label,
+        hint,
+        value: tot && n !== undefined && d !== undefined ? pct(n, d) : null,
+        of: tot && n !== undefined && d !== undefined ? `${n.toLocaleString()} / ${d.toLocaleString()}` : null,
+    });
     return [
         // People over people (ADR-0085). Attempts over people read 134%.
-        { label: t('reports.rateParticipation'), hint: t('reports.rateParticipationHint'), value: tot ? pct(tot.participants, tot.registered) : null },
-        { label: t('reports.rateCompletion'), hint: t('reports.rateCompletionHint'), value: tot ? pct(tot.submitted, tot.started) : null },
-        { label: t('reports.ratePublish'), hint: t('reports.ratePublishHint'), value: tot ? pct(tot.published, tot.submitted) : null },
+        tile(t('reports.rateParticipation'), t('reports.rateParticipationHint'), tot?.participants, tot?.registered),
+        tile(t('reports.rateCompletion'), t('reports.rateCompletionHint'), tot?.submitted, tot?.started),
+        tile(t('reports.ratePublish'), t('reports.ratePublishHint'), tot?.published, tot?.submitted),
     ];
 });
 
@@ -486,6 +496,8 @@ onMounted(async () => {
                     <div v-for="r in rateTiles" :key="r.label" class="rounded-lg border border-gray-200 bg-white px-4 py-3">
                         <div class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ r.label }}</div>
                         <div class="mt-1 text-2xl font-semibold tabular-nums">{{ r.value === null ? $t('common.dash') : r.value + '%' }}</div>
+                        <!-- The two numbers the percentage is made of. -->
+                        <div class="text-sm tabular-nums text-gray-600">{{ r.of ?? $t('common.dash') }}</div>
                         <div class="text-xs text-gray-400">{{ r.hint }}</div>
                     </div>
                 </div>

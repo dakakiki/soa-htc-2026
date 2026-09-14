@@ -226,16 +226,17 @@ class ReportTest extends TestCase
         $this->assertEquals(8, $rows['North Macedonia']['score']['avg']);
     }
 
-    public function test_group_by_a_content_dimension_leaves_registered_null(): void
+    public function test_a_content_row_carries_its_own_registered_count(): void
     {
         $c = $this->content();
         $this->attempt($this->registration(), $c, 'completed', 5.0);
 
         $response = $this->actingAs($this->admin())->getJson('/api/reports/summary?group_by=test')->assertOk();
 
-        // Registered is registration-level, so it is null per content-dimension row
-        // (but still present as the population total).
-        $this->assertNull($response->json('rows.0.registered'));
+        // 🪤 It used to be null here, on the grounds that a registration is not
+        // attached to a test. It reaches one through the difficulty levels the
+        // test is built for, and the column no longer has a hole in it.
+        $this->assertSame(1, $response->json('rows.0.registered'));
         $this->assertSame(1, $response->json('rows.0.submitted'));
         $this->assertSame($c['test']->id, $response->json('rows.0.key'));
         $this->assertSame(1, $response->json('totals.registered'));
@@ -783,5 +784,43 @@ class ReportTest extends TestCase
 
         // Geography is not listed in full — only the countries that carry scores.
         $this->assertCount(1, $matrix['rows']);
+    }
+
+    /**
+     * The registered column is filled on every row, content included — the same
+     * children are registered whether the report is about the contest or about
+     * practice, and a quiz row without a denominator says nothing about how many
+     * of those who could sit it did (owner, 14.09).
+     *
+     * A content row reaches the registrations through the difficulty levels it is
+     * built for: `content()` builds its quiz, exam and test at H2, so a child
+     * registered at H2 counts, and a child at H3 does not.
+     */
+    public function test_a_content_row_counts_the_children_registered_at_its_levels(): void
+    {
+        $content = $this->content();
+        $atLevel = $this->registration();
+        $this->attempt($atLevel, $content, 'completed', 5.0);
+        $this->registration();
+
+        // A third child sits a level this quiz is not built for.
+        $elsewhere = $this->registration();
+        $elsewhere->update(['difficulty_level_id' => DifficultyLevel::where('level_short', 'H3')->firstOrFail()->id]);
+
+        foreach (['quiz', 'exam', 'test'] as $dim) {
+            $row = collect($this->actingAs($this->admin())
+                ->getJson("/api/reports/summary?group_by={$dim}")->assertOk()->json('rows'))
+                ->firstWhere('participants', 1);
+
+            $this->assertNotNull($row, $dim);
+            $this->assertSame(2, $row['registered'], "{$dim}: the two children registered at H2");
+        }
+
+        // And it does not move with the test type: the same children either way.
+        $registered = fn (string $mode) => $this->actingAs($this->admin())
+            ->getJson("/api/reports/summary?group_by=quiz&mode={$mode}")->assertOk()->json('rows.0.registered');
+
+        $this->assertSame(2, $registered('competition'));
+        $this->assertSame(2, $registered('sample'));
     }
 }

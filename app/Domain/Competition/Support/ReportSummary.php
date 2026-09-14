@@ -33,12 +33,20 @@ use Illuminate\Support\Facades\DB;
  *  - void      = attempts reset by an admin (5e).
  * `registered` counts registrations in the population scope (season, geography,
  * coordinator, level) and — being registration- not attempt-level — ignores the
- * content filters (quiz/exam/test) and is null for content group_by rows.
+ * content filters (quiz/exam/test) and the test type: the same children are
+ * registered whichever of the two a report is about. A content row reaches them
+ * through the difficulty levels that content is built for.
  */
 final class ReportSummary
 {
     /** Dimensions that describe the registration population. */
     private const REGISTRATION_DIMS = ['country', 'region', 'school', 'level'];
+
+    /**
+     * Dimensions that describe the content. They reach the registrations through
+     * the difficulty levels they are built for — see {@see self::registeredRows()}.
+     */
+    private const CONTENT_DIMS = ['quiz', 'exam', 'test'];
 
     /**
      * Dimensions the breakdown lists in full, member by member, whether or not a
@@ -72,9 +80,9 @@ final class ReportSummary
         $rows = [];
         if ($groupBy !== null) {
             $measures = self::measures(self::attemptRows($filters, $groupBy), self::scoreStats($filters, $groupBy));
-            $registered = in_array($groupBy, self::REGISTRATION_DIMS, true)
-                ? self::registeredRows($filters, $groupBy)
-                : [];
+            // Every dimension now has a registered count: geography and level
+            // straight off the registration, content through its levels.
+            $registered = self::registeredRows($filters, $groupBy);
 
             /*
              * Members first, in their own order, so the table reads as the list it
@@ -97,9 +105,7 @@ final class ReportSummary
                 $row['key'] = $key;
                 $row['label'] = $members[$key]['label'] ?? ($described[$key]['label'] ?? null);
                 $row['sublabels'] = $members[$key]['sublabels'] ?? ($described[$key]['sublabels'] ?? []);
-                $row['registered'] = in_array($groupBy, self::REGISTRATION_DIMS, true)
-                    ? ($registered[$key] ?? 0)
-                    : null;
+                $row['registered'] = $registered[$key] ?? 0;
                 $rows[] = $row;
             }
 
@@ -352,6 +358,41 @@ final class ReportSummary
             ->leftJoin('schools as s', 'r.school_id', '=', 's.id');
 
         self::applyPopulationFilters($query, $filters, registrationTable: 'r');
+
+        /*
+         * A quiz, an exam and a test each carry the difficulty levels they are
+         * for, and a registration carries the level the child sits at — so the
+         * registered column for a content row is the children **registered at
+         * that content's levels**: how many could sit it, against how many did.
+         *
+         * 🔴 It used to be a dash there, on the grounds that a registration is
+         * not attached to a test. True, but it leaves the one column that does
+         * not change between the contest and practice empty in half the tables —
+         * and the reader has no denominator at all (owner, 14.09).
+         *
+         * 🪤 `count(distinct r.id)`, because content for several levels joins the
+         * same registration once per level.
+         */
+        if (in_array($groupBy, self::CONTENT_DIMS, true)) {
+            [$pivot, $column] = match ($groupBy) {
+                'quiz' => ['difficulty_level_quiz', 'quiz_id'],
+                'exam' => ['difficulty_level_exam', 'exam_id'],
+                default => ['difficulty_level_test', 'test_id'],
+            };
+
+            $rows = $query
+                ->join($pivot.' as p', 'p.difficulty_level_id', '=', 'r.difficulty_level_id')
+                ->select([DB::raw("p.$column as gkey"), DB::raw('count(distinct r.id) as registered')])
+                ->groupBy(DB::raw("p.$column"))
+                ->get();
+
+            $out = [];
+            foreach ($rows as $row) {
+                $out[$row->gkey] = (int) $row->registered;
+            }
+
+            return $out;
+        }
 
         // Only registration dimensions can group the population; for content
         // group_by we still return the overall total under the null key.
