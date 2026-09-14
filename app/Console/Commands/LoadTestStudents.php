@@ -11,6 +11,7 @@ use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Support\SeasonContext;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -48,7 +49,8 @@ class LoadTestStudents extends Command
         {--country=RS : ISO code of the country they are registered in}
         {--tag=loadtest : Marker for the venue and the output file}
         {--cleanup : Delete everything this tag created, and nothing else}
-        {--force : Required on a production environment}';
+        {--reset : Delete only their attempts, so the same competitors can sit the test again}
+        {--force : Required to CREATE rows on a production environment}';
 
     protected $description = 'Create (or remove) synthetic competitors with live sessions, for load testing the exam engine';
 
@@ -56,13 +58,73 @@ class LoadTestStudents extends Command
     {
         $tag = (string) $this->option('tag');
 
+        if ($this->option('cleanup')) {
+            return $this->cleanup($tag);
+        }
+
+        if ($this->option('reset')) {
+            return $this->reset($tag);
+        }
+
+        /*
+         * Only creation is guarded. Removing and resetting touch nothing but rows
+         * carrying both markers — that is the whole design — and a guard that
+         * makes the undo harder than the do is a guard pointing the wrong way.
+         */
         if (app()->environment('production') && ! $this->option('force')) {
             $this->error('This writes rows on a production environment. Re-run with --force if that is what you mean.');
 
             return self::FAILURE;
         }
 
-        return $this->option('cleanup') ? $this->cleanup($tag) : $this->create($tag);
+        return $this->create($tag);
+    }
+
+    /**
+     * Clear the attempts and leave the competitors standing, so the same roomful
+     * can sit the same test again.
+     *
+     * 🪤 A competitor sits a given test once: `start` resumes or refuses the
+     * second time (ADR-0016). Without this, the second level of a ramp would be
+     * measuring the refusal rather than the exam.
+     */
+    private function reset(string $tag): int
+    {
+        $registrations = $this->syntheticRegistrationIds($tag);
+
+        if ($registrations->isEmpty()) {
+            $this->info('Nothing to reset.');
+
+            return self::SUCCESS;
+        }
+
+        $attempts = DB::table('attempts')->whereIn('registration_id', $registrations)->pluck('id');
+        $answers = DB::table('attempt_answers')->whereIn('attempt_id', $attempts)->delete();
+        $count = DB::table('attempts')->whereIn('id', $attempts)->delete();
+
+        $this->info("Reset {$count} attempts and {$answers} answers; {$registrations->count()} competitors kept.");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * The registrations carrying BOTH markers — the tag's venue and the
+     * synthetic number block. Everything destructive goes through here.
+     *
+     * @return Collection<int, int>
+     */
+    private function syntheticRegistrationIds(string $tag)
+    {
+        $venue = School::query()->where('name', $this->venueName($tag))->first();
+
+        if ($venue === null) {
+            return collect();
+        }
+
+        return Registration::query()
+            ->where('school_id', $venue->id)
+            ->where('competitor_number', 'like', self::NUMBER_PREFIX.'%')
+            ->pluck('id');
     }
 
     private function create(string $tag): int
@@ -223,10 +285,7 @@ class LoadTestStudents extends Command
             return self::SUCCESS;
         }
 
-        $registrations = Registration::query()
-            ->where('school_id', $venue->id)
-            ->where('competitor_number', 'like', self::NUMBER_PREFIX.'%')
-            ->pluck('id');
+        $registrations = $this->syntheticRegistrationIds($tag);
 
         $attempts = DB::table('attempts')->whereIn('registration_id', $registrations)->pluck('id');
 
