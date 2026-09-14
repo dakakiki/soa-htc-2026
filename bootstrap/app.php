@@ -7,6 +7,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -68,9 +70,47 @@ return Application::configure(basePath: dirname(__DIR__))
          * this pattern either — the segment boundary is part of it).
          */
         $middleware->validateCsrfTokens(except: ['api/student/*']);
+
+        /*
+         * Authenticate the competitor BEFORE the route's models are looked up.
+         *
+         * 🪤 Without this the order is the other way round, and it answers a
+         * question it was never asked. `SubstituteBindings` rides in the `api`
+         * group, which runs ahead of a route's own middleware, so an unsigned
+         * caller asking for an attempt that does not exist was told **404 with
+         * the model's class path**, while asking for one that does exist got
+         * 401. The difference is an oracle: anyone could sit outside and learn
+         * which attempt ids are real. Measured against staging on 2026-09-14,
+         * where `api/student/*` is deliberately open even behind the site's
+         * password — and on production it is open by nature.
+         *
+         * Running the check first makes both answers 401, which is the honest
+         * one: a caller with no token has no business knowing either way.
+         */
+        $middleware->prependToPriorityList(
+            before: SubstituteBindings::class,
+            prepend: EnsureStudentSession::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        /*
+         * A 404 says that and no more.
+         *
+         * Laravel turns a missing bound model into a `NotFoundHttpException` and
+         * keeps its message — `No query results for model [App\Domain\…\Attempt]
+         * 184387` — which it then hands to the caller as JSON even with
+         * `APP_DEBUG=false`. That is the application's own namespace, and the id
+         * that was asked for, read out to anyone who mistypes an address.
+         */
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json(['message' => 'Not found.'], 404);
+            }
+
+            return null;
+        });
     })->create();
