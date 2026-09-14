@@ -2770,5 +2770,11 @@ deployment/storage/backup.
 - ❌ **Grupisanje po kategoriji ovde NIJE uvedeno** (za razliku od ADR-0088): isti kod postoji u dve
   Regular šeme, pa se iz arhivskog stringa **ne može znati** kojoj kategoriji pripada. Grupisati bi
   značilo izmisliti podatak.
-- 🪤 **Raspodele `by_level` i `by_grade` i dalje idu „najveći prvi"** — nisu dirane. Posledica je da
-  se ose čitaju izmešano (ocene ispadnu `6, 5, 4, 3, 7…`). Ostavljeno vlasniku na odluku.
+- 🔴 **Raspodele `by_level` i `by_grade` više NE idu „najveći prvi"** (vlasnik, isti dan:
+  *„ne može najveći prvi, uvek idu po istom redosledu kao i svuda"*). Obe ose su **ordinalne** —
+  nivoi napreduju, ocene rastu — pa ređanje po visini stupca razbija baš onu osu duž koje se gleda,
+  i susedni stupci prestaju da budu oni koje vredi porediti. Bilo je `H1 · LH · H3 · H2 · H4 · BH · H5`
+  i `6 · 5 · 4 · 3 · 7 · 8 · 2 · 9 · 10 · 1 · 11 · 12 · 13`; sada nivoi idu redom kojim se uče,
+  a ocene rastu od 1.
+- `distribution()` zato više ne sortira u SQL-u nego prima **ključ za redosled** po koloni: nivoi
+  dele istu rang-mapu sa filterom iznad, ocene idu numerički. Jedno pravilo, jedno mesto.
