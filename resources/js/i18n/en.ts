@@ -1590,6 +1590,12 @@ export default {
         quiz: 'Quiz',
         exam: 'Exam',
         test: 'Test',
+        // 🪤 Not "filter by" — practice and the contest are two populations, and
+        // the sum of them was what this screen used to show (ADR-0084).
+        mode: 'Counting',
+        modeCompetition: 'The contest',
+        modeSample: 'Practice only',
+        modeAll: 'Both together',
         groupBy: 'Break down by',
         groupNone: 'No breakdown (totals only)',
         groupCountry: 'Country',

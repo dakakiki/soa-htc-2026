@@ -2570,3 +2570,44 @@ deployment/storage/backup.
 - 🪤 **Ocena sama NIJE na tom ekranu, i to je namerno.** Ekran posle predaje je kraj ispita; broj pored
   „Handed in" je posao ekrana sa rezultatima, gde stoji uz sve ostale. Zato `published` da, `score` ne.
 - **Cena:** jedan podatak više na žici i jedan tekst više u prevodu.
+
+## ADR-0084 — Reports broji takmičenje; proba je posebna populacija, ne sabirak
+
+- **Status:** Prihvaćeno (2026-09-14). **IMPLEMENTIRANO.**
+- **Kontekst:** Vlasnik je 14.09, planirajući brojač ponavljanja probnog ispita, pročitao da funnel
+  broji probu i takmičenje zajedno i rekao: *„to nisu iste stvari… mora jasno da se odvoji."*
+- **Izmereno nad celom populacijom, ne procenjeno:**
+
+  | | |
+  | --- | --- |
+  | PREDATO, kako je funnel pokazivao | **184.389** |
+  | od toga **proba** | **38.676** — **21,0 %** |
+  | od toga takmičenje | 145.713 |
+
+- 🔴 **A objava je bila iskrivljena gore od same primese.** Proba se objavljuje **sama** (ADR-0019),
+  pa joj je stopa objave **100 % po konstrukciji**:
+
+  | | Objavljeno | Predato | Stopa |
+  | --- | ---: | ---: | ---: |
+  | Kako je pisalo | 144.769 | 184.389 | **78,5 %** |
+  | Samo takmičenje | 106.093 | 145.713 | **72,8 %** |
+
+  Skoro **šest procentnih poena** ulepšavanja na broju koji meri **dokle je administrator stigao sa
+  objavom** — 38.676 automatski objavljenih proba koje niko nije objavio.
+- **Tri razloga zašto nisu jedna populacija:** drugi ljudi ih polažu, objava se ponaša drugačije, i
+  **proba se ponavlja** dok je takmičenje jedan pokušaj (ADR-0016). Zbir preko toga ne odgovara ni na
+  jedno pitanje.
+- **Odluka:** Reports podrazumevano broji **takmičenje**. Proba se vidi kad se izričito traži:
+  `mode` = `competition` (podrazumevano) · `sample` · `all`, na sva tri kraja (`summary`, `matrix`,
+  `export-pdf`), i kao vidljiva kontrola **„Counting"** na ekranu.
+- ⚠️ **Menja brojeve koje je vlasnik do sada gledao** — predato `184.389 → 145.713`, objavljeno
+  `144.769 → 106.093`. To je ispravka, i zato kontrola stoji na ekranu a ne skrivena u URL-u.
+- 🪤 **Granica je RUNDA (`exam_rounds.is_sample`)**, kao kod `ResultLedger` i `AttemptGrader` —
+  nikad `attempts.is_practice`. Izmereno: kolona i runda se slažu na **svih 184.389 redova**, u oba
+  smera, i kolona je neznatno jeftinija (**29 ms** naspram **32 ms** nad celom tabelom). Ali kolona se
+  žigoše iz **tipa kviza**, a svaka odluka u sloju rezultata donosi se nad **rundom**. Ključ na dve
+  različite stvari znači da Reports jednog dana može da se ne složi sa ledger-om oko istog pokušaja, a
+  tri milisekunde nisu razlog za to.
+- 🪤 **`resetFilters` ga NE briše** — očišćen, izveštaj ne bi bio ni o čemu. Vraća se na takmičenje.
+- **Ne dira:** `registered` (to su registracije, ne pokušaji) ni sloj rezultata, koji probu ionako
+  isključuje od ADR-0027.

@@ -39,6 +39,12 @@ final class ReportSummary
     /** Dimensions that describe the registration population. */
     private const REGISTRATION_DIMS = ['country', 'region', 'school', 'level'];
 
+    /** What a report counts unless it is told otherwise: the contest (ADR-0084). */
+    public const MODE_DEFAULT = 'competition';
+
+    /** @var list<string> */
+    public const MODES = ['competition', 'sample', 'all'];
+
     /**
      * @param  array<string, mixed>  $filters  normalized: season_id, country_id,
      *                                         region_id, school_id, difficulty_level_id, quiz_id, exam_id, test_id,
@@ -312,8 +318,51 @@ final class ReportSummary
 
         self::applyPopulationFilters($query, $filters, registrationTable: 'r');
         self::applyContentFilters($query, $filters);
+        self::applyMode($query, $filters);
 
         return $query;
+    }
+
+    /**
+     * Which contest this report is about — and by default it is THE contest.
+     *
+     * 🔴 Until 2026-09-14 there was no such choice and every count was both at
+     * once. Measured on the real population: of 184.389 submitted attempts,
+     * 38.676 — **one in five** — were practice. Worse for the publication rate,
+     * because a practice mark publishes ITSELF (ADR-0019), so its rate is 100%
+     * by construction: the headline read 144.769 of 184.389 published (78,5%),
+     * while the contest's own rate was 106.093 of 145.713 (72,8%). Nearly six
+     * points of flattery on the one number that is supposed to measure how far
+     * an administrator has got.
+     *
+     * Three reasons they are not one population: different people sit them,
+     * publication behaves differently, and practice REPEATS while the contest is
+     * one attempt (ADR-0016). A sum over the two answers no question anybody has.
+     *
+     * 🪤 Keyed on the ROUND's `is_sample`, like {@see ResultLedger} and
+     * {@see AttemptGrader} — never on `attempts.is_practice`. The two agree on
+     * all 184.389 rows today (measured, in both directions), and the column is
+     * marginally cheaper (29 ms against 32 ms over the whole table), but the
+     * column is stamped from the QUIZ's type while every results decision is
+     * made on the round. Keyed differently, Reports could one day disagree with
+     * the ledger about the same attempt, and three milliseconds is not a reason.
+     */
+    private static function applyMode($query, array $filters): void
+    {
+        $mode = $filters['mode'] ?? self::MODE_DEFAULT;
+
+        if ($mode === 'all') {
+            return;
+        }
+
+        $inSample = fn ($q) => $q->selectRaw('1')
+            ->from('exam_test as mt')
+            ->join('exams as me', 'me.id', '=', 'mt.exam_id')
+            ->join('exam_rounds as mr', 'mr.id', '=', 'me.exam_round_id')
+            ->whereColumn('mt.test_id', 'attempts.test_id')
+            ->where('mr.is_sample', true);
+
+        $mode === 'sample' ? $query->whereExists($inSample) : $query->whereNotExists($inSample);
     }
 
     /** Filters and groupings that read a column on `registrations` (or on `schools`, which hangs off it). */

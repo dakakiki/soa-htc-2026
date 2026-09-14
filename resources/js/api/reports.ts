@@ -41,6 +41,13 @@ export interface ReportFilterOptions {
 
 export type GroupBy = 'country' | 'region' | 'school' | 'level' | 'quiz' | 'exam' | 'test';
 
+/**
+ * Which contest a report is about (ADR-0084). Not a filter like the others:
+ * practice is a different population that publishes itself and repeats, so a
+ * sum over the two answers no question. Omitted, the server reads 'competition'.
+ */
+export type ReportMode = 'competition' | 'sample' | 'all';
+
 export interface ReportQuery {
     country_id?: number | null;
     region_id?: number | null;
@@ -51,6 +58,7 @@ export interface ReportQuery {
     exam_id?: number | null;
     test_id?: number | null;
     group_by?: GroupBy | null;
+    mode?: ReportMode | null;
 }
 
 /**
