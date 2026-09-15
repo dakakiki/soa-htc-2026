@@ -30,13 +30,54 @@ interface BeforeInstallPromptEvent extends Event {
     readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-/*
- * 🔴 PRIVREMENO, ZA SREDJIVANJE IZGLEDA (2026-09-15) — MORA IZAC PRE SPAJANJA.
- * Dok se dogovaraju izgled i tekst, dugme stoji na svakoj sirini i bez obzira
- * na to da li pregledac nudi instalaciju; na `dev.lcl` on to nikad ne nudi,
- * jer nudi samo preko https. Na `false` se vraca pravo ponasanje.
+/**
+ * The offer is switched on per device, and is off for everybody else.
+ *
+ * The application is on staging before the client sees it there, and a
+ * half-finished install bar has no business standing on the screen during a
+ * demonstration. So nothing is offered to anybody until the address is opened
+ * once with `?pwa=1`; the answer is remembered in that browser, and `?pwa=0`
+ * forgets it again.
+ *
+ * It is per device on purpose: installing is a thing a phone does, so the
+ * switch has to be thrown on the phone that will do it, not in a setting on a
+ * desktop somewhere.
+ *
+ * 🪤 `localStorage` throws rather than returns null in a browser that has
+ * blocked site data, and a thrown getter here would take the whole layout
+ * down with it.
  */
-const DESIGN_PREVIEW = false;
+const OFFER_KEY = 'pwa-install-offer';
+
+function deviceWantsTheOffer(): boolean {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    const asked = new URLSearchParams(window.location.search).get('pwa');
+
+    try {
+        if (asked !== null) {
+            if (asked === '0') {
+                window.localStorage.removeItem(OFFER_KEY);
+
+                return false;
+            }
+
+            window.localStorage.setItem(OFFER_KEY, '1');
+
+            return true;
+        }
+
+        return window.localStorage.getItem(OFFER_KEY) === '1';
+    } catch {
+        // No storage: the switch cannot be remembered, so honour the address
+        // for this page and nothing more.
+        return asked !== null && asked !== '0';
+    }
+}
+
+const offered = ref(false);
 
 const { t } = useI18n();
 
@@ -80,7 +121,9 @@ const isIos = computed<boolean>(() => {
  * can at least show the way. Never when it is already installed: an offer to do
  * what is done reads as a bug.
  */
-const visible = computed<boolean>(() => DESIGN_PREVIEW || (!installed.value && (deferred.value !== null || isIos.value)));
+const visible = computed<boolean>(
+    () => offered.value && ! installed.value && (deferred.value !== null || isIos.value),
+);
 
 function onBeforeInstallPrompt(event: Event): void {
     // Keeping the event is what stops the browser from handling it its own way,
@@ -116,6 +159,7 @@ function showIos(): void {
 }
 
 onMounted(() => {
+    offered.value = deviceWantsTheOffer();
     installed.value = detectInstalled();
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
     window.addEventListener('appinstalled', onInstalled);
@@ -128,8 +172,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div v-if="visible" class="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3"
-        :class="DESIGN_PREVIEW ? '' : 'lg:hidden'">
+    <div v-if="visible" class="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3 lg:hidden">
         <div
             v-if="showIosPanel"
             class="w-[17.5rem] rounded-xl border border-brand-palette-4/10 bg-white p-4 shadow-xl"
