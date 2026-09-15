@@ -7,6 +7,7 @@ import { useStudentSessionStore } from '@/stores/studentSession';
 import { useThemeStore } from '@/stores/theme';
 import { getSiteStatus } from '@/api/publicContent';
 import SiteSeasonStrip from '@/components/public/SiteSeasonStrip.vue';
+import PwaInstallButton from '@/components/PwaInstallButton.vue';
 import Tooltip from '@/components/Tooltip.vue';
 import type { SiteStatus } from '@/types/models';
 
@@ -58,6 +59,10 @@ async function signOut(): Promise<void> {
 <template>
     <div class="flex min-h-screen flex-col bg-[#fbfaf8] text-brand-palette-4">
         <SiteSeasonStrip v-if="!bare" :site="site" class="hidden lg:block" />
+
+        <!-- Not during a test: that screen paints its own chrome and the
+             competitor has one thing to do on it. -->
+        <PwaInstallButton v-if="!bare" />
 
         <header v-if="!bare" class="border-b border-brand-palette-4/12">
             <div class="mx-auto flex w-full max-w-[1240px] items-center gap-4 px-6 py-3 lg:py-5">
