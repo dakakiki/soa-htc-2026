@@ -3405,3 +3405,24 @@ sa dva oblika i „navy" varijanta deljenih polja; **vraćena je na vlasnikov za
   drugo nije poznato dok tri podatka nisu data (ADR-0077).
 - **Zatvorena struja** to kaže i nudi struje koje **su** otvorene, pokazujući na ekrane aplikacije a
   ne sajta.
+
+### ✅ Dopuna istog dana: **ekran ispita je izuzetak — deli se**
+
+Vlasnik, 15.09, posle što je studentska grana bila gotova: *„govorim o izmenama u responsive. da ne
+moramo da pravimo posebne ekrane"*. Ekrani **4c** (ispit u toku) i **4d** (predato) **ne dobijaju svoju
+kopiju** — `/student/tests/:id` ostaje jedan ekran za oba sveta.
+
+Razlog stoji uz pravilo, ne protiv njega: taj ekran **već ne crta nikakvu ljusku** (`bare` od ADR-0014),
+pa nema ljuske koju bi trebalo razdvajati — on je isti ekran sa obe strane. Ono što se razlikuje je
+**veličina**, a to je responsive posao.
+
+- Sve ispod `lg` je spušteno jedan stepen: pitanje **21 → 18px**, tekst **17 → 15px**, odgovor
+  **56 → 44px** visine sa manjim tipom. `lg:` vrednosti su nedirnute, pa se desktop nije pomerio.
+- ⚠️ **Odgovor ostaje na 44px.** To je kontrola zbog koje ekran postoji, a 44px je pod za nešto što
+  desetogodišnjak tapka pod satom. Ispod toga ide samo **traka sa brojevima pitanja** (28px), gde
+  promašaj znači jedan tap više a ne pogrešan odgovor.
+- **Traka sa brojevima i HAND IN se ne smanjuju** — to su dve stvari za kojima takmičar poseže.
+- 🪝 Ekran ispita je zato i **jedini koji mora da pita `inApp()`**: njegova dva izlaza su vodila na
+  sajtovu listu ispita i izbacivala dete iz instaliranog okvira (PR #74).
+
+**4d ostaje kako je** — vlasnik: „moze da ostane kako jeste. koristi postojeci".

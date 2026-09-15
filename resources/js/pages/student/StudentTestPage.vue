@@ -548,11 +548,24 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
             </div>
         </div>
 
+        <!--
+            🪤 Every size below `lg` is set a step smaller than the desktop's, and
+            the `lg:` values are untouched. The owner's decision of 2026-09-15:
+            the phone gets RESPONSIVE changes and not screens of its own — "da ne
+            moramo da pravimo posebne ekrane" — because this is the one screen the
+            app and the website share, and it already draws no chrome either side
+            (the rest of the app's screens are its own: ADR-0103).
+            So: the question and its answers shrink, and the two things a
+            candidate reaches for — the question strip and HAND IN — do not.
+            ⚠️ An answer stays at `min-h-11` (44px). It is the control the whole
+            screen exists for, and 44px is the floor for something a ten-year-old
+            taps against a clock; only the secondary number chips go below it.
+        -->
         <div class="mx-auto grid w-full max-w-[1240px] flex-1 gap-10 px-5 pt-5 lg:grid-cols-12 lg:gap-14 lg:px-6 lg:pt-9">
             <div class="lg:col-span-8">
                 <!-- How to answer this test, stated once — authored on the test
                      itself rather than repeated into the first question. -->
-                <div v-if="testIntro" class="rich-text border-l-[3px] border-brand-palette-3 py-0.5 pl-4 text-[15px] leading-relaxed text-brand-palette-4/70"
+                <div v-if="testIntro" class="rich-text border-l-[3px] border-brand-palette-3 py-0.5 pl-4 text-[14px] leading-relaxed text-brand-palette-4/70 lg:text-[15px]"
                     v-html="testIntro"></div>
 
                 <div
@@ -562,8 +575,8 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     :data-index="qi"
                     :style="{ scrollMarginTop: anchorOffset }"
                     :class="qi === 0
-                        ? 'mt-6 lg:mt-8'
-                        : 'mt-8 border-t border-brand-palette-4/12 pt-7 lg:mt-9'"
+                        ? 'mt-5 lg:mt-8'
+                        : 'mt-7 border-t border-brand-palette-4/12 pt-6 lg:mt-9 lg:pt-7'"
                 >
                     <!-- Headings the author put in front of this question: the
                          paper's own words, in the same voice as the test's
@@ -571,7 +584,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     <div
                         v-for="(note, ni) in notesBefore(qi)"
                         :key="`note-${qi}-${ni}`"
-                        class="rich-text mb-5 border-l-[3px] border-brand-palette-3 py-0.5 pl-4 text-[15px] leading-relaxed text-brand-palette-4/70"
+                        class="rich-text mb-4 border-l-[3px] border-brand-palette-3 py-0.5 pl-4 text-[14px] leading-relaxed text-brand-palette-4/70 lg:mb-5 lg:text-[15px]"
                         v-html="note.body"
                     ></div>
 
@@ -582,20 +595,20 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     </p>
 
                     <!-- Admin-authored rich text. -->
-                    <h2 v-if="q.title" class="rich-text mt-3 text-[21px] font-medium leading-[1.35] tracking-[-0.02em] text-pretty lg:text-[26px] lg:leading-[1.3]"
+                    <h2 v-if="q.title" class="rich-text mt-2.5 text-[18px] font-medium leading-[1.4] tracking-[-0.02em] text-pretty lg:mt-3 lg:text-[26px] lg:leading-[1.3]"
                         v-html="q.title"></h2>
-                    <div v-if="q.description" class="rich-text mt-3 text-[17px] leading-[1.6] text-pretty text-brand-palette-4/80 lg:text-[19px] lg:leading-[1.7]"
+                    <div v-if="q.description" class="rich-text mt-2.5 text-[15px] leading-[1.55] text-pretty text-brand-palette-4/80 lg:mt-3 lg:text-[19px] lg:leading-[1.7]"
                         v-html="renderedDescription(q)"></div>
 
                     <img v-if="q.image_url" :src="q.image_url" alt="" class="mt-4 max-h-80 rounded-xl object-contain" />
                     <audio v-if="q.audio_url" :src="q.audio_url" controls class="mt-4 w-full"></audio>
 
                     <!-- Multiple choice -->
-                    <div v-if="q.question_type === 'multiple_choice'" class="mt-5 flex flex-col gap-2.5">
+                    <div v-if="q.question_type === 'multiple_choice'" class="mt-4 flex flex-col gap-2 lg:mt-5 lg:gap-2.5">
                         <label
                             v-for="(opt, oi) in q.options"
                             :key="opt.id"
-                            class="flex min-h-14 cursor-pointer items-center gap-3.5 rounded-2xl px-4 py-3 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-palette-4/40 lg:gap-4 lg:px-5"
+                            class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-palette-4/40 lg:min-h-14 lg:gap-4 lg:rounded-2xl lg:px-5 lg:py-3"
                             :class="(mc[q.id] ?? []).includes(opt.id)
                                 ? 'border-[1.5px] border-brand-palette-4 bg-white'
                                 : 'border border-brand-palette-4/16 hover:border-brand-palette-4/35'"
@@ -607,14 +620,14 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                                 :class="[mono, 'text-[12px]', (mc[q.id] ?? []).includes(opt.id) ? 'font-semibold text-brand-palette-4' : 'text-brand-palette-4/45']"
                                 class="shrink-0"
                             >{{ answerMarker(q.answer_numbering, oi) }}</span>
-                            <span class="flex-1 text-[16px] leading-[1.4] lg:text-[17px]">{{ opt.text }}</span>
-                            <IconCircleCheck v-if="(mc[q.id] ?? []).includes(opt.id)" :size="20" :stroke-width="2" class="shrink-0 text-brand-palette-4" />
+                            <span class="flex-1 text-[15px] leading-[1.4] lg:text-[17px]">{{ opt.text }}</span>
+                            <IconCircleCheck v-if="(mc[q.id] ?? []).includes(opt.id)" :size="18" :stroke-width="2" class="shrink-0 text-brand-palette-4 lg:size-5" />
                         </label>
                     </div>
 
                     <!-- Gap filling: the blanks are numbered in the sentence above,
                          and answered here in the same order. -->
-                    <div v-else-if="q.question_type === 'gap_filling'" class="mt-5 flex flex-col gap-3">
+                    <div v-else-if="q.question_type === 'gap_filling'" class="mt-4 flex flex-col gap-2.5 lg:mt-5 lg:gap-3">
                         <div v-for="(_, gi) in gaps[q.id] ?? []" :key="gi" class="flex items-center gap-3">
                             <span
                                 :class="[mono, 'text-[11px]', (gaps[q.id][gi] ?? '').trim() !== '' ? 'text-brand-ink-accent' : 'text-brand-palette-4/40']"
@@ -625,19 +638,19 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                                 type="text"
                                 :aria-label="$t('student.test.gapPlaceholder')"
                                 :placeholder="$t('student.test.gapPlaceholder')"
-                                class="h-[52px] flex-1 border-0 border-b bg-transparent px-0 text-[17px] text-brand-palette-4 placeholder:text-brand-palette-4/28 focus:outline-none focus:ring-0"
+                                class="h-12 flex-1 border-0 border-b bg-transparent px-0 text-[16px] text-brand-palette-4 placeholder:text-brand-palette-4/28 focus:outline-none focus:ring-0 lg:h-[52px] lg:text-[17px]"
                                 :class="(gaps[q.id][gi] ?? '').trim() !== '' ? 'border-brand-palette-4' : 'border-brand-palette-4/22 focus:border-brand-palette-4'"
                             />
                         </div>
                     </div>
 
                     <!-- Essay -->
-                    <div v-else class="mt-5">
+                    <div v-else class="mt-4 lg:mt-5">
                         <textarea
                             v-model="essay[q.id]"
                             rows="6"
                             :placeholder="$t('student.test.essayPlaceholder')"
-                            class="w-full rounded-2xl border border-brand-palette-4/20 bg-white px-4 py-3 text-[17px] leading-relaxed text-brand-palette-4 placeholder:text-brand-palette-4/28 focus:border-brand-palette-4 focus:outline-none"
+                            class="w-full rounded-2xl border border-brand-palette-4/20 bg-white px-3.5 py-3 text-[16px] leading-relaxed text-brand-palette-4 placeholder:text-brand-palette-4/28 focus:border-brand-palette-4 focus:outline-none lg:px-4 lg:text-[17px]"
                         ></textarea>
                     </div>
                 </div>
@@ -646,7 +659,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                 <div
                     v-for="(note, ni) in trailingNotes"
                     :key="`note-end-${ni}`"
-                    class="rich-text mt-8 border-l-[3px] border-brand-palette-3 py-0.5 pl-4 text-[15px] leading-relaxed text-brand-palette-4/70 lg:mt-9"
+                    class="rich-text mt-8 border-l-[3px] border-brand-palette-3 py-0.5 pl-4 text-[14px] leading-relaxed text-brand-palette-4/70 lg:mt-9 lg:text-[15px]"
                     v-html="note.body"
                 ></div>
 
