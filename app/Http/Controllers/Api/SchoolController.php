@@ -151,6 +151,11 @@ class SchoolController extends Controller
         if ($request->filled('country_id')) {
             $query->where('country_id', $request->integer('country_id'));
         }
+        // Several countries at once: the message audience narrows venues by the
+        // countries it was addressed to, and those are a list rather than one.
+        if (is_array($request->input('country_ids')) && $request->input('country_ids') !== []) {
+            $query->whereIn('country_id', array_map('intval', $request->input('country_ids')));
+        }
         if ($request->filled('region_id')) {
             $query->where('region_id', $request->integer('region_id'));
         }

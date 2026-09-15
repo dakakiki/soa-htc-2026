@@ -22,21 +22,21 @@ use Illuminate\Support\Collection;
  * audience is every coordinator of the season and every filled list cuts the
  * set down further — roles AND countries AND venues AND people.
  *
- * Everything here is scoped to one season. A coordinator is a coordinator of a
- * season, not of the system: last year's people are not this year's audience.
+ * Everything here is scoped to one season. Somebody holds a role in a season,
+ * not in the system: last year's people are not this year's audience.
  */
 class RecipientResolver
 {
     /**
-     * The roles that make somebody a coordinator. Administrators are not an
-     * audience: they write the messages.
+     * The one role that is never an audience.
      *
-     * @var list<string>
+     * A competitor is not a user: they identify with a candidate number, hold
+     * no account and have no address to write to. Everybody else assigned to
+     * the season - administrators, Hippo, country and school coordinators -
+     * can be written to, and the level filter chooses among them (owner,
+     * 2026-09-15).
      */
-    private const COORDINATOR_ROLES = [
-        SystemRole::CountryCoordinator->value,
-        SystemRole::SchoolCoordinator->value,
-    ];
+    private const NEVER_A_RECIPIENT = SystemRole::Student->value;
 
     /**
      * @return Builder<User>
@@ -48,9 +48,7 @@ class RecipientResolver
                 $assignment->where('season_id', $seasonId)
                     ->where('status', 'active')
                     ->whereHas('role', function (Builder $role) use ($audience): void {
-                        // Coordinators, and only the chosen kinds of coordinator
-                        // when kinds were chosen.
-                        $role->whereIn('key', self::COORDINATOR_ROLES);
+                        $role->where('key', '!=', self::NEVER_A_RECIPIENT);
 
                         if ($audience->roles !== []) {
                             $role->whereIn('id', $audience->roles);

@@ -17,6 +17,12 @@ export const useConfirmStore = defineStore('confirm', () => {
     const danger = ref(false);
     /** Overrides the confirm button's label, which otherwise reads "Delete". */
     const confirmLabel = ref('');
+    /**
+     * What is being confirmed. The neutral dialog was written for deletions and
+     * says so in its icon and in the red of its button; anything else asking
+     * through it was asking "Delete?" with different words on top.
+     */
+    const kind = ref<'delete' | 'send'>('delete');
     let resolver: ((value: boolean) => void) | null = null;
 
     function ask(options: {
@@ -24,11 +30,13 @@ export const useConfirmStore = defineStore('confirm', () => {
         message: string;
         danger?: boolean;
         confirmLabel?: string;
+        kind?: 'delete' | 'send';
     }): Promise<boolean> {
         title.value = options.title ?? '';
         message.value = options.message;
         danger.value = options.danger ?? false;
         confirmLabel.value = options.confirmLabel ?? '';
+        kind.value = options.kind ?? 'delete';
         open.value = true;
         return new Promise<boolean>((resolve) => {
             resolver = resolve;
@@ -47,6 +55,7 @@ export const useConfirmStore = defineStore('confirm', () => {
         message,
         danger,
         confirmLabel,
+        kind,
         ask,
         confirm: () => settle(true),
         cancel: () => settle(false),

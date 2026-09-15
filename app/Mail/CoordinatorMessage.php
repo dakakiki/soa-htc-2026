@@ -45,7 +45,11 @@ class CoordinatorMessage extends Mailable
             with: [
                 'name' => $this->recipientName,
                 'siteName' => $this->siteName(),
-                'body' => $this->hardBreaks($this->message->body),
+                // What the editor wrote, when there is any. A mail-only message
+                // has no plain body at all, and a notification-only one has no
+                // HTML - whichever exists is the one that goes.
+                'html' => $this->message->body_html,
+                'body' => $this->hardBreaks((string) $this->message->body),
                 'loginUrl' => $this->loginUrl(),
             ],
         );

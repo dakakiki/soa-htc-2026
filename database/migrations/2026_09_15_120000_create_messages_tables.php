@@ -32,8 +32,17 @@ return new class extends Migration
             // season, so "everyone" only means anything inside one.
             $table->foreignId('season_id')->constrained()->cascadeOnDelete();
 
+            // One subject for every channel: a notification title and a mail
+            // subject line are the same sentence.
             $table->string('subject', 200);
-            $table->text('body');
+
+            // Two bodies, because the channels are not the same medium. `body`
+            // is the plain, short text a notification and the in-app notice
+            // carry; `body_html` is what the mail carries, written in an editor.
+            // Each is required only by the channel that uses it, so a mail-only
+            // message has no plain body and a notification-only one has no HTML.
+            $table->text('body')->nullable();
+            $table->text('body_html')->nullable();
 
             // Four lists that multiply: roles AND countries AND venues AND
             // people. An empty list is not a filter, so {} addresses every

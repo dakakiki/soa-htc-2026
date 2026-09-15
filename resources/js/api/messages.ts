@@ -28,7 +28,10 @@ export interface MessageAudience {
 export interface Message {
     id: number;
     subject: string;
-    body: string;
+    /** The plain, short text a notification and the in-app notice carry. */
+    body: string | null;
+    /** What the editor wrote, and what the mail carries. */
+    body_html: string | null;
     audience: MessageAudience;
     /** The audience in words, built by the server for the list screen. */
     audience_label?: string;
@@ -45,7 +48,8 @@ export interface Message {
 
 export interface MessagePayload {
     subject: string;
-    body: string;
+    body: string | null;
+    body_html: string | null;
     audience: MessageAudience;
     channels: MessageChannel[];
     status: Exclude<MessageStatus, 'sent'>;
@@ -83,6 +87,18 @@ export function deleteMessage(id: number) {
 /** How many coordinators an audience comes to, asked before sending. */
 export function countRecipients(audience: MessageAudience) {
     return http.post<{ data: { count: number } }>('/api/messages/recipients', { audience });
+}
+
+/**
+ * The people a filter currently matches — the list the coordinator picker is
+ * ticked out of. The same resolver answers it, so a country already chosen
+ * cannot offer somebody it has excluded.
+ */
+export function listRecipients(audience: MessageAudience, search?: string) {
+    return http.post<{ data: { id: number; name: string; email: string }[]; meta: { total: number } }>(
+        '/api/messages/recipients/list',
+        { audience: { ...audience, users: [] }, search },
+    );
 }
 
 /** Send it now: the in-app notices go at once, the mails are left owed. */

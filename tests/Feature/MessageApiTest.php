@@ -60,6 +60,23 @@ class MessageApiTest extends TestCase
     }
 
     /**
+     * What an audience comes to, asked the way the screen asks it.
+     *
+     * Tests count DIFFERENCES rather than totals: the seeded season already
+     * holds an administrator, who is a user of it like anybody else, and a
+     * test that hard-codes "1" is really asserting what the seeder does.
+     *
+     * @param  array<string, list<int>>  $audience
+     */
+    private function countFor(array $audience = []): int
+    {
+        return (int) $this->actingAs($this->admin())
+            ->postJson('/api/messages/recipients', ['audience' => $audience])
+            ->assertOk()
+            ->json('data.count');
+    }
+
+    /**
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
@@ -68,8 +85,9 @@ class MessageApiTest extends TestCase
         return array_merge([
             'subject' => 'Entry closes on 20 September',
             'body' => 'Every child needs a candidate number before entry closes.',
+            'body_html' => '<p>Every child needs a candidate number.</p>',
             'audience' => ['roles' => [], 'countries' => [], 'venues' => [], 'users' => []],
-            'channels' => ['mail'],
+            'channels' => ['app', 'mail'],
             'status' => 'draft',
         ], $overrides);
     }
@@ -86,16 +104,50 @@ class MessageApiTest extends TestCase
     }
 
     /**
-     * The app channel is not the administrator's to switch off: it is the one
-     * that needs no address and no permission, so every message carries it.
+     * Each body is required by the channel that carries it, and by nothing
+     * else: a mail-only message needs no notification text, and one that only
+     * goes to the app needs no HTML.
      */
-    public function test_the_app_channel_is_added_even_when_it_was_not_asked_for(): void
+    public function test_a_mail_only_message_needs_no_notification_text(): void
     {
         $response = $this->actingAs($this->admin())
-            ->postJson('/api/messages', $this->payload(['channels' => ['mail']]))
+            ->postJson('/api/messages', $this->payload(['channels' => ['mail'], 'body' => null]))
             ->assertCreated();
 
-        $this->assertContains(MessageChannel::App->value, $response->json('data.channels'));
+        $this->assertSame([MessageChannel::Mail->value], $response->json('data.channels'));
+        $this->assertNull($response->json('data.body'));
+    }
+
+    public function test_a_notification_only_message_needs_no_html(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => ['app'], 'body_html' => null]))
+            ->assertCreated()
+            ->assertJsonPath('data.body_html', null);
+    }
+
+    public function test_the_app_channel_still_needs_its_text(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => ['app'], 'body' => ' ']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('body');
+    }
+
+    public function test_the_mail_channel_still_needs_its_text(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => ['mail'], 'body_html' => '<p> </p>']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('body_html');
+    }
+
+    public function test_a_message_needs_a_channel(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => []]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('channels');
     }
 
     public function test_push_is_refused_while_there_is_nowhere_to_push_to(): void
@@ -112,12 +164,10 @@ class MessageApiTest extends TestCase
      */
     public function test_an_empty_audience_is_everyone(): void
     {
+        $before = $this->countFor();
         $this->coordinator('one@soahtc.test');
 
-        $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience' => []])
-            ->assertOk()
-            ->assertJsonPath('data.count', 1);
+        $this->assertSame($before + 1, $this->countFor());
     }
 
     public function test_a_scheduled_message_needs_a_time(): void
@@ -164,13 +214,15 @@ class MessageApiTest extends TestCase
             'status' => 'active',
         ]);
 
+        $here = ['countries' => [$school->country_id]];
+        $before = $this->countFor($here);
+
         $this->coordinator('inside@soahtc.test', school: $school);
         $this->coordinator('outside@soahtc.test', school: $abroad);
 
-        $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience' => ['countries' => [$school->country_id]]])
-            ->assertOk()
-            ->assertJsonPath('data.count', 1);
+        // One of the two was added to this country; the other one abroad is
+        // not in the answer.
+        $this->assertSame($before + 1, $this->countFor($here));
     }
 
     /**
@@ -196,24 +248,15 @@ class MessageApiTest extends TestCase
         $schoolRole = $this->roleId(SystemRole::SchoolCoordinator->value);
 
         // The role alone: both school coordinators, here and abroad.
-        $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience' => ['roles' => [$schoolRole]]])
-            ->assertOk()
-            ->assertJsonPath('data.count', 2);
+        $this->assertSame(2, $this->countFor(['roles' => [$schoolRole]]));
 
-        // The country alone: both levels, but only here.
-        $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience' => ['countries' => [$school->country_id]]])
-            ->assertOk()
-            ->assertJsonPath('data.count', 2);
-
-        // Both together: the school coordinators of this country, and nobody else.
-        $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', [
-                'audience' => ['roles' => [$schoolRole], 'countries' => [$school->country_id]],
-            ])
-            ->assertOk()
-            ->assertJsonPath('data.count', 1);
+        // Both together: the school coordinators of this country, and nobody
+        // else — not the country coordinator beside them, not the school
+        // coordinator abroad.
+        $this->assertSame(1, $this->countFor([
+            'roles' => [$schoolRole],
+            'countries' => [$school->country_id],
+        ]));
     }
 
     /** A venue narrows to the people who run it, whatever else is set. */
@@ -229,10 +272,7 @@ class MessageApiTest extends TestCase
         $this->coordinator('first@soahtc.test', school: $school);
         $this->coordinator('second@soahtc.test', school: $other);
 
-        $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience' => ['venues' => [$other->id]]])
-            ->assertOk()
-            ->assertJsonPath('data.count', 1);
+        $this->assertSame(1, $this->countFor(['venues' => [$other->id]]));
     }
 
     /** Down to one person, which is the old "one coordinator" case. */
@@ -241,21 +281,21 @@ class MessageApiTest extends TestCase
         $one = $this->coordinator('one@soahtc.test');
         $this->coordinator('two@soahtc.test');
 
-        $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience' => ['users' => [$one->id]]])
-            ->assertOk()
-            ->assertJsonPath('data.count', 1);
+        $this->assertSame(1, $this->countFor(['users' => [$one->id]]));
     }
 
     /**
-     * The administrator is not an audience: they write the messages.
+     * A competitor is not a user: no account, no address, nothing to write to.
+     * Every other level of the season can be written to, administrators
+     * included (owner, 2026-09-15).
      */
-    public function test_administrators_are_not_recipients(): void
+    public function test_competitors_are_never_recipients(): void
     {
-        $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience' => []])
-            ->assertOk()
-            ->assertJsonPath('data.count', 0);
+        $this->coordinator('one@soahtc.test');
+
+        // Whatever the season holds, asking for competitors asks for nobody.
+        $this->assertGreaterThan(0, $this->countFor());
+        $this->assertSame(0, $this->countFor(['roles' => [$this->roleId(SystemRole::Student->value)]]));
     }
 
     /**
@@ -290,8 +330,12 @@ class MessageApiTest extends TestCase
         Mail::fake();
         $this->coordinator('reader@soahtc.test');
 
+        // Addressed to one level, so what the command does is the only thing
+        // the count can be measuring.
         $id = $this->actingAs($this->admin())
-            ->postJson('/api/messages', $this->payload())
+            ->postJson('/api/messages', $this->payload([
+                'audience' => ['roles' => [$this->roleId(SystemRole::SchoolCoordinator->value)]],
+            ]))
             ->json('data.id');
         $this->actingAs($this->admin())->postJson("/api/messages/{$id}/send")->assertOk();
 

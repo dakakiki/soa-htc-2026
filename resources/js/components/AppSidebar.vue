@@ -143,9 +143,6 @@ const nav: NavNode[] = [
         ],
     },
     { kind: 'item', label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.edit' },
-    // Messages to coordinators (2026-09-15). Beside the people it writes to,
-    // not inside them: the audience is wider than one venue's coordinator.
-    { kind: 'item', label: t('nav.messages'), icon: IconMail, to: 'messages', prefix: 'messages', perm: 'messages.manage' },
     {
         kind: 'group',
         key: 'quizzes',
@@ -198,6 +195,10 @@ const nav: NavNode[] = [
             { label: t('nav.layout'), icon: IconLayoutRows, to: 'cms.layout', prefix: 'cms.layout', perm: 'cms.manage' },
         ],
     },
+    // Messages to coordinators (2026-09-15). After the website and before
+    // access: it is something the organisation sends out, not something a
+    // venue or a round is made of (owner, 2026-09-15).
+    { kind: 'item', label: t('nav.messages'), icon: IconMail, to: 'messages', prefix: 'messages', perm: 'messages.manage' },
     // Access and Settings stay last.
     {
         kind: 'group',

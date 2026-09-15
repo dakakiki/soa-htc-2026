@@ -365,6 +365,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('messages/inbox', [MessageController::class, 'inbox']);
     Route::post('messages/deliveries/{delivery}/dismiss', [MessageController::class, 'dismiss']);
     Route::post('messages/recipients', [MessageController::class, 'recipients']);
+    Route::post('messages/recipients/list', [MessageController::class, 'recipientList']);
     Route::post('messages/{message}/send', [MessageController::class, 'send']);
     Route::apiResource('messages', MessageController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::delete('coordinators/{coordinator}/assets/{asset}', [CoordinatorController::class, 'deleteAsset']);

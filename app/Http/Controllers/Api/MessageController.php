@@ -159,6 +159,40 @@ class MessageController extends Controller
     }
 
     /**
+     * The people a filter currently matches, for the coordinator picker.
+     *
+     * 🔴 The same resolver again. The list the administrator ticks names out of
+     * is the list the message would go to, so choosing a country and then a
+     * person cannot offer somebody the country filter has already excluded.
+     */
+    public function recipientList(Request $request): JsonResponse
+    {
+        $this->authorize('messages.manage');
+        $season = $this->season();
+
+        $data = $request->validate([
+            ...$this->audienceRules(),
+            'search' => ['sometimes', 'nullable', 'string', 'max:100'],
+        ]);
+
+        // The names already chosen must not narrow the list they were chosen
+        // from, or removing one would be the only way to see the others again.
+        $audience = Audience::fromArray(['users' => []] + ($data['audience'] ?? []));
+
+        $query = $this->recipients->query($season->id, $audience);
+
+        if (($data['search'] ?? '') !== '') {
+            $term = '%'.$data['search'].'%';
+            $query->where(fn ($q) => $q->where('name', 'like', $term)->orWhere('email', 'like', $term));
+        }
+
+        return response()->json([
+            'data' => $query->orderBy('name')->limit(200)->get(['id', 'name', 'email']),
+            'meta' => ['total' => $query->count()],
+        ]);
+    }
+
+    /**
      * Send it now.
      *
      * Only the writing is done here: the in-app notices are rows, so they are
@@ -220,8 +254,13 @@ class MessageController extends Controller
     private function validated(Request $request): array
     {
         $data = $request->validate([
+            // One subject for every channel: a notification title and a mail
+            // subject line are the same sentence.
             'subject' => ['required', 'string', 'max:200'],
-            'body' => ['required', 'string', 'max:5000'],
+            // Short, because a notification is read in one glance and the rest
+            // is cut off by the phone rather than by us.
+            'body' => ['nullable', 'string', 'max:500'],
+            'body_html' => ['nullable', 'string', 'max:20000'],
             ...$this->audienceRules(),
             'channels' => ['required', 'array', 'min:1'],
             'channels.*' => [Rule::enum(MessageChannel::class)],
@@ -231,18 +270,28 @@ class MessageController extends Controller
 
         $channels = array_values(array_unique($data['channels']));
 
-        // The app channel is not optional: it is the one that needs no address
-        // and no permission, so it is the one a message can always rely on.
-        if (! in_array(MessageChannel::App->value, $channels, true)) {
-            $channels[] = MessageChannel::App->value;
-        }
-
         // 🔴 Push has nowhere to go yet — no VAPID keys and no subscriptions.
         // Accepting it would write deliveries nothing will ever pay off.
         if (in_array(MessageChannel::Push->value, $channels, true)) {
             throw ValidationException::withMessages([
                 'channels' => 'Push is not available yet.',
             ]);
+        }
+
+        /*
+         * Each body is required by the channel that carries it, and by nothing
+         * else. A mail-only message needs no notification text, and a message
+         * that only goes to the app needs no HTML — asking for both every time
+         * would leave half of every message unread and unsent.
+         */
+        $notification = array_intersect([MessageChannel::App->value, MessageChannel::Push->value], $channels) !== [];
+
+        if ($notification && trim((string) ($data['body'] ?? '')) === '') {
+            throw ValidationException::withMessages(['body' => 'Write the message.']);
+        }
+
+        if (in_array(MessageChannel::Mail->value, $channels, true) && trim(strip_tags((string) ($data['body_html'] ?? ''))) === '') {
+            throw ValidationException::withMessages(['body_html' => 'Write the e-mail.']);
         }
 
         if ($data['status'] === MessageStatus::Scheduled->value && ($data['send_at'] ?? null) === null) {
@@ -253,7 +302,8 @@ class MessageController extends Controller
 
         return [
             'subject' => $data['subject'],
-            'body' => $data['body'],
+            'body' => $data['body'] ?? null,
+            'body_html' => $data['body_html'] ?? null,
             // Normalised on the way in, so what is stored is always four lists
             // of whole numbers whatever the form sent.
             'audience' => Audience::fromArray($data['audience'] ?? [])->toArray(),
@@ -354,6 +404,7 @@ class MessageController extends Controller
             'id' => $message->id,
             'subject' => $message->subject,
             'body' => $message->body,
+            'body_html' => $message->body_html,
             'audience' => $message->audience()->toArray(),
             'channels' => $message->channels,
             'status' => $message->status,

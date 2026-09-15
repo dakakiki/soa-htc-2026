@@ -1,9 +1,13 @@
 {{--
     An administrator's message to coordinators (2026-09-15).
 
-    🪤 `{{ }}` and nothing else: the subject and the body are typed by a person
-    in the administration, and this mail is the one place that text leaves the
-    system. Escaped here, it cannot carry markup into anybody's inbox.
+    Two shapes, one for each way the body was written:
+
+    - `html` is what the rich editor produced. It is admin-authored markup, the
+      same trust the CMS gives its own pages, so it is printed as markup.
+    - `body` is the plain text a notification carries. It is escaped, and its
+      single newlines were turned into Markdown hard breaks on the way in, so
+      the mail reads the way the box looked.
 
     The link is the sign-in page rather than a deep link into the message: there
     is nothing to act on in a mail, and the coordinator's own screen is where
@@ -14,7 +18,11 @@
 
 Hello {{ $name }},
 
+@if (filled($html))
+<div>{!! $html !!}</div>
+@else
 {{ $body }}
+@endif
 
 <x-mail::button :url="$loginUrl">Open {{ $siteName }}</x-mail::button>
 

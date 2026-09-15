@@ -890,6 +890,17 @@ export default {
         saveFailed: 'Save failed.',
 
         subject: 'Subject',
+        // One sentence for every channel: a notification title and a mail
+        // subject line are the same thing said once.
+        subjectNote: 'The same line is the notification title and the e-mail subject.',
+        messageSection: 'Message',
+        // Two bodies, because a notification and a mail are not the same
+        // medium. Each is asked for only by the channel that carries it.
+        bodyPlain: 'Message text',
+        bodyMail: 'E-mail text',
+        bodyMailPlaceholder: 'Write the e-mail…',
+        pickAChannel: 'Choose at least one channel.',
+        selectAll: 'Select all',
         body: 'Text',
         // Said where it is written, because this is the one place the text
         // leaves the system and a notification cannot carry styling.
@@ -908,21 +919,21 @@ export default {
         allChannels: 'All channels',
 
         recipients: 'Recipients',
-        recipientsNote: 'Coordinators only',
+        recipientsNote: 'Everyone who holds an account in this season',
         // Four filters that multiply. Each one left alone narrows nothing, so
         // the empty form is everybody and two filled fields are an intersection
         // ("school coordinators of Serbia and Croatia").
         audienceHint: 'Leave a field empty to put no limit on it',
-        audienceRoleLabel: 'Coordinator level',
+        audienceRoleLabel: 'User level',
         audienceCountryLabel: 'Countries',
         audienceVenueLabel: 'Venues',
-        audienceUserLabel: 'Named coordinators',
+        audienceUserLabel: 'Users',
         anyRole: 'Any level',
         anyCountry: 'Any country',
         anyVenue: 'Any venue',
-        anyUser: 'Anyone',
-        everyone: 'every coordinator in the season',
-        willReceive: 'no coordinator will receive this | {count} coordinator will receive this | {count} coordinators will receive this',
+        anyUser: 'Everyone the filters match',
+        everyone: 'everyone with an account in this season',
+        willReceive: 'nobody will receive this | {count} person will receive this | {count} people will receive this',
         countFailed: 'Could not count the recipients.',
 
         channels: 'Channels',
@@ -930,8 +941,6 @@ export default {
         channelAppNote: 'Always on. The message waits on the coordinator’s screen until they put it away.',
         channelMail: 'E-mail',
         channelMailNote: 'To the address on the coordinator’s account.',
-        channelPush: 'Push notification',
-        channelPushNote: 'Available once coordinators have installed the app and allowed notifications. Nothing to send to yet.',
 
         when: 'When',
         sendNow: 'Send now',
@@ -939,7 +948,8 @@ export default {
         serverTime: 'Server time',
         saveDraft: 'Save draft',
         send: 'Send',
-        sendConfirm: 'Send this message to {count} coordinators now? It cannot be taken back.',
+        sendTitle: 'Send this message?',
+        sendConfirm: 'Send this message to {count} people now? It cannot be taken back.',
         sendFailed: 'Could not send the message.',
         delivered: '{sent} delivered',
         deliveredWithFailures: '{sent} delivered, {failed} failed',
