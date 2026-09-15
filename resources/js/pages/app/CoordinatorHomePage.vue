@@ -19,14 +19,17 @@ import AppCoordinatorScreen from '@/components/app/AppCoordinatorScreen.vue';
  * 🪤 Three things the prototype drew that are NOT here, each for its own reason:
  *
  *  - **The exam password.** `quizzes.quiz_password` is a bcrypt hash: the server
- *    can check one and cannot read one back. Shown as `••••••` with an eye, it
- *    would be a control that cannot work. Whether the password is stored
- *    reversibly instead is the owner's decision and has not been made.
+ *    can check one and cannot read one back, so `••••••` with an eye would be a
+ *    control that cannot work. Offered the owner the one way it could be done —
+ *    storing it reversibly — and the answer on 2026-09-15 was to drop the card:
+ *    "skloni karticu sa lozinkom". A coordinator gets the password from an
+ *    administrator, as they do today.
  *  - **"Entry closes 20 Sep · 5 days left".** Removed on the owner's word,
  *    2026-09-15: "nije potrebna izbaci je".
- *  - **A clock window ("10:00 – 10:40")**. A test carries a DURATION and no
- *    time of day, so the card says how long the paper runs instead — the same
- *    thing the candidate's own screen says.
+ *  - **A clock window ("10:00 – 10:40")**. A test carries a DURATION and no time
+ *    of day, and the owner's answer was to print that instead ("umesto 10:00 -
+ *    10:40 napisi trajanje ispita") — which is also what the candidate's own
+ *    screen says, so the two agree.
  *
  * 🔴 And one number that is deliberately absent from the open cards: an
  * AVERAGE. While the room is still working it says something different every

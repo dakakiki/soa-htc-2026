@@ -9,7 +9,9 @@ import { http } from '@/api/http';
  *
  * 🪤 There is no exam password in any of these shapes, and that is not an
  * omission: `quizzes.quiz_password` is a bcrypt hash, so the server can check a
- * password and cannot read one back.
+ * password and cannot read one back. The owner's decision of 2026-09-15 was to
+ * drop the prototype's password card rather than store the password reversibly,
+ * so there is nothing here to add later.
  */
 
 /** One paper, as a coordinator's room sees it. */
