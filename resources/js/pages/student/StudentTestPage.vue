@@ -321,6 +321,12 @@ function goToQuestion(index: number): void {
  * question the candidate is reading out from under them, mid-test, every time
  * they crossed into the next one.
  *
+ * 🪤 The strip needs padding on BOTH edges, not just the bottom. `overflow-x`
+ * clips the other axis too, and the ring that marks the question being read is
+ * drawn 2px OUTSIDE its chip — so with nothing above them the numbers came out
+ * sliced along their top edge (owner, 2026-09-15, from a phone: "vidis da su
+ * brojevi sa gornje strane odseceni").
+ *
  * The chips are 28px and not the 44px a tap target is usually given (owner,
  * 2026-09-15: "imaju po 40 pitanja u testu" — at 36px a forty-question test was
  * three screens of sideways scrolling). The trade is deliberate and it is the
@@ -604,7 +610,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     <audio v-if="q.audio_url" :src="q.audio_url" controls class="mt-4 w-full"></audio>
 
                     <!-- Multiple choice -->
-                    <div v-if="q.question_type === 'multiple_choice'" class="mt-4 flex flex-col gap-2 lg:mt-5 lg:gap-2.5">
+                    <div v-if="q.question_type === 'multiple_choice'" class="mt-3 flex flex-col gap-2 lg:mt-5 lg:gap-2.5">
                         <label
                             v-for="(opt, oi) in q.options"
                             :key="opt.id"
@@ -627,7 +633,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
 
                     <!-- Gap filling: the blanks are numbered in the sentence above,
                          and answered here in the same order. -->
-                    <div v-else-if="q.question_type === 'gap_filling'" class="mt-4 flex flex-col gap-2.5 lg:mt-5 lg:gap-3">
+                    <div v-else-if="q.question_type === 'gap_filling'" class="mt-3 flex flex-col gap-2.5 lg:mt-5 lg:gap-3">
                         <div v-for="(_, gi) in gaps[q.id] ?? []" :key="gi" class="flex items-center gap-3">
                             <span
                                 :class="[mono, 'text-[11px]', (gaps[q.id][gi] ?? '').trim() !== '' ? 'text-brand-ink-accent' : 'text-brand-palette-4/40']"
@@ -645,7 +651,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
                     </div>
 
                     <!-- Essay -->
-                    <div v-else class="mt-4 lg:mt-5">
+                    <div v-else class="mt-3 lg:mt-5">
                         <textarea
                             v-model="essay[q.id]"
                             rows="6"
@@ -725,7 +731,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
             <div
                 v-if="questions.length > 1"
                 ref="navStrip"
-                class="-mx-5 mb-2.5 flex gap-1 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                class="-mx-5 mb-2 flex gap-1 overflow-x-auto px-5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 role="group"
                 :aria-label="t('student.test.questions')"
             >
