@@ -11,8 +11,8 @@ use App\Domain\Cms\Support\PublicPaths;
 use App\Domain\Organization\Models\Setting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\View\View;
 use Throwable;
 
 /**
@@ -38,7 +38,7 @@ class SpaController extends Controller
         'type' => 'website',
     ];
 
-    public function __invoke(Request $request): View|RedirectResponse
+    public function __invoke(Request $request): Response|RedirectResponse
     {
         $path = '/'.trim($request->path(), '/');
 
@@ -64,7 +64,26 @@ class SpaController extends Controller
             $meta = self::FALLBACK_META;
         }
 
-        return view('app', ['meta' => $meta]);
+        /*
+         * 🔴 Never cached, and this is not a preference.
+         *
+         * The shell NAMES the built assets, and Vite names those by content
+         * hash — `app-D7RQXRTf.js` and a chunk per lazily-loaded screen. A
+         * deploy writes new hashes and DELETES the old files, so a shell served
+         * from a cache is a shell pointing at assets that no longer exist: the
+         * first menu click after a deploy fails with "Failed to fetch
+         * dynamically imported module" and navigation stops dead, with the page
+         * still on screen looking fine.
+         *
+         * Reported by the owner on STAGE, 2026-09-15, after eight deploys in an
+         * afternoon with a tab left open. The client half of the same fix is in
+         * `router/index.ts`, which reloads when an import fails — this half
+         * makes sure the reload gets a FRESH shell rather than the same stale
+         * one out of the cache.
+         */
+        return response()
+            ->view('app', ['meta' => $meta])
+            ->header('Cache-Control', 'no-cache, must-revalidate');
     }
 
     /** Where the redirect's target lives now, or null if it is gone or unpublished. */
