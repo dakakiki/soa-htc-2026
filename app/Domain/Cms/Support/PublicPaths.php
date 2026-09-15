@@ -28,6 +28,8 @@ final class PublicPaths
      */
     public const RESERVED = [
         'api', 'up', 'storage', 'build',
+        // The installed application's entry screens, and `start_url`.
+        'app',
         'login', 'register', 'forgot-password', 'reset-password',
         'profile', 'dashboard', 'student', 'students', 'venues', 'users',
         'coordinators', 'coordinator-registrations', 'locations', 'difficulty',

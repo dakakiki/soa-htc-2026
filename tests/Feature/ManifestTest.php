@@ -20,7 +20,8 @@ class ManifestTest extends TestCase
         $response = $this->get('/manifest.webmanifest');
 
         $response->assertOk();
-        $response->assertJsonPath('start_url', '/');
+        // The chooser, not the front page — see ManifestController.
+        $response->assertJsonPath('start_url', '/app');
         $response->assertJsonPath('scope', '/');
         $response->assertJsonPath('display', 'standalone');
         $response->assertJsonPath('background_color', '#ffffff');
@@ -29,6 +30,33 @@ class ManifestTest extends TestCase
             'application/manifest+json',
             (string) $response->headers->get('content-type'),
         );
+    }
+
+    /**
+     * 🪤 The scope is the whole site while the start address is one screen
+     * inside it, and the two are easy to "tidy" into agreement. Narrowing the
+     * scope to `/app` would put the exam itself out of the installed window —
+     * Android opens an out-of-scope address in the browser instead, so a
+     * competitor would be thrown into a Chrome tab as their test began.
+     */
+    public function test_the_start_screen_is_narrow_and_the_scope_is_not(): void
+    {
+        $response = $this->get('/manifest.webmanifest');
+
+        $response->assertJsonPath('start_url', '/app');
+        $response->assertJsonPath('scope', '/');
+    }
+
+    /**
+     * The address the manifest sends a phone to has to be a screen. Nothing at
+     * runtime checks it — the SPA's routes are a const in a TypeScript file the
+     * server never reads — so this reads that file, as `PublicRoutesTest` does.
+     */
+    public function test_the_start_address_is_a_screen_the_spa_serves(): void
+    {
+        $router = (string) file_get_contents(base_path('resources/js/router/index.ts'));
+
+        $this->assertStringContainsString("path: '/app'", $router);
     }
 
     /**

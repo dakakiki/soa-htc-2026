@@ -35,7 +35,21 @@ class ManifestController extends Controller
             ->json([
                 'name' => $name,
                 'short_name' => $this->shortName($name),
-                'start_url' => '/',
+                /*
+                 * Where the installed icon opens: the application's own front
+                 * door, which asks whether this is a candidate or a coordinator
+                 * (`/app`). Not the front page — that is a website for somebody
+                 * who is reading, and an icon on a home screen is tapped by
+                 * somebody who has arrived to do a job.
+                 */
+                'start_url' => '/app',
+                /*
+                 * ⚠️ The whole site, and it has to be. `/app` as the scope would
+                 * put every other address outside the installed window — the exam
+                 * at `/student/tests/…` included — and Android hands an
+                 * out-of-scope link to the browser instead: the child would be
+                 * thrown into a Chrome tab the moment their test opened.
+                 */
                 'scope' => '/',
                 'display' => 'standalone',
                 /*
