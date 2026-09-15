@@ -3287,3 +3287,121 @@ jednom zaboravljena.
 🔴 **Ikona manifesta je SVG sa `sizes: "any"`** (`ManifestController::icons()`), a Chromium iz takve
 ikone **ne instalira**. Android grana neće proći do kraja dok se uz SVG ne isporuči i **PNG 192 i 512**.
 iOS grana za to ne mari i radi danas.
+
+✅ **Dopuna, izmereno 2026-09-15 uveče:** na STAGE-u je u međuvremenu otpremljena **PNG ikona
+512×512**, pa manifest više ne prijavljuje SVG i **ta zapreka tamo ne stoji** — Chromium traži
+najmanje jednu ikonu od **192px ili veću**, a 512 to zadovoljava. Ovo je **podatak, ne kod**:
+`icons()` i dalje meri ono što administrator otpremi i opisuje ga istinito, pa na svežoj instalaciji
+sve zavisi od te otpreme — recept ostaje u `docs/06`.
+
+
+## ADR-0102 — Instalirana aplikacija se otvara na svom pitanju: `start_url` je `/app`, a `scope` ostaje `/`
+
+**Datum:** 2026-09-15 · **Status:** prihvaćeno · **PR #68, #69**
+
+Manifest je telefon vodio na **naslovnu stranu**. Naslovna je sajt za nekoga ko **čita**; ikona na
+početnom ekranu se tapne zato što je neko **došao da nešto uradi** — dete sa lozinkom ispita u ruci
+ili koordinator koji vodi učionicu. To su dva različita dolaska, pa `start_url` sada imenuje
+**`/app`**: ekran koji pita da li je ovo takmičar ili koordinator.
+
+⚠️ **`scope` ostaje `/`, i mora.** Suziti ga na `/app` značilo bi da je **svaka druga adresa van
+instaliranog okvira** — naslovna, vest, i **sam ispit na `/student/tests/…`** — a Android adresu van
+scope-a predaje pregledaču. Dete bi ispalo u Chrome karticu **u trenutku kad mu se test otvori**.
+Postoji test koji to čuva (`ManifestTest`), jer su `start_url` i `scope` dve vrednosti koje neko lako
+„poravna" jednu prema drugoj.
+
+### Ekran 1 — „Who's using the app?"
+
+Dve kartice, narandžasta za dete i obris za koordinatora: jednu tapne desetogodišnjak u učionici pod
+satom, drugu odrastao čovek koji je tu namerno došao.
+
+🔴 **„Pick once. The app remembers you until you sign out" je SESIJA, ne tap.** Ruta skreće
+koordinatora koji je prijavljen na njegov dashboard, a identifikovano dete na njegove ekrane; ekran
+pita **samo kad su obe sesije otvorene** u istom pregledaču, jer je to jedini slučaj u kome je pitanje
+stvarno. Tap koji nije doveden do identifikacije **nije znanje o tome ko je ovo** — preskočiti ekran
+na osnovu njega ostavilo bi dete koje je pogrešno izabralo bez puta do druge kartice.
+
+🪤 **Ne uvek na studentski dashboard.** Takmičar koji je ušao kroz „Check results" nema struju, a taj
+ekran filtrira po struji kroz koju se ušlo — sreo bi ga **prazan**. Zato ta sesija ide na ocene.
+
+### Linija sa sezonom piše ono što piše i traka na sajtu
+
+Vlasnik, 15.09: linija na dnu ekrana 1 kaže isto što i traka nad naslovom sajta — **runda levo,
+sezona desno**, iste dve niske (`SiteSeasonStrip`).
+
+🔴 Prototip je pored runde imao **„· open"**. Ta reč se **ne vraća**: čitala se iz `EntryWindow`, iz
+toga da li je bilo aktivnog takmičarskog kviza, dok svaki od njih stoji za lozinkom koja se čita u
+učionici. Javljala je ulaz koji niko nije imao i otišla je sa trakom koja ju je štampala
+(**ADR-0081**).
+
+### Ostalo iz iste runde
+
+- Ekrani aplikacije su **`bare`**: `PublicLayout` sada poštuje tu zastavicu kao što `StudentLayout`
+  već odavno poštuje — bez trake, zaglavlja, futera i kontejnera. **Ponuda za instalaciju ostaje** na
+  njima, jer je onaj ko je upravo otvorio `/app` u pregledaču tačno onaj kome je namenjena
+  (ADR-0101).
+- 🪤 Zaglavlje i futer se sada traže **prvi put kad ih neki ekran zaista crta**, a ne u `onMounted`.
+  Ljuska ostaje montirana kroz javnu navigaciju, pa bi poseta koja počinje na `bare` ekranu — a to je
+  **svako pokretanje instalirane aplikacije** — inače ili plaćala zaglavlje koje niko ne crta, ili
+  nosila prazno zaglavlje kroz ostatak posete.
+- **`app` je rezervisan slug** (`PublicPaths`), pa CMS strana ne može da stane tamo gde ruter već
+  odgovara. `PublicRoutesTest` to i proverava, čitajući sam ruter.
+
+
+## ADR-0103 — PWA ekrani su svoje stranice: prelaz na mobilnu aplikaciju mora da bude brisanje dva foldera
+
+**Datum:** 2026-09-15 · **Status:** prihvaćeno · **PR #70**
+
+🔴 **Vlasnikovo pravilo, 15.09:** *„sve stranice koje se koriste za PWA treba da budu posebne. ne bi
+trebao da koristiš niti jednu sa desktop app"* — i razlog: *„ako se jednom pređe sa PWA na izradu
+mobile app, nema izmena na stranicama"*.
+
+Ako se jednog dana PWA zameni pravom mobilnom aplikacijom, to mora da bude **brisanje
+`resources/js/pages/app/` i `resources/js/components/app/` i ničega više**. Stranica sajta koja radi
+dvostruki posao morala bi tada da se **rasplitava**, tako da neko pogađa koja je polovina bila
+telefonska — i to na aplikaciji koja u tom trenutku radi.
+
+### Šta je čije
+
+| ekran | aplikacija | sajt (nedirnut) |
+| --- | --- | --- |
+| izbor korisnika | `/app` | — |
+| studentski meni | `/app/student` | — |
+| tri podatka | `/app/identify/:mode` | `/student/access/:mode` |
+| koordinatorova prijava | `/app/login` | `/login` |
+
+Sajt zadržava svoje stranice sa **naslovom i tekstom koje piše administrator** (ADR-0046), i dugmad
+sa naslovne i stavke gornjeg menija i dalje vode na njih.
+
+Aplikacija ima i **svoja polja**: `components/app/AppScreen.vue` (okvir sva četiri ekrana — navy,
+kolona 26rem, traka sa samo strelicom nazad, i zalepljeno dugme u dohvatu palca),
+`AppDateBoxes.vue` i `AppCountryPicker.vue`.
+
+🪤 **Panel sa dna, ne dropdown.** Sedamdeset država u dropdown-u na telefonu otvara se **preko polja**
+koje dete čita. Panel se zatvara i na **gest nazad** — bez toga je gest gasio ceo ekran i gubio
+podatke koji su već uneti.
+
+### ✅ API ostaje deljen — to je ono što preživljava taj dan
+
+`stores/` i `api/` koriste oba, i mobilna aplikacija bi zvala **iste endpoint-e**. Druga kopija
+identifikacije bila bi **drugi set pravila o tome ko sme da polaže** — a to nije ljuska.
+
+### 💰 Cena je svesno izabrana
+
+Ista pravila su opisana **dvaput u šablonu**. Kad se menja pravilo forme — koja struja traži lozinku,
+šta piše zatvorena struja — menja se na **dva mesta**. Prva verzija ove runde je bila jedna stranica
+sa dva oblika i „navy" varijanta deljenih polja; **vraćena je na vlasnikov zahtev**, pre spajanja.
+
+### Pravila koja ti ekrani nose
+
+- 🪤 **Nema „keep me signed in".** Ekran pre prijave već obećava da aplikacija pamti do odjave, pa bi
+  pitanje bilo pitanje da li da se održi obećanje koje je već dato. Sesija se pamti; odjava je način
+  da se prekine.
+- 🪤 **Nema registracije.** Prijava za vođenje učionice **nije nalog** (ADR-0053) — pregleda je
+  administrator — pa ekran kaže gde se to radi, umesto da nudi formu koja ne pravi ništa.
+- 🪤 **Polje za lozinku je vezano na `competition`**, ne na „nije sample". Napisano obrnuto, svaka
+  struja dodata kasnije nemo traži lozinku za koju nikad ne prikaže polje (2026-08-27).
+- **Runda se ne imenuje nigde.** Koju rundu takmičar polaže sledi iz nivoa i države, a ni jedno ni
+  drugo nije poznato dok tri podatka nisu data (ADR-0077).
+- **Zatvorena struja** to kaže i nudi struje koje **su** otvorene, pokazujući na ekrane aplikacije a
+  ne sajta.
