@@ -91,14 +91,23 @@ const note = 'mt-0.5 block text-[0.8rem] leading-snug';
                 </RouterLink>
             </div>
 
-            <!-- The season and the round, and nothing the application inferred
-                 about either (ADR-0081): both of these were typed with the season
-                 record. -->
-            <div v-if="site?.season || site?.round" class="mt-7 flex items-center justify-between gap-2.5 border-t border-white/15 pt-4">
-                <span v-if="site.season" :class="mono" class="text-[10.5px] text-brand-palette-3/80">{{ site.season }}</span>
-                <span v-if="site.round" :class="mono" class="ml-auto text-[10.5px] text-brand-palette-1">
+            <!--
+                The same line the site prints above its own masthead, in the same
+                order and the same words (owner, 2026-09-15) — `SiteSeasonStrip`
+                is that strip, and this is it after the shell went away.
+
+                Which means: the round and the season an administrator TYPED, and
+                nothing the application inferred about either. The prototype had
+                "· open" beside the round; that word was read off `EntryWindow`,
+                from whether any competition quiz was active, while all of them
+                sit behind a password — so it announced an entry nobody had, and
+                it went with the strip that printed it (ADR-0081).
+            -->
+            <div v-if="site?.round || site?.season" class="mt-7 flex items-center justify-between gap-2.5 border-t border-white/15 pt-4">
+                <span v-if="site.round" :class="mono" class="text-[10.5px] text-brand-palette-1">
                     {{ $t('public.status.round', { round: site.round, year: site.year }) }}
                 </span>
+                <span v-if="site.season" :class="mono" class="ml-auto text-[10.5px] text-brand-palette-3/80">{{ site.season }}</span>
             </div>
         </div>
     </div>
