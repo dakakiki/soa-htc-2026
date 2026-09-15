@@ -466,6 +466,47 @@ export default {
             // flag, on pages every country reads.
             round: 'Round {round} · {year}',
         },
+        /*
+         * The installed application's own two entry screens (prototype 1 and 2),
+         * which no website visitor meets: `/app` asks who is holding the phone,
+         * and `/app/student` asks what the child came to do.
+         *
+         * Every word here is interface, not content. These screens carry no
+         * layout zone on purpose — they are reached by tapping an icon on a home
+         * screen, where an administrator changing the wording out of season
+         * would be changing the one screen nobody can see to check.
+         */
+        app: {
+            who: "Who's using the app?",
+            // What "remembers" means is the session, not the tap: the screen is
+            // skipped while one is open and asks again after signing out.
+            lead: 'Pick once. The app remembers you until you sign out.',
+            student: 'Student',
+            studentNote: 'Take your test, try a sample, check your results.',
+            coordinator: 'Coordinator',
+            coordinatorNote: 'Sign in with your e-mail to run your venue.',
+            back: 'Back',
+            what: 'What would you like to do?',
+            // Upper case in the string rather than in a class: this is the one
+            // row on the screen that is tapped in an exam room, to the second,
+            // and it is meant to be found without reading.
+            start: 'START TEST',
+            startNote: 'You will need the exam password from your coordinator',
+            sample: 'Try a sample exam',
+            sampleNote: 'Practice as often as you like — it is never scored against you',
+            results: 'Check results',
+            /*
+             * 🪤 The two streams are named as the CANDIDATE entered them —
+             * `/student/access/competition` and `/student/access/sample`, the
+             * words on the screen that asks for the password. The results screen
+             * behind this row heads its two blocks `Contest` and `Practice`
+             * ({@see student.results}), which is the same division under the
+             * names the marks are published under.
+             */
+            resultsNote: 'Your {competition} and {sample} tests results',
+            resultsCompetition: 'competition',
+            resultsSample: 'sample',
+        },
         // The offer to install, spoken plainly. `button` doubles as the
         // accessible name, so it says what happens rather than naming a screen.
         install: {

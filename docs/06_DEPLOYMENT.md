@@ -263,7 +263,7 @@ knowing that, which is why the limits are worth setting rather than relying on.
 | **MySQL version and mode** | Dev is **MySQL 8.3 with `ONLY_FULL_GROUP_BY` and `STRICT_TRANS_TABLES` already on**, so everything has been exercised in strict mode. An older MySQL or MariaDB differs in the other direction. | `SELECT VERSION(), @@sql_mode`; then open Reports and Archive, which lean hardest on `GROUP BY` |
 | **PDF** | mPDF needs a writable temp directory, and the certificate and attendance register render in chunks. | Generate a certificate and an attendance register for a real venue |
 | **Timezone** | An attempt's `expires_at` is computed server-side; a wrong `APP_TIMEZONE` ends exams at the wrong moment. | `APP_TIMEZONE` against the competition's own clock |
-| **Installing the app** | A service worker needs a secure context, so it never registers on the plain-HTTP development vhost — installability has never once been exercised (ADR-0073). | Open the site on a phone over HTTPS: the browser should offer *Add to Home Screen*, and the installed window should carry the uploaded icon and the brand colour. `/manifest.webmanifest` must come back as JSON, not as the SPA's page |
+| **Installing the app** | A service worker needs a secure context, so it never registers on the plain-HTTP development vhost — installability has never once been exercised (ADR-0073). | Open the site on a phone over HTTPS: the browser should offer *Add to Home Screen*, and the installed window should carry the uploaded icon and the brand colour, and it should **open on `/app`** — the screen that asks whether this is a candidate or a coordinator, not the front page. `/manifest.webmanifest` must come back as JSON, not as the SPA's page |
 
 ## When somebody says it broke
 

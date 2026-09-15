@@ -66,6 +66,15 @@ const year = new Date().getFullYear();
 const fullBleed = computed(() => route.meta.fullBleed === true);
 
 /**
+ * The screen replaces the shell entirely: no strip, no masthead, no footer and
+ * no container. The installed application's entry screens are this (ADR-0101's
+ * successor round) — they are tapped from a home screen and paint their own
+ * ground edge to edge, and a website's navigation above them would be offering a
+ * third thing to do to somebody who has just been asked to choose between two.
+ */
+const bare = computed(() => route.meta.bare === true);
+
+/**
  * The header sits on the page colour, so it needs the dark logo. Without one the
  * site name in words is the honest fallback — a white mark on off-white is not
  * a logo, it is a blank space.
@@ -135,8 +144,24 @@ const footerLink = (href: string | null | undefined): string => {
     ].join(' ');
 };
 
-onMounted(async () => {
-    document.addEventListener('click', onClickOutside);
+/**
+ * Everything the chrome needs, fetched once per visit.
+ *
+ * 🪤 Deliberately NOT tied to `onMounted`. The shell stays mounted across
+ * public navigation, so a visit that begins on a bare screen — which is every
+ * launch of the installed application — would otherwise either pay for a
+ * masthead and a footer nothing draws, or carry an empty header for the rest of
+ * the visit once it left that screen. Hence: skipped while bare, and run the
+ * first time a screen wants chrome.
+ */
+const chromeAsked = ref(false);
+
+async function loadShell(): Promise<void> {
+    if (chromeAsked.value) {
+        return;
+    }
+
+    chromeAsked.value = true;
 
     const [headerBlock, footerBlock] = await Promise.all([
         loadChrome('public.header'),
@@ -160,6 +185,14 @@ onMounted(async () => {
     } catch {
         // The strip simply stays quiet if the season cannot be read.
     }
+}
+
+onMounted(() => {
+    document.addEventListener('click', onClickOutside);
+
+    if (!bare.value) {
+        void loadShell();
+    }
 });
 
 onBeforeUnmount(() => {
@@ -175,6 +208,13 @@ watch(
     },
 );
 
+// The first screen that wants chrome pays for it — see `loadShell`.
+watch(bare, (isBare) => {
+    if (!isBare) {
+        void loadShell();
+    }
+});
+
 
 watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', open));
 </script>
@@ -185,11 +225,14 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
              the application inferred (ADR-0081). "Live exams open" stood here
              and was inferred, from whether any competition quiz was active,
              while every one of them sits behind a password. -->
-        <SiteSeasonStrip :site="site" />
+        <SiteSeasonStrip v-if="!bare" :site="site" />
 
+        <!-- Kept on the bare screens too, and they are the best place for it:
+             somebody who has just opened `/app` in a browser is exactly who the
+             offer is for. It hides itself once the app is installed. -->
         <PwaInstallButton />
 
-        <header class="border-b border-brand-palette-4/12">
+        <header v-if="!bare" class="border-b border-brand-palette-4/12">
             <div class="mx-auto flex h-[78px] w-full max-w-[1240px] items-center gap-10 px-6">
                 <RouterLink :to="{ name: 'home' }" class="flex shrink-0 items-center gap-2.5 text-base font-semibold tracking-tight">
                     <img v-if="headerLogo" :src="headerLogo" :alt="$t('app.name')" class="h-8 max-w-[12rem] object-contain" />
@@ -250,7 +293,7 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
             </div>
         </header>
 
-        <main class="flex-1" :class="fullBleed ? '' : 'mx-auto w-full max-w-[1240px] px-6 py-10'">
+        <main :class="bare ? 'flex flex-1 flex-col' : fullBleed ? 'flex-1' : 'mx-auto w-full max-w-[1240px] flex-1 px-6 py-10'">
             <slot />
         </main>
 
@@ -261,7 +304,7 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
              own `px-4 sm:px-8`, which put the blue edge 8px outside the content
              between 640 and 1240 and 8px inside it below that — the kind of
              misalignment that only shows up at the widths nobody screenshots. -->
-        <footer class="pb-6">
+        <footer v-if="!bare" class="pb-6">
           <div class="mx-auto w-full max-w-[1240px] px-6">
             <div class="rounded-[28px] bg-brand-palette-4 px-8 py-11 text-white sm:px-12">
                 <div class="grid gap-10 pb-9 sm:grid-cols-2 lg:grid-cols-4">

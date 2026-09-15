@@ -38,6 +38,65 @@ const routes: RouteRecordRaw[] = [
         meta: { zone: 'public', fullBleed: true },
     },
     {
+        /*
+         * Where the INSTALLED application opens — `ManifestController` names this
+         * address as `start_url`, and the front page is no longer it. The two are
+         * different arrivals: `/` is a website somebody is reading, and an icon
+         * on a home screen is tapped by a child with a password in their hand or
+         * by a coordinator with a room to run.
+         *
+         * ⚠️ The manifest's `scope` stays `/` and must. Scoping it to `/app`
+         * would put every other address — the front page, a news item, the exam
+         * itself at `/student/tests/…` — outside the installed window, and
+         * Android hands an out-of-scope link to the browser instead: the child
+         * would be thrown into a Chrome tab the moment the test opened.
+         *
+         * Both screens paint their own navy ground with no masthead (`bare`), so
+         * they are `public` only in the sense of needing no account.
+         */
+        path: '/app',
+        name: 'app.start',
+        component: () => import('@/pages/app/StartPage.vue'),
+        meta: { zone: 'public', bare: true },
+        beforeEnter: async () => {
+            /*
+             * "The app remembers you until you sign out" — and what remembers is
+             * the session, so a screen asking who this is has nothing to ask
+             * while one is open. Both are checked because the two are separate
+             * sessions in the same browser (ADR-0014): an open pair is the one
+             * case where the question is real, and it is asked rather than
+             * guessed.
+             */
+            const session = useSessionStore();
+            const student = useStudentSessionStore();
+            await student.ensureLoaded();
+
+            const coordinator = session.isAuthenticated;
+            const competitor = student.isIdentified;
+
+            if (coordinator && !competitor) {
+                return { name: 'dashboard' };
+            }
+
+            if (competitor && !coordinator) {
+                /*
+                 * 🪤 Not always the dashboard. A candidate who identified through
+                 * "Check results" has no stream — the dashboard filters by the one
+                 * they entered through and would meet them with an empty page.
+                 */
+                return { name: student.mode === 'results' ? 'student.results' : 'student.dashboard' };
+            }
+
+            return true;
+        },
+    },
+    {
+        path: '/app/student',
+        name: 'app.student',
+        component: () => import('@/pages/app/StudentMenuPage.vue'),
+        meta: { zone: 'public', bare: true },
+    },
+    {
         path: '/login',
         name: 'login',
         component: () => import('@/pages/LoginPage.vue'),
