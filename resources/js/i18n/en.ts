@@ -536,6 +536,22 @@ export default {
             // reviewed by an administrator before it is an account (ADR-0053),
             // so this says where that is done rather than offering to do it.
             signInHelper: 'New coordinator? Register on the website first — a registration is not yet an account.',
+
+            /*
+             * Screens 4e and 5b — the two empty states. The marks, the chips and
+             * every other word on those screens come from `student.dashboard` and
+             * `student.results`, which the website says too; what is here is only
+             * what the app says differently, because it is a phone and the way
+             * onward has to be a row rather than a sentence.
+             */
+            noTests: 'No assessments are available yet.',
+            noTestsNote: 'Your coordinator opens the test on the day. The app will show it here as soon as it is open.',
+            // Shorter than `sampleNote` on the menu: on a row offered beside an
+            // empty screen the promise is enough and the rule is not the point.
+            sampleWay: 'Practice as often as you like',
+            noResultsNote: 'A mark appears here once you have sat a test and an administrator has published it.',
+            backToTests: 'Back to my tests',
+            backToTestsNote: 'See what is open for you',
         },
         // The offer to install, spoken plainly. `button` doubles as the
         // accessible name, so it says what happens rather than naming a screen.

@@ -35,6 +35,14 @@ import type { Country } from '@/types/models';
 const props = defineProps<{
     modelValue: number | null;
     countries: Country[];
+    /**
+     * 🪤 Whether the list is still on its way. Without this the sheet opened on
+     * an empty array said "No country by that name" — which is not what was
+     * true; it had not been told any names yet. A screen must not state
+     * something it does not know, least of all to a child who has just been
+     * asked for their country.
+     */
+    loading?: boolean;
 }>();
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: number | null): void }>();
@@ -77,21 +85,29 @@ const sheetStyle = computed(() => {
 });
 
 /**
- * How tall the panel may be. 78% of the screen normally, so the form behind it
- * is still there; all of the visible strip once a keyboard has taken most of it,
+ * How tall the panel IS. 78% of the screen normally, so the form behind it is
+ * still there; all of the visible strip once a keyboard has taken most of it,
  * because there is nothing left to show behind and every pixel is wanted for the
  * search box and the list.
+ *
+ * 🪤 A height, not a maximum (owner, 2026-09-15: "da li može country search i
+ * posle unete pretrage da ostane poravnat po gornjoj ivici?"). With a maximum
+ * the panel shrank to fit however many countries matched, and since it is
+ * anchored to the BOTTOM of the screen, shrinking moved its top edge — and the
+ * search box with it — downward under the typing hand. Typing "Serb" walked the
+ * field the reader was looking at down the screen. Fixed, the list simply has
+ * room left under it.
  */
 const panelStyle = computed(() => {
     const f = frame.value;
 
     if (f === null) {
-        return { maxHeight: '78%' };
+        return { height: '78%' };
     }
 
     const keyboardUp = window.innerHeight - f.height > 120;
 
-    return { maxHeight: `${Math.round(f.height * (keyboardUp ? 1 : 0.78))}px` };
+    return { height: `${Math.round(f.height * (keyboardUp ? 1 : 0.78))}px` };
 });
 
 const selected = computed(() => props.countries.find((c) => c.id === props.modelValue) ?? null);
@@ -219,7 +235,7 @@ onBeforeUnmount(() => {
 
                 <ul class="mt-3 flex-1 overflow-y-auto">
                     <li v-if="matches.length === 0" class="px-1.5 py-5 text-sm text-brand-palette-4/55">
-                        {{ t('public.app.noCountry') }}
+                        {{ loading === true ? t('common.loading') : t('public.app.noCountry') }}
                     </li>
                     <li v-for="country in matches" :key="country.id">
                         <button

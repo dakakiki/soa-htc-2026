@@ -59,6 +59,8 @@ const title = computed(() => {
 });
 
 const countries = ref<Country[]>([]);
+/** True until the list has arrived, so the sheet can say so rather than guess. */
+const countriesLoading = ref(true);
 const countryId = ref<number | null>(null);
 const candidateNo = ref('');
 const dob = ref('');
@@ -104,6 +106,8 @@ onMounted(async () => {
         countries.value = data.data;
     } catch {
         // The picker stays empty; the error surfaces on submit.
+    } finally {
+        countriesLoading.value = false;
     }
 });
 
@@ -175,8 +179,8 @@ async function submit(): Promise<void> {
     }
 
     // Looking things up ends on the marks; the exam streams end on the list of
-    // what may be sat.
-    void router.push({ name: mode.value === 'results' ? 'student.results' : 'student.dashboard' });
+    // what may be sat — both of them the app's own screens, never the website's.
+    void router.push({ name: mode.value === 'results' ? 'app.results' : 'app.tests' });
 }
 </script>
 
@@ -220,7 +224,7 @@ async function submit(): Promise<void> {
             <div class="mt-4">
                 <span :class="label">{{ $t('student.access.country') }}</span>
                 <div class="mt-1.5">
-                    <AppCountryPicker v-model="countryId" :countries="countries" />
+                    <AppCountryPicker v-model="countryId" :countries="countries" :loading="countriesLoading" />
                 </div>
             </div>
 
