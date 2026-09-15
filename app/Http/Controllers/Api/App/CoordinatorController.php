@@ -29,11 +29,12 @@ use Illuminate\Http\Request;
  * "you may not see this venue" confirms the venue exists. The same reasoning as
  * PR #41, which stopped the API naming its own classes.
  *
- * 🔴 The EXAM PASSWORD is not served here and cannot be. `quizzes.quiz_password`
- * is a bcrypt hash — the server can check one and cannot read one back (owner
- * told 2026-09-15; the decision on whether to store it reversibly is theirs and
- * has not been made). The prototype's password card therefore has no source, and
- * an invented one would be worse than none.
+ * 🔴 The EXAM PASSWORD is not served here, cannot be, and is not going to be.
+ * `quizzes.quiz_password` is a bcrypt hash: the server can check one and cannot
+ * read one back. Told the owner on 2026-09-15 along with the one way it could be
+ * done — storing it reversibly — and the decision was to DROP THE CARD instead
+ * ("skloni karticu sa lozinkom"). So the hash stays a hash, and a coordinator
+ * gets the password the way they do today, from an administrator.
  */
 class CoordinatorController extends Controller
 {

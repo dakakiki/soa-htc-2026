@@ -3426,3 +3426,80 @@ pa nema ljuske koju bi trebalo razdvajati — on je isti ekran sa obe strane. On
   sajtovu listu ispita i izbacivala dete iz instaliranog okvira (PR #74).
 
 **4d ostaje kako je** — vlasnik: „moze da ostane kako jeste. koristi postojeci".
+
+
+## ADR-0104 — Koordinatorov telefon: brojevi koji mere ono što im ime kaže, i dve stvari koje su sklonjene jer nemaju podatak
+
+**Datum:** 2026-09-15 · **Status:** prihvaćeno · **PR #77, #79**
+
+Ekrani **7–9d** prototipa, poslednji od jedanaest. `/app/welcome` (šta je otvoreno i šta je objavljeno),
+`/app/venues` (koja učionica) i `/app/venues/:id` (brojevi jedne učionice — četiri stanja prototipa
+na jednoj stranici).
+
+**Školski koordinator ne vidi ekran 8.** Drži jednu učionicu, pa red sa `Welcome`-a vodi pravo na
+njene brojeve. To se odlučuje na `Welcome`-u, a ne na ekranu 8: stranica čiji je jedini posao da
+preusmeri je stranica koja blesne.
+
+### Brojevi (`VenueOverview`)
+
+| broj | meri |
+| --- | --- |
+| **Entered** | **decu** na spisku tih učionica kojima nivo stavlja taj rad pred njih (preko `difficulty_level_test`) |
+| **Started** | decu koja su ga otvorila |
+| **Submitted** | decu koja su ga predala |
+
+Sva tri broje **decu**, ne pokušaje (ADR-0084–0087).
+
+🔴 **Prosek se računa isključivo nad objavljenim ocenama** i zato stoji samo pod „Published", nikad uz
+otvoren rad: dok se u učionici radi, prosek svaki put kaže drugo (vlasnik, 15.09) — to nije broj, to
+je broj u pokretu.
+
+🔴 **Proba ne ulazi ni u jedan od njih.** Granica je `SampleRound` — **runda** koja je proba, nikad
+ime ili tip kviza — pa penzionisan probni lanac ostaje proba (ADR-0084).
+
+🔴 **Poništen (`void`) pokušaj nije nešto što je učionica uradila.** Baza dozvoljava najviše **jedan
+aktivan** pokušaj po detetu i radu (ADR-0016, preko generisane `active_test_id`), pa drugi red postoji
+samo zato što ga je administrator **poništio sa razlogom**. Prva verzija ovih upita ga je računala i
+izveštavala rad kao predat koji niko neće oceniti. **Uhvaćeno testom** koji je pokušao da jednom detetu
+da dva pokušaja, ne pregledom koda.
+
+### Opseg je kapija
+
+Svaki odgovor je ograničen `User::allowedSchoolIds()` — jednim row-scope autoritetom aplikacije (`null`
+za nosioca `schools.view.all`, inače učionice vezane za njegove dodele u **aktivnoj** sezoni). Učionica
+imenovana u adresi se proverava prema tom skupu i vraća **404, ne 403**: „ne smeš da vidiš ovu
+učionicu" potvrđuje da učionica postoji (isto rezonovanje kao PR #41).
+
+🔴 **Rute nemaju permisiju, namerno.** Permisija koja bi morala da se dodeli svakom koordinatoru da bi
+išta značila je kapija koja je uvek otvorena. Opseg **jeste** kapija.
+
+### 🔴 Kartica sa lozinkom ispita je sklonjena
+
+`quizzes.quiz_password` je **bcrypt heš**: server ume da proveri lozinku i ne ume da je pročita. Prototip
+je crtao `••••••` sa okom za prikaz — kontrolu koja ne može da radi.
+
+Vlasniku je 15.09 ponuđen i jedini način da bi radila — **čuvati lozinku šifrovano** (`encrypted`)
+umesto heširano — uz cenu: lozinke svih ispita postaju čitljive svakome kome dođu i baza **i**
+`APP_KEY`, a svaka greška u toj ruti ih odaje. **Odluka:** *„skloni karticu sa lozinkom"*.
+
+Heš ostaje heš, a koordinator lozinku dobija od administratora, kao i danas.
+
+### Dve stvari koje prototip crta a baza ne nosi
+
+- **Sat ispita („10:00 – 10:40")** — test ima `duration`, ne i vreme dana. Vlasnik, 15.09: *„umesto
+  10:00 - 10:40 napisi trajanje ispita"*. Kartica piše **koliko rad traje**, što je i ono što piše
+  detetov ekran — pa se dva ekrana slažu.
+- **„VENUE 1042"** — učionica ima ime i grad, **ne i broj**. Traka nosi **ime** učionice školskom
+  koordinatoru, a **broj učionica** državnom: imenovati jednu od dvadeset četiri znači imenovati
+  pogrešnu.
+
+### Ostalo sa ekrana 7 (vlasnik, 15.09)
+
+- ❌ **„Entry closes 20 Sep · 5 days left" je izbačeno** — *„nije potrebna izbaci je"*. Time je otpala
+  i nedoumica da li `season.ends_at` znači rok za prijavu.
+- Uvod je **„Exams for your venues"**, skraćeno sa „The exams the administrator has opened for your
+  venue." — i **množina** je odluka: ekran pokriva **sve** učionice koordinatora, ne jednu.
+- **„Published · Round 15"**: runda dolazi **iz sezone** (*„ovaj podatak uzimas iz settings"*), ne
+  izvedena iz onoga što je slučajno aktivno — ADR-0081.
+- **Obaveštenje** je administratorova poruka iz `GET /api/messages/inbox` (ADR-0099/0100), isti tekst
+  koji ide i na mejl, i sklanja se `POST .../dismiss` — svoj red, ničiji drugi.
