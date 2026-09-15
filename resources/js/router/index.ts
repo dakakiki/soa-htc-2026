@@ -83,7 +83,7 @@ const routes: RouteRecordRaw[] = [
             const competitor = student.isIdentified;
 
             if (coordinator && !competitor) {
-                return { name: 'dashboard' };
+                return { name: 'app.welcome' };
             }
 
             if (competitor && !coordinator) {
@@ -146,6 +146,34 @@ const routes: RouteRecordRaw[] = [
         name: 'app.results',
         component: () => import('@/pages/app/MyResultsPage.vue'),
         meta: { zone: 'public', bare: true, requiresCompetitor: true },
+    },
+    {
+        /*
+         * The coordinator's own screens (prototype 7-9d). `requiresAuth` is the
+         * admin session — the same account as the website's sign-in — and the
+         * shell is the app's own, so no `zone: 'admin'`.
+         *
+         * 🔴 No `permission`. What a coordinator may see is decided by the
+         * venues bound to them (`User::allowedSchoolIds()`), which the server
+         * applies to every answer; a permission would have to be granted to
+         * every coordinator to mean anything, which is a gate always open.
+         */
+        path: '/app/welcome',
+        name: 'app.welcome',
+        component: () => import('@/pages/app/CoordinatorHomePage.vue'),
+        meta: { requiresAuth: true, zone: 'public', bare: true },
+    },
+    {
+        path: '/app/venues',
+        name: 'app.venues',
+        component: () => import('@/pages/app/VenuePickPage.vue'),
+        meta: { requiresAuth: true, zone: 'public', bare: true },
+    },
+    {
+        path: '/app/venues/:venueId(\d+)',
+        name: 'app.venue',
+        component: () => import('@/pages/app/VenueFiguresPage.vue'),
+        meta: { requiresAuth: true, zone: 'public', bare: true },
     },
     {
         path: '/login',
@@ -758,7 +786,13 @@ router.beforeEach(async (to) => {
     }
 
     if (to.meta.requiresAuth && !session.isAuthenticated) {
-        return { name: 'login', query: { redirect: to.fullPath } };
+        /*
+         * 🪤 The app's own sign-in when this is the app. The website's sign-in
+         * screen is a page with a masthead and a footer; inside an installed
+         * window it is a different application, the same leak the sign-out had
+         * (owner, 2026-09-15).
+         */
+        return { name: inApp() ? 'app.signIn' : 'login', query: { redirect: to.fullPath } };
     }
 
     if (to.meta.permission) {

@@ -102,6 +102,29 @@ export function listRecipients(audience: MessageAudience, search?: string) {
 }
 
 /** Send it now: the in-app notices go at once, the mails are left owed. */
+/**
+ * The coordinator's own end of it: what is waiting for the person signed in.
+ *
+ * 🔴 No audience, no filter and no id — the server answers only about the
+ * deliveries addressed to them, which is why these two carry no permission
+ * (see `MessageController::inbox`).
+ */
+export interface InboxMessage {
+    /** The DELIVERY's id, which is what putting it away names. */
+    id: number;
+    subject: string;
+    body: string;
+    sent_at: string | null;
+}
+
+export function messageInbox() {
+    return http.get<{ data: InboxMessage[] }>('/api/messages/inbox');
+}
+
+export function dismissMessage(deliveryId: number) {
+    return http.post(`/api/messages/deliveries/${deliveryId}/dismiss`);
+}
+
 export function sendMessage(id: number) {
     return http.post<{ data: Message }>(`/api/messages/${id}/send`);
 }
