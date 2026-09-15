@@ -76,14 +76,6 @@ const statusChip = (status: MessageStatus): string => ({
     sent: 'bg-emerald-50 text-emerald-700',
 }[status]);
 
-const audienceLabel = (row: Message): string => ({
-    all: t('message.audienceAll'),
-    role: t('message.audienceRole'),
-    country: t('message.audienceCountry'),
-    venue: t('message.audienceVenue'),
-    user: t('message.audienceUser'),
-}[row.audience_type]);
-
 /** What a row says under the audience: the people, once there are people. */
 function reach(row: Message): string | null {
     if (row.status !== 'sent') {
@@ -164,7 +156,9 @@ const hasRows = computed(() => rows.value.length > 0);
                             <div class="mt-0.5 line-clamp-1 text-xs text-gray-500">{{ row.body }}</div>
                         </td>
                         <td class="px-4 py-3">
-                            <div>{{ audienceLabel(row) }}</div>
+                            <!-- The filter said in words, built by the server:
+                                 the names it needs are not on this screen. -->
+                            <div>{{ row.audience_label ?? '—' }}</div>
                             <div v-if="reach(row)" class="mt-0.5 text-xs text-gray-500">{{ reach(row) }}</div>
                         </td>
                         <td class="px-4 py-3">

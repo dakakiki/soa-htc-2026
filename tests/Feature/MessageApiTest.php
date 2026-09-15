@@ -50,7 +50,9 @@ class MessageApiTest extends TestCase
                 'password' => 'secret-password',
                 'country_id' => $school->country_id,
                 'role_id' => $this->roleId($roleKey),
-                'school_ids' => $roleKey === SystemRole::SchoolCoordinator->value ? [$school->id] : [],
+                // Both levels are created with a venue: the administration
+                // asks for at least one whichever level it is.
+                'school_ids' => [$school->id],
             ])
             ->assertCreated();
 
@@ -66,7 +68,7 @@ class MessageApiTest extends TestCase
         return array_merge([
             'subject' => 'Entry closes on 20 September',
             'body' => 'Every child needs a candidate number before entry closes.',
-            'audience_type' => 'all',
+            'audience' => ['roles' => [], 'countries' => [], 'venues' => [], 'users' => []],
             'channels' => ['mail'],
             'status' => 'draft',
         ], $overrides);
@@ -104,12 +106,18 @@ class MessageApiTest extends TestCase
             ->assertJsonValidationErrors('channels');
     }
 
-    public function test_an_audience_that_is_not_everyone_needs_at_least_one_id(): void
+    /**
+     * An empty list is not a filter. The administration is allowed to mean
+     * "everybody", and saying so should not need a special case.
+     */
+    public function test_an_empty_audience_is_everyone(): void
     {
+        $this->coordinator('one@soahtc.test');
+
         $this->actingAs($this->admin())
-            ->postJson('/api/messages', $this->payload(['audience_type' => 'country', 'audience_ids' => []]))
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('audience_ids');
+            ->postJson('/api/messages/recipients', ['audience' => []])
+            ->assertOk()
+            ->assertJsonPath('data.count', 1);
     }
 
     public function test_a_scheduled_message_needs_a_time(): void
@@ -131,7 +139,7 @@ class MessageApiTest extends TestCase
         $this->coordinator('two@soahtc.test');
 
         $preview = $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience_type' => 'all'])
+            ->postJson('/api/messages/recipients', ['audience' => []])
             ->assertOk()
             ->json('data.count');
 
@@ -145,7 +153,7 @@ class MessageApiTest extends TestCase
         $this->assertSame($preview, MessageDelivery::where('message_id', $id)->where('channel', 'app')->count());
     }
 
-    public function test_a_country_audience_reaches_only_that_country(): void
+    public function test_a_country_narrows_to_that_country(): void
     {
         $school = School::firstOrFail();
         // The seeder puts every school in one country, and this test needs two.
@@ -160,10 +168,81 @@ class MessageApiTest extends TestCase
         $this->coordinator('outside@soahtc.test', school: $abroad);
 
         $this->actingAs($this->admin())
+            ->postJson('/api/messages/recipients', ['audience' => ['countries' => [$school->country_id]]])
+            ->assertOk()
+            ->assertJsonPath('data.count', 1);
+    }
+
+    /**
+     * 🔴 The whole point of the four lists: "the school coordinators of
+     * these countries" is one message. The first design stored a single
+     * audience type and could not say it (owner, 2026-09-15).
+     */
+    public function test_role_and_country_narrow_together(): void
+    {
+        $school = School::firstOrFail();
+        $elsewhere = Country::where('id', '!=', $school->country_id)->firstOrFail();
+        $abroad = School::create([
+            'country_id' => $elsewhere->id,
+            'name' => 'School Abroad',
+            'status' => 'active',
+        ]);
+
+        // Two in the country, of different levels; one of the same level abroad.
+        $this->coordinator('school-here@soahtc.test', school: $school);
+        $this->coordinator('country-here@soahtc.test', SystemRole::CountryCoordinator->value, $school);
+        $this->coordinator('school-abroad@soahtc.test', school: $abroad);
+
+        $schoolRole = $this->roleId(SystemRole::SchoolCoordinator->value);
+
+        // The role alone: both school coordinators, here and abroad.
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages/recipients', ['audience' => ['roles' => [$schoolRole]]])
+            ->assertOk()
+            ->assertJsonPath('data.count', 2);
+
+        // The country alone: both levels, but only here.
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages/recipients', ['audience' => ['countries' => [$school->country_id]]])
+            ->assertOk()
+            ->assertJsonPath('data.count', 2);
+
+        // Both together: the school coordinators of this country, and nobody else.
+        $this->actingAs($this->admin())
             ->postJson('/api/messages/recipients', [
-                'audience_type' => 'country',
-                'audience_ids' => [$school->country_id],
+                'audience' => ['roles' => [$schoolRole], 'countries' => [$school->country_id]],
             ])
+            ->assertOk()
+            ->assertJsonPath('data.count', 1);
+    }
+
+    /** A venue narrows to the people who run it, whatever else is set. */
+    public function test_a_venue_narrows_to_its_coordinators(): void
+    {
+        $school = School::firstOrFail();
+        $other = School::create([
+            'country_id' => $school->country_id,
+            'name' => 'Second School',
+            'status' => 'active',
+        ]);
+
+        $this->coordinator('first@soahtc.test', school: $school);
+        $this->coordinator('second@soahtc.test', school: $other);
+
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages/recipients', ['audience' => ['venues' => [$other->id]]])
+            ->assertOk()
+            ->assertJsonPath('data.count', 1);
+    }
+
+    /** Down to one person, which is the old "one coordinator" case. */
+    public function test_naming_people_narrows_to_them(): void
+    {
+        $one = $this->coordinator('one@soahtc.test');
+        $this->coordinator('two@soahtc.test');
+
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages/recipients', ['audience' => ['users' => [$one->id]]])
             ->assertOk()
             ->assertJsonPath('data.count', 1);
     }
@@ -174,7 +253,7 @@ class MessageApiTest extends TestCase
     public function test_administrators_are_not_recipients(): void
     {
         $this->actingAs($this->admin())
-            ->postJson('/api/messages/recipients', ['audience_type' => 'all'])
+            ->postJson('/api/messages/recipients', ['audience' => []])
             ->assertOk()
             ->assertJsonPath('data.count', 0);
     }

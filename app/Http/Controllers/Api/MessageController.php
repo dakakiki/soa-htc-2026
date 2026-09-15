@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Communication\Enums\MessageAudience;
 use App\Domain\Communication\Enums\MessageChannel;
 use App\Domain\Communication\Enums\MessageStatus;
 use App\Domain\Communication\Models\Message;
 use App\Domain\Communication\Models\MessageDelivery;
+use App\Domain\Communication\Support\Audience;
 use App\Domain\Communication\Support\MessageDispatcher;
 use App\Domain\Communication\Support\RecipientResolver;
+use App\Domain\Identity\Models\Role;
+use App\Domain\Organization\Models\Country;
 use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Support\SeasonContext;
 use App\Http\Controllers\Controller;
@@ -80,7 +82,7 @@ class MessageController extends Controller
         // the SPA reads `meta.total` and `meta.last_page`, and a page returned
         // any other way reaches the screen as "could not load".
         return response()->json([
-            'data' => $page->items(),
+            'data' => $this->withAudienceLabels($page->items()),
             'meta' => [
                 'current_page' => $page->currentPage(),
                 'last_page' => $page->lastPage(),
@@ -147,17 +149,11 @@ class MessageController extends Controller
         $this->authorize('messages.manage');
         $season = $this->season();
 
-        $data = $request->validate([
-            'audience_type' => ['required', Rule::enum(MessageAudience::class)],
-            'audience_ids' => ['sometimes', 'array'],
-            'audience_ids.*' => ['integer'],
-        ]);
-
-        $audience = MessageAudience::from($data['audience_type']);
+        $data = $request->validate($this->audienceRules());
 
         return response()->json([
             'data' => [
-                'count' => $this->recipients->count($season->id, $audience, array_map('intval', $data['audience_ids'] ?? [])),
+                'count' => $this->recipients->count($season->id, Audience::fromArray($data['audience'] ?? [])),
             ],
         ]);
     }
@@ -226,25 +222,12 @@ class MessageController extends Controller
         $data = $request->validate([
             'subject' => ['required', 'string', 'max:200'],
             'body' => ['required', 'string', 'max:5000'],
-            'audience_type' => ['required', Rule::enum(MessageAudience::class)],
-            'audience_ids' => ['sometimes', 'array'],
-            'audience_ids.*' => ['integer'],
+            ...$this->audienceRules(),
             'channels' => ['required', 'array', 'min:1'],
             'channels.*' => [Rule::enum(MessageChannel::class)],
             'status' => ['required', Rule::in([MessageStatus::Draft->value, MessageStatus::Scheduled->value])],
             'send_at' => ['nullable', 'date'],
         ]);
-
-        $audience = MessageAudience::from($data['audience_type']);
-        $ids = array_map('intval', $data['audience_ids'] ?? []);
-
-        // Every audience but "everyone" is a filter over something, and a
-        // filter over nothing would quietly address the whole season.
-        if ($audience !== MessageAudience::All && $ids === []) {
-            throw ValidationException::withMessages([
-                'audience_ids' => 'Choose at least one.',
-            ]);
-        }
 
         $channels = array_values(array_unique($data['channels']));
 
@@ -271,11 +254,89 @@ class MessageController extends Controller
         return [
             'subject' => $data['subject'],
             'body' => $data['body'],
-            'audience_type' => $audience,
-            'audience_ids' => $audience === MessageAudience::All ? null : $ids,
+            // Normalised on the way in, so what is stored is always four lists
+            // of whole numbers whatever the form sent.
+            'audience' => Audience::fromArray($data['audience'] ?? [])->toArray(),
             'channels' => $channels,
             'status' => MessageStatus::from($data['status']),
             'send_at' => $data['status'] === MessageStatus::Scheduled->value ? $data['send_at'] : null,
+        ];
+    }
+
+    /**
+     * The audience said in words, so the list does not print raw ids.
+     *
+     * Names are fetched once for the whole page rather than per row: two
+     * queries for twenty messages instead of forty.
+     *
+     * @param  list<Message>  $messages
+     * @return list<array<string, mixed>>
+     */
+    private function withAudienceLabels(array $messages): array
+    {
+        $roleIds = [];
+        $countryIds = [];
+
+        foreach ($messages as $message) {
+            $audience = $message->audience();
+            $roleIds = array_merge($roleIds, $audience->roles);
+            $countryIds = array_merge($countryIds, $audience->countries);
+        }
+
+        $roles = Role::query()->whereIn('id', array_unique($roleIds))->pluck('name', 'id');
+        $countries = Country::query()->whereIn('id', array_unique($countryIds))->pluck('name', 'id');
+
+        return array_map(function (Message $message) use ($roles, $countries): array {
+            $audience = $message->audience();
+            $parts = [];
+
+            foreach ($audience->roles as $id) {
+                $parts[] = (string) ($roles[$id] ?? ('#'.$id));
+            }
+
+            // Three names read; a dozen do not, and the number is what the
+            // administrator was thinking in anyway.
+            if (count($audience->countries) > 0 && count($audience->countries) <= 3) {
+                foreach ($audience->countries as $id) {
+                    $parts[] = (string) ($countries[$id] ?? ('#'.$id));
+                }
+            } elseif (count($audience->countries) > 3) {
+                $parts[] = count($audience->countries).' countries';
+            }
+
+            if ($audience->venues !== []) {
+                $parts[] = count($audience->venues).' '.(count($audience->venues) === 1 ? 'venue' : 'venues');
+            }
+
+            if ($audience->users !== []) {
+                $parts[] = count($audience->users).' '.(count($audience->users) === 1 ? 'person' : 'people');
+            }
+
+            return $message->toArray() + [
+                'audience_label' => $parts === [] ? 'Everyone' : implode(' · ', $parts),
+            ];
+        }, $messages);
+    }
+
+    /**
+     * The audience, as four lists that multiply. Nothing is required: an empty
+     * list narrows nothing, so an empty audience is every coordinator of the
+     * season — which is a thing the administration is allowed to mean.
+     *
+     * @return array<string, list<string>>
+     */
+    private function audienceRules(): array
+    {
+        return [
+            'audience' => ['sometimes', 'array'],
+            'audience.roles' => ['sometimes', 'array'],
+            'audience.roles.*' => ['integer'],
+            'audience.countries' => ['sometimes', 'array'],
+            'audience.countries.*' => ['integer'],
+            'audience.venues' => ['sometimes', 'array'],
+            'audience.venues.*' => ['integer'],
+            'audience.users' => ['sometimes', 'array'],
+            'audience.users.*' => ['integer'],
         ];
     }
 
@@ -293,8 +354,7 @@ class MessageController extends Controller
             'id' => $message->id,
             'subject' => $message->subject,
             'body' => $message->body,
-            'audience_type' => $message->audience_type,
-            'audience_ids' => $message->audience_ids,
+            'audience' => $message->audience()->toArray(),
             'channels' => $message->channels,
             'status' => $message->status,
             'send_at' => $message->send_at,

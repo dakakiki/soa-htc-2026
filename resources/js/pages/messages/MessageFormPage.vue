@@ -28,19 +28,17 @@ const locked = ref(false);
 const form = reactive({
     subject: '',
     body: '',
-    audience_type: 'all' as MessageAudience,
     mail: true,
     scheduled: false,
     send_at: '',
 });
 
-/** One list per audience shape, so switching back does not lose the last pick. */
-const picked = reactive<Record<Exclude<MessageAudience, 'all'>, number[]>>({
-    role: [],
-    country: [],
-    venue: [],
-    user: [],
-});
+/**
+ * The audience: four lists that multiply. Each one left empty narrows nothing,
+ * so "country coordinators of Serbia and Croatia" is roles + countries, and an
+ * empty form addresses every coordinator of the season.
+ */
+const audience = reactive<MessageAudience>({ roles: [], countries: [], venues: [], users: [] });
 
 const roleOptions = ref<{ id: number; label: string }[]>([]);
 const countryOptions = ref<{ id: number; label: string }[]>([]);
@@ -57,16 +55,9 @@ const userChips = ref<{ id: number; label: string }[]>([]);
 const userSearching = ref(false);
 const userTotal = ref(0);
 
-const AUDIENCES: { key: MessageAudience; label: string }[] = [
-    { key: 'all', label: 'message.audienceAll' },
-    { key: 'role', label: 'message.audienceRole' },
-    { key: 'country', label: 'message.audienceCountry' },
-    { key: 'venue', label: 'message.audienceVenue' },
-    { key: 'user', label: 'message.audienceUser' },
-];
-
-const audienceIds = computed<number[]>(() =>
-    form.audience_type === 'all' ? [] : picked[form.audience_type],
+const isEveryone = computed(() =>
+    audience.roles.length === 0 && audience.countries.length === 0
+    && audience.venues.length === 0 && audience.users.length === 0,
 );
 
 /* ---- the count -------------------------------------------------------
@@ -78,15 +69,9 @@ const recipients = ref<number | null>(null);
 const counting = ref(false);
 
 async function recount(): Promise<void> {
-    if (form.audience_type !== 'all' && audienceIds.value.length === 0) {
-        recipients.value = null;
-
-        return;
-    }
-
     counting.value = true;
     try {
-        const { data } = await countRecipients(form.audience_type, audienceIds.value);
+        const { data } = await countRecipients({ ...audience });
         recipients.value = data.data.count;
     } catch {
         recipients.value = null;
@@ -96,7 +81,10 @@ async function recount(): Promise<void> {
     }
 }
 
-watch(() => [form.audience_type, audienceIds.value.join(',')], recount, { immediate: false });
+watch(
+    () => [audience.roles.join(','), audience.countries.join(','), audience.venues.join(','), audience.users.join(',')],
+    recount,
+);
 
 /* ---- lookups --------------------------------------------------------- */
 async function searchVenues(term: string): Promise<void> {
@@ -124,27 +112,27 @@ async function searchUsers(term: string): Promise<void> {
 /** Picking adds a chip; the select itself never holds the value. */
 function addVenue(value: number | null): void {
     const option = venueOptions.value.find((o) => o.id === value);
-    if (option && !picked.venue.includes(option.id)) {
-        picked.venue.push(option.id);
+    if (option && !audience.venues.includes(option.id)) {
+        audience.venues.push(option.id);
         venueChips.value.push(option);
     }
 }
 
 function addUser(value: number | null): void {
     const option = userOptions.value.find((o) => o.id === value);
-    if (option && !picked.user.includes(option.id)) {
-        picked.user.push(option.id);
+    if (option && !audience.users.includes(option.id)) {
+        audience.users.push(option.id);
         userChips.value.push(option);
     }
 }
 
 function dropVenue(value: number): void {
-    picked.venue = picked.venue.filter((v) => v !== value);
+    audience.venues = audience.venues.filter((v) => v !== value);
     venueChips.value = venueChips.value.filter((c) => c.id !== value);
 }
 
 function dropUser(value: number): void {
-    picked.user = picked.user.filter((v) => v !== value);
+    audience.users = audience.users.filter((v) => v !== value);
     userChips.value = userChips.value.filter((c) => c.id !== value);
 }
 
@@ -165,19 +153,19 @@ onMounted(async () => {
 
         form.subject = message.subject;
         form.body = message.body;
-        form.audience_type = message.audience_type;
         form.mail = message.channels.includes('mail');
         form.scheduled = message.status === 'scheduled';
         form.send_at = message.send_at ? message.send_at.slice(0, 16) : '';
         locked.value = message.status === 'sent';
 
-        if (message.audience_type !== 'all') {
-            picked[message.audience_type] = message.audience_ids ?? [];
-        }
+        audience.roles = message.audience.roles ?? [];
+        audience.countries = message.audience.countries ?? [];
+        audience.venues = message.audience.venues ?? [];
+        audience.users = message.audience.users ?? [];
 
         // The chips for what was already chosen, from the pages we have.
-        venueChips.value = venueOptions.value.filter((o) => picked.venue.includes(o.id));
-        userChips.value = userOptions.value.filter((o) => picked.user.includes(o.id));
+        venueChips.value = venueOptions.value.filter((o) => audience.venues.includes(o.id));
+        userChips.value = userOptions.value.filter((o) => audience.users.includes(o.id));
     }
 
     await recount();
@@ -193,8 +181,7 @@ function payload(status: 'draft' | 'scheduled') {
     return {
         subject: form.subject,
         body: form.body,
-        audience_type: form.audience_type,
-        audience_ids: audienceIds.value,
+        audience: { ...audience },
         channels,
         status,
         send_at: status === 'scheduled' ? form.send_at : null,
@@ -228,7 +215,7 @@ async function saveDraft(): Promise<void> {
 /** Sending cannot be taken back, so it asks first and says how many. */
 async function sendNow(): Promise<void> {
     const asked = await confirm.ask({
-        message: t('message.sendConfirm'),
+        message: t('message.sendConfirm', { count: recipients.value ?? 0 }),
         confirmLabel: t('message.send'),
     });
 
@@ -296,46 +283,39 @@ const label = 'block text-sm font-medium text-gray-700';
                     </div>
                 </div>
 
-                <!-- Who it goes to -->
+                <!--
+                    Who it goes to: four filters that multiply. Each one left
+                    empty narrows nothing, so "school coordinators of Serbia and
+                    Croatia" is two of them filled and the other two left alone.
+                -->
                 <div class="rounded-lg border border-gray-200 bg-white">
-                    <div class="border-b border-gray-200 px-4 py-3 text-sm font-semibold">{{ $t('message.recipients') }}</div>
-                    <div class="flex flex-col gap-4 p-4">
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                v-for="option in AUDIENCES"
-                                :key="option.key"
-                                type="button"
-                                :disabled="locked"
-                                class="rounded-md border px-3 py-1.5 text-sm"
-                                :class="form.audience_type === option.key
-                                    ? 'border-brand-primary bg-brand-primary-soft font-semibold text-brand-primary-hover'
-                                    : 'border-gray-300 hover:bg-gray-50'"
-                                @click="form.audience_type = option.key"
-                            >{{ $t(option.label) }}</button>
-                        </div>
-
-                        <label v-if="form.audience_type === 'role'" class="block">
+                    <div class="flex items-baseline justify-between gap-3 border-b border-gray-200 px-4 py-3">
+                        <span class="text-sm font-semibold">{{ $t('message.recipients') }}</span>
+                        <span class="text-xs text-gray-500">{{ $t('message.audienceHint') }}</span>
+                    </div>
+                    <div class="grid gap-4 p-4 sm:grid-cols-2">
+                        <label class="block">
                             <span :class="label">{{ $t('message.audienceRoleLabel') }}</span>
                             <div class="mt-1">
-                                <MultiSelect v-model="picked.role" :options="roleOptions" :disabled="locked"
-                                    :placeholder="$t('message.audienceRoleLabel')" />
+                                <MultiSelect v-model="audience.roles" :options="roleOptions" :disabled="locked"
+                                    :placeholder="$t('message.anyRole')" />
                             </div>
                         </label>
 
-                        <label v-if="form.audience_type === 'country'" class="block">
+                        <label class="block">
                             <span :class="label">{{ $t('message.audienceCountryLabel') }}</span>
                             <div class="mt-1">
-                                <MultiSelect v-model="picked.country" :options="countryOptions" :disabled="locked"
-                                    :placeholder="$t('message.audienceCountryLabel')" />
+                                <MultiSelect v-model="audience.countries" :options="countryOptions" :disabled="locked"
+                                    :placeholder="$t('message.anyCountry')" />
                             </div>
                         </label>
 
-                        <div v-if="form.audience_type === 'venue'">
+                        <div>
                             <span :class="label">{{ $t('message.audienceVenueLabel') }}</span>
                             <div class="mt-1">
                                 <SearchSelect :model-value="null" :options="venueOptions" remote
                                     :searching="venueSearching" :total="venueTotal" :disabled="locked"
-                                    :placeholder="$t('message.audienceVenueLabel')"
+                                    :placeholder="$t('message.anyVenue')"
                                     @search="searchVenues" @update:model-value="addVenue" />
                             </div>
                             <div v-if="venueChips.length" class="mt-2 flex flex-wrap gap-1.5">
@@ -349,12 +329,12 @@ const label = 'block text-sm font-medium text-gray-700';
                             </div>
                         </div>
 
-                        <div v-if="form.audience_type === 'user'">
+                        <div>
                             <span :class="label">{{ $t('message.audienceUserLabel') }}</span>
                             <div class="mt-1">
                                 <SearchSelect :model-value="null" :options="userOptions" remote
                                     :searching="userSearching" :total="userTotal" :disabled="locked"
-                                    :placeholder="$t('message.audienceUserLabel')"
+                                    :placeholder="$t('message.anyUser')"
                                     @search="searchUsers" @update:model-value="addUser" />
                             </div>
                             <div v-if="userChips.length" class="mt-2 flex flex-wrap gap-1.5">
@@ -368,13 +348,15 @@ const label = 'block text-sm font-medium text-gray-700';
                             </div>
                         </div>
 
-                        <p v-if="form.audience_type !== 'all' && audienceIds.length === 0" class="text-sm text-gray-500">
-                            {{ $t('message.pickAtLeastOne') }}
-                        </p>
-                        <div v-else class="flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
-                            <IconUsers :size="17" />
-                            <span v-if="counting">{{ $t('common.loading') }}</span>
-                            <span v-else-if="recipients !== null">{{ $t('message.willReceive', { count: recipients }, recipients) }}</span>
+                        <div class="sm:col-span-2">
+                            <div class="flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                                <IconUsers :size="17" />
+                                <span v-if="counting">{{ $t('common.loading') }}</span>
+                                <span v-else-if="recipients !== null">
+                                    {{ $t('message.willReceive', { count: recipients }, recipients) }}
+                                    <span v-if="isEveryone" class="opacity-70">— {{ $t('message.everyone') }}</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -386,7 +368,7 @@ const label = 'block text-sm font-medium text-gray-700';
                         <!-- Not the administrator's to switch off: the app needs
                              no address and no permission, so it always arrives. -->
                         <label class="flex items-start gap-3 py-3 opacity-60">
-                            <input type="checkbox" checked disabled class="mt-0.5" />
+                            <input type="checkbox" :checked="true" disabled class="mt-0.5" />
                             <span>
                                 <span class="block text-sm font-medium">{{ $t('message.channelApp') }}</span>
                                 <span class="mt-0.5 block text-xs text-gray-500">{{ $t('message.channelAppNote') }}</span>

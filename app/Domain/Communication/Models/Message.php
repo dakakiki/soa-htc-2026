@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Communication\Models;
 
-use App\Domain\Communication\Enums\MessageAudience;
 use App\Domain\Communication\Enums\MessageChannel;
 use App\Domain\Communication\Enums\MessageStatus;
+use App\Domain\Communication\Support\Audience;
 use App\Domain\Organization\Models\Season;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Message extends Model
 {
     protected $fillable = [
-        'season_id', 'subject', 'body', 'audience_type', 'audience_ids',
+        'season_id', 'subject', 'body', 'audience',
         'channels', 'status', 'send_at', 'sent_at', 'recipients_count', 'created_by',
     ];
 
@@ -30,8 +30,7 @@ class Message extends Model
             'season_id' => 'integer',
             'created_by' => 'integer',
             'recipients_count' => 'integer',
-            'audience_type' => MessageAudience::class,
-            'audience_ids' => 'array',
+            'audience' => 'array',
             'channels' => 'array',
             'status' => MessageStatus::class,
             'send_at' => 'datetime',
@@ -55,6 +54,12 @@ class Message extends Model
     public function deliveries(): HasMany
     {
         return $this->hasMany(MessageDelivery::class);
+    }
+
+    /** The four lists, normalised: an empty one narrows nothing. */
+    public function audience(): Audience
+    {
+        return Audience::fromArray($this->audience);
     }
 
     /**

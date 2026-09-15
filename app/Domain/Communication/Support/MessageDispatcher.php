@@ -46,11 +46,7 @@ class MessageDispatcher
      */
     public function dispatch(Message $message): int
     {
-        $users = $this->recipients->users(
-            $message->season_id,
-            $message->audience_type,
-            array_map('intval', $message->audience_ids ?? []),
-        );
+        $users = $this->recipients->users($message->season_id, $message->audience());
 
         $channels = $message->channelCases();
         $now = now();

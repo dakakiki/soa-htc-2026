@@ -17,9 +17,9 @@ use Illuminate\Support\Facades\Schema;
  * and only the second table can say so.
  *
  * 🪤 The audience is stored as a filter, not as a list of people. A message
- * addressed to "everyone in Serbia" sent in September must still read as
- * "everyone in Serbia" in December, when three more coordinators have been
- * added. Who it actually reached is in the deliveries.
+ * addressed to "the school coordinators of Serbia" sent in September must still
+ * read that way in December, when three more of them have been added. Who it
+ * actually reached is in the deliveries.
  */
 return new class extends Migration
 {
@@ -35,11 +35,15 @@ return new class extends Migration
             $table->string('subject', 200);
             $table->text('body');
 
-            // all | role | country | venue | user
-            $table->string('audience_type', 20);
-            // The ids the type points at - roles, countries, schools or users.
-            // Null for `all`, which needs none.
-            $table->json('audience_ids')->nullable();
+            // Four lists that multiply: roles AND countries AND venues AND
+            // people. An empty list is not a filter, so {} addresses every
+            // coordinator in the season and {"roles":[2],"countries":[7,9]}
+            // addresses the country coordinators of two countries.
+            //
+            // 🪤 One `audience_type` was the first design and it could not say
+            // that sentence: it forced a choice between "by role" and "by
+            // country" when the administration means both at once.
+            $table->json('audience');
 
             // A list, because a message can go out on more than one at once.
             // `app` is always in it: that is the channel that cannot fail.

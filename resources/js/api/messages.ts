@@ -11,14 +11,27 @@ import type { Paginated } from '@/types/models';
  */
 export type MessageStatus = 'draft' | 'scheduled' | 'sent';
 export type MessageChannel = 'app' | 'mail' | 'push';
-export type MessageAudience = 'all' | 'role' | 'country' | 'venue' | 'user';
+
+/**
+ * Four lists that multiply: roles AND countries AND venues AND people. An
+ * empty list narrows nothing, so an empty audience is every coordinator of the
+ * season, and `{roles: [countryCoordinator], countries: [rs, hr]}` is the
+ * country coordinators of two countries.
+ */
+export interface MessageAudience {
+    roles: number[];
+    countries: number[];
+    venues: number[];
+    users: number[];
+}
 
 export interface Message {
     id: number;
     subject: string;
     body: string;
-    audience_type: MessageAudience;
-    audience_ids: number[] | null;
+    audience: MessageAudience;
+    /** The audience in words, built by the server for the list screen. */
+    audience_label?: string;
     channels: MessageChannel[];
     status: MessageStatus;
     send_at: string | null;
@@ -33,8 +46,7 @@ export interface Message {
 export interface MessagePayload {
     subject: string;
     body: string;
-    audience_type: MessageAudience;
-    audience_ids?: number[];
+    audience: MessageAudience;
     channels: MessageChannel[];
     status: Exclude<MessageStatus, 'sent'>;
     send_at?: string | null;
@@ -69,8 +81,8 @@ export function deleteMessage(id: number) {
 }
 
 /** How many coordinators an audience comes to, asked before sending. */
-export function countRecipients(audience_type: MessageAudience, audience_ids: number[] = []) {
-    return http.post<{ data: { count: number } }>('/api/messages/recipients', { audience_type, audience_ids });
+export function countRecipients(audience: MessageAudience) {
+    return http.post<{ data: { count: number } }>('/api/messages/recipients', { audience });
 }
 
 /** Send it now: the in-app notices go at once, the mails are left owed. */

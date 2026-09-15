@@ -909,16 +909,19 @@ export default {
 
         recipients: 'Recipients',
         recipientsNote: 'Coordinators only',
-        audienceAll: 'Everyone',
-        audienceRole: 'By role',
-        audienceCountry: 'By country',
-        audienceVenue: 'By venue',
-        audienceUser: 'One coordinator',
-        audienceRoleLabel: 'Role',
+        // Four filters that multiply. Each one left alone narrows nothing, so
+        // the empty form is everybody and two filled fields are an intersection
+        // ("school coordinators of Serbia and Croatia").
+        audienceHint: 'Leave a field empty to put no limit on it',
+        audienceRoleLabel: 'Coordinator level',
         audienceCountryLabel: 'Countries',
         audienceVenueLabel: 'Venues',
-        audienceUserLabel: 'Coordinator',
-        pickAtLeastOne: 'Choose at least one.',
+        audienceUserLabel: 'Named coordinators',
+        anyRole: 'Any level',
+        anyCountry: 'Any country',
+        anyVenue: 'Any venue',
+        anyUser: 'Anyone',
+        everyone: 'every coordinator in the season',
         willReceive: 'no coordinator will receive this | {count} coordinator will receive this | {count} coordinators will receive this',
         countFailed: 'Could not count the recipients.',
 
@@ -936,7 +939,7 @@ export default {
         serverTime: 'Server time',
         saveDraft: 'Save draft',
         send: 'Send',
-        sendConfirm: 'Send this message now? It cannot be taken back.',
+        sendConfirm: 'Send this message to {count} coordinators now? It cannot be taken back.',
         sendFailed: 'Could not send the message.',
         delivered: '{sent} delivered',
         deliveredWithFailures: '{sent} delivered, {failed} failed',
