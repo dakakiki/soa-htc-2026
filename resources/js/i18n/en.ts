@@ -506,6 +506,36 @@ export default {
             resultsNote: 'Your {competition} and {sample} tests results',
             resultsCompetition: 'competition',
             resultsSample: 'sample',
+
+            /*
+             * Screen 3 — the three details. The app bar names the stream, which
+             * is why the heading does not have to: `results` above doubles as the
+             * third title, because the row and the screen it opens say the same
+             * thing.
+             */
+            titleCompetition: 'Start test',
+            titleSample: 'Sample exam',
+            details: 'Your details',
+            searchCountry: 'Search country',
+            noCountry: 'No country by that name.',
+            close: 'Close',
+            // The rule above the password, naming what is behind it.
+            competitionTest: 'Competition test',
+            passwordHelper: 'Your coordinator reads the password out to the room when the test starts.',
+            // One word for all three streams: the screen is already titled, so
+            // the button says what happens next rather than repeating it.
+            continue: 'Continue',
+
+            /*
+             * Screen 6 — the coordinator's sign-in. `login.*` carries the field
+             * labels, the button and the errors; what is here is the two
+             * sentences this screen says and the website's does not.
+             */
+            signInLead: 'The same e-mail and password you use on the website.',
+            // 🪤 Not a link, and not a form. An application to run a venue is
+            // reviewed by an administrator before it is an account (ADR-0053),
+            // so this says where that is done rather than offering to do it.
+            signInHelper: 'New coordinator? Register on the website first — a registration is not yet an account.',
         },
         // The offer to install, spoken plainly. `button` doubles as the
         // accessible name, so it says what happens rather than naming a screen.

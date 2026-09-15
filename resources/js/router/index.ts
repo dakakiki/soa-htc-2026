@@ -97,6 +97,31 @@ const routes: RouteRecordRaw[] = [
         meta: { zone: 'public', bare: true },
     },
     {
+        /*
+         * The three details, and the coordinator's sign-in, on the application's
+         * OWN screens rather than the website's.
+         *
+         * 🔴 The owner's rule of 2026-09-15, and the reason the duplication is
+         * deliberate: the day the PWA is replaced by a mobile application built
+         * properly, that has to be the deletion of `pages/app/` and
+         * `components/app/` and NOTHING ELSE. A website page doing double duty as
+         * a phone screen would have to be unpicked instead, by somebody working
+         * out which half belonged to which — so `/student/access/:mode` and
+         * `/login` keep their admin-written headings (ADR-0046) and the app
+         * keeps these. What survives that day is the API.
+         */
+        path: '/app/identify/:mode(sample|competition|results)',
+        name: 'app.identify',
+        component: () => import('@/pages/app/IdentifyPage.vue'),
+        meta: { zone: 'public', bare: true },
+    },
+    {
+        path: '/app/login',
+        name: 'app.signIn',
+        component: () => import('@/pages/app/SignInPage.vue'),
+        meta: { guestOnly: true, zone: 'public', bare: true },
+    },
+    {
         path: '/login',
         name: 'login',
         component: () => import('@/pages/LoginPage.vue'),
