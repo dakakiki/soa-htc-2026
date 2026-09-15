@@ -28,6 +28,13 @@ declare module 'vue-router' {
          * an exam by mis-tapping.
          */
         bare?: boolean;
+        /**
+         * An identified candidate, without the website's student shell. The app's
+         * own signed-in screens are this: they need the short-lived competitor
+         * session exactly as `zone: 'student'` does, and they draw their own frame
+         * (`components/app/AppSignedInScreen.vue`) instead of that zone's.
+         */
+        requiresCompetitor?: boolean;
     }
 }
 
@@ -85,7 +92,7 @@ const routes: RouteRecordRaw[] = [
                  * "Check results" has no stream — the dashboard filters by the one
                  * they entered through and would meet them with an empty page.
                  */
-                return { name: student.mode === 'results' ? 'student.results' : 'student.dashboard' };
+                return { name: student.mode === 'results' ? 'app.results' : 'app.tests' };
             }
 
             return true;
@@ -121,6 +128,24 @@ const routes: RouteRecordRaw[] = [
         name: 'app.signIn',
         component: () => import('@/pages/app/SignInPage.vue'),
         meta: { guestOnly: true, zone: 'public', bare: true },
+    },
+    {
+        /*
+         * The app's own signed-in screens — what may be sat, and what has been
+         * (prototype 4/4b/4e and 5/5b). `requiresCompetitor` rather than
+         * `zone: 'student'`: the same session is needed, and the frame around it
+         * is the app's own (ADR-0103).
+         */
+        path: '/app/tests',
+        name: 'app.tests',
+        component: () => import('@/pages/app/MyTestsPage.vue'),
+        meta: { zone: 'public', bare: true, requiresCompetitor: true },
+    },
+    {
+        path: '/app/results',
+        name: 'app.results',
+        component: () => import('@/pages/app/MyResultsPage.vue'),
+        meta: { zone: 'public', bare: true, requiresCompetitor: true },
     },
     {
         path: '/login',
@@ -743,8 +768,13 @@ router.beforeEach(async (to) => {
         }
     }
 
-    // Competitor (student) session — separate from the admin session above.
-    if (to.meta.zone === 'student') {
+    /*
+     * Competitor (student) session — separate from the admin session above, and
+     * required by two different shells: the website's `zone: 'student'` pages and
+     * the app's own signed-in screens, which carry their own frame and so cannot
+     * use that zone (ADR-0103).
+     */
+    if (to.meta.zone === 'student' || to.meta.requiresCompetitor === true) {
         const student = useStudentSessionStore();
         await student.ensureLoaded();
 
