@@ -14,6 +14,7 @@ export default {
         users: 'Users',
         students: 'Students',
         coordinators: 'Coordinators',
+        messages: 'Messages',
         registrationQueue: 'Registrations',
         locations: 'Countries & Regions',
         difficulty: 'Difficulty levels',
@@ -876,6 +877,75 @@ export default {
         // What approval does and does not do — said on the screen, because it is
         // the one thing a reviewer is likely to assume wrongly.
         scopeNote: 'Approving opens the account only. Attach the venue afterwards on the Coordinators screen.',
+    },
+    message: {
+        // Messages to coordinators (2026-09-15). One text, several channels.
+        title: 'Messages',
+        count: 'No. messages: {count}',
+        add: 'New message',
+        edit: 'Edit message',
+        search: 'Search subject or text',
+        empty: 'No messages yet.',
+        error: 'Could not load messages.',
+        saveFailed: 'Save failed.',
+
+        subject: 'Subject',
+        body: 'Text',
+        // Said where it is written, because this is the one place the text
+        // leaves the system and a notification cannot carry styling.
+        bodyNote: 'Plain text — a notification cannot carry styling',
+
+        columnRecipients: 'Recipients',
+        columnChannels: 'Channels',
+        columnStatus: 'Status',
+        columnWhen: 'When',
+
+        status: 'Status',
+        statusDraft: 'Draft',
+        statusScheduled: 'Scheduled',
+        statusSent: 'Sent',
+        allStatuses: 'All statuses',
+        allChannels: 'All channels',
+
+        recipients: 'Recipients',
+        recipientsNote: 'Coordinators only',
+        audienceAll: 'Everyone',
+        audienceRole: 'By role',
+        audienceCountry: 'By country',
+        audienceVenue: 'By venue',
+        audienceUser: 'One coordinator',
+        audienceRoleLabel: 'Role',
+        audienceCountryLabel: 'Countries',
+        audienceVenueLabel: 'Venues',
+        audienceUserLabel: 'Coordinator',
+        pickAtLeastOne: 'Choose at least one.',
+        willReceive: 'no coordinator will receive this | {count} coordinator will receive this | {count} coordinators will receive this',
+        countFailed: 'Could not count the recipients.',
+
+        channels: 'Channels',
+        channelApp: 'In the app',
+        channelAppNote: 'Always on. The message waits on the coordinator’s screen until they put it away.',
+        channelMail: 'E-mail',
+        channelMailNote: 'To the address on the coordinator’s account.',
+        channelPush: 'Push notification',
+        channelPushNote: 'Available once coordinators have installed the app and allowed notifications. Nothing to send to yet.',
+
+        when: 'When',
+        sendNow: 'Send now',
+        schedule: 'Schedule',
+        serverTime: 'Server time',
+        saveDraft: 'Save draft',
+        send: 'Send',
+        sendConfirm: 'Send this message now? It cannot be taken back.',
+        sendFailed: 'Could not send the message.',
+        delivered: '{sent} delivered',
+        deliveredWithFailures: '{sent} delivered, {failed} failed',
+        // 🔴 A notification is read on a locked screen, by whoever is
+        // holding the phone. The warning belongs where the text is typed.
+        careful: 'A notification is read on a locked screen. Never put a mark or an exam password in the text.',
+        sentLocked: 'This message has gone out. What people were told is a record, so it can no longer be changed.',
+        confirmDelete: 'Delete this message?',
+        deleteFailed: 'Delete failed.',
     },
     coordinator: {
         title: 'Coordinators',

@@ -36,3 +36,19 @@ Schedule::command('attempts:finalize-expired')
     // The sweep is quick, but a slow one must not have a second copy started on
     // top of it: two graders on one attempt is not a race worth running.
     ->withoutOverlapping();
+
+/*
+ * Messages to coordinators (2026-09-15).
+ *
+ * Two jobs in one command: dispatch what is scheduled and due, then hand over
+ * the mails any message still owes. Every minute, because a message scheduled
+ * for 08:00 that arrives at 08:05 has missed the morning it was written for,
+ * and because the mail half is deliberately slow — a big audience is paid off
+ * over several runs rather than in one request that would time out.
+ */
+Schedule::command('messages:send')
+    ->everyMinute()
+    // A run still working through four hundred addresses must not have a second
+    // copy started on top of it: the pending rows are claimed one at a time, and
+    // two runs would race to send the same mail twice.
+    ->withoutOverlapping();

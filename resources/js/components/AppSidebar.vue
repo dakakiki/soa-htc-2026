@@ -7,6 +7,7 @@ import { pendingRegistrationCount } from '@/api/coordinatorRegistrations';
 import {
     IconLayoutDashboard,
     IconBuilding,
+    IconMail,
     IconUsersGroup,
     IconUsers,
     IconUserStar,
@@ -142,6 +143,9 @@ const nav: NavNode[] = [
         ],
     },
     { kind: 'item', label: t('nav.venues'), icon: IconBuilding, to: 'venues', prefix: 'venues', perm: 'schools.edit' },
+    // Messages to coordinators (2026-09-15). Beside the people it writes to,
+    // not inside them: the audience is wider than one venue's coordinator.
+    { kind: 'item', label: t('nav.messages'), icon: IconMail, to: 'messages', prefix: 'messages', perm: 'messages.manage' },
     {
         kind: 'group',
         key: 'quizzes',

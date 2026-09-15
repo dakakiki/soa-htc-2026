@@ -237,6 +237,24 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'coordinators.manage' },
     },
     {
+        path: '/messages',
+        name: 'messages',
+        component: () => import('@/pages/messages/MessagesListPage.vue'),
+        meta: { requiresAuth: true, permission: 'messages.manage' },
+    },
+    {
+        path: '/messages/new',
+        name: 'messages.new',
+        component: () => import('@/pages/messages/MessageFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'messages.manage' },
+    },
+    {
+        path: '/messages/:id/edit',
+        name: 'messages.edit',
+        component: () => import('@/pages/messages/MessageFormPage.vue'),
+        meta: { requiresAuth: true, permission: 'messages.manage' },
+    },
+    {
         path: '/locations',
         name: 'locations',
         component: () => import('@/pages/locations/LocationsListPage.vue'),

@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\DifficultyLevelController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ExamRoundController;
 use App\Http\Controllers\Api\GradingController;
+use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
@@ -351,6 +352,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('coordinators/import/errors', [CoordinatorController::class, 'importErrors']);
 
     Route::apiResource('coordinators', CoordinatorController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+
+    /*
+     * Messages to coordinators (2026-09-15).
+     *
+     * `recipients` is registered before the resource so that it is not read as
+     * a {message} show, the same reason "coordinators/export" sits above.
+     * `inbox` and `dismiss` are the coordinator's own end of it and carry no
+     * permission: they can only return, and only put away, what was addressed
+     * to the person signed in.
+     */
+    Route::get('messages/inbox', [MessageController::class, 'inbox']);
+    Route::post('messages/deliveries/{delivery}/dismiss', [MessageController::class, 'dismiss']);
+    Route::post('messages/recipients', [MessageController::class, 'recipients']);
+    Route::post('messages/{message}/send', [MessageController::class, 'send']);
+    Route::apiResource('messages', MessageController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::delete('coordinators/{coordinator}/assets/{asset}', [CoordinatorController::class, 'deleteAsset']);
     Route::post('users/{user}/assignments', [AssignmentController::class, 'store']);
     Route::put('assignments/{assignment}', [AssignmentController::class, 'update']);
