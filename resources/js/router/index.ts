@@ -770,6 +770,52 @@ export const router = createRouter({
     },
 });
 
+/**
+ * The application on screen is older than the one on the server.
+ *
+ * 🔴 Vite names every built file by content hash and a deploy DELETES the old
+ * ones, so a tab opened before a deploy still holds an `app-*.js` that asks for
+ * chunks that are gone. Vue Router reports that as a failed dynamic import, and
+ * until now it reported it to nobody: the page stayed on screen looking fine
+ * while every menu click did nothing (owner, on STAGE, 2026-09-15, after eight
+ * deploys in an afternoon — "posle nekog vremena navigacija ne radi").
+ *
+ * The answer is to fetch the shell again AT THE ADDRESS THAT WAS CLICKED, so
+ * the click completes instead of merely being survived. `SpaController` sends
+ * the shell with `no-cache` so that this reload cannot be answered out of the
+ * cache with the same stale asset names.
+ *
+ * 🪤 Once per address, remembered for the tab. A chunk that is genuinely missing
+ * — a bad build, a half-finished upload — would otherwise reload for ever, and
+ * a reload loop is a worse failure than a dead menu: it takes the console with
+ * it, so nobody can see why.
+ */
+router.onError((error, to) => {
+    const message = String((error as Error)?.message ?? '');
+
+    // Every engine words it differently; all three mean the same thing.
+    const staleBuild = /dynamically imported module|Importing a module script failed|Loading chunk .* failed/i.test(message);
+
+    if (!staleBuild) {
+        return;
+    }
+
+    const key = `reload-once:${to.fullPath}`;
+
+    try {
+        if (window.sessionStorage.getItem(key) !== null) {
+            return;
+        }
+
+        window.sessionStorage.setItem(key, '1');
+    } catch {
+        // No storage to remember with: reload anyway. A dead menu with no way
+        // out is the worse of the two failures.
+    }
+
+    window.location.assign(to.fullPath);
+});
+
 router.beforeEach(async (to) => {
     /*
      * Which of the two this is — the installed application or the website. Read
