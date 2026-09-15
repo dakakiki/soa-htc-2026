@@ -8,6 +8,7 @@ import { apiErrorMessage } from '@/api/http';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import { answerMarker } from '@/utils/answerNumbering';
 import { clearDraft, dropStaleDrafts, loadDraft, saveDraft } from '@/utils/attemptDraft';
+import { inApp } from '@/utils/appJourney';
 import type { AttemptNote, AttemptQuestion, AttemptSession, SubmitAnswer } from '@/types/models';
 
 /**
@@ -289,12 +290,59 @@ const band = ref<HTMLElement | null>(null);
 const bandHeight = ref(90);
 let bandWatcher: ResizeObserver | undefined;
 
+/**
+ * The list of tests — the app's own, or the website's.
+ *
+ * 🪤 This screen is reached from both, and it is the ONE screen they share: it
+ * already draws no chrome, so it is the same screen on either side (ADR-0103
+ * covers the rest). Its two ways back therefore have to ask which side they are
+ * on. Before this, handing in inside the installed application dropped a child
+ * onto the website's student shell — masthead, season strip and all (caught
+ * 2026-09-15, the same leak as the sign-out's).
+ */
+const testsList = computed(() => ({ name: inApp() ? 'app.tests' : 'student.dashboard' }));
+
 /** Clearance under the band, so the question label is not flush against it. */
 const anchorOffset = computed(() => `${bandHeight.value + 16}px`);
 
 function goToQuestion(index: number): void {
     document.querySelector(`[data-index="${index}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+/**
+ * The phone's question strip: the same numbers the desktop stacks in a rail,
+ * laid out in one scrolling line above HAND IN (owner, 2026-09-15). Until now a
+ * phone had no overview at all — a candidate on question 28 of 34 could not see
+ * which ones they had left blank, and could not jump back to one.
+ *
+ * 🪤 The strip is scrolled with `scrollTo` ON THE STRIP, never with the chip's
+ * own `scrollIntoView`. That method scrolls every scrollable ancestor, so
+ * keeping the current number in view would also move the PAGE — dragging the
+ * question the candidate is reading out from under them, mid-test, every time
+ * they crossed into the next one.
+ *
+ * The chips are 28px and not the 44px a tap target is usually given (owner,
+ * 2026-09-15: "imaju po 40 pitanja u testu" — at 36px a forty-question test was
+ * three screens of sideways scrolling). The trade is deliberate and it is the
+ * safe way round: a mis-tap here jumps to the wrong question, which is one more
+ * tap to undo, and the strip auto-centres the one being read so the tap is
+ * usually near the middle of the line rather than at its edge.
+ */
+const navStrip = ref<HTMLElement | null>(null);
+
+watch(currentIndex, (index) => {
+    const strip = navStrip.value;
+    const chip = strip?.querySelector<HTMLElement>(`[data-nav="${index}"]`);
+
+    if (strip === null || strip === undefined || chip === null || chip === undefined) {
+        return;
+    }
+
+    strip.scrollTo({
+        left: chip.offsetLeft - strip.clientWidth / 2 + chip.clientWidth / 2,
+        behavior: 'smooth',
+    });
+});
 
 function buildAnswers(): SubmitAnswer[] {
     return questions.value.map((q) => {
@@ -353,7 +401,7 @@ onMounted(async () => {
         // A completed test (409) sends the competitor back to the list.
         const status = (e as { response?: { status?: number } }).response?.status;
         if (status === 409) {
-            void router.replace({ name: 'student.dashboard' });
+            void router.replace(testsList.value);
             return;
         }
         error.value = apiErrorMessage(e, t('student.test.error'));
@@ -463,7 +511,7 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
             </p>
 
             <RouterLink
-                :to="{ name: 'student.dashboard' }"
+                :to="testsList"
                 class="mb-9 mt-3 flex h-[52px] w-full items-center justify-center rounded-full bg-brand-palette-1 text-base font-semibold text-brand-palette-4 transition hover:brightness-105"
             >
                 {{ $t('student.test.backToList') }}
@@ -653,8 +701,39 @@ const mono = 'font-mono uppercase tracking-[0.16em]';
             </aside>
         </div>
 
-        <!-- On a phone the way out rides the bottom edge instead of a rail. -->
+        <!--
+            On a phone the rail cannot stand beside the questions, so it lies down
+            under them: one scrolling line of numbers with the way out beneath it.
+            Same three states as the desktop rail — answered filled, blank
+            outlined, and the one being read ringed rather than recoloured, so
+            "where I am" does not overwrite "whether I answered it".
+        -->
         <div class="sticky bottom-0 z-20 border-t border-brand-palette-4/10 bg-[#fbfaf8]/95 px-5 pb-8 pt-3 backdrop-blur lg:hidden">
+            <div
+                v-if="questions.length > 1"
+                ref="navStrip"
+                class="-mx-5 mb-2.5 flex gap-1 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                role="group"
+                :aria-label="t('student.test.questions')"
+            >
+                <button
+                    v-for="(q, qi) in questions"
+                    :key="q.id"
+                    type="button"
+                    :data-nav="qi"
+                    :aria-label="t('student.test.questionNo', { n: qi + 1 })"
+                    :aria-current="qi === currentIndex ? 'true' : undefined"
+                    class="grid h-7 w-7 shrink-0 place-items-center rounded-lg font-mono text-[11px] tabular-nums transition"
+                    :class="[
+                        isAnswered(q)
+                            ? 'bg-brand-palette-4 text-white'
+                            : 'border border-brand-palette-4/20 text-brand-palette-4/45',
+                        qi === currentIndex ? 'ring-2 ring-brand-ink-accent' : '',
+                    ]"
+                    @click="goToQuestion(qi)"
+                >{{ qi + 1 }}</button>
+            </div>
+
             <button
                 type="button"
                 :disabled="submitting"
