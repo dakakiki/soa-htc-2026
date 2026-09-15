@@ -31,6 +31,7 @@ final class PublicPaths
         'login', 'register', 'forgot-password', 'reset-password',
         'profile', 'dashboard', 'student', 'students', 'venues', 'users',
         'coordinators', 'coordinator-registrations', 'locations', 'difficulty',
+        'messages',
         'content', 'grading', 'publishing', 'results', 'reports', 'reset',
         'roles', 'settings', 'website', 'cms',
         self::POST_PREFIX,

@@ -37,6 +37,7 @@ class RolePermissionSeeder extends Seeder
         'cms.manage' => 'Manage the public website: pages, posts and categories',
         'results.manage' => 'Grade essays, publish and manage results',
         'reports.view' => 'View competition reports and statistics',
+        'messages.manage' => 'Write and send messages to coordinators',
     ];
 
     /**

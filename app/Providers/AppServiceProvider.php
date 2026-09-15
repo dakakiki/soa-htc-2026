@@ -90,6 +90,11 @@ class AppServiceProvider extends ServiceProvider
         // Competition reports (5f) — a distinct read permission from results.manage.
         Gate::define('reports.view', fn (User $user): bool => $user->hasPermission('reports.view'));
 
+        // Messages to coordinators (2026-09-15). The administration's end of it;
+        // the coordinator's own inbox needs no permission, because it can only
+        // ever return what was addressed to the person asking.
+        Gate::define('messages.manage', fn (User $user): bool => $user->hasPermission('messages.manage'));
+
         // Web identify is guessable down to the competitor's date of birth, so cap
         // attempts per competitor_number (which IP rotation can't dodge) alongside
         // the per-IP cap — otherwise a targeted DOB brute force could take a session.

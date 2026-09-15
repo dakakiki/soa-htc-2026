@@ -14,6 +14,7 @@ export default {
         users: 'Users',
         students: 'Students',
         coordinators: 'Coordinators',
+        messages: 'Messages',
         registrationQueue: 'Registrations',
         locations: 'Countries & Regions',
         difficulty: 'Difficulty levels',
@@ -876,6 +877,88 @@ export default {
         // What approval does and does not do — said on the screen, because it is
         // the one thing a reviewer is likely to assume wrongly.
         scopeNote: 'Approving opens the account only. Attach the venue afterwards on the Coordinators screen.',
+    },
+    message: {
+        // Messages to coordinators (2026-09-15). One text, several channels.
+        title: 'Messages',
+        count: 'No. messages: {count}',
+        add: 'New message',
+        edit: 'Edit message',
+        search: 'Search subject or text',
+        empty: 'No messages yet.',
+        error: 'Could not load messages.',
+        saveFailed: 'Save failed.',
+
+        subject: 'Subject',
+        // One sentence for every channel: a notification title and a mail
+        // subject line are the same thing said once.
+        subjectNote: 'The same line is the notification title and the e-mail subject.',
+        messageSection: 'Message',
+        // Two bodies, because a notification and a mail are not the same
+        // medium. Each is asked for only by the channel that carries it.
+        bodyPlain: 'Message text',
+        bodyMail: 'E-mail text',
+        bodyMailPlaceholder: 'Write the e-mail…',
+        pickAChannel: 'Choose at least one channel.',
+        selectAll: 'Select all',
+        body: 'Text',
+        // Said where it is written, because this is the one place the text
+        // leaves the system and a notification cannot carry styling.
+        bodyNote: 'Plain text — a notification cannot carry styling',
+
+        columnRecipients: 'Recipients',
+        columnChannels: 'Channels',
+        columnStatus: 'Status',
+        columnWhen: 'When',
+
+        status: 'Status',
+        statusDraft: 'Draft',
+        statusScheduled: 'Scheduled',
+        statusSent: 'Sent',
+        allStatuses: 'All statuses',
+        allChannels: 'All channels',
+
+        recipients: 'Recipients',
+        recipientsNote: 'Everyone who holds an account in this season',
+        // Four filters that multiply. Each one left alone narrows nothing, so
+        // the empty form is everybody and two filled fields are an intersection
+        // ("school coordinators of Serbia and Croatia").
+        audienceHint: 'Leave a field empty to put no limit on it',
+        audienceRoleLabel: 'User level',
+        audienceCountryLabel: 'Countries',
+        audienceVenueLabel: 'Venues',
+        audienceUserLabel: 'Users',
+        anyRole: 'Any level',
+        anyCountry: 'Any country',
+        anyVenue: 'Any venue',
+        anyUser: 'Everyone the filters match',
+        everyone: 'everyone with an account in this season',
+        willReceive: 'nobody will receive this | {count} person will receive this | {count} people will receive this',
+        countFailed: 'Could not count the recipients.',
+
+        channels: 'Channels',
+        channelApp: 'In the app',
+        channelAppNote: 'Always on. The message waits on the coordinator’s screen until they put it away.',
+        channelMail: 'E-mail',
+        channelMailNote: 'To the address on the coordinator’s account.',
+
+        when: 'When',
+        sendNow: 'Send now',
+        schedule: 'Schedule',
+        serverTime: 'Server time',
+        saveDraft: 'Save draft',
+        send: 'Send',
+        sendTitle: 'Send this message?',
+        sendConfirm: 'Send this message to {count} people now? It cannot be taken back.',
+        sendFailed: 'Could not send the message.',
+        delivered: '{sent} delivered',
+        deliveredWithFailures: '{sent} delivered, {failed} failed',
+        // 🔴 A notification is read on a locked screen, by whoever is
+        // holding the phone. The warning belongs where the text is typed.
+        careful: 'A notification is read on a locked screen. Never put a mark or an exam password in the text.',
+        sentLocked: 'This message has gone out. What people were told is a record, so it can no longer be changed.',
+        confirmDelete: 'Delete this message?',
+        deleteFailed: 'Delete failed.',
     },
     coordinator: {
         title: 'Coordinators',

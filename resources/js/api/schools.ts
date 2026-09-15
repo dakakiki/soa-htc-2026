@@ -18,6 +18,8 @@ export interface SchoolPayload {
 export interface SchoolListParams {
     page?: number;
     country_id?: number;
+    /** Several countries at once, for the message audience cascade. */
+    country_ids?: number[];
     region_id?: number;
     per_page?: number;
     search?: string;

@@ -117,7 +117,8 @@ class RoleAdminTest extends TestCase
         $this->actingAs($this->admin())
             ->getJson('/api/permissions')
             ->assertOk()
-            // The whole catalog, including coordinators.approve (ADR-0053).
-            ->assertJsonCount(19, 'data');
+            // The whole catalog, including coordinators.approve (ADR-0053) and
+            // messages.manage (2026-09-15).
+            ->assertJsonCount(20, 'data');
     }
 }

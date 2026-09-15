@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconAlertTriangle, IconTrash } from '@tabler/icons-vue';
+import { IconAlertTriangle, IconSend, IconTrash } from '@tabler/icons-vue';
 import { useConfirmStore } from '@/stores/confirm';
 
 const { t } = useI18n();
@@ -38,8 +38,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
                     class="flex items-center gap-2 px-5 py-4"
                     :class="store.danger ? 'bg-red-600 text-white' : 'border-b border-gray-100'"
                 >
-                    <span :class="store.danger ? 'text-white' : 'text-red-600'">
+                    <!-- The mark says what kind of thing is about to happen,
+                         which for anything but a deletion is not a bin. -->
+                    <span :class="store.danger ? 'text-white' : (store.kind === 'send' ? 'text-green-600' : 'text-red-600')">
                         <IconAlertTriangle v-if="store.danger" :size="22" />
+                        <IconSend v-else-if="store.kind === 'send'" :size="20" />
                         <IconTrash v-else :size="20" />
                     </span>
                     <h2
@@ -55,25 +58,29 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
                     class="whitespace-pre-line px-5 py-4"
                     :class="store.danger ? 'text-sm font-medium text-red-700' : 'text-sm text-gray-600'"
                 >{{ store.message }}</div>
-                <!-- Danger footer pushes the two apart: backing out sits at the far
-                     left, away from the button that cannot be taken back. -->
+                <!-- Footers that push the two apart: backing out sits at the far
+                     left, away from the button that cannot be taken back. The
+                     danger dialog does it, and so does sending — one deletes
+                     data, the other puts a message in four hundred inboxes. -->
                 <div
                     class="flex gap-2 px-5 py-4"
                     :class="store.danger
                         ? 'justify-between border-t border-red-200 bg-red-50'
-                        : 'justify-end border-t border-gray-100'"
+                        : (store.kind === 'send'
+                            ? 'justify-between border-t border-gray-100'
+                            : 'justify-end border-t border-gray-100')"
                 >
                     <button
                         type="button"
                         class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm hover:bg-gray-50"
                         @click="store.cancel"
-                    >{{ store.danger ? t('common.cancel') : t('common.back') }}</button>
+                    >{{ store.danger || store.kind === 'send' ? t('common.cancel') : t('common.back') }}</button>
                     <button
                         type="button"
                         class="rounded-md px-4 py-2 text-sm font-medium text-white"
                         :class="store.danger
                             ? 'bg-green-600 uppercase tracking-wide hover:bg-green-700'
-                            : 'bg-red-600 hover:bg-red-700'"
+                            : (store.kind === 'send' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700')"
                         @click="store.confirm"
                     >{{ store.confirmLabel || t('confirm.confirm') }}</button>
                 </div>

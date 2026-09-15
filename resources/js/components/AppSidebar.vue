@@ -7,6 +7,7 @@ import { pendingRegistrationCount } from '@/api/coordinatorRegistrations';
 import {
     IconLayoutDashboard,
     IconBuilding,
+    IconMail,
     IconUsersGroup,
     IconUsers,
     IconUserStar,
@@ -194,6 +195,10 @@ const nav: NavNode[] = [
             { label: t('nav.layout'), icon: IconLayoutRows, to: 'cms.layout', prefix: 'cms.layout', perm: 'cms.manage' },
         ],
     },
+    // Messages to coordinators (2026-09-15). After the website and before
+    // access: it is something the organisation sends out, not something a
+    // venue or a round is made of (owner, 2026-09-15).
+    { kind: 'item', label: t('nav.messages'), icon: IconMail, to: 'messages', prefix: 'messages', perm: 'messages.manage' },
     // Access and Settings stay last.
     {
         kind: 'group',
