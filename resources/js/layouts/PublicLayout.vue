@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/theme';
 import { getPublicLayout, getSiteStatus } from '@/api/publicContent';
 import PublicMenuLink from '@/components/PublicMenuLink.vue';
 import SiteSeasonStrip from '@/components/public/SiteSeasonStrip.vue';
+import PwaInstallButton from '@/components/PwaInstallButton.vue';
 import type { PublicMenu, SiteStatus } from '@/types/models';
 
 /** One link column of the footer, as the footer block stores it. */
@@ -185,6 +186,8 @@ watch(mobileOpen, (open) => document.body.classList.toggle('overflow-hidden', op
              and was inferred, from whether any competition quiz was active,
              while every one of them sits behind a password. -->
         <SiteSeasonStrip :site="site" />
+
+        <PwaInstallButton />
 
         <header class="border-b border-brand-palette-4/12">
             <div class="mx-auto flex h-[78px] w-full max-w-[1240px] items-center gap-10 px-6">

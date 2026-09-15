@@ -466,6 +466,26 @@ export default {
             // flag, on pages every country reads.
             round: 'Round {round} · {year}',
         },
+        // The offer to install, spoken plainly. `button` doubles as the
+        // accessible name, so it says what happens rather than naming a screen.
+        install: {
+            button: 'Install app',
+            // Each platform its own button: one ends in the system dialog, the
+            // other in the panel below, because only one of them has a dialog.
+            android: 'Install on Android',
+            ios: 'Install on iPhone',
+            // 🪤 iOS words are Apple's own, quoted exactly: a visitor hunting
+            // "Add to Home Screen" in the share sheet needs our words to match
+            // what is printed there, not a better translation of it.
+            iosTitle: 'Add application to home screen',
+            // Split around the glyph: the share mark belongs beside the words
+            // that name it, not stranded at the end of a line that wrapped.
+            iosStep1Before: 'Tap the share button',
+            iosStep1After: 'at the bottom of the screen',
+            iosStep2: 'Choose "Add to Home Screen"',
+            iosStep3: 'Tap "Add"',
+            close: 'Close',
+        },
         news: {
             // The mono line above the masthead. The front page numbers its
             // sections 01-04; the journal carries on from there.
