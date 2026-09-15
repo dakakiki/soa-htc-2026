@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useSessionStore } from '@/stores/session';
 import { useStudentSessionStore } from '@/stores/studentSession';
+import { inApp, noteJourney } from '@/utils/appJourney';
 
 /**
  * Which application shell a route renders in (ADR-0014). `App.vue` maps this to
@@ -717,6 +718,13 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
+    /*
+     * Which of the two this is — the installed application or the website. Read
+     * on the way out of a sign-out, and here so that the answer is known before
+     * anything needs it ({@see utils/appJourney}).
+     */
+    noteJourney(to.path);
+
     const session = useSessionStore();
     await session.ensureLoaded();
 
@@ -741,7 +749,14 @@ router.beforeEach(async (to) => {
         await student.ensureLoaded();
 
         if (!student.isIdentified) {
-            return { name: 'home' };
+            /*
+             * 🪤 Not the website's front page when this is the app. A session
+             * that has expired or been signed out lands here, and the front page
+             * is a different application to somebody inside an installed window
+             * — masthead, menu, footer and no way back to the screen they were
+             * on (owner, 2026-09-15).
+             */
+            return { name: inApp() ? 'app.start' : 'home' };
         }
     }
 

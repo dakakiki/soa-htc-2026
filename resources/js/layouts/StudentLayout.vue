@@ -6,6 +6,7 @@ import { IconLogout } from '@tabler/icons-vue';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import { useThemeStore } from '@/stores/theme';
 import { getSiteStatus } from '@/api/publicContent';
+import { inApp } from '@/utils/appJourney';
 import SiteSeasonStrip from '@/components/public/SiteSeasonStrip.vue';
 import PwaInstallButton from '@/components/PwaInstallButton.vue';
 import Tooltip from '@/components/Tooltip.vue';
@@ -50,9 +51,22 @@ onMounted(async () => {
     }
 });
 
+/**
+ * 🪤 Where a sign-out lands depends on which of the two this is. The website's
+ * front page is the right answer on the website and the wrong one inside an
+ * installed window, where it is simply a different application — the owner
+ * reported it on 2026-09-15: "logout vodi na site umesto na prvi ekran PWA".
+ *
+ * `replace`, not `push`: the prototype's rule is that signing out empties the
+ * history, because there is nothing behind it any more — the screen they left
+ * has no session and would only bounce.
+ *
+ * ⏳ Until the app has its own screens for the list and the marks (ADR-0103),
+ * this shell serves both and has to ask.
+ */
 async function signOut(): Promise<void> {
     await student.logout();
-    await router.push({ name: 'home' });
+    await router.replace({ name: inApp() ? 'app.start' : 'home' });
 }
 </script>
 
