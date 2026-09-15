@@ -3145,3 +3145,145 @@ Otkad red sadržaja ima **Registered** kroz nivoe (ADR-0095), **svaki kviz ima i
 seme redova iz `registered` vraćalo probne kvizove u takmičarsku tabelu, sa imeniocem i bez ijednog
 takmičara. To je tiho poništavalo ADR-0094. Redovi sadržaja se sada seju **iz pokušaja i iz spiska
 članova**, nikad iz imenioca; geografija i nivo, kojima je `registered` sama populacija, i dalje iz oba.
+
+## ADR-0099 — Poruke koordinatorima: jedan tekst, više kanala, a primaoci su presek filtera
+
+**Datum:** 2026-09-15 · **Status:** prihvaćeno · **PR #65**
+
+Koordinator je od organizacije čuo samo ono što neko zapamti da mu pošalje ručno. Administracija
+dobija svoj segment — **Messages**, iza nove permisije `messages.manage` — u kom se poruka napiše
+**jednom**, pa se bira kome ide, kojim kanalima i kada.
+
+### Primaoci su četiri liste koje se množe
+
+`rola` **I** `država` **I** `učionica` **I** `imenovani ljudi`. Lista koja je prazna **ne sužava
+ništa**, pa je prazan obrazac svako u sezoni, a dve popunjene liste su presek.
+
+🔴 **Prvi oblik je bio jedan `audience_type`** (svi · rola · država · učionica · jedan čovek) i vlasnik
+ga je odbio istog dana: nije umeo da kaže rečenicu koju administracija stvarno misli — **„school
+koordinatori Srbije i Hrvatske"** je jedna poruka, a ne izbor između „po roli" i „po državi".
+
+Audience se čuva **kao filter, ne kao spisak imena**. Poruka naslovljena na „školske koordinatore
+Srbije" u septembru mora i u decembru da čita isto, kad ih bude troje više. Koga je stvarno stigla je
+drugo pitanje, i stoji u `message_deliveries`.
+
+### Jedan upit i za broj i za slanje
+
+🔴 Broj pored birača (`{n} people will receive this`) i ljudi kojima poruka ode dolaze iz **istog**
+`RecipientResolver`-a. Dva pisanja jedne publike su dva obećanja koja se raziđu — to je ista zamka
+zbog koje je jedan ekran pisao 134% a drugi 56% o istoj stvari.
+
+**Primalac je svako ko ima nalog u sezoni**, sa jednim izuzetkom: **takmičar**. On nema ni nalog ni
+adresu. Administratori i korisničke role (npr. Hippo) **jesu** primaoci — vlasnikova odluka 15.09,
+pošto je polje preimenovano iz „Coordinator level" u **`User level`**. Nivoi se ređaju **po dosegu**
+(administrator → korisničke role → država → učionica), ne azbučno.
+
+### Dve tabele, jer poruka i isporuka nisu isto
+
+| tabela | šta drži |
+| --- | --- |
+| `messages` | šta je **sastavljeno** — tekst, filter, kanali, status, vreme |
+| `message_deliveries` | šta se **desilo** — red po čoveku po kanalu, sa greškom ako je bilo |
+
+Poruka koja kaže da je otišla na 412 ljudi i mejl server koji je odbio tri adrese su **oba tačna**, i
+samo druga tabela ume to da kaže.
+
+### Slanje je rascepljeno po brzini
+
+- **U aplikaciji** je isporuka **red u tabeli**, pa cela publika stane u jedan `insert` i obaveštenje
+  je na svakom ekranu pre nego što se klik završi.
+- **Mejl** je tuđi server, jedna adresa po jedna, i četiri stotine njih **ne staju u jedan zahtev**.
+  Zato `dispatch` samo upiše šta je **dužno**, a `messages:send` (cron, svakog minuta) to isplaćuje u
+  serijama. Odbijena adresa obori **svoj** red, nikad ceo posao.
+
+🪤 „Sent" na isporuci znači da je **pošiljalac primio** poruku, ne da ju je neko pročitao. Ništa u
+aplikaciji ne može da zna drugo, a kolona koja bi to tvrdila merila bi nešto drugo od svog imena.
+
+### Šta je namerno zatvoreno
+
+- **Push je odbijen na validaciji** — nema VAPID ključeva ni tabele pretplata, pa bi upisivao isporuke
+  koje niko nikad neće platiti. Polje je sklonjeno i sa ekrana (vlasnik, 15.09): kućica koju niko ne
+  može da čekira je obećanje koje ekran ne može da održi.
+- **Poslata poruka se ne menja i ne briše.** To je zapis šta je ljudima rečeno, a zapis koji se ne
+  slaže sa sandučićima koja ga drže gori je od nikakvog.
+
+🪤 `channels` je JSON lista, a SQLite i MySQL se ne slažu kako se po njoj pretražuje. Filter je zato
+`LIKE` nad zapisanom listom — ista rečenica na oba motora, nad zatvorenim skupom kratkih reči koje ne
+mogu da se sudare (`app`, `mail`, `push`).
+
+
+## ADR-0100 — Obaveštenje i mejl nisu isti medij: dva tela, svako traži svoj kanal
+
+**Datum:** 2026-09-15 · **Status:** prihvaćeno · **PR #65**
+
+**Naslov je jedan** — isti red je naslov obaveštenja i predmet mejla, pa se piše jednom.
+
+Tela su **dva**, jer se ne čitaju isto:
+
+| polje | ko ga nosi | oblik |
+| --- | --- | --- |
+| `body` | obaveštenje u aplikaciji i push | **običan tekst**, najviše 500 znakova, sa brojačem na ekranu |
+| `body_html` | mejl | **WYSIWYG editor** |
+
+Svako telo traži **samo kanal koji ga nosi**: poruka koja ide samo mejlom nema tekst obaveštenja, a
+ona koja ide samo u aplikaciju nema HTML. Tražiti oba svaki put značilo bi da pola svake poruke ostane
+nenapisano i neposlato.
+
+### 🪤 Jedan `Enter` je u mejlu nestajao
+
+Telo mejla je Markdown, a Markdown čita **jedan prelom reda kao razmak**. Dva reda ukucana u polje
+stizala su u sandučić kao **jedna rečenica**, dok je isti tekst u aplikaciji — gde obaveštenje poštuje
+prelome — stajao u dva reda. Jedna poruka, dva čitanja: tačno ono što pisanje teksta na jednom mestu
+treba da spreči.
+
+Sada se jedan prelom pretvara u **Markdown-ov tvrdi prelom** (dva razmaka na kraju reda), pa izlazi
+`<br>`. Prazan red i dalje pravi pasus. Zahtev je postavljen **na jeziku kojim je mejl ionako pisan**,
+umesto da se u njega ubacuje sirov HTML.
+
+🔴 Tekst se i dalje **ekranizuje**: administrator koji otkuca `<b>bold</b>` dobija tekst `<b>bold</b>`,
+a `<script>` ne stiže nikome. Mejl je jedino mesto gde taj tekst napušta sistem.
+
+### Ostalo iz iste runde (vlasnik, 15.09)
+
+- **Nijedan kanal nije čekiran unapred.** Kojim putem poruka ide je odluka, a kućica koja stigne već
+  čekirana donosi je umesto onoga ko zaboravi da pogleda.
+- **Slanje pita**, u dijalogu koji zna da nije brisanje: avionče umesto kante, zeleno umesto crvenog, i
+  izlaz na **levom** kraju — daleko od dugmeta koje se ne može povući. Zajednički `ConfirmDialog` je
+  dobio vrstu (`kind`), podrazumevano i dalje brisanje, pa se nijedan drugi ekran nije pomerio.
+- 🪤 **Naslov sekcije nije `<legend>`.** Legenda se crta **na** ivici `<fieldset>`-a i buši rupu u
+  liniji iznad naslova; sekcije su obični naslovi, a linija ih **zatvara** odozdo.
+
+
+## ADR-0101 — Ponuda za instalaciju se pali po uređaju, ne isporučuje se svima
+
+**Datum:** 2026-09-15 · **Status:** prihvaćeno · **PR #66**
+
+Chrome je ukinuo traku koju je nekad sam prikazivao, pa sajt koji ignoriše `beforeinstallprompt` jeste
+sajt čiji posetilac instalaciju nalazi samo kroz meni pregledača — to jest, nikad. Događaj se zato
+hvata i troši na **sopstveno dugme**, plutajuće dole desno, na telefonu i tabletu.
+
+- **Android** troši događaj i otvara sistemski dijalog.
+- **iPhone** ga nema i neće ga dobiti: tamo ne postoji dijalog za instalaciju, nego **Share → Add to
+  Home Screen**. Zato ista traka, a na dodir panel koji pokazuje put.
+
+### Prekidač po uređaju
+
+🔴 **STAGE je mesto gde se sajt pokazuje klijentu**, a ponuda oko koje se još odlučuje nema šta da
+stoji na ekranu tokom prikaza. Zato se ništa ne nudi nikome dok se adresa jednom ne otvori sa
+**`?pwa=1`**; pregledač to zapamti, a **`?pwa=0`** zaboravi.
+
+**Po uređaju, ne po nalogu** — instaliranje je nešto što radi telefon, pa prekidač mora da se povuče
+na telefonu koji će to i uraditi.
+
+🪤 `localStorage` u pregledaču sa blokiranim podacima **baca** umesto da vrati prazno, a izuzetak
+odavde bi oborio ceo raspored. Zato je svako čitanje i pisanje u `try`.
+
+Time je penzionisan i **`DESIGN_PREVIEW`** — konstanta koja je stajala umesto ove ideje dok se dogovarao
+izgled. Svestan prekidač kaže šta je; konstanta koju neko mora da se seti da vrati kaže samo da je
+jednom zaboravljena.
+
+### Šta i dalje ne radi, i zna se
+
+🔴 **Ikona manifesta je SVG sa `sizes: "any"`** (`ManifestController::icons()`), a Chromium iz takve
+ikone **ne instalira**. Android grana neće proći do kraja dok se uz SVG ne isporuči i **PNG 192 i 512**.
+iOS grana za to ne mari i radi danas.
