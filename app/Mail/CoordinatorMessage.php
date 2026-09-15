@@ -45,9 +45,32 @@ class CoordinatorMessage extends Mailable
             with: [
                 'name' => $this->recipientName,
                 'siteName' => $this->siteName(),
-                'body' => $this->message->body,
+                'body' => $this->hardBreaks($this->message->body),
                 'loginUrl' => $this->loginUrl(),
             ],
         );
+    }
+
+    /**
+     * Keep the line breaks the administrator typed.
+     *
+     * 🪤 A mail body is Markdown, and Markdown reads one newline as a space:
+     * two lines typed in the box arrived in the inbox as one sentence, while
+     * the same text in the app — where the notice honours newlines — stood on
+     * two. One message, two readings of it.
+     *
+     * Two trailing spaces are Markdown's own hard break, so the break is asked
+     * for in the language the mail is already written in rather than by putting
+     * raw HTML into it. A blank line still starts a paragraph, as before.
+     */
+    private function hardBreaks(string $body): string
+    {
+        // Line endings first: a paste from Windows carries a carriage return,
+        // and one left in front of the newline would sit inside the break.
+        $body = str_replace(["\r\n", "\r"], "\n", $body);
+
+        // Single newlines only. A blank line is already a paragraph, and
+        // padding it would leave a trailing break hanging above it.
+        return preg_replace('/(?<!\n)\n(?!\n)/', "  \n", $body) ?? $body;
     }
 }

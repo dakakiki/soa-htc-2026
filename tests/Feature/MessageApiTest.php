@@ -410,6 +410,43 @@ class MessageApiTest extends TestCase
             ->assertJsonStructure(['meta' => ['current_page', 'last_page', 'total']]);
     }
 
+    /**
+     * 🚤 A mail body is Markdown, and Markdown reads one newline as a
+     * space. Two lines typed in the box reached the inbox as one sentence,
+     * while the same text in the app stood on two - one message, two readings.
+     */
+    public function test_the_mail_keeps_the_line_breaks_that_were_typed(): void
+    {
+        $message = new Message([
+            'subject' => 'Two lines',
+            'body' => "First line\nSecond line\n\nA new paragraph",
+        ]);
+
+        $html = (new CoordinatorMessage($message, 'Jelena'))->render();
+
+        $this->assertStringContainsString('First line<br', $html);
+        // A blank line was already a paragraph and stays one.
+        $this->assertStringContainsString('A new paragraph', $html);
+    }
+
+    /**
+     * 🔴 The body is typed by a person in the administration, and the
+     * mail is the one place that text leaves the system.
+     */
+    public function test_markup_typed_into_the_body_does_not_reach_the_inbox_as_markup(): void
+    {
+        $message = new Message([
+            'subject' => 'Careful',
+            'body' => '<script>alert(1)</script> and <b>bold</b>',
+        ]);
+
+        $html = (new CoordinatorMessage($message, 'Jelena'))->render();
+
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringNotContainsString('<b>bold</b>', $html);
+        $this->assertStringContainsString('&lt;b&gt;bold', $html);
+    }
+
     public function test_a_coordinator_cannot_reach_the_administration_screen(): void
     {
         $reader = $this->coordinator('reader@soahtc.test');
