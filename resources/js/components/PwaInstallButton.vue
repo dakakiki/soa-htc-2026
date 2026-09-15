@@ -36,7 +36,7 @@ interface BeforeInstallPromptEvent extends Event {
  * na to da li pregledac nudi instalaciju; na `dev.lcl` on to nikad ne nudi,
  * jer nudi samo preko https. Na `false` se vraca pravo ponasanje.
  */
-const DESIGN_PREVIEW = true;
+const DESIGN_PREVIEW = false;
 
 const { t } = useI18n();
 
@@ -166,17 +166,25 @@ onBeforeUnmount(() => {
             </ol>
         </div>
 
-        <div class="flex items-center gap-2 rounded-full bg-brand-palette-4 py-2 pl-4 pr-2 text-white shadow-lg">
+        <!--
+            White, because the bar has to hold its own on a navy section and on
+            a photograph alike: navy on navy disappears, and an image is always
+            darker than white. The hairline keeps it off the light parts of the
+            page, and the shadow lifts it off the picture.
+        -->
+        <div
+            class="flex items-center gap-2 rounded-full border border-brand-palette-4/10 bg-white py-2 pl-4 pr-2 text-brand-palette-4 shadow-xl drop-shadow-lg"
+        >
             <IconDeviceMobileDown :size="20" :stroke-width="1.7" aria-hidden="true" />
 
             <span class="font-mono text-[11px] uppercase tracking-[0.12em]">{{ t('public.install.button') }}</span>
 
-            <span class="ml-1 h-5 w-px bg-white/20" aria-hidden="true"></span>
+            <span class="ml-1 h-5 w-px bg-brand-palette-4/15" aria-hidden="true"></span>
 
             <button
                 type="button"
                 :aria-label="t('public.install.android')"
-                class="grid h-9 w-9 place-items-center rounded-full bg-white/10 transition hover:bg-brand-palette-2 hover:text-brand-palette-4 active:scale-95"
+                class="grid h-9 w-9 place-items-center rounded-full bg-brand-palette-4/5 transition hover:bg-brand-palette-2 hover:text-brand-palette-4 active:scale-95"
                 @click="installAndroid"
             >
                 <IconBrandAndroid :size="19" :stroke-width="1.7" />
@@ -186,7 +194,7 @@ onBeforeUnmount(() => {
                 type="button"
                 :aria-label="t('public.install.ios')"
                 :aria-expanded="showIosPanel"
-                class="grid h-9 w-9 place-items-center rounded-full bg-white/10 transition hover:bg-brand-palette-2 hover:text-brand-palette-4 active:scale-95"
+                class="grid h-9 w-9 place-items-center rounded-full bg-brand-palette-4/5 transition hover:bg-brand-palette-2 hover:text-brand-palette-4 active:scale-95"
                 @click="showIos"
             >
                 <IconBrandApple :size="19" :stroke-width="1.7" />
