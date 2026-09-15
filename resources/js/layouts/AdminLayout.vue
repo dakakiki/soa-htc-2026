@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { IconLogout, IconUserCircle } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
+import { inApp } from '@/utils/appJourney';
 import AppSidebar from '@/components/AppSidebar.vue';
 import Tooltip from '@/components/Tooltip.vue';
 
@@ -17,9 +18,18 @@ const themeStore = useThemeStore();
 const router = useRouter();
 const { t } = useI18n();
 
+/**
+ * 🪤 The website's sign-in screen is the right place to land on the website, and
+ * the wrong one inside the installed application — there it is a page with a
+ * masthead and a footer where the app's own first screen should be (owner,
+ * 2026-09-15). `replace`, so the signed-out screen is not behind it.
+ *
+ * ⏳ Until the coordinator has their own app screens (prototype 7–9d) this shell
+ * serves both and has to ask.
+ */
 async function logout(): Promise<void> {
     await session.logout();
-    await router.push({ name: 'login' });
+    await router.replace({ name: inApp() ? 'app.start' : 'login' });
 }
 </script>
 

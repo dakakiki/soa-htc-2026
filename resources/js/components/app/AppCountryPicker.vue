@@ -23,6 +23,14 @@ import type { Country } from '@/types/models';
  * swipe back is what anybody does to dismiss a panel, and without this it
  * dismissed the whole screen instead, losing the details already typed. Handled
  * by pushing a history entry when the sheet opens and listening for it to pop.
+ *
+ * 🔴 And it is measured against the VISUAL viewport, not the layout one. The
+ * owner, 2026-09-15: "kada ukucam nešto za pretragu ode ispod tastature." A
+ * phone's on-screen keyboard does not shorten the page — it is drawn OVER it —
+ * so `position: fixed; inset: 0` still covers the full window and the sheet's
+ * own search box, sitting at the top of a panel anchored to the bottom, goes
+ * behind the keys the moment they appear. `window.visualViewport` reports what
+ * is actually visible, and the sheet is positioned and sized from that.
  */
 const props = defineProps<{
     modelValue: number | null;
@@ -36,6 +44,55 @@ const { t } = useI18n();
 const open = ref(false);
 const term = ref('');
 const search = ref<HTMLInputElement | null>(null);
+
+/**
+ * The part of the window the keyboard is not covering: where it starts and how
+ * tall it is. Both zero-ish until the sheet opens, and re-read on every visual
+ * viewport change — which is what opening, closing or resizing a keyboard is.
+ */
+const frame = ref<{ top: number; height: number } | null>(null);
+
+function measure(): void {
+    const vv = window.visualViewport;
+
+    // No API (an old browser): fall back to the full window, which is what the
+    // sheet did before — wrong under a keyboard, but never worse than that.
+    frame.value = vv === null || vv === undefined
+        ? null
+        : { top: Math.round(vv.offsetTop), height: Math.round(vv.height) };
+}
+
+/**
+ * Where the sheet is allowed to stand. Without a measurement it is the whole
+ * window; with one it is exactly the visible strip.
+ */
+const sheetStyle = computed(() => {
+    const f = frame.value;
+
+    if (f === null) {
+        return undefined;
+    }
+
+    return { top: `${f.top}px`, height: `${f.height}px` };
+});
+
+/**
+ * How tall the panel may be. 78% of the screen normally, so the form behind it
+ * is still there; all of the visible strip once a keyboard has taken most of it,
+ * because there is nothing left to show behind and every pixel is wanted for the
+ * search box and the list.
+ */
+const panelStyle = computed(() => {
+    const f = frame.value;
+
+    if (f === null) {
+        return { maxHeight: '78%' };
+    }
+
+    const keyboardUp = window.innerHeight - f.height > 120;
+
+    return { maxHeight: `${Math.round(f.height * (keyboardUp ? 1 : 0.78))}px` };
+});
 
 const selected = computed(() => props.countries.find((c) => c.id === props.modelValue) ?? null);
 
@@ -69,6 +126,9 @@ function onPopState(): void {
 function show(): void {
     open.value = true;
     term.value = '';
+    measure();
+    window.visualViewport?.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('scroll', measure);
 
     if (!pushed) {
         pushed = true;
@@ -81,6 +141,8 @@ function show(): void {
 
 function hide(): void {
     open.value = false;
+    window.visualViewport?.removeEventListener('resize', measure);
+    window.visualViewport?.removeEventListener('scroll', measure);
 
     if (pushed) {
         pushed = false;
@@ -100,6 +162,8 @@ watch(open, (isOpen) => document.body.classList.toggle('overflow-hidden', isOpen
 
 onBeforeUnmount(() => {
     window.removeEventListener('popstate', onPopState);
+    window.visualViewport?.removeEventListener('resize', measure);
+    window.visualViewport?.removeEventListener('scroll', measure);
     document.body.classList.remove('overflow-hidden');
 });
 </script>
@@ -117,16 +181,26 @@ onBeforeUnmount(() => {
             <IconSearch :size="18" :stroke-width="1.8" class="shrink-0 opacity-70" aria-hidden="true" />
         </button>
 
-        <!--
+<!--
             Fixed to the window rather than to the field: the sheet belongs to the
             phone, not to the form, and a sheet positioned inside a scrolling
             column rides up and down with it.
+
+            🪤 `left`/`right` from the class and `top`/`height` from the style —
+            NOT `inset-0`. The vertical pair is the visible strip the keyboard
+            left behind, and a shorthand that also set them would win by order
+            and put the sheet back under the keys.
         -->
-        <div v-if="open" class="fixed inset-0 z-30 flex flex-col items-center justify-end bg-[rgba(0,20,33,0.55)]" @click.self="hide">
+        <div
+            v-if="open"
+            class="fixed left-0 right-0 top-0 z-30 flex h-full flex-col items-center justify-end bg-[rgba(0,20,33,0.55)]"
+            :style="sheetStyle"
+            @click.self="hide"
+        >
             <!-- 26rem like the screen above it: on a phone that is the whole
                  width, and on a desktop a sheet spanning the window while the
                  screen is a narrow column reads as a different page. -->
-            <div class="flex max-h-[78%] w-full max-w-[26rem] flex-col rounded-t-[24px] bg-[#fbfaf8] px-4 pb-6 pt-4 text-brand-palette-4">
+            <div class="flex w-full max-w-[26rem] flex-col rounded-t-[24px] bg-[#fbfaf8] px-4 pb-6 pt-4 text-brand-palette-4" :style="panelStyle">
                 <button
                     type="button"
                     :aria-label="t('public.app.close')"
