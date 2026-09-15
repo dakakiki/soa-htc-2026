@@ -552,6 +552,58 @@ export default {
             noResultsNote: 'A mark appears here once you have sat a test and an administrator has published it.',
             backToTests: 'Back to my tests',
             backToTestsNote: 'See what is open for you',
+
+            /*
+             * Screens 7-9d — the coordinator's side. Interface, not content:
+             * these screens are reached by tapping an icon, and an administrator
+             * editing wording on a screen nobody can open to check is a worse
+             * bargain here than on a page a visitor reads.
+             */
+            welcome: 'Welcome',
+            // Owner, 2026-09-15, shortened from "The exams the administrator has
+            // opened for your venue." — and PLURAL: the screen covers every
+            // venue the coordinator runs, not one.
+            welcomeLead: 'Exams for your venues',
+            venuesCount: '{n} venues',
+            loadFailed: 'Could not load this just now.',
+            // The administrator's message, which is the same text the mail
+            // carries (ADR-0099/0100).
+            fromOrganiser: 'From the organiser',
+            dismiss: 'Dismiss',
+            noExams: 'No exams are open for your venue.',
+            // 🪤 The prototype promised "with its password and the numbers for
+            // your room". The password cannot be served — it is a bcrypt hash —
+            // so the sentence does not promise it.
+            noExamsNote: 'An exam appears here on the day the administrator opens it, with the numbers for your room.',
+            questionsCount: '{n} questions',
+            /*
+             * The three counts, each measuring what its name says (ADR-0084-0087):
+             * who the paper was in front of, who opened it, who handed it in. An
+             * AVERAGE is only ever under Published — while the room is working it
+             * says something different every time it is read (owner, 15.09).
+             */
+            entered: 'Entered',
+            started: 'Started',
+            submitted: 'Submitted',
+            average: 'Average',
+            publishedHead: 'Published',
+            // The round alone, without the year the site's own strip carries:
+            // typed with the season record, never inferred (ADR-0081).
+            roundOnly: 'Round {round}',
+            venueResults: 'Venue results',
+            venueResultsNote: 'Every test, every venue you run',
+            venueResultsOneNote: 'Published after the round closes',
+            countryCoordinator: 'Country coordinator',
+            whichVenue: 'Which venue?',
+            search: 'Search',
+            searchVenue: 'School or city',
+            noVenues: 'No venue by that name.',
+            venueNotFound: 'This venue is not available.',
+            nothingPublished: 'Nothing has been published for this venue yet.',
+            // 9c: one venue is not a choice they made, so it is "your venue".
+            nothingPublishedMine: 'Nothing has been published for your venue yet.',
+            nothingPublishedNote: 'Numbers appear once the round closes and an administrator publishes the marks.',
+            anotherVenue: 'Another venue',
         },
         // The offer to install, spoken plainly. `button` doubles as the
         // accessible name, so it says what happens rather than naming a screen.

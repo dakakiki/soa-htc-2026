@@ -75,10 +75,11 @@ async function submit(): Promise<void> {
     /*
      * Signing in succeeded, so a navigation that then redirects — a missing
      * permission, say — must not be reported as a failed sign-in. The address
-     * may carry where the coordinator was headed; otherwise it is their own
-     * screen.
+     * may carry where the coordinator was headed; otherwise it is the app's own
+     * Welcome and never the desktop administration — somebody who signed in
+     * through the app is holding a phone.
      */
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard';
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/app/welcome';
 
     void router.push(redirect);
 }

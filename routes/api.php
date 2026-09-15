@@ -2,6 +2,7 @@
 
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Support\QuestionMedia;
+use App\Http\Controllers\Api\App\CoordinatorController as AppCoordinatorController;
 use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AttemptController;
@@ -362,6 +363,23 @@ Route::middleware('auth:sanctum')->group(function () {
      * permission: they can only return, and only put away, what was addressed
      * to the person signed in.
      */
+    /*
+     * The installed application's coordinator screens (prototype 7-9d).
+     *
+     * 🔴 No permission gate, and that is deliberate: these routes answer only
+     * about the venues `User::allowedSchoolIds()` binds to the person signed in,
+     * and a coordinator holding nothing gets empty lists rather than a refusal.
+     * A permission would have to be granted to every coordinator to mean
+     * anything, which is a gate that is always open — the scope IS the gate.
+     * A venue named in the address is checked against that set and answers 404
+     * when it is not in it.
+     */
+    Route::prefix('app/coordinator')->group(function () {
+        Route::get('home', [AppCoordinatorController::class, 'home']);
+        Route::get('venues', [AppCoordinatorController::class, 'venues']);
+        Route::get('venues/{school}/figures', [AppCoordinatorController::class, 'figures']);
+    });
+
     Route::get('messages/inbox', [MessageController::class, 'inbox']);
     Route::post('messages/deliveries/{delivery}/dismiss', [MessageController::class, 'dismiss']);
     Route::post('messages/recipients', [MessageController::class, 'recipients']);
