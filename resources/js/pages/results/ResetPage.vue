@@ -417,7 +417,11 @@ onMounted(async () => {
 
                 <p v-if="modalError" class="mt-1 text-sm text-red-600">{{ modalError }}</p>
 
-                <div class="mt-4 flex justify-end gap-2">
+                <!-- A footer, not a huddle in the corner: separated by a rule, spanning
+                     the dialog, cancel at the far left and the action at the far right
+                     (owner, 17.09). Same shape as the shared ConfirmDialog's danger
+                     variant, so the two read as one application. -->
+                <div class="-mx-5 -mb-5 mt-5 flex items-center justify-between gap-2 rounded-b-lg border-t border-gray-200 bg-gray-50 px-5 py-3">
                     <button
                         type="button"
                         :disabled="working"
