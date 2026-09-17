@@ -3503,3 +3503,187 @@ Heš ostaje heš, a koordinator lozinku dobija od administratora, kao i danas.
   izvedena iz onoga što je slučajno aktivno — ADR-0081.
 - **Obaveštenje** je administratorova poruka iz `GET /api/messages/inbox` (ADR-0099/0100), isti tekst
   koji ide i na mejl, i sklanja se `POST .../dismiss` — svoj red, ničiji drugi.
+
+## ADR-0105 — `.env` se čita po zahtevu, ne po procesu
+
+**Datum:** 2026-09-17 · **Status:** prihvaćeno · **PR #80**
+
+Javna strana je pri prvom otvaranju umela da se nacrta **prazna**: ljuska (gornja traka, meni,
+footer) tu, `<main>` prazan, logo polomljen. Ponovno učitavanje bi to popravilo.
+
+Nije bio spor prvi crtež. **Tri zahteva su padala unutar Laravela**, i to u **devet dnevnih logova**
+unazad: `/api/public/layout/public.home`, `public.footer` i `storage/branding/…png`.
+
+### Uzrok
+
+Apache na Windowsu je `mpm_winnt` — **jedan proces sa 1024 niti** (`ThreadsPerChild`) — a PHP je
+učitan kao modul **unutar njega**. Sve niti dele jednu tabelu promenljivih okruženja.
+
+phpdotenv svaku vrednost iz `.env` upisuje kroz **`putenv()`**, koje je **procesno globalno i nije
+bezbedno za niti**. Pod istovremenim zahtevima nit pročita okruženje **polupopunjeno**, pa `env()`
+padne na fabričke vrednosti iz `config/`:
+
+| traženo | fabrički fallback | posledica |
+| --- | --- | --- |
+| `DB_CONNECTION` | `'sqlite'` (`config/database.php:20`) | traži `database.sqlite`, kog nema → 500 |
+| `APP_ENV` | `'production'` (`config/app.php:29`) | `production.ERROR` u lokalnom logu |
+| `APP_KEY` | `null` (`config/app.php:100`) | `MissingAppKeyException` |
+
+Javna strana pri otvaranju ispali šest poziva odjednom — dovoljno da jedan izgubi. Kad izgubi baš
+onaj koji nosi sadržaj strane, ostane prazan `<main>`.
+
+### Mereno, pre i posle
+
+40 istovremenih zahteva na `/api/public/layout/public.home`: **dva su vratila 500**. U logu **dve
+različite** greške — `production.ERROR` (nit nije videla ništa) i `local.ERROR` (`APP_ENV` pročitan,
+`DB_CONNECTION` nije). **Ta druga je dokaz da je čitanje delimično**, što isključuje hladan start
+kao objašnjenje.
+
+Posle izmene: **150 istovremenih, svih 150 = `200`**, ništa u logu.
+
+### Odluka
+
+`Illuminate\Support\Env::disablePutenv()` u `public/index.php`, pre podizanja aplikacije. phpdotenv
+tada piše samo u `$_ENV`/`$_SERVER`, koji su **po zahtevu**.
+
+Bezbedno jer `getenv()` **nema nigde** u `app/`, `config/`, `bootstrap/` ni `routes/`.
+
+🪤 Na Linuxu sa PHP-FPM svaki radnik je zaseban proces, pa STAGE verovatno nije bio izložen — **to
+nije izmereno** i ne tvrdi se.
+
+⚠️ **Pouka o postupku, ne o kodu.** Prazan ekran je prvo proglašen **preranim snimkom** i to je
+upisano u memoriju kao zamku. Bilo je pogrešno. Vlasnik je odbio objašnjenje rečima „ovo smo već
+jednom imali" i bio u pravu — logovi su stajali tu sve vreme. **Objašnjenje bez merenja nije
+objašnjenje.**
+
+---
+
+## ADR-0106 — Brisanje rezultata je brisanje, i objavljena ocena ide sa njim
+
+**Datum:** 2026-09-17 · **Status:** prihvaćeno · **PR #82**
+
+Na student edit strani, ispod forme, stoji panel **„Exams taken"** (PR #81) i
+svaki red ima dugme za brisanje rezultata.
+
+🔴 **Prva verzija je zvala postojeći `reset`** i pokušaj **poništavala** (ADR-0022): red ostaje, trag
+se čuva. Vlasniku su iznete posledice tvrdog brisanja, i on ga je **svejedno tražio**:
+
+> *„Ne treba da se radi reset rezultata vec kompletno brisanje svih informacija vezano za taj test i
+> studenta. NE RESET vec DELETE"*
+
+i, za tačku koja se ne rešava sama:
+
+> *„Molim te nadji nacin da se i 3 resi"*
+
+**Ne vraćati na poništavanje.**
+
+### Šta odlazi
+
+`DELETE /api/results/attempts/{attempt}` → `ResultsController::destroyAttempt`:
+
+1. red u `attempts`, a sa njim **kaskadno** `attempt_answers`, `grade_revisions` ispod njih i svaki
+   raniji `attempt_resets` snimak;
+2. time i mesto u `unique(registration_id, active_test_id)`, pa dete može ponovo isti ispit;
+3. 🔴 **objavljena ocena u `registration_results` (Layer B)** — i to je „tačka 3". Layer B **nema
+   strani ključ** ka `attempts` i ključan je po (registration, test) (ADR-0027), pa nijedna kaskada
+   ne bi je dohvatila. Brisanje koje stane na pokušaju **ostavilo bi ocenu da stoji** u gridu,
+   izveštajima i izvozu — bez ičega iza nje.
+
+🪤 Layer B red se briše **bez obzira na `source`**: i `import` red odlazi. „Kompletno brisanje svih
+informacija" je vlasnikova formulacija, a uvezena ocena je za onoga ko čita izveštaj ista ocena.
+
+🪤 **`ResultLedger::reconcile()` se namerno NE zove.** On Layer B računa **iz pokušaja**, a tačno
+stanje posle ovog brisanja je **nijedan red**.
+
+### Cena koja je svesno plaćena
+
+Posle brisanja **ne ostaje nikakav trag** da je rezultat postojao — ni ko ga je obrisao, ni koliki je
+bio. Za resetovane postoji brojač; **za obrisane ne postoji nijedan broj, nigde**.
+
+✅ **`reset` nije dirnut.** Results → Reset attempts i dalje poništava, sa obaveznim razlogom i
+`attempt_resets` redom. Dva puta za dve različite namere: masovno poništavanje nad stotinama dece
+je operacija gde trag vredi, pojedinačna ispravka sa student strane nije.
+
+⚠️ Kaskade su ono u šta zelen SQLite ne sme da se veruje — tri testa ih izgovaraju naglas, a suite
+se vozi i na MySQL-u.
+
+---
+
+## ADR-0107 — Resetovan pokušaj nije izlazak na ispit
+
+**Datum:** 2026-09-17 · **Status:** prihvaćeno · **PR #83**
+
+> 🔴 **Vlasnik, 17.09:** *„ako je pokusaj resetovan. ne moze da se broji da je polagao. jer nije."*
+
+Reset postavlja `status` i briše `published_at`, ali **ostavlja `submitted_at` tamo gde je bio**.
+Četiri brojanja na dashboard-u bila su vezana **samo za tu kolonu**, pa se dete čiji je pokušaj
+resetovan i dalje brojalo kao da je izašlo — a dete čiji je **jedini** pokušaj resetovan brojalo se
+kao da je uopšte izašlo.
+
+| gde | šta broji |
+| --- | --- |
+| `$whoSat` | pločice učešća, takmičenje i proba |
+| `$regionsInContest` | pločica „regioni koji su učestvovali" |
+| `$turnout` | izlaznost po državama — karta i tabela |
+| `byVenue()` | koordinatorova tabela učionica |
+
+**Reports je oduvek bio ispravan** (`status <> 'void'`), i koordinatorov pregled učionica takođe, uz
+komentar koji objašnjava baš ovaj razlog. Dashboard je bio jedini koji se nije slagao.
+
+🪤 **Ništa se vidljivo nije promenilo.** Na dev spisku stoji **jedan** resetovan pokušaj i **nijedno**
+dete kome su svi pokušaji resetovani — svaki broj na ekranu bio je tačan slučajno. Tako ova vrsta
+nesaglasnosti i ostaje skrivena: do dana kad se reset upotrebi ozbiljno. Učionica koja ponovi ispit
+napravila bi da dashboard i Reports daju **dva različita odgovora na isto pitanje** — tačno ono
+protiv čega su ADR-0084–0087.
+
+---
+
+## ADR-0108 — Totals broji decu, a pokušaji idu u red ispod
+
+**Datum:** 2026-09-17 · **Status:** prihvaćeno · **PR #84**
+
+Red Totals na Reports ekranu **nije se slagao sam sa sobom oko jedinice**: Registered i Took part su
+brojali decu, a Started, Submitted i Published **pokušaje**.
+
+Na r14 takmičenju to je klijentu izgledalo ovako:
+
+| mera | pre | posle |
+| --- | --- | --- |
+| Registered | 108.812 | 108.812 |
+| Took part | 61.309 | 61.309 |
+| Started | **145.713** (pokušaji) | **61.309** |
+| Submitted | **145.713** (pokušaji) | **61.309** |
+| Published | **106.093** (pokušaji) | **50.898** |
+
+Levak koji **raste** sa 108.812 na 145.713, i poslednji stepenik veći od populacije iz koje je
+potekao. To se ne čita kao promena jedinice — čita se kao **pokvaren izveštaj**. Vlasnik, 17.09:
+*„to moramo da menjamo jer je zbunjujuce za klijenta"*.
+
+### Odluka
+
+Svaka pločica broji **decu**. Broj pokušaja ide **ispod nje, u dva sitna reda** — koliko pokušaja i
+koliko po detetu. Isti podaci ostaju na ekranu, samo više ne stoje tamo gde pozivaju na sabiranje
+koje ne znači ništa. Levak se sada samo sužava: 108.812 → 61.309 → 61.309 → 50.898.
+
+🔴 **Started ostaje** iako je **isti broj kao Took part i uvek će biti** — pokušaj postoji zato što
+ga je dete započelo. Vlasnik ga zadržava zbog reda sa pokušajima koji visi ispod (*„ostaje started
+da znaju da imaju taj info"*), pa je dupliranje **namerno i označeno**, a ne ostavljeno da se
+primeti.
+
+**Reset** ulazi kao šesta pločica, narandžasta, sa svojom rečenicom da broji **pokušaje** a ne decu.
+Nije stepenik takmičenja, pa stoji **posle** četiri koja levak crta. Pločice su prebačene na **šest
+u redu** da Reset ne otvara drugi red sam — a to je bio razlog zbog kog je 14.09 i sklonjen.
+
+### Zamka koja je ovo i pokrenula
+
+`Void + Submitted` **nije nijedan KPI**. Pokušaj ima tri stanja (`in_progress`, `completed`, `void`),
+pa je to „sve osim onih koji su baš u toku" — poklopi se sa Started samo dok nijedan ispit nije
+otvoren. Tačan identitet je **`Started + Void` = svi pokušaji koji su ikada nastali**.
+
+🔴 I dalje važi: mere u deci i mere u pokušajima **se ne sabiraju i ne oduzimaju** (ADR-0085/0086).
+Na pravim podacima to je oko **2,38 pokušaja po detetu** u takmičenju.
+
+### Šta je sve pratilo
+
+Rates (completion i publish rate su sada deca ÷ deca, kao što je participation već bio), funnel, i
+**PDF izvoz**. Breakdown tabela je **već** brojala decu i nije dirana.
