@@ -64,6 +64,38 @@ final class AuditTrail
     }
 
     /**
+     * Somebody got in, left, or was turned away.
+     *
+     * Separate from {@see record()} for two reasons. A failed sign-in has no
+     * subject to point at — the address typed may belong to nobody — and at the
+     * moment the Login event fires the request is not authenticated yet, so the
+     * actor has to come from the event rather than from auth().
+     *
+     * This belongs in the trail rather than in the application log: it is the
+     * authority surface, same as who was granted a role. It is also the half of
+     * the question "who was in here doing this" that nothing else could answer.
+     *
+     * 🪤 `$details` must never carry the credentials. The Failed event hands
+     * over the password alongside the address; only the address goes in, and this
+     * method is the reason the caller cannot get that wrong by accident.
+     *
+     * @param  array<string, mixed>|null  $details
+     */
+    public static function recordAccess(string $action, ?User $user, ?array $details = null): void
+    {
+        AuditLog::create([
+            'actor_id' => $user?->getAuthIdentifier(),
+            'actor_label' => $user?->name,
+            'action' => $action,
+            'subject_type' => $user ? $user::class : null,
+            'subject_id' => $user ? (string) $user->getKey() : null,
+            'after' => $details,
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
+    }
+
+    /**
      * What a role is, in the only terms worth keeping: its name and the
      * permissions it grants.
      *
