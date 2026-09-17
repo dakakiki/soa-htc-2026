@@ -192,27 +192,27 @@ class ReportController extends Controller
          * said 56%: `started` counts attempts and a child sits several tests.
          */
         $participation = $pct((int) $t['participants'], (int) $t['registered']);
-        $completion = $pct((int) $t['submitted'], (int) $t['started']);
-        $publish = $pct((int) $t['published'], (int) $t['submitted']);
+        $completion = $pct((int) $t['submitted_participants'], (int) $t['participants']);
+        $publish = $pct((int) $t['published_participants'], (int) $t['submitted_participants']);
 
         // The two numbers each rate is made of, beside the percentage.
         $of = fn (int $n, int $d): string => number_format($n).' / '.number_format($d);
         $participationOf = $of((int) $t['participants'], (int) $t['registered']);
-        $completionOf = $of((int) $t['submitted'], (int) $t['started']);
-        $publishOf = $of((int) $t['published'], (int) $t['submitted']);
+        $completionOf = $of((int) $t['submitted_participants'], (int) $t['participants']);
+        $publishOf = $of((int) $t['published_participants'], (int) $t['submitted_participants']);
 
         $totCells = '';
         // The same five tiles the screen shows, in the same order. Void left both
         // (owner, 14.09): an administrator's reset is not a stage of the contest.
-        foreach ([['Registered', $t['registered'], '#111827'], ['Took part', $t['participants'], '#111827'], ['Started', $t['started'], '#111827'], ['Submitted', $t['submitted'], '#111827'], ['Published', $t['published'], '#059669']] as [$label, $val, $color]) {
-            $totCells .= '<td width="20%" style="border:0.6pt solid #e5e7eb;padding:6px;">'
+        foreach ([['Registered', $t['registered'], '#111827'], ['Took part', $t['participants'], '#111827'], ['Started', $t['participants'], '#111827'], ['Submitted', $t['submitted_participants'], '#111827'], ['Published', $t['published_participants'], '#059669'], ['Reset', $t['void'], '#d97706']] as [$label, $val, $color]) {
+            $totCells .= '<td width="16%" style="border:0.6pt solid #e5e7eb;padding:6px;">'
                 .'<div style="font-size:7pt;color:#6b7280;">'.$label.'</div>'
                 .'<div style="font-size:15pt;font-weight:bold;color:'.$color.';">'.$val.'</div></td>';
         }
 
         $base = max(1, (int) $t['registered']);
         $funnel = '';
-        foreach ([['Registered', $t['registered']], ['Started', $t['started']], ['Submitted', $t['submitted']], ['Published', $t['published']]] as [$label, $val]) {
+        foreach ([['Registered', $t['registered']], ['Started', $t['participants']], ['Submitted', $t['submitted_participants']], ['Published', $t['published_participants']]] as [$label, $val]) {
             $w = (int) round((int) $val / $base * 100);
             $funnel .= '<tr>'
                 .'<td width="16%" style="font-size:8pt;color:#6b7280;padding:2px 0;">'.$label.'</td>'
@@ -277,14 +277,14 @@ class ReportController extends Controller
 
                 <h3 style="font-size:10pt;margin:6px 0 4px;page-break-after:avoid;">Rates</h3>
                 <table width="100%" cellspacing="0" cellpadding="0"><tr>
-                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PARTICIPATION</div><div style="font-size:13pt;font-weight:bold;">{$participation}</div><div style="font-size:8pt;color:#374151;">{$participationOf}</div><div style="font-size:7pt;color:#9ca3af;">Competitors who started / Registered</div></td>
-                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">COMPLETION</div><div style="font-size:13pt;font-weight:bold;">{$completion}</div><div style="font-size:8pt;color:#374151;">{$completionOf}</div><div style="font-size:7pt;color:#9ca3af;">Submitted / Started</div></td>
-                    <td width="34%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PUBLISH RATE</div><div style="font-size:13pt;font-weight:bold;">{$publish}</div><div style="font-size:8pt;color:#374151;">{$publishOf}</div><div style="font-size:7pt;color:#9ca3af;">Published / Submitted</div></td>
+                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PARTICIPATION</div><div style="font-size:13pt;font-weight:bold;">{$participation}</div><div style="font-size:8pt;color:#374151;">{$participationOf}</div><div style="font-size:7pt;color:#9ca3af;">Took part / Registered</div></td>
+                    <td width="33%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">COMPLETION</div><div style="font-size:13pt;font-weight:bold;">{$completion}</div><div style="font-size:8pt;color:#374151;">{$completionOf}</div><div style="font-size:7pt;color:#9ca3af;">Submitted / Took part, both competitors</div></td>
+                    <td width="34%" style="border:0.6pt solid #e5e7eb;padding:6px;"><div style="font-size:7pt;color:#6b7280;">PUBLISH RATE</div><div style="font-size:13pt;font-weight:bold;">{$publish}</div><div style="font-size:8pt;color:#374151;">{$publishOf}</div><div style="font-size:7pt;color:#9ca3af;">Published / Submitted, both competitors</div></td>
                 </tr></table>
 
                 <h3 style="font-size:10pt;margin:12px 0 4px;page-break-after:avoid;">Participation funnel</h3>
                 <table width="100%" cellspacing="0" cellpadding="0">{$funnel}</table>
-                <div style="font-size:7pt;color:#6b7280;margin:3px 0 0;">Registered counts competitors; Started, Submitted and Published count attempts &mdash; a competitor sits several tests, so those bars can pass 100%.</div>
+                <div style="font-size:7pt;color:#6b7280;margin:3px 0 0;">Every stage counts competitors, so each is a subset of the one before it.</div>
 
                 {$breakdown}
 

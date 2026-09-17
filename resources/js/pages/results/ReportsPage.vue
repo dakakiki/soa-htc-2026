@@ -13,7 +13,6 @@ import {
     type ReportFilterOptions,
     type MatrixAxis,
     type ReportMatrix,
-    type ReportMeasures,
     type ReportQuery,
     type ReportRow,
 } from '@/api/reports';
@@ -234,16 +233,42 @@ function resetFilters(): void {
     void loadSummary();
 }
 
-const measureRows: { key: keyof ReportMeasures; label: string; tone?: string }[] = [
-    { key: 'registered', label: t('reports.registered') },
-    { key: 'participants', label: t('reports.participants') },
-    { key: 'started', label: t('reports.started') },
-    { key: 'submitted', label: t('reports.submitted') },
-    { key: 'published', label: t('reports.publishedMeasure'), tone: 'text-green-600' },
-    // Void is not a stage of the competition — it is an administrator resetting an
-    // attempt, it reads 0 across the whole population, and as a sixth tile it
-    // started a second row of its own to say so (owner, 14.09).
-];
+/**
+ * Every tile counts COMPETITORS, and the attempts those competitors made go in
+ * the small line under it.
+ *
+ * \U0001F534 They used to disagree on the unit: Registered and Took part counted
+ * children while Started, Submitted and Published counted attempts. On r14 that
+ * read 108.812 registered followed by 145.713 started \u2014 a funnel that grows,
+ * which to a client reads as a broken report rather than as a change of unit
+ * (owner, 17.09). Published was 106.093 against 61.309 who took part, so the
+ * last stage looked bigger than the population it came from.
+ *
+ * \U0001FAA4 Started is the same number as Took part and always will be: an attempt
+ * exists because a competitor started it. It is kept because the attempts line
+ * under it is what an administrator comes here for (owner, 17.09), and the
+ * duplication is labelled rather than left to be noticed.
+ */
+const measureTiles = computed(() => {
+    const tot = summary.value?.totals;
+    const attempts = (a?: number | null, people?: number | null): string[] => {
+        if (a === null || a === undefined || !people) return [];
+        return [
+            t('reports.attemptsCount', { attempts: a.toLocaleString() }),
+            t('reports.attemptsPer', { per: (a / people).toFixed(2) }),
+        ];
+    };
+    return [
+        { key: 'registered', label: t('reports.registered'), value: tot?.registered ?? null, subs: [] as string[], tone: undefined as string | undefined },
+        { key: 'participants', label: t('reports.participants'), value: tot?.participants ?? null, subs: [], tone: undefined },
+        { key: 'started', label: t('reports.started'), value: tot?.participants ?? null, subs: attempts(tot?.started, tot?.participants), tone: undefined },
+        { key: 'submitted', label: t('reports.submitted'), value: tot?.submitted_participants ?? null, subs: attempts(tot?.submitted, tot?.submitted_participants), tone: undefined },
+        { key: 'published', label: t('reports.publishedMeasure'), value: tot?.published_participants ?? null, subs: attempts(tot?.published, tot?.published_participants), tone: 'text-green-600' },
+        // Not a stage of the contest, which is why it sits after the funnel's
+        // four and carries its own sentence instead of a count of children.
+        { key: 'void', label: t('reports.voidMeasure'), value: tot?.void ?? null, subs: [t('reports.voidNote')], tone: 'text-amber-600' },
+    ];
+});
 
 const num = (v: number | null | undefined): string => (v === null || v === undefined ? t('common.dash') : String(v));
 
@@ -264,8 +289,8 @@ const rateTiles = computed(() => {
     return [
         // People over people (ADR-0085). Attempts over people read 134%.
         tile(t('reports.rateParticipation'), t('reports.rateParticipationHint'), tot?.participants, tot?.registered),
-        tile(t('reports.rateCompletion'), t('reports.rateCompletionHint'), tot?.submitted, tot?.started),
-        tile(t('reports.ratePublish'), t('reports.ratePublishHint'), tot?.published, tot?.submitted),
+        tile(t('reports.rateCompletion'), t('reports.rateCompletionHint'), tot?.submitted_participants, tot?.participants),
+        tile(t('reports.ratePublish'), t('reports.ratePublishHint'), tot?.published_participants, tot?.submitted_participants),
     ];
 });
 
@@ -282,9 +307,9 @@ const funnel = computed(() => {
     });
     return [
         stage(t('reports.registered'), tot.registered),
-        stage(t('reports.started'), tot.started),
-        stage(t('reports.submitted'), tot.submitted),
-        stage(t('reports.publishedMeasure'), tot.published),
+        stage(t('reports.started'), tot.participants),
+        stage(t('reports.submitted'), tot.submitted_participants),
+        stage(t('reports.publishedMeasure'), tot.published_participants),
     ];
 });
 
@@ -468,12 +493,13 @@ onMounted(async () => {
             <!-- Totals -->
             <div>
                 <h2 class="mb-2 text-sm font-semibold text-gray-700">{{ $t('reports.totals') }}</h2>
-                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                    <div v-for="m in measureRows" :key="m.key" class="rounded-lg border border-gray-200 bg-white px-4 py-3">
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6">
+                    <div v-for="m in measureTiles" :key="m.key" class="rounded-lg border border-gray-200 bg-white px-4 py-3">
                         <div class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ m.label }}</div>
                         <div class="mt-1 text-2xl font-semibold tabular-nums" :class="m.tone">
-                            {{ num(summary.totals[m.key] as number) }}
+                            {{ num(m.value) }}
                         </div>
+                        <div v-for="line in m.subs" :key="line" class="mt-0.5 text-[11px] leading-tight text-gray-500">{{ line }}</div>
                     </div>
                 </div>
 
