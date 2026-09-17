@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Assessment\Models\Exam;
 use App\Domain\Assessment\Models\ExamRound;
+use App\Domain\Assessment\Models\Question;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
 use App\Domain\Competition\Models\Attempt;
@@ -16,6 +17,7 @@ use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -103,6 +105,13 @@ class StudentAttemptsPanelTest extends TestCase
         ]);
     }
 
+    /** Any round id, for the Layer B rows the tests plant directly. */
+    private function anyRoundId(): int
+    {
+        return (int) (ExamRound::query()->value('id')
+            ?? ExamRound::create(['name' => 'LayerB', 'active' => true, 'sort_order' => 99])->id);
+    }
+
     public function test_it_splits_the_competitors_exams_into_contest_and_practice(): void
     {
         $reg = $this->student();
@@ -138,29 +147,131 @@ class StudentAttemptsPanelTest extends TestCase
             ->assertJsonCount(0, 'data.sample');
     }
 
-    public function test_deleting_a_result_clears_the_panel_and_frees_the_exam(): void
+    public function test_deleting_a_result_removes_the_attempt_its_answers_and_the_published_mark(): void
     {
         $reg = $this->student();
         $c = $this->content('Retake', false);
         $attempt = $this->attempt($reg, $c);
 
-        $this->actingAs($this->admin())
-            ->postJson("/api/results/attempts/{$attempt->id}/reset", ['reason' => 'Result deleted from the student page.'])
-            ->assertOk();
+        // An answer, so the cascade has something to take with it.
+        $question = Question::create([
+            'title' => 'Q', 'description' => 'Pick', 'question_type' => 'multiple_choice',
+            'points' => 2, 'status' => 'active',
+        ]);
+        $answerId = DB::table('attempt_answers')->insertGetId([
+            'attempt_id' => $attempt->id,
+            'question_id' => $question->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
 
-        // Gone from the panel...
+        // The published mark in Layer B. It has NO foreign key to `attempts`, so
+        // nothing in the database removes it on its own — this row is the whole
+        // reason the endpoint does more than $attempt->delete().
+        DB::table('registration_results')->insert([
+            'registration_id' => $reg->id,
+            'test_id' => $c['test']->id,
+            'exam_round_id' => $this->anyRoundId(),
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'score' => 5, 'max_score' => 10,
+            'source' => 'attempt', 'published_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin())
+            ->deleteJson("/api/results/attempts/{$attempt->id}")
+            ->assertNoContent();
+
+        // 1) the attempt is gone outright — not voided, gone
+        $this->assertDatabaseMissing('attempts', ['id' => $attempt->id]);
+        $this->assertDatabaseCount('attempt_resets', 0);
+
+        // 2) its answers went with it by cascade
+        $this->assertDatabaseMissing('attempt_answers', ['id' => $answerId]);
+
+        // 3) and so did the published mark, which no cascade would have touched
+        $this->assertDatabaseMissing('registration_results', [
+            'registration_id' => $reg->id, 'test_id' => $c['test']->id,
+        ]);
+
+        // The panel is empty, and the one-attempt slot is free again.
         $this->actingAs($this->admin())
             ->getJson("/api/registrations/{$reg->id}/attempts")
             ->assertOk()
             ->assertJsonCount(0, 'data.competition');
 
-        // ...kept for audit, and no longer holding the one-attempt slot, which is
-        // what lets the competitor sit this very test again.
-        $this->assertDatabaseHas('attempts', ['id' => $attempt->id, 'status' => 'void']);
-        $this->assertDatabaseHas('attempt_resets', ['attempt_id' => $attempt->id]);
         $this->assertSame(0, Attempt::query()
             ->where('registration_id', $reg->id)->where('test_id', $c['test']->id)
-            ->active()->count());
+            ->count());
+    }
+
+    public function test_deleting_a_result_clears_an_imported_mark_for_the_same_test(): void
+    {
+        $reg = $this->student();
+        $c = $this->content('Imported', false);
+        $attempt = $this->attempt($reg, $c);
+
+        // Owner, 2026-09-17: nothing about that test and that child survives. An
+        // offline import is the same mark to whoever reads a report, so it goes too.
+        DB::table('registration_results')->insert([
+            'registration_id' => $reg->id,
+            'test_id' => $c['test']->id,
+            'exam_round_id' => $this->anyRoundId(),
+            'season_id' => Season::where('round_number', 14)->value('id'),
+            'score' => 9, 'max_score' => 10,
+            'source' => 'import', 'published_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin())
+            ->deleteJson("/api/results/attempts/{$attempt->id}")
+            ->assertNoContent();
+
+        $this->assertDatabaseMissing('registration_results', [
+            'registration_id' => $reg->id, 'test_id' => $c['test']->id,
+        ]);
+    }
+
+    public function test_deleting_a_result_leaves_other_students_and_other_tests_alone(): void
+    {
+        $c = $this->content('Shared', false);
+        $other = $this->content('Other', false);
+
+        $mine = $this->student();
+        $theirs = $this->student();
+        $attempt = $this->attempt($mine, $c);
+        $keepSameTest = $this->attempt($theirs, $c);
+        $keepOtherTest = $this->attempt($mine, $other);
+
+        $this->actingAs($this->admin())
+            ->deleteJson("/api/results/attempts/{$attempt->id}")
+            ->assertNoContent();
+
+        $this->assertDatabaseHas('attempts', ['id' => $keepSameTest->id]);
+        $this->assertDatabaseHas('attempts', ['id' => $keepOtherTest->id]);
+    }
+
+    public function test_deleting_a_result_needs_the_results_permission(): void
+    {
+        $reg = $this->student();
+        $attempt = $this->attempt($reg, $this->content('Guarded', false));
+
+        $this->deleteJson("/api/results/attempts/{$attempt->id}")->assertUnauthorized();
+
+        // Editing a student is not the same right as destroying their result.
+        $season = Season::where('round_number', 14)->firstOrFail();
+        $role = Role::where('key', SystemRole::SchoolCoordinator->value)->firstOrFail();
+        $coordinator = User::factory()->create(['can_student_edit' => true]);
+        $assignment = SeasonUserAssignment::create([
+            'season_id' => $season->id, 'user_id' => $coordinator->id,
+            'role_id' => $role->id, 'status' => 'active',
+        ]);
+        $assignment->schools()->sync([School::firstOrFail()->id]);
+
+        $this->actingAs($coordinator)
+            ->deleteJson("/api/results/attempts/{$attempt->id}")
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('attempts', ['id' => $attempt->id]);
     }
 
     public function test_it_refuses_a_caller_who_may_not_see_the_student(): void

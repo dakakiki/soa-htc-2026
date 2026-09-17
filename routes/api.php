@@ -415,6 +415,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('results/attempts/bulk-reset', [ResultsController::class, 'bulkReset']);
     Route::post('results/reset-export', [ResultsController::class, 'resetExport']);
     Route::post('results/attempts/{attempt}/reset', [ResultsController::class, 'reset'])->whereNumber('attempt');
+    Route::delete('results/attempts/{attempt}', [ResultsController::class, 'destroyAttempt'])->whereNumber('attempt');
     // Results import (offline results → Layer B, ADR-0027). Gated by results.manage.
     Route::get('results/import/options', [ResultsController::class, 'importOptions']);
     Route::get('results/import/template', [ResultsController::class, 'importTemplate']);

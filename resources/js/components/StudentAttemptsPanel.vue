@@ -7,18 +7,16 @@
  * head, striped rows and the row action right-aligned in the last cell. Two
  * screens that list exams should not look like two applications.
  *
- * 🪤 "Delete" here is the reset the results side already has (ADR-0022): the
- * attempt is voided, not dropped. The row leaves this panel, the score leaves
- * the grid, reports and the export — and `attempt_resets` keeps what it was and
- * who took it back. A row deleted outright would cascade its answers and its
- * grading history away and leave no record that a competition result ever
- * existed.
+ * 🔴 "Delete" here means delete: the attempt row goes, its answers and their
+ * grading history go with it by cascade, and so does the published mark in Layer
+ * B, which has no foreign key to hold it. Nothing is kept for audit. Owner's
+ * decision, 2026-09-17, taken over the softer reset the Results screen uses.
  */
 import { onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconTrash } from '@tabler/icons-vue';
 import { listRegistrationAttempts, type StudentAttempt } from '@/api/registrations';
-import { resetAttempt } from '@/api/results';
+import { deleteAttempt } from '@/api/results';
 import { apiErrorMessage } from '@/api/http';
 import { useConfirmStore } from '@/stores/confirm';
 import { useSessionStore } from '@/stores/session';
@@ -66,7 +64,7 @@ async function remove(a: StudentAttempt): Promise<void> {
     working.value = a.id;
     error.value = '';
     try {
-        await resetAttempt(a.id, t('registration.attempts.resetReason'));
+        await deleteAttempt(a.id);
         await load();
     } catch (e) {
         error.value = apiErrorMessage(e);

@@ -256,6 +256,53 @@ class ResultsController extends Controller
     }
 
     /**
+     * Delete one attempt outright: the competitor sat the wrong exam and nothing
+     * about it should survive. Owner's decision, 2026-09-17, taken over the reset
+     * that voids instead — a result taken back from the student page is meant to
+     * leave no trace, not to leave an audited one.
+     *
+     * Three things go, and the third is the reason this is not just ->delete():
+     *
+     *  1. the attempt row, and with it `attempt_answers` and the `grade_revisions`
+     *     hanging off them, and any `attempt_resets` snapshot — all by cascade;
+     *  2. the one-attempt slot, so the competitor can sit that exam again;
+     *  3. 🔴 the published mark in `registration_results` (Layer B), which has NO
+     *     foreign key to `attempts` (ADR-0027, unique on registration + test). A
+     *     delete that stopped at the attempt would leave the score standing in the
+     *     grid, the reports and the export with nothing behind it.
+     *
+     * {@see ResultLedger::reconcile()} is deliberately not used here: it recomputes
+     * Layer B *from the attempts*, and the correct state after this delete is no row
+     * at all. The row is removed whatever its `source` — an offline import for the
+     * same competitor and test is the same mark to whoever reads a report.
+     */
+    public function destroyAttempt(Request $request, Attempt $attempt): Response
+    {
+        $this->authorize('results.manage');
+
+        // Like the single reset, this takes an attempt by id, so a non-global caller
+        // must be confined to their own schools here too.
+        $callerSchoolIds = $request->user()?->allowedSchoolIds();
+        if ($callerSchoolIds !== null && ! $callerSchoolIds->contains($attempt->registration()->value('school_id'))) {
+            abort(403);
+        }
+
+        $registrationId = (int) $attempt->registration_id;
+        $testId = (int) $attempt->test_id;
+
+        DB::transaction(function () use ($attempt, $registrationId, $testId): void {
+            $attempt->delete();
+
+            DB::table('registration_results')
+                ->where('registration_id', $registrationId)
+                ->where('test_id', $testId)
+                ->delete();
+        });
+
+        return response()->noContent();
+    }
+
+    /**
      * Void one attempt, snapshotting its pre-void state for audit (ADR-0022).
      * Shared by the single reset and the bulk reset. Assumes the caller has
      * excluded already-void attempts.

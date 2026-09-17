@@ -1447,9 +1447,7 @@ export default {
             colScore: 'Score',
             delete: 'Delete result',
             confirmTitle: 'Delete this result?',
-            confirmDelete: 'The result for "{test}" will be removed and the student will be able to sit this exam again. This cannot be undone.',
-            // Stored on the reset record, so the audit says where it came from.
-            resetReason: 'Result deleted from the student page.',
+            confirmDelete: 'The result for "{test}", the answers behind it and the published mark will be deleted, and the student will be able to sit this exam again. Nothing is kept — this cannot be undone.',
         },
     },
     quiz: {

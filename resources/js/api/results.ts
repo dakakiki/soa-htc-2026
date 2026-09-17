@@ -95,10 +95,20 @@ export function resetCandidates(scope: ResetScope) {
 /**
  * Take one attempt back so the competitor can sit that exam again. The attempt
  * is voided rather than removed: it leaves the results, and `attempt_resets`
- * keeps what it was and who reset it (ADR-0022).
+ * keeps what it was and who reset it (ADR-0022). Used by the Results screen.
  */
 export function resetAttempt(attemptId: number, reason: string) {
     return http.post<{ status: string }>(`/api/results/attempts/${attemptId}/reset`, { reason });
+}
+
+/**
+ * Delete one attempt outright — the answers, the grading history and the
+ * published mark in Layer B go with it, and nothing is kept for audit. This is
+ * what the student page's delete button does; the reset above is the softer
+ * path the Results screen uses.
+ */
+export function deleteAttempt(attemptId: number) {
+    return http.delete<void>(`/api/results/attempts/${attemptId}`);
 }
 
 export function bulkReset(payload: ResetTarget & { reason: string }) {
