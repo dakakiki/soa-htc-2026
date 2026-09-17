@@ -5,48 +5,50 @@ import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '@/stores/session';
 import { pendingRegistrationCount } from '@/api/coordinatorRegistrations';
 import {
-    IconLayoutDashboard,
-    IconBuilding,
-    IconMail,
-    IconUsersGroup,
-    IconUsers,
-    IconUserStar,
-    IconUserPlus,
-    IconSettings,
-    IconLock,
-    IconShieldLock,
-    IconWorld,
-    IconPalette,
-    IconCalendarEvent,
-    IconCertificate,
-    IconStairs,
-    IconListCheck,
-    IconStack2,
-    IconClipboardList,
-    IconClipboardCheck,
-    IconChecklist,
-    IconSend,
-    IconFileImport,
-    IconFileExport,
-    IconChartBar,
+    IconActivity,
     IconArchive,
-    IconRotate,
-    IconHelpCircle,
-    IconFileText,
-    IconTag,
-    IconClockHour4,
-    IconCategory,
-    IconWorldWww,
     IconArticle,
-    IconNews,
-    IconFolders,
-    IconPhoto,
-    IconLayoutRows,
-    IconMenu2,
+    IconBuilding,
+    IconCalendarEvent,
+    IconCategory,
+    IconCertificate,
+    IconChartBar,
+    IconChecklist,
     IconChevronDown,
     IconChevronUp,
     IconChevronsLeft,
     IconChevronsRight,
+    IconClipboardCheck,
+    IconClipboardList,
+    IconClockHour4,
+    IconFileExport,
+    IconFileImport,
+    IconFileText,
+    IconFolders,
+    IconHelpCircle,
+    IconHistory,
+    IconLayoutDashboard,
+    IconLayoutRows,
+    IconListCheck,
+    IconLock,
+    IconMail,
+    IconMenu2,
+    IconNews,
+    IconPalette,
+    IconPhoto,
+    IconRotate,
+    IconSend,
+    IconSettings,
+    IconShieldLock,
+    IconStack2,
+    IconStairs,
+    IconTag,
+    IconUserPlus,
+    IconUserStar,
+    IconUsers,
+    IconUsersGroup,
+    IconWorld,
+    IconWorldWww,
 } from '@tabler/icons-vue';
 
 interface NavItem {
@@ -199,6 +201,26 @@ const nav: NavNode[] = [
     // access: it is something the organisation sends out, not something a
     // venue or a round is made of (owner, 2026-09-15).
     { kind: 'item', label: t('nav.messages'), icon: IconMail, to: 'messages', prefix: 'messages', perm: 'messages.manage' },
+    /*
+     * Monitoring. Its own group rather than a child of Access: Access is about
+     * WHO MAY do things, this is about what was actually done. They answer
+     * different questions and are read at different times.
+     *
+     * 🪤 Two permissions, like the results archive above — the trail cannot be
+     * narrowed to a coordinator's venues, so the server refuses a scoped reader.
+     */
+    {
+        kind: 'group',
+        key: 'monitoring',
+        label: t('nav.monitoring'),
+        icon: IconActivity,
+        children: [
+            {
+                label: t('nav.userLog'), icon: IconHistory, to: 'monitoring.userLog',
+                prefix: 'monitoring.userLog', perm: ['users.manage', 'schools.view.all'],
+            },
+        ],
+    },
     // Access and Settings stay last.
     {
         kind: 'group',
