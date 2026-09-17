@@ -590,6 +590,12 @@ const routes: RouteRecordRaw[] = [
      * offering the screen would be offering a locked door.
      */
     {
+        path: '/monitoring/current-action',
+        name: 'monitoring.currentAction',
+        component: () => import('@/pages/monitoring/CurrentActionPage.vue'),
+        meta: { requiresAuth: true, permission: ['reports.view', 'schools.view.all'] },
+    },
+    {
         path: '/monitoring/user-log',
         name: 'monitoring.userLog',
         component: () => import('@/pages/monitoring/UserLogPage.vue'),

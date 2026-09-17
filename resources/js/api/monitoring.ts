@@ -58,3 +58,53 @@ export function userLogOptions() {
 export function exportUserLog(params: UserLogParams = {}) {
     return http.get('/api/monitoring/user-log/export', { params: clean(params), responseType: 'blob' });
 }
+
+/** One competitor sitting an exam right now. */
+export interface CurrentActionRow {
+    id: number;
+    registration_id: number;
+    competitor_number: string;
+    name: string | null;
+    country: string | null;
+    venue: string | null;
+    level: string | null;
+    quiz: string | null;
+    test: string | null;
+    started_at: string | null;
+    expires_at: string | null;
+    answered: number;
+    /** Past the deadline and still open: a closed browser, not somebody working. */
+    overdue: boolean;
+}
+
+export interface CurrentAction {
+    /** The server's clock at the moment of the answer; the countdown runs off this. */
+    as_of: string;
+    counts: {
+        running: number;
+        overdue: number;
+        submitted_recently: number;
+        venues: number;
+        recent_minutes: number;
+    };
+    rows: CurrentActionRow[];
+}
+
+export interface CurrentActionParams {
+    q?: string;
+    country_id?: number | null;
+    region_id?: number | null;
+    school_id?: number | null;
+    /** Only the ones already out of time — the click behind the red count. */
+    overdue?: boolean;
+}
+
+export function currentAction(params: CurrentActionParams = {}) {
+    const clean: Record<string, string | number> = {};
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== null && v !== undefined && v !== '' && v !== false) {
+            clean[k] = v === true ? 1 : (v as string | number);
+        }
+    });
+    return http.get<{ data: CurrentAction }>('/api/monitoring/current-action', { params: clean });
+}
