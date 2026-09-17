@@ -6,6 +6,7 @@ import { useSessionStore } from '@/stores/session';
 import { pendingRegistrationCount } from '@/api/coordinatorRegistrations';
 import {
     IconActivity,
+    IconActivityHeartbeat,
     IconArchive,
     IconArticle,
     IconBuilding,
@@ -215,6 +216,11 @@ const nav: NavNode[] = [
         label: t('nav.monitoring'),
         icon: IconActivity,
         children: [
+            // Live first: it is the one read while something is happening.
+            {
+                label: t('nav.currentAction'), icon: IconActivityHeartbeat, to: 'monitoring.currentAction',
+                prefix: 'monitoring.currentAction', perm: ['reports.view', 'schools.view.all'],
+            },
             {
                 label: t('nav.userLog'), icon: IconHistory, to: 'monitoring.userLog',
                 prefix: 'monitoring.userLog', perm: ['users.manage', 'schools.view.all'],

@@ -58,3 +58,41 @@ export function userLogOptions() {
 export function exportUserLog(params: UserLogParams = {}) {
     return http.get('/api/monitoring/user-log/export', { params: clean(params), responseType: 'blob' });
 }
+
+/** One competitor sitting an exam right now. */
+export interface CurrentActionRow {
+    id: number;
+    registration_id: number;
+    competitor_number: string;
+    name: string | null;
+    country: string | null;
+    venue: string | null;
+    level: string | null;
+    quiz: string | null;
+    test: string | null;
+    started_at: string | null;
+    expires_at: string | null;
+    answered: number;
+    /** Past the deadline and still open: a closed browser, not somebody working. */
+    overdue: boolean;
+}
+
+export interface CurrentAction {
+    /** The server's clock at the moment of the answer; the countdown runs off this. */
+    as_of: string;
+    counts: {
+        running: number;
+        overdue: number;
+        submitted_recently: number;
+        venues: number;
+        recent_minutes: number;
+    };
+    by_exam: { test_id: number; test: string; n: number }[];
+    rows: CurrentActionRow[];
+}
+
+export function currentAction(q?: string) {
+    return http.get<{ data: CurrentAction }>('/api/monitoring/current-action', {
+        params: q ? { q } : {},
+    });
+}

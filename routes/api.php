@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Cms\PostController as CmsPostController;
 use App\Http\Controllers\Api\CoordinatorController;
 use App\Http\Controllers\Api\CoordinatorRegistrationController;
 use App\Http\Controllers\Api\CountryController;
+use App\Http\Controllers\Api\CurrentActionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DifficultyCategoryController;
 use App\Http\Controllers\Api\DifficultyLevelController;
@@ -430,6 +431,9 @@ Route::middleware('auth:sanctum')->group(function () {
      * surface. Administrators only: the trail has no venue column, so it cannot
      * be narrowed to a coordinator's own schools (see the controller).
      */
+    // Who is sitting an exam right now. Counts first, capped list second — the
+    // busiest legacy minute carried 6.607 results, which no list survives.
+    Route::get('monitoring/current-action', CurrentActionController::class);
     Route::get('monitoring/user-log', [UserLogController::class, 'index']);
     Route::get('monitoring/user-log/options', [UserLogController::class, 'options']);
     Route::get('monitoring/user-log/export', [UserLogController::class, 'export']);
