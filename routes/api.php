@@ -325,6 +325,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Declared before the resource so the static path isn't caught by {registration}.
     Route::get('registrations/result-columns', [RegistrationController::class, 'resultColumns']);
     Route::get('registrations/{registration}/results', [RegistrationController::class, 'results']);
+    Route::get('registrations/{registration}/attempts', [RegistrationController::class, 'attempts']);
     Route::apiResource('registrations', RegistrationController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
 
     // Staff users and their season role/scope assignments.

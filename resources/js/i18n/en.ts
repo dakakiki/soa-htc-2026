@@ -1435,6 +1435,22 @@ export default {
         saveFailed: 'Save failed.',
         deleteFailed: 'Delete failed.',
         confirmDelete: 'Delete this registration?',
+        attempts: {
+            heading: 'Exams taken',
+            competition: 'Competition',
+            sample: 'Sample',
+            empty: 'This student has not sat any exam yet.',
+            colQuiz: 'Quiz',
+            colExam: 'Exam',
+            colTest: 'Test',
+            colDate: 'Date',
+            colScore: 'Score',
+            delete: 'Delete result',
+            confirmTitle: 'Delete this result?',
+            confirmDelete: 'The result for "{test}" will be removed and the student will be able to sit this exam again. This cannot be undone.',
+            // Stored on the reset record, so the audit says where it came from.
+            resetReason: 'Result deleted from the student page.',
+        },
     },
     quiz: {
         title: 'Quizzes',

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
+use App\Domain\Assessment\Support\SampleRound;
+use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Support\AttendanceImporter;
 use App\Domain\Competition\Support\AttendanceReport;
@@ -26,6 +28,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -36,7 +39,7 @@ class RegistrationController extends Controller
     {
         $this->authorize('viewAny', Registration::class);
 
-        $query = Registration::query()->with(['school', 'country', 'level'])->latest('id');
+        $query = Registration::query()->with(['school', 'country', 'level'])->orderBy('competitor_number');
         $this->applyFilters($query, $request);
 
         $perPage = min(max($request->integer('per_page', 20), 1), 200);
@@ -440,6 +443,92 @@ class RegistrationController extends Controller
         $this->authorize('view', $registration);
 
         return response()->json(['data' => RegistrationResults::detail($registration->id)]);
+    }
+
+    /**
+     * Every exam this competitor has sat, split into the two populations the
+     * results side is keyed on: contest first, practice second. Void attempts are
+     * left out — a reset attempt is gone as far as the screen is concerned, and
+     * its record lives in `attempt_resets` (ADR-0022).
+     *
+     * 🪤 The split is the ROUND's `is_sample` via {@see SampleRound}, never the
+     * attempt's own `is_practice` stamp nor the quiz's type. The three agree on
+     * today's data and are answers to different questions (ADR-0084).
+     */
+    public function attempts(Registration $registration): JsonResponse
+    {
+        $this->authorize('view', $registration);
+
+        $sampleTestIds = SampleRound::testIds()->pluck('test_id')
+            ->map(fn ($id): int => (int) $id)->all();
+
+        $attempts = Attempt::query()
+            ->where('registration_id', $registration->id)
+            ->active()
+            ->with(['test:id,title', 'quiz:id,title'])
+            ->orderByDesc('started_at')
+            ->get();
+
+        $examTitles = $this->examTitlesFor($attempts);
+
+        $rows = $attempts->map(fn (Attempt $a): array => [
+            'id' => $a->id,
+            'test_id' => $a->test_id,
+            'quiz_title' => $a->quiz?->title,
+            'exam_title' => $examTitles[$a->quiz_id.':'.$a->test_id] ?? null,
+            'test_title' => $a->test?->title,
+            'status' => $a->status->value,
+            'grading_status' => $a->grading_status?->value,
+            'score' => $a->score,
+            'max_score' => $a->max_score,
+            'started_at' => $a->started_at?->toIso8601String(),
+            'submitted_at' => $a->submitted_at?->toIso8601String(),
+            'published_at' => $a->published_at?->toIso8601String(),
+            'is_sample' => in_array((int) $a->test_id, $sampleTestIds, true),
+        ]);
+
+        return response()->json(['data' => [
+            'competition' => $rows->where('is_sample', false)->values(),
+            'sample' => $rows->where('is_sample', true)->values(),
+        ]]);
+    }
+
+    /**
+     * The exam each attempt sat under, keyed "quizId:testId".
+     *
+     * An attempt records the quiz and the test but not the exam between them, so
+     * it is recovered from the two pivots: the exam that belongs to that quiz and
+     * carries that test. A test reused across two exams of one quiz resolves to
+     * the earlier one by the quiz's own ordering, which is the one the competitor
+     * met first.
+     *
+     * @param  Collection<int, Attempt>  $attempts
+     * @return array<string, string>
+     */
+    private function examTitlesFor($attempts): array
+    {
+        $quizIds = $attempts->pluck('quiz_id')->filter()->unique()->all();
+        $testIds = $attempts->pluck('test_id')->filter()->unique()->all();
+
+        if ($quizIds === [] || $testIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('exam_quiz')
+            ->join('exam_test', 'exam_test.exam_id', '=', 'exam_quiz.exam_id')
+            ->join('exams', 'exams.id', '=', 'exam_quiz.exam_id')
+            ->whereIn('exam_quiz.quiz_id', $quizIds)
+            ->whereIn('exam_test.test_id', $testIds)
+            ->orderBy('exam_quiz.position')
+            ->select(['exam_quiz.quiz_id', 'exam_test.test_id', 'exams.title'])
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row->quiz_id.':'.$row->test_id] ??= $row->title;
+        }
+
+        return $map;
     }
 
     public function show(Registration $registration): RegistrationResource

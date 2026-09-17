@@ -32,6 +32,33 @@ export function listRegistrations(params: RegistrationListParams = {}) {
     return http.get<Paginated<Registration>>('/api/registrations', { params });
 }
 
+/** One exam a competitor has sat, as the student page's attempts panel lists it. */
+export interface StudentAttempt {
+    id: number;
+    test_id: number | null;
+    quiz_title: string | null;
+    exam_title: string | null;
+    test_title: string | null;
+    status: string;
+    grading_status: string | null;
+    score: string | null;
+    max_score: string | null;
+    started_at: string | null;
+    submitted_at: string | null;
+    published_at: string | null;
+    is_sample: boolean;
+}
+
+export interface StudentAttempts {
+    competition: StudentAttempt[];
+    sample: StudentAttempt[];
+}
+
+/** The competitor's exams, split contest / practice. Void attempts are not returned. */
+export function listRegistrationAttempts(id: number) {
+    return http.get<{ data: StudentAttempts }>(`/api/registrations/${id}/attempts`);
+}
+
 /** Download the currently filtered students roster as .xlsx (same filters as the list). */
 export function exportRegistrations(params: RegistrationListParams = {}) {
     return http.get('/api/registrations/export', { params, responseType: 'blob' });
