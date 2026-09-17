@@ -1,0 +1,111 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Domain\Audit\Models\AuditLog;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Tests\TestCase;
+
+/**
+ * Signing in, signing out and being turned away are written to the trail.
+ *
+ * Asked for by the owner on 2026-09-17: accounts had been used for things nobody
+ * could afterwards pin on anybody. Nothing recorded sign-ins before this — the
+ * trail covered who was GRANTED authority, never who used it.
+ */
+class AccessTrailTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
+
+    /** Sanctum only starts a session for a first-party request; the browser sends this Origin itself. */
+    private function spa(): TestResponse|static
+    {
+        return $this->withHeader('Origin', config('app.url'));
+    }
+
+    private function admin(): User
+    {
+        return User::where('email', 'admin@soahtc.test')->firstOrFail();
+    }
+
+    public function test_a_sign_in_is_written_down_with_who_and_from_where(): void
+    {
+        $admin = $this->admin();
+
+        $this->spa()->postJson('/api/auth/login', ['email' => $admin->email, 'password' => 'password'])
+            ->assertOk();
+
+        $row = AuditLog::where('action', 'auth.signed_in')->sole();
+
+        $this->assertSame($admin->id, $row->actor_id);
+        $this->assertSame($admin->name, $row->actor_label);
+        $this->assertSame($admin::class, $row->subject_type);
+        $this->assertNotNull($row->ip_address);
+    }
+
+    public function test_a_sign_out_is_written_down(): void
+    {
+        $this->actingAs($this->admin())->spa()->postJson('/api/auth/logout')->assertNoContent();
+
+        $this->assertSame(1, AuditLog::where('action', 'auth.signed_out')->count());
+    }
+
+    /**
+     * The failures are the half the owner actually asked about: an account being
+     * guessed at looks like nothing until the attempts sit beside the sign-in
+     * that eventually worked.
+     */
+    public function test_a_failed_sign_in_keeps_the_address_and_never_the_password(): void
+    {
+        $this->spa()->postJson('/api/auth/login', ['email' => 'admin@soahtc.test', 'password' => 'not-the-password'])
+            ->assertStatus(422);
+
+        $row = AuditLog::where('action', 'auth.failed')->sole();
+
+        $this->assertSame('admin@soahtc.test', $row->after['email']);
+
+        // 🔴 The Failed event hands the password over beside the address. It must
+        // not reach a table that is kept for years and is not wiped at rollover.
+        $this->assertStringNotContainsString('not-the-password', json_encode($row->getAttributes()));
+        $this->assertArrayNotHasKey('password', $row->after);
+    }
+
+    public function test_an_address_that_belongs_to_nobody_is_still_written_down(): void
+    {
+        $this->spa()->postJson('/api/auth/login', ['email' => 'nobody@example.test', 'password' => 'whatever'])
+            ->assertStatus(422);
+
+        $row = AuditLog::where('action', 'auth.failed')->sole();
+
+        // Nobody to attribute it to, which is itself the finding.
+        $this->assertNull($row->actor_id);
+        $this->assertNull($row->subject_id);
+        $this->assertSame('nobody@example.test', $row->after['email']);
+    }
+
+    /**
+     * The competitors are deliberately left out: fifty thousand children
+     * identifying would bury the handful of lines this is for, and
+     * `student_sessions` already carries their side with its own ip and device.
+     */
+    public function test_a_competitor_identifying_does_not_reach_the_trail(): void
+    {
+        $before = AuditLog::count();
+
+        $this->postJson('/api/identify', [
+            'competitor_number' => '14000001',
+            'date_of_birth' => '2010-01-01',
+            'country_id' => 1,
+        ]);
+
+        $this->assertSame($before, AuditLog::count());
+    }
+}

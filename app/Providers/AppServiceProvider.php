@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Country;
@@ -23,6 +24,9 @@ use App\Policies\SeasonUserAssignmentPolicy;
 use App\Policies\SettingPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\JsonResponse;
@@ -50,6 +54,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->nameWhatWritesToTheLog();
+        $this->recordWhoGetsIn();
 
         // Domain models live outside app/Models, so policies are registered explicitly.
         Gate::policy(School::class, SchoolPolicy::class);
@@ -169,6 +174,61 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(20)->by('ip:'.$request->ip()),
             Limit::perDay(3)->by('mail:'.mb_strtolower(trim((string) $request->input('email')))),
         ]);
+    }
+
+    /**
+     * Write down who got in, who left, and who was turned away.
+     *
+     * 🔴 Asked for by the owner on 2026-09-17, after accounts had been used for
+     * things nobody could afterwards pin on anybody: *"imali smo situaciju da ulaze
+     * i rade svasta pa ako postoji opcija da vidimo sa kog koordinatorskog naloga
+     * je nek nesto cackao"*. Nothing recorded sign-ins before this — the trail
+     * covered who was GRANTED authority, never who used it.
+     *
+     * The failures matter as much as the successes. A coordinator account being
+     * guessed at looks like nothing at all until the attempts are written down
+     * beside the sign-in that eventually worked.
+     *
+     * 🪤 `Failed` carries the password in `$credentials`. Only the address
+     * typed goes in; {@see AuditTrail::recordAccess()} is where that is enforced
+     * rather than remembered.
+     *
+     * 🪤 Nothing is recorded for the competitors: fifty thousand children
+     * identifying would bury the handful of lines this is for, and
+     * `student_sessions` already carries their side with its own ip and device.
+     */
+    private function recordWhoGetsIn(): void
+    {
+        Event::listen(Login::class, function (Login $event): void {
+            AuditTrail::recordAccess('auth.signed_in', $event->user, self::device());
+        });
+
+        Event::listen(Logout::class, function (Logout $event): void {
+            // A session that simply expires fires nothing, so an absent sign-out
+            // means "walked away", not "still in".
+            AuditTrail::recordAccess('auth.signed_out', $event->user, self::device());
+        });
+
+        Event::listen(Failed::class, function (Failed $event): void {
+            AuditTrail::recordAccess('auth.failed', $event->user instanceof User ? $event->user : null, [
+                // The address typed, never the password beside it. An address that
+                // belongs to nobody is exactly the line worth keeping.
+                'email' => is_string($event->credentials['email'] ?? null) ? $event->credentials['email'] : null,
+            ] + self::device());
+        });
+    }
+
+    /**
+     * The browser a request came from, trimmed to what the column can hold and
+     * what a person would actually read.
+     *
+     * @return array<string, string|null>
+     */
+    private static function device(): array
+    {
+        $agent = request()?->userAgent();
+
+        return ['user_agent' => is_string($agent) ? mb_substr($agent, 0, 255) : null];
     }
 
     /**
