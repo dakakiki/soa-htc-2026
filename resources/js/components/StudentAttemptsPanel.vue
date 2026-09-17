@@ -7,18 +7,25 @@
  * head, striped rows and the row action right-aligned in the last cell. Two
  * screens that list exams should not look like two applications.
  *
- * 🔴 "Delete" here means delete: the attempt row goes, its answers and their
- * grading history go with it by cascade, and so does the published mark in Layer
- * B, which has no foreign key to hold it. Nothing is kept for audit. Owner's
- * decision, 2026-09-17, taken over the softer reset the Results screen uses.
+ * The row action is the RESET the Results screen already has (ADR-0022): the
+ * attempt stops counting, the competitor can sit that exam again, and the mark,
+ * the answers and the reason are all kept.
+ *
+ * 🔴 It was a hard delete for part of 2026-09-17. The owner took that back the
+ * same day, having talked the client out of it: keeping the data is the better
+ * trade, and a competitor can sit again either way. The delete endpoint is left
+ * in place but nothing calls it — do not wire it back here without being asked.
+ *
+ * 🪤 The reason is typed, not filled in for the administrator. It is the whole
+ * value of keeping the row: "reset from the student page" answers nothing six
+ * weeks later, "power cut in room 3" does.
  */
 import { onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconTrash } from '@tabler/icons-vue';
+import { IconRotate } from '@tabler/icons-vue';
 import { listRegistrationAttempts, type StudentAttempt } from '@/api/registrations';
-import { deleteAttempt } from '@/api/results';
+import { resetAttempt } from '@/api/results';
 import { apiErrorMessage } from '@/api/http';
-import { useConfirmStore } from '@/stores/confirm';
 import { useSessionStore } from '@/stores/session';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import Tooltip from '@/components/Tooltip.vue';
@@ -26,7 +33,6 @@ import Tooltip from '@/components/Tooltip.vue';
 const props = defineProps<{ registrationId: number }>();
 
 const { t } = useI18n();
-const confirm = useConfirmStore();
 const session = useSessionStore();
 
 const competition = ref<StudentAttempt[]>([]);
@@ -50,24 +56,36 @@ async function load(): Promise<void> {
     }
 }
 
-async function remove(a: StudentAttempt): Promise<void> {
-    const name = a.test_title ?? t('common.dash');
-    const ok = await confirm.ask({
-        title: t('registration.attempts.confirmTitle'),
-        message: t('registration.attempts.confirmDelete', { test: name }),
-        danger: true,
-    });
-    if (!ok) {
+const pending = ref<StudentAttempt | null>(null);
+const reason = ref('');
+const modalError = ref('');
+
+function ask(a: StudentAttempt): void {
+    pending.value = a;
+    reason.value = '';
+    modalError.value = '';
+}
+
+async function confirmReset(): Promise<void> {
+    const a = pending.value;
+    if (!a) {
+        return;
+    }
+    // Same floor the endpoint enforces, said here so the administrator is not
+    // told off by a 422 after the fact.
+    if (reason.value.trim().length < 3) {
+        modalError.value = t('registration.attempts.reason');
         return;
     }
 
     working.value = a.id;
     error.value = '';
     try {
-        await deleteAttempt(a.id);
+        await resetAttempt(a.id, reason.value.trim());
+        pending.value = null;
         await load();
     } catch (e) {
-        error.value = apiErrorMessage(e);
+        modalError.value = apiErrorMessage(e);
     } finally {
         working.value = null;
     }
@@ -145,15 +163,15 @@ onMounted(load);
                                 <td class="whitespace-nowrap px-4 py-2 text-center tabular-nums text-gray-700">{{ fmtScore(a) }}</td>
                                 <td class="px-4 py-2">
                                     <div class="flex justify-end gap-2">
-                                        <Tooltip v-if="canManage" :text="$t('registration.attempts.delete')">
+                                        <Tooltip v-if="canManage" :text="$t('registration.attempts.reset')">
                                             <button
                                                 type="button"
                                                 :disabled="working !== null"
-                                                :aria-label="$t('registration.attempts.delete')"
-                                                class="rounded-md border border-gray-300 p-1.5 text-red-600 hover:bg-gray-50 disabled:opacity-50"
-                                                @click="remove(a)"
+                                                :aria-label="$t('registration.attempts.reset')"
+                                                class="rounded-md border border-gray-300 p-1.5 text-amber-600 hover:bg-gray-50 disabled:opacity-50"
+                                                @click="ask(a)"
                                             >
-                                                <IconTrash :size="16" />
+                                                <IconRotate :size="16" />
                                             </button>
                                         </Tooltip>
                                     </div>
@@ -163,6 +181,48 @@ onMounted(load);
                     </table>
                 </div>
             </article>
+        </div>
+
+        <!-- Same shape as the Results screen's reset modal: amber, a typed reason,
+             and the error inside the dialog rather than behind it. -->
+        <div v-if="pending" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" @click.self="pending = null">
+            <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+                <h3 class="text-lg font-semibold">{{ $t('registration.attempts.modalTitle') }}</h3>
+                <p class="mt-1 text-sm text-gray-600">
+                    {{ $t('registration.attempts.modalBody', { test: pending.test_title ?? $t('common.dash') }) }}
+                </p>
+
+                <label class="mt-4 block">
+                    <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('registration.attempts.reason') }}</span>
+                    <textarea
+                        v-model="reason"
+                        rows="3"
+                        :placeholder="$t('registration.attempts.reasonPlaceholder')"
+                        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-link focus:ring-brand-link"
+                    ></textarea>
+                </label>
+
+                <p v-if="modalError" class="mt-1 text-sm text-red-600">{{ modalError }}</p>
+
+                <div class="mt-4 flex justify-end gap-2">
+                    <button
+                        type="button"
+                        :disabled="working !== null"
+                        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        @click="pending = null"
+                    >
+                        {{ $t('common.cancel') }}
+                    </button>
+                    <button
+                        type="button"
+                        :disabled="working !== null"
+                        class="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                        @click="confirmReset"
+                    >
+                        {{ working !== null ? $t('registration.attempts.working') : $t('registration.attempts.confirm') }}
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </template>
