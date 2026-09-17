@@ -32,7 +32,7 @@ import SearchInput from '@/components/SearchInput.vue';
 const { t } = useI18n();
 
 const rows = ref<UserLogEntry[]>([]);
-const options = ref<UserLogOptions>({ actions: [], actors: [] });
+const options = ref<UserLogOptions>({ actions: [], actors: [], export_cap: 0 });
 const loading = ref(true);
 const exporting = ref(false);
 const error = ref('');
@@ -134,6 +134,10 @@ const hasPayload = (r: UserLogEntry): boolean => r.before !== null || r.after !=
                 <span class="text-sm text-gray-500">{{ loading ? '' : $t('userLog.total', { n: total.toLocaleString() }) }}</span>
                 <!-- 🪤 The button sits in its own box: ExportButton does not pass a
                      class through to anything the flex row can push around. -->
+                <!-- Warned before the click, not discovered inside the file. -->
+                <span v-if="options.export_cap > 0 && total > options.export_cap" class="text-xs text-amber-700">
+                    {{ $t('userLog.exportCapped', { n: options.export_cap.toLocaleString() }) }}
+                </span>
                 <div class="ml-auto">
                     <ExportButton :loading="exporting" :label="$t('userLog.export')" @click="download" />
                 </div>

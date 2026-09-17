@@ -29,6 +29,8 @@ export interface UserLogParams {
 
 export interface UserLogOptions {
     actions: string[];
+    /** Beyond this the export is truncated, so the screen warns first. */
+    export_cap: number;
     actors: { id: number; label: string | null }[];
 }
 
@@ -88,6 +90,9 @@ export interface CurrentAction {
         recent_minutes: number;
     };
     rows: CurrentActionRow[];
+    /** How many the list would have had; `rows` is capped at `rows_cap`. */
+    rows_total: number;
+    rows_cap: number;
 }
 
 export interface CurrentActionParams {

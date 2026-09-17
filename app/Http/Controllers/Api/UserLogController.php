@@ -69,6 +69,8 @@ class UserLogController extends Controller
 
         return response()->json(['data' => [
             'actions' => AuditLog::query()->distinct()->orderBy('action')->pluck('action')->all(),
+            // So the screen can warn BEFORE a truncated download rather than after.
+            'export_cap' => self::EXPORT_CAP,
             'actors' => AuditLog::query()
                 ->whereNotNull('actor_id')
                 ->select(['actor_id', 'actor_label'])

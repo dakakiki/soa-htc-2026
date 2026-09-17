@@ -310,7 +310,11 @@ function onSearch(): void {
                         </tr>
                     </tbody>
                 </table>
-                <p v-if="rows.length >= 100" class="mt-2 text-xs text-gray-500">{{ $t('currentAction.capped') }}</p>
+                <!-- Says how many are NOT on screen. A cap nobody is told about reads
+                     as "these are all of them". -->
+                <p v-if="(data?.rows_total ?? 0) > rows.length" class="mt-2 text-xs text-gray-500">
+                    {{ $t('currentAction.capped', { shown: rows.length, total: (data?.rows_total ?? 0).toLocaleString() }) }}
+                </p>
             </div>
         </div>
     </section>
