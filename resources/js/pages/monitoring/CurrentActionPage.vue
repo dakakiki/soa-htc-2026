@@ -5,7 +5,12 @@
  * 🔴 The shape follows one measurement. The legacy roster's busiest minute
  * carried 6.607 results — about 110 a second — and at that rate a list of rows
  * cannot be read: a row is gone before the eye reaches it. So the counts lead,
- * the per-test breakdown follows, and the list comes last and capped.
+ * the filters narrow, and the list comes last and capped.
+ *
+ * 🪤 The filters narrow the COUNTS as well as the list. Narrowed to one
+ * venue, "sitting now" has to mean that venue — a number standing above a
+ * list it does not describe is the mistake this application was caught
+ * making three times over on the same day.
  *
  * 🪤 Polling stops while the tab is hidden. Three people leave this open on a
  * second monitor all day; without that it is a request every ten seconds each,
@@ -15,6 +20,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconAlertTriangle, IconRefresh } from '@tabler/icons-vue';
 import { currentAction, type CurrentAction, type CurrentActionRow } from '@/api/monitoring';
+import { listCountries, listRegions } from '@/api/reference';
+import { listSchools } from '@/api/schools';
+import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
+import type { Country, Region, School } from '@/types/models';
 import { apiErrorMessage } from '@/api/http';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import SearchInput from '@/components/SearchInput.vue';
@@ -29,6 +38,63 @@ const error = ref('');
 const q = ref('');
 const lastAt = ref<number | null>(null);
 
+/*
+ * \U0001F534 The filters drive the counts as well as the list. A number standing above
+ * a list it does not describe is the mistake this application was caught making
+ * three times over on the same day \u2014 narrowed to one venue, "sitting now" has
+ * to mean that venue, and the server applies them to both.
+ */
+const countryId = ref<number | null>(null);
+const regionId = ref<number | null>(null);
+const schoolId = ref<number | null>(null);
+const onlyOverdue = ref(false);
+
+const countries = ref<Country[]>([]);
+const regions = ref<Region[]>([]);
+const schools = ref<School[]>([]);
+const schoolSearching = ref(false);
+const schoolTotal = ref(0);
+
+const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map((c) => ({ id: c.id, label: c.name })));
+const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
+const schoolOptions = computed<SearchSelectOption[]>(() => schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })));
+
+async function loadRegions(): Promise<void> {
+    regions.value = countryId.value ? (await listRegions(countryId.value)).data.data : [];
+}
+
+async function loadSchools(term = ''): Promise<void> {
+    schoolSearching.value = term !== '';
+    try {
+        const { data } = await listSchools({
+            country_id: countryId.value ?? undefined,
+            region_id: regionId.value ?? undefined,
+            search: term || undefined,
+            per_page: 50,
+        });
+        schools.value = data.data;
+        schoolTotal.value = data.meta?.total ?? data.data.length;
+    } finally {
+        schoolSearching.value = false;
+    }
+}
+
+async function onCountry(v: number | null): Promise<void> {
+    countryId.value = v;
+    // A region or venue from the previous country would silently narrow to nothing.
+    regionId.value = null;
+    schoolId.value = null;
+    await Promise.all([loadRegions(), loadSchools()]);
+    await load();
+}
+
+async function onRegion(v: number | null): Promise<void> {
+    regionId.value = v;
+    schoolId.value = null;
+    await loadSchools();
+    await load();
+}
+
 /**
  * The browser's clock is not the one the deadline was written against, so every
  * poll records how far apart they are and the countdown uses the difference.
@@ -41,7 +107,13 @@ let ticker: ReturnType<typeof setInterval> | undefined;
 
 async function load(): Promise<void> {
     try {
-        const { data: body } = await currentAction(q.value || undefined);
+        const { data: body } = await currentAction({
+            q: q.value || undefined,
+            country_id: countryId.value,
+            region_id: regionId.value,
+            school_id: schoolId.value,
+            overdue: onlyOverdue.value,
+        });
         data.value = body.data;
         clockSkew.value = Date.now() - new Date(body.data.as_of).getTime();
         lastAt.value = Date.now();
@@ -75,6 +147,7 @@ function stop(): void {
 }
 
 onMounted(() => {
+    void listCountries().then(({ data }) => (countries.value = data.data)).catch(() => undefined);
     void load();
     start();
     ticker = setInterval(() => (tick.value = Date.now()), 1000);
@@ -158,13 +231,35 @@ function onSearch(): void {
             </div>
         </div>
 
-        <div v-if="(data?.by_exam.length ?? 0) > 0" class="rounded-lg border border-gray-200 bg-white p-4">
-            <div class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">{{ $t('currentAction.byTest') }}</div>
-            <div class="flex flex-wrap gap-2">
-                <span v-for="e in data?.by_exam" :key="e.test_id"
-                    class="rounded-md bg-brand-primary-soft px-2.5 py-1 text-sm">
-                    {{ e.test }} <strong class="tabular-nums">{{ e.n }}</strong>
-                </span>
+        <!-- \U0001FAA4 These replaced a row of chips naming every test being sat. On the
+             real roster that is dozens of names and answers nothing anybody asks
+             while an exam is running; where the people are does (owner, 17.09). -->
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <SearchSelect :model-value="countryId" :options="countryOptions" dense
+                    :placeholder="$t('currentAction.filterCountry')" :search-placeholder="$t('currentAction.country')"
+                    @update:model-value="onCountry" />
+
+                <SearchSelect :model-value="regionId" :options="regionOptions" dense :disabled="countryId === null"
+                    :placeholder="$t('currentAction.filterRegion')" :search-placeholder="$t('currentAction.filterRegion')"
+                    @update:model-value="onRegion" />
+
+                <!-- 🪤 Waits for a country, like the students list. Offering every
+                     venue in the world before one is chosen is a list nobody can
+                     find anything in (owner, 17.09). -->
+                <SearchSelect :model-value="schoolId" :options="schoolOptions" dense remote
+                    :disabled="countryId === null"
+                    :searching="schoolSearching" :total="schoolTotal" @search="(term: string) => loadSchools(term)"
+                    :placeholder="$t('currentAction.filterVenue')" :search-placeholder="$t('currentAction.venue')"
+                    @update:model-value="(v: number | null) => { schoolId = v; load(); }" />
+
+                <!-- 🪤 This narrows the LIST, not the counts. "Past the deadline"
+                     already has its own number, and making the switch move the
+                     counts would set the two tiles equal and mean nothing. -->
+                <label class="flex items-center gap-2 text-sm text-gray-700">
+                    <input v-model="onlyOverdue" type="checkbox" class="rounded border-gray-300" @change="load" />
+                    {{ $t('currentAction.onlyOverdue') }}
+                </label>
             </div>
         </div>
 

@@ -87,12 +87,24 @@ export interface CurrentAction {
         venues: number;
         recent_minutes: number;
     };
-    by_exam: { test_id: number; test: string; n: number }[];
     rows: CurrentActionRow[];
 }
 
-export function currentAction(q?: string) {
-    return http.get<{ data: CurrentAction }>('/api/monitoring/current-action', {
-        params: q ? { q } : {},
+export interface CurrentActionParams {
+    q?: string;
+    country_id?: number | null;
+    region_id?: number | null;
+    school_id?: number | null;
+    /** Only the ones already out of time — the click behind the red count. */
+    overdue?: boolean;
+}
+
+export function currentAction(params: CurrentActionParams = {}) {
+    const clean: Record<string, string | number> = {};
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== null && v !== undefined && v !== '' && v !== false) {
+            clean[k] = v === true ? 1 : (v as string | number);
+        }
     });
+    return http.get<{ data: CurrentAction }>('/api/monitoring/current-action', { params: clean });
 }

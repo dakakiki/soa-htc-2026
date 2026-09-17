@@ -50,9 +50,9 @@ class CurrentActionTest extends TestCase
         ];
     }
 
-    private function sitting(array $c, string $status, ?\DateTimeInterface $expires = null, ?string $name = null): Attempt
+    private function sitting(array $c, string $status, ?\DateTimeInterface $expires = null, ?string $name = null, ?School $school = null): Attempt
     {
-        $school = School::firstOrFail();
+        $school ??= School::firstOrFail();
         $this->seq++;
         $reg = Registration::create([
             'season_id' => Season::where('round_number', 14)->value('id'),
@@ -127,19 +127,48 @@ class CurrentActionTest extends TestCase
             ->assertJsonPath('data.counts.submitted_recently', 0);
     }
 
-    public function test_the_breakdown_names_the_tests_being_sat(): void
+    /**
+     * \U0001F534 The counts follow the filters, they do not stay global.
+     *
+     * A number above a list it does not describe is the exact mistake this
+     * application was caught making three times over on the same day. Narrowed to
+     * one venue, "sitting now" has to mean that venue.
+     */
+    public function test_the_filters_narrow_the_counts_and_not_only_the_list(): void
     {
-        $busy = $this->content('Busy');
-        $quiet = $this->content('Quiet');
-        $this->sitting($busy, 'in_progress');
-        $this->sitting($busy, 'in_progress');
-        $this->sitting($quiet, 'in_progress');
+        $c = $this->content('Scoped');
+        $mine = School::firstOrFail();
+        $theirs = School::where('id', '!=', $mine->id)->firstOrFail();
 
-        $byExam = $this->actingAs($this->admin())
-            ->getJson('/api/monitoring/current-action')->assertOk()->json('data.by_exam');
+        $this->sitting($c, 'in_progress', null, null, $mine);
+        $this->sitting($c, 'in_progress', null, null, $mine);
+        $this->sitting($c, 'in_progress', null, null, $theirs);
 
-        $this->assertSame('BusyT', $byExam[0]['test']);
-        $this->assertSame(2, $byExam[0]['n']);
+        $all = $this->actingAs($this->admin())
+            ->getJson('/api/monitoring/current-action')->assertOk()->json('data');
+        $this->assertSame(3, $all['counts']['running']);
+        $this->assertCount(3, $all['rows']);
+
+        $one = $this->actingAs($this->admin())
+            ->getJson('/api/monitoring/current-action?school_id='.$mine->id)->assertOk()->json('data');
+
+        $this->assertSame(2, $one['counts']['running'], 'The count has to describe the list under it.');
+        $this->assertCount(2, $one['rows']);
+        $this->assertSame(1, $one['counts']['venues']);
+    }
+
+    /** The red count is an alarm; this is the click that shows who it is about. */
+    public function test_it_can_show_only_the_ones_that_ran_out(): void
+    {
+        $c = $this->content('OnlyOverdue');
+        $this->sitting($c, 'in_progress', now()->addMinutes(20));
+        $this->sitting($c, 'in_progress', now()->subMinutes(5));
+
+        $rows = $this->actingAs($this->admin())
+            ->getJson('/api/monitoring/current-action?overdue=1')->assertOk()->json('data.rows');
+
+        $this->assertCount(1, $rows);
+        $this->assertTrue($rows[0]['overdue']);
     }
 
     /** The call that actually comes in is "competitor X has a problem". */

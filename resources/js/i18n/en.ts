@@ -1872,7 +1872,11 @@ export default {
         // competitor still working when it means the opposite.
         overdueNote: 'open but out of time \u2014 a closed browser waiting to be finalised',
         venues: 'Venues in use',
-        byTest: 'Being sat right now',
+        filterCountry: 'Country…',
+        filterRegion: 'Region…',
+        filterVenue: 'Venue…',
+        onlyOverdue: 'Only out of time',
+        scopeAll: 'every venue',
         left: 'Left',
         competitor: 'Student ID',
         name: 'Name',

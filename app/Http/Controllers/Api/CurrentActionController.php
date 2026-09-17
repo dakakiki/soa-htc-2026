@@ -7,11 +7,11 @@ namespace App\Http\Controllers\Api;
 use App\Console\Commands\FinalizeExpiredAttempts;
 use App\Domain\Competition\Models\Attempt;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Monitoring → Current action: who is sitting an exam right now.
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  * busiest minute carried 6.607 results — around 110 a second — and a page that
  * is a list of rows is unreadable at that rate: a row is gone before it can be
  * read. So the counts come first and the list second, capped, with the ones
- * closest to their deadline at the top.
+ * closest to their deadline at the top — and the filters narrow both.
  *
  * 🪤 An attempt past its deadline but still `in_progress` is not somebody
  * working. It is a browser that was closed or a connection that dropped, waiting
@@ -48,56 +48,49 @@ class CurrentActionController extends Controller
         $now = now();
         $deadline = $now->copy()->subSeconds(Attempt::SUBMIT_GRACE_SECONDS);
 
-        // Qualified: the venues count joins `registrations`, which has a `status` too.
-        $open = fn () => Attempt::query()->where('attempts.status', 'in_progress');
-
-        $running = (clone $open())->where('attempts.expires_at', '>=', $deadline);
-        $overdue = (clone $open())->where('attempts.expires_at', '<', $deadline);
+        /*
+         * \U0001F534 The filters drive the counts as well as the list. A number above a
+         * list it does not describe is the exact mistake this application was
+         * caught making three times over on 2026-09-17 — narrowed to one venue,
+         * "sitting now" has to mean that venue.
+         */
+        $open = fn () => $this->scoped($request);
 
         return response()->json(['data' => [
             'as_of' => $now->toIso8601String(),
             'counts' => [
-                'running' => (clone $running)->count(),
-                'overdue' => (clone $overdue)->count(),
-                'submitted_recently' => Attempt::query()
+                'running' => $open()->where('attempts.expires_at', '>=', $deadline)->count(),
+                'overdue' => $open()->where('attempts.expires_at', '<', $deadline)->count(),
+                'submitted_recently' => $this->scoped($request, open: false)
                     ->where('attempts.status', '!=', 'void')
                     ->where('attempts.submitted_at', '>=', $now->copy()->subMinutes(self::RECENT_MINUTES))
                     ->count(),
-                'venues' => (clone $open())
-                    ->join('registrations as r', 'r.id', '=', 'attempts.registration_id')
-                    ->distinct()
-                    ->count('r.school_id'),
+                'venues' => $open()->distinct()->count('r.school_id'),
                 'recent_minutes' => self::RECENT_MINUTES,
             ],
-            'by_exam' => $this->byExam(),
             'rows' => $this->rows($request, $deadline),
         ]]);
     }
 
     /**
-     * Open attempts grouped by the test they are on, busiest first.
+     * Attempts inside the chosen population.
      *
-     * This is the part that stays readable when the list cannot: during a real
-     * exam almost every open attempt belongs to a handful of tests, and knowing
-     * which of them is carrying the weight is the useful thing.
+     * The joins are always there rather than added when a filter is set: the
+     * venue count needs `registrations` anyway, and one shape is easier to read
+     * than two that differ by which filter happens to be on.
      *
-     * @return list<array<string, mixed>>
+     * @return Builder<Attempt>
      */
-    private function byExam(): array
+    private function scoped(Request $request, bool $open = true)
     {
-        return DB::table('attempts')
-            ->join('tests as t', 't.id', '=', 'attempts.test_id')
-            ->where('attempts.status', 'in_progress')
-            ->groupBy('t.id', 't.title')
-            ->orderByDesc(DB::raw('count(*)'))
-            ->limit(20)
-            ->get(['t.id as test_id', 't.title as test', DB::raw('count(*) as n')])
-            ->map(fn (object $r): array => [
-                'test_id' => (int) $r->test_id,
-                'test' => $r->test,
-                'n' => (int) $r->n,
-            ])
-            ->all();
+        return Attempt::query()
+            ->join('registrations as r', 'r.id', '=', 'attempts.registration_id')
+            ->leftJoin('schools as s', 's.id', '=', 'r.school_id')
+            ->when($open, fn ($q) => $q->where('attempts.status', 'in_progress'))
+            ->when($request->integer('country_id') > 0, fn ($q) => $q->where('r.country_id', $request->integer('country_id')))
+            // Region lives on the venue, not on the registration.
+            ->when($request->integer('region_id') > 0, fn ($q) => $q->where('s.region_id', $request->integer('region_id')))
+            ->when($request->integer('school_id') > 0, fn ($q) => $q->where('r.school_id', $request->integer('school_id')));
     }
 
     /**
@@ -111,12 +104,11 @@ class CurrentActionController extends Controller
      */
     private function rows(Request $request, Carbon $deadline): array
     {
-        return Attempt::query()
-            ->where('attempts.status', 'in_progress')
-            ->join('registrations as r', 'r.id', '=', 'attempts.registration_id')
+        return $this->scoped($request)
             ->leftJoin('countries as c', 'c.id', '=', 'r.country_id')
-            ->leftJoin('schools as s', 's.id', '=', 'r.school_id')
             ->leftJoin('difficulty_levels as dl', 'dl.id', '=', 'r.difficulty_level_id')
+            // The red count is an alarm; this is the click that shows who it is about.
+            ->when($request->boolean('overdue'), fn ($q) => $q->where('attempts.expires_at', '<', $deadline))
             ->leftJoin('tests as t', 't.id', '=', 'attempts.test_id')
             ->leftJoin('quizzes as qz', 'qz.id', '=', 'attempts.quiz_id')
             // One box for the call that actually comes in: "competitor X has a problem".
