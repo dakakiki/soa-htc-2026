@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Audit\Support;
 
 use App\Domain\Audit\Models\AuditLog;
+use App\Domain\Competition\Models\Registration;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\SeasonUserAssignment;
 use App\Models\User;
@@ -15,10 +16,15 @@ use Illuminate\Database\Eloquent\Model;
  *
  * The trail is deliberately narrow. What it records is the AUTHORITY surface —
  * roles, permissions, season assignments, accounts — plus the season rollover
- * that was already here. What it does NOT record is the competition itself:
- * fifty thousand competitors identifying, starting and handing in would bury
- * everything above in noise, and `attempts`, `attempt_answers` and
- * `student_sessions` already say all of it better.
+ * that was already here, plus what STAFF do to a competitor's registration
+ * (ADR-0110). What it does NOT record is the competition itself: fifty thousand
+ * competitors identifying, starting and handing in would bury everything above
+ * in noise, and `attempts`, `attempt_answers` and `student_sessions` already say
+ * all of it better.
+ *
+ * \U0001FAA4 The registration is the line between the two, and it falls on this side:
+ * a child does not write to this trail, a coordinator does. Adding, editing and
+ * deleting a registration is administration, not competing.
  *
  * It also stays out of the way of the trails that already exist for their own
  * subjects — a voided attempt is in `attempt_resets` with its reason, a corrected
@@ -93,6 +99,67 @@ final class AuditTrail
             'ip_address' => request()?->ip(),
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * A bulk file flow: an import, an attendance update, an export.
+     *
+     * No subject, because there is no single row it happened to — and no
+     * contents either. Owner, 2026-09-17: *"kod akcija export import i sl. necemo
+     * beleziti sta je exportovao. samo da je uradio tu akciju"*. An import
+     * touches a hundred thousand rows; writing them down one by one would bury
+     * the trail they are being written into, and the file itself is the record of
+     * what was in it.
+     *
+     * @param  array<string, mixed>  $summary
+     */
+    public static function recordBulk(string $action, array $summary): void
+    {
+        $actor = auth()->user();
+
+        AuditLog::create([
+            'actor_id' => $actor?->getAuthIdentifier(),
+            'actor_label' => $actor?->name,
+            'action' => $action,
+            'after' => $summary,
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
+    }
+
+    /**
+     * What a registration is, in the terms somebody reading this in a year would
+     * need: the competitor number that identifies it, and the fields staff can
+     * actually change.
+     *
+     * 🔴 Names and dates of birth: this table is NOT wiped at the rollover, so
+     * they outlive the season. That is deliberate and it is not a new kind of
+     * retention — `archive_registrations` already keeps the name and the number
+     * for every past round. Without them a deletion reads "number 14000669 was
+     * removed", which answers nothing about who lost their place.
+     *
+     * 🪤 Venue, country and level as TEXT, not ids. An id means nothing to a
+     * reader and points at a row that may itself be gone by the time anybody
+     * looks — the results archive keeps them as text for the same reason.
+     *
+     * @return array<string, mixed>
+     */
+    public static function forRegistration(Registration $registration): array
+    {
+        $registration->loadMissing(['school', 'country', 'level']);
+
+        return [
+            'competitor_number' => $registration->competitor_number,
+            'name' => $registration->name,
+            'date_of_birth' => $registration->date_of_birth,
+            'grade' => $registration->grade,
+            'venue' => $registration->school?->name,
+            'school' => $registration->school_external,
+            'country' => $registration->country?->name,
+            'level' => $registration->level?->level_short,
+            'status' => $registration->status,
+            'attendance' => $registration->attendance,
+        ];
     }
 
     /**

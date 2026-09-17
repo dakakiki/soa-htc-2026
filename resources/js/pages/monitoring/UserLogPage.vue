@@ -7,10 +7,10 @@
  * sign-ins at all — the trail covered who was GRANTED authority and never who
  * used it.
  *
- * 🪤 What it does NOT yet cover: adding, editing or deleting a student, and the
- * bulk file flows. Those are not written to the trail at all, so an absent row
- * means "not recorded", never "did not happen". Say so when somebody reads this
- * screen looking for a deletion.
+ * 🪤 What it does NOT cover: the competition itself. A child identifying,
+ * starting or handing in is not here and must not be — fifty thousand of those
+ * would bury the handful of lines this screen is for, and `attempts` and
+ * `student_sessions` already carry that side (ADR-0110).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';

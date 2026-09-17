@@ -1866,7 +1866,7 @@ export default {
         // \U0001FAA4 Says what is NOT here. An absent row means "not recorded", never
         // "did not happen", and somebody reading this screen after a deletion
         // needs to know that before concluding anything.
-        subtitle: 'Sign-ins, sign-outs, failed attempts, and changes to roles, accounts and assignments. Adding, editing and deleting students is not recorded yet.',
+        subtitle: 'Sign-ins, sign-outs and failed attempts; changes to roles, accounts and assignments; and what staff do to a student. Imports and exports record that they happened, not what was in them.',
         total: '{n} entries',
         export: 'Export .xlsx',
         when: 'When',

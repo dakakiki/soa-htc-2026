@@ -3750,3 +3750,63 @@ aplikaciju do njega nema puta.
 ⏳ I nosi rok: sve to **nestaje pri prelasku sezone** (`SeasonRollover::WIPE_TABLES`), jer arhiva
 čuva samo konačnu ocenu. Ako istorija pokušaja ikad treba, odluka o arhiviranju ide **pre**
 prelaska — stavka **0** u `NEXT-SESSION.md`.
+
+
+## ADR-0110 — Trag beleži i šta se radi studentu, ali od masovnih tokova samo da su se desili
+
+**Datum:** 2026-09-17 · **Status:** prihvaćeno · **PR #93** · **Dopunjuje:** ADR-0071
+
+> 🔴 **Vlasnik, 17.09:** *„imali smo situaciju da ulaze i rade svasta pa ako postoji opcija da vidimo
+> sa kog koordinatorskog naloga je nek nesto cackao"*
+
+Do ovoga je trag (`audit_logs`, ADR-0071) beležio **ko je dobio ovlašćenje** — role, permisije,
+dodele, naloge — i **nikad ko ga je upotrebio**. Prijave nisu postojale uopšte (rešeno prvo, PR #90),
+a radnje nad studentima nisu postojale ni posle toga.
+
+### Granica koja se pomera, i zašto baš tu
+
+Opis `AuditTrail`-a izričito isključuje **takmičenje**: pedeset hiljada dece koja se identifikuju,
+počinju i predaju zatrpalo bi ono zbog čega trag postoji, a `attempts`, `attempt_answers` i
+`student_sessions` to ionako nose bolje.
+
+🔴 **Registracija pada na drugu stranu te granice, i to je ceo sadržaj ove odluke:** u trag ne piše
+dete — piše **koordinator**. Dodavanje, izmena i brisanje registracije su **administracija**, ne
+takmičenje. Zato ulaze, a sam ispit i dalje ne.
+
+### Šta se beleži
+
+| radnja | zapis |
+| --- | --- |
+| `student.created` | pun snimak posle |
+| `student.updated` | **pre i posle** |
+| `student.deleted` | 🔴 **snimak PRE brisanja** — posle nema šta da se pročita |
+| `students.imported` | fajl · učionica · broj redova · koliko upisano · koliko grešaka |
+| `students.attendance_imported` | fajl · broj redova · koliko izmenjeno · nenađeni · neispravni |
+| `students.exported` | **broj redova i filteri** |
+
+### 🔴 Kod masovnih tokova — samo da se desilo, ne i šta
+
+> **Vlasnik, 17.09:** *„kod akcija export import i sl. necemo beleziti sta je exportovao. samo da je
+> uradio tu akciju"*
+
+Uvoz dira do sto hiljada redova; upisivanje red po red zatrpalo bi trag u koji se upisuje, a sam
+fajl je zapis onoga što je u njemu bilo. Kod izvoza se beleže **broj redova i filteri** — filteri su
+ono što kaže da li je zahvat bio razuman, a imena nikad ne ulaze. Test to i tvrdi: ime i kandidatski
+broj iz izvezene populacije **ne smeju** da se nađu ni u jednoj koloni.
+
+### 🪤 Šta zapis nosi, i šta to znači za trajanje
+
+Snimak registracije nosi **ime i datum rođenja**, kao tekst — ne id-jeve. Id ne znači ništa onome ko
+ovo čita, i pokazuje na red koji je do tada možda i sam obrisan; arhiva rezultata čuva tekst iz istog
+razloga.
+
+⚠️ `audit_logs` se **ne briše pri prelasku sezone** (ADR-0068), pa ti podaci nadžive sezonu. To nije
+nova vrsta čuvanja — `archive_registrations` već trajno čuva ime i kandidatski broj za svaku prošlu
+rundu. Bez imena bi brisanje glasilo „uklonjen broj 14000669", što ne odgovara na pitanje **ko je
+ostao bez mesta**.
+
+### Šta ovo NE radi
+
+⚠️ Trag **ništa ne sprečava**. Vlasnik je to izričito potvrdio kad je postavljeno kao pitanje:
+*„ne treba da spreci... logujemo to sto smo dogovorili"*. Ko je šta smeo ostaje pitanje permisija
+(ADR-0038), i nije predmet ove odluke.

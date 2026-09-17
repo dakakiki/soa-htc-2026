@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Assessment\Support\SampleRound;
+use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Support\AttendanceImporter;
@@ -69,6 +70,16 @@ class RegistrationController extends Controller
         $ids = $query->pluck('registrations.id')->all();
 
         [$headers, $rows] = RegistrationExporter::export($ids);
+
+        // How many rows left the building and under which filters — not who was in
+        // them. The filters are what says whether the reach was reasonable.
+        AuditTrail::recordBulk('students.exported', [
+            'rows' => count($ids),
+            'filters' => array_filter($request->only([
+                'search', 'country_id', 'region_id', 'school_id', 'level_id',
+                'grade', 'exam_round_id', 'status', 'attendance', 'missing',
+            ]), fn ($v): bool => $v !== null && $v !== ''),
+        ]);
 
         $filename = now()->format('Y-m-d').'_Students_Export.xlsx';
 
@@ -281,6 +292,16 @@ class RegistrationController extends Controller
 
         $summary = RegistrationImporter::import($schoolId, (int) $validated['category_id'], $rows);
 
+        // That it happened, how much of it landed, and which file it came from —
+        // never the rows themselves (owner, 2026-09-17).
+        AuditTrail::recordBulk('students.imported', [
+            'file' => $validated['file']->getClientOriginalName(),
+            'venue_id' => $schoolId,
+            'rows' => count($rows),
+            'created' => $summary['created'] ?? null,
+            'errors' => $summary['error_count'] ?? null,
+        ]);
+
         return response()->json($summary, $summary['error_count'] === 0 ? 200 : 422);
     }
 
@@ -347,6 +368,14 @@ class RegistrationController extends Controller
         }
 
         $summary = AttendanceImporter::import($rows, $request->user()->allowedSchoolIds());
+
+        AuditTrail::recordBulk('students.attendance_imported', [
+            'file' => $validated['file']->getClientOriginalName(),
+            'rows' => count($rows),
+            'updated' => $summary['updated'] ?? null,
+            'not_found' => $summary['not_found'] ?? null,
+            'invalid' => $summary['invalid'] ?? null,
+        ]);
 
         return response()->json($summary);
     }
@@ -544,6 +573,8 @@ class RegistrationController extends Controller
 
         $registration = $this->createWithNumber($request->validated());
 
+        AuditTrail::record('student.created', $registration, after: AuditTrail::forRegistration($registration));
+
         return RegistrationResource::make($registration->load(['school', 'country', 'level']))
             ->response()->setStatusCode(201);
     }
@@ -552,12 +583,21 @@ class RegistrationController extends Controller
     {
         $this->authorize('update', $registration);
 
+        $before = AuditTrail::forRegistration($registration);
+
         $data = $request->validated();
         // Country stays derived from the school.
         if (isset($data['school_id'])) {
             $data['country_id'] = School::whereKey($data['school_id'])->value('country_id');
         }
         $registration->update($data);
+
+        AuditTrail::record(
+            'student.updated',
+            $registration,
+            $before,
+            AuditTrail::forRegistration($registration->refresh()),
+        );
 
         return RegistrationResource::make($registration->load(['school', 'country', 'level']));
     }
@@ -566,7 +606,13 @@ class RegistrationController extends Controller
     {
         $this->authorize('delete', $registration);
 
+        // Snapshotted BEFORE the delete: afterwards there is nothing left to read,
+        // and "who lost their place" is the whole question a deletion raises.
+        $before = AuditTrail::forRegistration($registration);
+
         $registration->delete();
+
+        AuditTrail::record('student.deleted', $registration, before: $before);
 
         return response()->noContent();
     }
