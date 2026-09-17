@@ -106,8 +106,8 @@ const countryOptions = computed<SearchSelectOption[]>(() => countries.value.map(
 const regionOptions = computed<SearchSelectOption[]>(() => regions.value.map((r) => ({ id: r.id, label: r.name })));
 const schoolOptions = computed<SearchSelectOption[]>(() => schools.value.map((s) => ({ id: s.id, label: s.name, sub: s.city })));
 
-// Fixed columns (7) + result columns + Results icon + Actions, for the empty row.
-const FIXED_COLS = 7;
+// Fixed columns (8) + result columns + Results icon + Actions, for the empty row.
+const FIXED_COLS = 8;
 const totalCols = computed(
     () => FIXED_COLS + resultCols.value.reduce((n, c) => n + (c.types.length ? c.types.length + 1 : 1), 0) + 2,
 );
@@ -445,6 +445,7 @@ onMounted(async () => {
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.dobCol') }}</th>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.country') }}</th>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.venue') }}</th>
+                        <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-gray-500">{{ $t('registration.school') }}</th>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-center text-gray-500">{{ $t('registration.grade') }}</th>
                         <th rowspan="2" class="bg-gray-50 px-4 py-2 align-bottom text-center text-gray-500">{{ $t('registration.diffCat') }}</th>
                         <template v-for="col in resultCols" :key="col.round_id">
@@ -476,6 +477,7 @@ onMounted(async () => {
                         <td class="whitespace-nowrap px-4 py-3 text-gray-600">{{ fmtDob(x.date_of_birth) }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ x.country?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ x.school?.name ?? $t('common.dash') }}</td>
+                        <td class="max-w-xs truncate px-4 py-3 text-gray-600">{{ x.school_external || $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ x.grade ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ x.level?.level_short ?? $t('common.dash') }}</td>
                         <template v-for="col in resultCols" :key="col.round_id">

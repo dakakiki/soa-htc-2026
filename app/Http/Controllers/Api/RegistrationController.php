@@ -36,7 +36,7 @@ class RegistrationController extends Controller
     {
         $this->authorize('viewAny', Registration::class);
 
-        $query = Registration::query()->with(['school', 'country', 'level'])->latest('id');
+        $query = Registration::query()->with(['school', 'country', 'level'])->orderBy('competitor_number');
         $this->applyFilters($query, $request);
 
         $perPage = min(max($request->integer('per_page', 20), 1), 200);
