@@ -1888,7 +1888,7 @@ export default {
         refresh: 'Refresh now',
         searchPlaceholder: 'Student ID or name\u2026',
         empty: 'Nobody is sitting an exam right now.',
-        capped: 'The closest 100 to their deadline are listed; the counts above cover the rest.',
+        capped: 'Showing the {shown} closest to their deadline, of {total}. Narrow by venue, or search for one competitor \u2014 the counts above cover them all.',
     },
     userLog: {
         title: 'User log',
@@ -1915,6 +1915,7 @@ export default {
         empty: 'Nothing recorded for these filters.',
         page: 'Page {page} of {last}',
         anyOption: 'All',
+        exportCapped: 'The export stops at {n} rows \u2014 narrow the filters first.',
     },
     reports: {
         title: 'Reports',

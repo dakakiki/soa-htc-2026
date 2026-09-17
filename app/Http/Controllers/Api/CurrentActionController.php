@@ -69,6 +69,21 @@ class CurrentActionController extends Controller
                 'recent_minutes' => self::RECENT_MINUTES,
             ],
             'rows' => $this->rows($request, $deadline),
+            /*
+             * How many the list would have had. A cap nobody is told about reads
+             * as "these are all of them" — at 1.340 sitting, a hundred rows with
+             * nothing saying so is a lie of omission.
+             */
+            'rows_total' => $this->scoped($request)
+                ->when($request->boolean('overdue'), fn ($q) => $q->where('attempts.expires_at', '<', $deadline))
+                ->when($request->filled('q'), function ($query) use ($request): void {
+                    $term = '%'.$request->string('q')->toString().'%';
+                    $query->where(function ($w) use ($term): void {
+                        $w->where('r.competitor_number', 'like', $term)->orWhere('r.name', 'like', $term);
+                    });
+                })
+                ->count(),
+            'rows_cap' => self::LIST_CAP,
         ]]);
     }
 
