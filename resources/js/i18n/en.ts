@@ -1892,15 +1892,15 @@ export default {
         totals: 'Totals',
         rates: 'Rates',
         rateParticipation: 'Participation',
-        rateParticipationHint: 'Competitors who started / Registered',
+        rateParticipationHint: 'Took part / Registered',
         rateCompletion: 'Completion',
-        rateCompletionHint: 'Submitted / Started',
+        rateCompletionHint: 'Submitted / Took part, both competitors',
         ratePublish: 'Publish rate',
-        ratePublishHint: 'Published / Submitted',
+        ratePublishHint: 'Published / Submitted, both competitors',
         funnel: 'Participation funnel',
         // 🪤 The funnel widens, and the reason is the units: Registered counts
         // children, the three bars after it count attempts (ADR-0085).
-        funnelNote: 'Registered counts competitors; Started, Submitted and Published count attempts — a competitor sits several tests, so those bars can pass 100%. For competitors rather than attempts, see “Took part” above and the breakdown table below.',
+        funnelNote: 'Every stage counts competitors, so each is a subset of the one before it. How many attempts those competitors made is under the tiles above.',
         heatmap: 'Heatmap — average score',
         heatRows: 'Rows',
         heatCols: 'Columns',
@@ -1914,6 +1914,16 @@ export default {
         started: 'Started',
         submitted: 'Submitted',
         publishedMeasure: 'Published',
+        voidMeasure: 'Reset',
+        // The one tile that counts attempts, so it says so itself.
+        voidNote: 'attempts an administrator reset',
+        // Under the tiles that count children: how much work those children did.
+        attemptsCount: '{attempts} attempts',
+        attemptsPer: '{per} per competitor',
+        // Took part and Started are the same question asked twice \u2014 an attempt
+        // exists because a competitor started it. Said once, under Started.
+        startedSame: 'the same competitors as Took part',
+        submittedOpen: 'below Took part only while an exam is still running',
         void: 'Void',
         scoreHeading: 'Scores',
         scoreAvg: 'Avg',
