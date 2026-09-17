@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
+use App\Domain\Assessment\Support\SampleRound;
+use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Competition\Support\AttendanceImporter;
 use App\Domain\Competition\Support\AttendanceReport;
@@ -440,6 +442,50 @@ class RegistrationController extends Controller
         $this->authorize('view', $registration);
 
         return response()->json(['data' => RegistrationResults::detail($registration->id)]);
+    }
+
+    /**
+     * Every exam this competitor has sat, split into the two populations the
+     * results side is keyed on: contest first, practice second. Void attempts are
+     * left out — a reset attempt is gone as far as the screen is concerned, and
+     * its record lives in `attempt_resets` (ADR-0022).
+     *
+     * 🪤 The split is the ROUND's `is_sample` via {@see SampleRound}, never the
+     * attempt's own `is_practice` stamp nor the quiz's type. The three agree on
+     * today's data and are answers to different questions (ADR-0084).
+     */
+    public function attempts(Registration $registration): JsonResponse
+    {
+        $this->authorize('view', $registration);
+
+        $sampleTestIds = SampleRound::testIds()->pluck('test_id')
+            ->map(fn ($id): int => (int) $id)->all();
+
+        $rows = Attempt::query()
+            ->where('registration_id', $registration->id)
+            ->active()
+            ->with(['test:id,title', 'quiz:id,title'])
+            ->orderByDesc('started_at')
+            ->get()
+            ->map(fn (Attempt $a): array => [
+                'id' => $a->id,
+                'test_id' => $a->test_id,
+                'test_title' => $a->test?->title,
+                'quiz_title' => $a->quiz?->title,
+                'status' => $a->status->value,
+                'grading_status' => $a->grading_status?->value,
+                'score' => $a->score,
+                'max_score' => $a->max_score,
+                'started_at' => $a->started_at?->toIso8601String(),
+                'submitted_at' => $a->submitted_at?->toIso8601String(),
+                'published_at' => $a->published_at?->toIso8601String(),
+                'is_sample' => in_array((int) $a->test_id, $sampleTestIds, true),
+            ]);
+
+        return response()->json(['data' => [
+            'competition' => $rows->where('is_sample', false)->values(),
+            'sample' => $rows->where('is_sample', true)->values(),
+        ]]);
     }
 
     public function show(Registration $registration): RegistrationResource

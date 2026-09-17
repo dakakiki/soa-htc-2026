@@ -92,6 +92,15 @@ export function resetCandidates(scope: ResetScope) {
     return http.get<ResetSummaryResponse>('/api/results/reset-candidates', { params: cleanParams(scope) });
 }
 
+/**
+ * Take one attempt back so the competitor can sit that exam again. The attempt
+ * is voided rather than removed: it leaves the results, and `attempt_resets`
+ * keeps what it was and who reset it (ADR-0022).
+ */
+export function resetAttempt(attemptId: number, reason: string) {
+    return http.post<{ status: string }>(`/api/results/attempts/${attemptId}/reset`, { reason });
+}
+
 export function bulkReset(payload: ResetTarget & { reason: string }) {
     return http.post<{ voided: number; students: number }>('/api/results/attempts/bulk-reset', cleanParams(payload));
 }

@@ -12,6 +12,7 @@ import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import ButtonGroup from '@/components/ButtonGroup.vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import LockedField from '@/components/LockedField.vue';
+import StudentAttemptsPanel from '@/components/StudentAttemptsPanel.vue';
 import { useScope } from '@/composables/useScope';
 import type { Country, LevelOption, School } from '@/types/models';
 
@@ -278,5 +279,8 @@ onMounted(async () => {
                 </div>
             </form>
         </div>
+
+        <!-- Only once the student exists: there is nothing to list while creating one. -->
+        <StudentAttemptsPanel v-if="isEdit && !loading" :registration-id="id" />
     </section>
 </template>
