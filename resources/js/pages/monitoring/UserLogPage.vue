@@ -123,15 +123,22 @@ const hasPayload = (r: UserLogEntry): boolean => r.before !== null || r.after !=
 
 <template>
     <section class="flex flex-col gap-6">
-        <div class="flex flex-wrap items-center gap-3">
-            <h1 class="text-2xl font-semibold tracking-tight">{{ $t('userLog.title') }}</h1>
-            <span v-if="!loading" class="text-sm text-gray-500">{{ $t('userLog.total', { n: total.toLocaleString() }) }}</span>
-            <ExportButton class="ml-auto" :loading="exporting" :label="$t('userLog.export')" @click="download" />
-        </div>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ $t('userLog.title') }}</h1>
 
         <p class="-mt-4 text-sm text-gray-500">{{ $t('userLog.subtitle') }}</p>
 
         <div class="rounded-lg border border-gray-200 bg-white p-4">
+            <!-- What the filters currently match on the left, what to do with it on
+                 the right, both above the fields they belong to (owner, 17.09). -->
+            <div class="mb-3 flex flex-wrap items-center gap-3">
+                <span class="text-sm text-gray-500">{{ loading ? '' : $t('userLog.total', { n: total.toLocaleString() }) }}</span>
+                <!-- 🪤 The button sits in its own box: ExportButton does not pass a
+                     class through to anything the flex row can push around. -->
+                <div class="ml-auto">
+                    <ExportButton :loading="exporting" :label="$t('userLog.export')" @click="download" />
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <label class="block">
                     <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('userLog.who') }}</span>
