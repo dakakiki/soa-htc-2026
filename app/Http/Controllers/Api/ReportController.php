@@ -262,7 +262,12 @@ class ReportController extends Controller
                 .'<table width="100%" cellspacing="0" cellpadding="0" style="border:0.6pt solid #e5e7eb;font-size:8pt;"><thead>'.$head.'</thead><tbody>'.$rows.'</tbody></table>';
         }
 
-        $scoreLine = 'Avg: <b>'.($s['avg'] ?? '—').'</b> &nbsp; Min: <b>'.($s['min'] ?? '—').'</b> &nbsp; Max: <b>'.($s['max'] ?? '—').'</b> &nbsp; Median: <b>'.($s['median'] ?? '—').'</b> &nbsp; Scored: '.$s['count'];
+        // Scores only when the scope is one test: tests are marked on different
+        // scales and `max_score` is not recorded, so a combined average has no
+        // unit and nothing to be compared against (owner, 17.09).
+        $scoreLine = ($f['test_id'] ?? null)
+            ? 'Avg: <b>'.($s['avg'] ?? '—').'</b> &nbsp; Min: <b>'.($s['min'] ?? '—').'</b> &nbsp; Max: <b>'.($s['max'] ?? '—').'</b> &nbsp; Median: <b>'.($s['median'] ?? '—').'</b> &nbsp; Scored: '.$s['count']
+            : 'Scores show when a single test is chosen. This scope covers several tests, marked on different scales, so one average of them has no unit.';
 
         $heatmap = $matrix !== null ? $this->heatmapHtml($matrix, $brand) : '';
 
