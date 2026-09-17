@@ -126,8 +126,13 @@ onMounted(load);
                     <table class="w-full text-sm">
                         <thead class="bg-brand-primary text-left text-xs uppercase tracking-wide text-brand-on-primary">
                             <tr>
-                                <th class="w-full px-4 py-2">{{ $t('registration.attempts.colTest') }}</th>
-                                <th class="whitespace-nowrap px-4 py-2">{{ $t('registration.attempts.colQuiz') }}</th>
+                                <!-- No width forced on the three name columns: the
+                                     table shares what it has by content, which keeps
+                                     "Hippo 5- S4 2026 (CEFR B2)" on one or two lines
+                                     instead of stacking it a word per row. -->
+                                <th class="px-4 py-2">{{ $t('registration.attempts.colQuiz') }}</th>
+                                <th class="px-4 py-2">{{ $t('registration.attempts.colExam') }}</th>
+                                <th class="px-4 py-2">{{ $t('registration.attempts.colTest') }}</th>
                                 <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('registration.attempts.colDate') }}</th>
                                 <th class="whitespace-nowrap px-4 py-2 text-center">{{ $t('registration.attempts.colScore') }}</th>
                                 <th class="px-4 py-2"></th>
@@ -135,8 +140,9 @@ onMounted(load);
                         </thead>
                         <tbody>
                             <tr v-for="a in group.rows" :key="a.id" class="odd:bg-white even:bg-gray-100 hover:bg-brand-primary-soft">
+                                <td class="px-4 py-2 text-gray-600">{{ a.quiz_title ?? $t('common.dash') }}</td>
+                                <td class="px-4 py-2 text-gray-600">{{ a.exam_title ?? $t('common.dash') }}</td>
                                 <td class="px-4 py-2">{{ a.test_title ?? $t('common.dash') }}</td>
-                                <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.quiz_title ?? $t('common.dash') }}</td>
                                 <td class="whitespace-nowrap px-4 py-2 text-center text-gray-600">{{ fmtDate(a.submitted_at ?? a.started_at) }}</td>
                                 <td class="whitespace-nowrap px-4 py-2 text-center tabular-nums text-gray-700">{{ fmtScore(a) }}</td>
                                 <td class="px-4 py-2">

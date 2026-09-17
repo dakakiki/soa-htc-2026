@@ -114,8 +114,14 @@ class StudentAttemptsPanelTest extends TestCase
         $res->assertOk()
             ->assertJsonCount(1, 'data.competition')
             ->assertJsonCount(1, 'data.sample')
+            ->assertJsonPath('data.competition.0.quiz_title', 'ContestQ')
+            // The attempt records quiz and test; the exam between them is recovered
+            // from the two pivots, so it is worth asserting rather than assuming.
+            ->assertJsonPath('data.competition.0.exam_title', 'ContestE')
             ->assertJsonPath('data.competition.0.test_title', 'ContestT')
             ->assertJsonPath('data.competition.0.is_sample', false)
+            ->assertJsonPath('data.sample.0.quiz_title', 'PracticeQ')
+            ->assertJsonPath('data.sample.0.exam_title', 'PracticeE')
             ->assertJsonPath('data.sample.0.test_title', 'PracticeT')
             ->assertJsonPath('data.sample.0.is_sample', true);
     }

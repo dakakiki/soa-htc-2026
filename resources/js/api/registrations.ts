@@ -36,8 +36,9 @@ export function listRegistrations(params: RegistrationListParams = {}) {
 export interface StudentAttempt {
     id: number;
     test_id: number | null;
-    test_title: string | null;
     quiz_title: string | null;
+    exam_title: string | null;
+    test_title: string | null;
     status: string;
     grading_status: string | null;
     score: string | null;

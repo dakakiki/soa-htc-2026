@@ -28,6 +28,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -461,31 +462,73 @@ class RegistrationController extends Controller
         $sampleTestIds = SampleRound::testIds()->pluck('test_id')
             ->map(fn ($id): int => (int) $id)->all();
 
-        $rows = Attempt::query()
+        $attempts = Attempt::query()
             ->where('registration_id', $registration->id)
             ->active()
             ->with(['test:id,title', 'quiz:id,title'])
             ->orderByDesc('started_at')
-            ->get()
-            ->map(fn (Attempt $a): array => [
-                'id' => $a->id,
-                'test_id' => $a->test_id,
-                'test_title' => $a->test?->title,
-                'quiz_title' => $a->quiz?->title,
-                'status' => $a->status->value,
-                'grading_status' => $a->grading_status?->value,
-                'score' => $a->score,
-                'max_score' => $a->max_score,
-                'started_at' => $a->started_at?->toIso8601String(),
-                'submitted_at' => $a->submitted_at?->toIso8601String(),
-                'published_at' => $a->published_at?->toIso8601String(),
-                'is_sample' => in_array((int) $a->test_id, $sampleTestIds, true),
-            ]);
+            ->get();
+
+        $examTitles = $this->examTitlesFor($attempts);
+
+        $rows = $attempts->map(fn (Attempt $a): array => [
+            'id' => $a->id,
+            'test_id' => $a->test_id,
+            'quiz_title' => $a->quiz?->title,
+            'exam_title' => $examTitles[$a->quiz_id.':'.$a->test_id] ?? null,
+            'test_title' => $a->test?->title,
+            'status' => $a->status->value,
+            'grading_status' => $a->grading_status?->value,
+            'score' => $a->score,
+            'max_score' => $a->max_score,
+            'started_at' => $a->started_at?->toIso8601String(),
+            'submitted_at' => $a->submitted_at?->toIso8601String(),
+            'published_at' => $a->published_at?->toIso8601String(),
+            'is_sample' => in_array((int) $a->test_id, $sampleTestIds, true),
+        ]);
 
         return response()->json(['data' => [
             'competition' => $rows->where('is_sample', false)->values(),
             'sample' => $rows->where('is_sample', true)->values(),
         ]]);
+    }
+
+    /**
+     * The exam each attempt sat under, keyed "quizId:testId".
+     *
+     * An attempt records the quiz and the test but not the exam between them, so
+     * it is recovered from the two pivots: the exam that belongs to that quiz and
+     * carries that test. A test reused across two exams of one quiz resolves to
+     * the earlier one by the quiz's own ordering, which is the one the competitor
+     * met first.
+     *
+     * @param  Collection<int, Attempt>  $attempts
+     * @return array<string, string>
+     */
+    private function examTitlesFor($attempts): array
+    {
+        $quizIds = $attempts->pluck('quiz_id')->filter()->unique()->all();
+        $testIds = $attempts->pluck('test_id')->filter()->unique()->all();
+
+        if ($quizIds === [] || $testIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('exam_quiz')
+            ->join('exam_test', 'exam_test.exam_id', '=', 'exam_quiz.exam_id')
+            ->join('exams', 'exams.id', '=', 'exam_quiz.exam_id')
+            ->whereIn('exam_quiz.quiz_id', $quizIds)
+            ->whereIn('exam_test.test_id', $testIds)
+            ->orderBy('exam_quiz.position')
+            ->select(['exam_quiz.quiz_id', 'exam_test.test_id', 'exams.title'])
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row->quiz_id.':'.$row->test_id] ??= $row->title;
+        }
+
+        return $map;
     }
 
     public function show(Registration $registration): RegistrationResource
