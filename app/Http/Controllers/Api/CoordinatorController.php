@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\SeasonUserAssignment;
@@ -119,6 +120,14 @@ class CoordinatorController extends Controller
         }
 
         $summary = CoordinatorImporter::import($rows);
+
+        // The act and its size, never the rows (owner, 2026-09-17).
+        AuditTrail::recordBulk('coordinators.imported', [
+            'file' => $validated['file']->getClientOriginalName(),
+            'rows' => count($rows),
+            'created' => $summary['created'] ?? null,
+            'errors' => $summary['error_count'] ?? null,
+        ]);
 
         return response()->json($summary, $summary['error_count'] === 0 ? 200 : 422);
     }
@@ -240,6 +249,8 @@ class CoordinatorController extends Controller
             return $user;
         });
 
+        AuditTrail::record('user.created', $user, after: AuditTrail::forUser($user->refresh()));
+
         return CoordinatorResource::make($this->loadCoordinator($user))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
@@ -264,12 +275,18 @@ class CoordinatorController extends Controller
             $data['file_path'] = $request->file('file_upload')->store('users', 'public');
         }
 
+        // Outside the transaction closure, or it is scoped to it and gone by the
+        // time the trail is written.
+        $before = AuditTrail::forUser($coordinator);
+
         DB::transaction(function () use ($request, $coordinator, $data): void {
             $coordinator->update($data);
             if ($request->filled('role_id')) {
                 $this->syncCoordinator($coordinator, $request->integer('role_id'), $this->schoolIds($request));
             }
         });
+
+        AuditTrail::record('user.updated', $coordinator, $before, AuditTrail::forUser($coordinator->refresh()));
 
         return CoordinatorResource::make($this->loadCoordinator($coordinator));
     }
@@ -310,7 +327,20 @@ class CoordinatorController extends Controller
             }
         }
 
+        /*
+         * \U0001F534 The same action names the Users screen writes, deliberately.
+         *
+         * A coordinator IS a user row; only the screen differs. Two sets of names
+         * for one act would mean "find every account deletion" needed both, and
+         * the trail exists so that question has one answer. Until now this screen
+         * wrote nothing at all, so whether an account left a trace depended on
+         * which screen was used to remove it (ADR-0111).
+         */
+        $before = AuditTrail::forUser($coordinator);
+
         $coordinator->delete();
+
+        AuditTrail::record('user.deleted', $coordinator, before: $before);
 
         return response()->noContent();
     }

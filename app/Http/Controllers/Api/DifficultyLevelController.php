@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Models\DifficultyLevel;
+use App\Domain\Audit\Support\AuditTrail;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDifficultyLevelRequest;
 use App\Http\Requests\UpdateDifficultyLevelRequest;
@@ -39,6 +40,8 @@ class DifficultyLevelController extends Controller
         $level = DifficultyLevel::create($request->validated());
 
         // refresh() pulls DB defaults (e.g. status) into the freshly created model.
+        AuditTrail::record('difficulty_level.created', $level, after: AuditTrail::fields($level->refresh(), 'level_short', 'name', 'difficulty_category_id', 'grades', 'position', 'status'));
+
         return DifficultyLevelResource::make($level->refresh())
             ->response()
             ->setStatusCode(201);
@@ -46,7 +49,16 @@ class DifficultyLevelController extends Controller
 
     public function update(UpdateDifficultyLevelRequest $request, DifficultyLevel $difficultyLevel): DifficultyLevelResource
     {
+        $before = AuditTrail::fields($difficultyLevel, 'level_short', 'name', 'difficulty_category_id', 'grades', 'position', 'status');
+
         $difficultyLevel->update($request->validated());
+
+        AuditTrail::record(
+            'difficulty_level.updated',
+            $difficultyLevel,
+            $before,
+            AuditTrail::fields($difficultyLevel->refresh(), 'level_short', 'name', 'difficulty_category_id', 'grades', 'position', 'status'),
+        );
 
         return DifficultyLevelResource::make($difficultyLevel);
     }
@@ -59,7 +71,12 @@ class DifficultyLevelController extends Controller
     {
         $this->authorize('delete', $difficultyLevel);
 
+        // Before, because afterwards there is nothing left to name.
+        $before = AuditTrail::fields($difficultyLevel, 'level_short', 'name', 'difficulty_category_id', 'grades', 'position', 'status');
+
         $difficultyLevel->delete();
+
+        AuditTrail::record('difficulty_level.deleted', $difficultyLevel, before: $before);
 
         return response()->noContent();
     }

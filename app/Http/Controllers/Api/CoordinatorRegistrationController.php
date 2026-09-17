@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Organization\Enums\CoordinatorRegistrationStatus;
 use App\Domain\Organization\Models\CoordinatorRegistration;
 use App\Domain\Organization\Support\CoordinatorApproval;
@@ -139,6 +140,18 @@ class CoordinatorRegistrationController extends Controller
 
         CoordinatorApproval::approve($registration, $request->user());
 
+        /*
+         * \U0001F534 Also in the trail, not only on the row.
+         *
+         * The row carries `reviewed_by` and the trail normally stays out of the
+         * way of a record that already exists \u2014 but {@see destroy()} deletes a
+         * decided application outright, and `reviewed_by` goes with it. So the row
+         * is not a durable record of who let somebody in; this is (ADR-0111).
+         */
+        AuditTrail::record('coordinator_application.approved', $registration, after: AuditTrail::fields(
+            $registration->refresh(), 'name', 'country_id', 'status', 'approved_user_id',
+        ));
+
         return CoordinatorRegistrationResource::make(
             $registration->refresh()->load(['country:id,name', 'reviewer:id,name']),
         );
@@ -154,6 +167,13 @@ class CoordinatorRegistrationController extends Controller
         ]);
 
         CoordinatorApproval::decline($registration, $request->user(), $validated['reason'] ?? null);
+
+        AuditTrail::record(
+            'coordinator_application.declined',
+            $registration,
+            after: AuditTrail::fields($registration->refresh(), 'name', 'country_id', 'status'),
+            reason: $validated['reason'] ?? null,
+        );
 
         return CoordinatorRegistrationResource::make(
             $registration->refresh()->load(['country:id,name', 'reviewer:id,name']),
@@ -173,8 +193,14 @@ class CoordinatorRegistrationController extends Controller
 
         abort_if($registration->status === CoordinatorRegistrationStatus::Pending, Response::HTTP_UNPROCESSABLE_ENTITY);
 
+        // Snapshotted before it goes: this is the moment `reviewed_by` stops
+        // existing anywhere else.
+        $before = AuditTrail::fields($registration, 'name', 'country_id', 'status', 'reviewed_by', 'reviewed_at');
+
         Storage::disk('local')->delete($registration->document_path);
         $registration->delete();
+
+        AuditTrail::record('coordinator_application.deleted', $registration, before: $before);
 
         return response()->noContent();
     }

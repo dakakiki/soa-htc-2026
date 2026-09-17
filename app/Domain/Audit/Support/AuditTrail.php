@@ -163,6 +163,31 @@ final class AuditTrail
     }
 
     /**
+     * The named fields of a row, for the registers whose shape is just their own
+     * columns: venues, coordinators, difficulty levels and categories.
+     *
+     * Deliberately not a `forVenue()` and a `forLevel()` and a `forCategory()`:
+     * three near-identical methods listing columns say no more than the call site
+     * naming them, and the call site is where somebody looks to see what is kept.
+     *
+     * \U0001FAA4 Name what you want. Handing a whole model over would put whatever a
+     * migration adds next into a table kept for years, including the next column
+     * nobody meant to keep twice.
+     *
+     * @return array<string, mixed>
+     */
+    public static function fields(Model $row, string ...$keys): array
+    {
+        $out = [];
+        foreach ($keys as $key) {
+            $value = $row->getAttribute($key);
+            $out[$key] = $value instanceof \BackedEnum ? $value->value : $value;
+        }
+
+        return $out;
+    }
+
+    /**
      * What a role is, in the only terms worth keeping: its name and the
      * permissions it grants.
      *
