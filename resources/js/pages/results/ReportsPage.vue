@@ -503,7 +503,7 @@ onMounted(async () => {
                     </div>
                 </div>
 
-                <div class="mt-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+                <div v-if="q.test_id" class="mt-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
                     <div class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ $t('reports.scoreHeading') }}</div>
                     <div class="mt-1 flex flex-wrap gap-x-8 gap-y-1 text-sm tabular-nums">
                         <span>{{ $t('reports.scoreAvg') }}: <strong>{{ num(summary.totals.score.avg) }}</strong></span>
@@ -513,6 +513,7 @@ onMounted(async () => {
                         <span class="text-gray-500">{{ $t('reports.scoreCount') }}: {{ summary.totals.score.count }}</span>
                     </div>
                 </div>
+                <p v-else class="mt-3 text-xs text-gray-500">{{ $t('reports.scoreScopeNote') }}</p>
             </div>
 
             <!-- Rates -->

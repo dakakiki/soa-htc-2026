@@ -1926,6 +1926,15 @@ export default {
         submittedOpen: 'below Took part only while an exam is still running',
         void: 'Void',
         scoreHeading: 'Scores',
+        // 🔴 Shown only when the scope is one test. Tests are marked on different
+        // scales — the six biggest contest tests run 0-30, 0-33, 0-35 and 0-37 — and
+        // `max_score` is null on 145.712 of 145.713 contest attempts, so a combined
+        // average cannot even be turned into a percentage. It is one bare number with
+        // nothing to compare it against, unlike the breakdown and the heatmap, whose
+        // cells mix the same tests and are therefore comparable to each other
+        // (owner, 17.09: „to je prosecna ocena za sve ispite / sve studente. nije neki
+        // parametar“).
+        scoreScopeNote: 'Scores show when a single test is chosen. This scope covers several tests, marked on different scales, so one average of them has no unit.',
         scoreAvg: 'Avg',
         scoreMin: 'Min',
         scoreMax: 'Max',
