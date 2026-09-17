@@ -25,6 +25,10 @@ use Tests\TestCase;
  * contest and practice, with the row the administrator can take back so the
  * child sits it again.
  *
+ * 🔴 The panel's row action is the RESET, not the delete: the owner took the
+ * hard delete back on 2026-09-17, having talked the client out of it. The delete
+ * endpoint is kept and still covered below, but nothing in the SPA calls it.
+ *
  * The split is the ROUND's `is_sample` (ADR-0084) — the test proves that by
  * putting the two tests in rounds that disagree with nothing else, so a future
  * copy of the rule keyed on the quiz type or on `attempts.is_practice` fails

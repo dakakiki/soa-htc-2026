@@ -3560,7 +3560,12 @@ objašnjenje.**
 
 ## ADR-0106 — Brisanje rezultata je brisanje, i objavljena ocena ide sa njim
 
-**Datum:** 2026-09-17 · **Status:** prihvaćeno · **PR #82**
+**Datum:** 2026-09-17 · **Status:** ⚠️ **povučeno za student stranu istog dana — vidi ADR-0109** · **PR #82**
+
+> 🔴 **Čitaj uz ADR-0109.** Dugme na student strani više **ne briše** nego **resetuje**. Endpoint
+> opisan ispod i dalje postoji i tačan je, ali ga **ništa u aplikaciji ne zove**. Ono što iz ovog
+> zapisa ostaje u punoj snazi je **tačka 3**: Layer B nema strani ključ ka `attempts`, pa bi brisanje
+> koje stane na pokušaju ostavilo ocenu da stoji. To važi za svakoga ko ikad bude brisao pokušaje.
 
 Na student edit strani, ispod forme, stoji panel **„Exams taken"** (PR #81) i
 svaki red ima dugme za brisanje rezultata.
@@ -3687,3 +3692,61 @@ Na pravim podacima to je oko **2,38 pokušaja po detetu** u takmičenju.
 
 Rates (completion i publish rate su sada deca ÷ deca, kao što je participation već bio), funnel, i
 **PDF izvoz**. Breakdown tabela je **već** brojala decu i nije dirana.
+
+
+## ADR-0109 — Sa student strane se rezultat RESETUJE, ne briše (povlači ADR-0106 za taj ekran)
+
+**Datum:** 2026-09-17 · **Status:** prihvaćeno · **PR #88** · **Povlači:** ADR-0106 za student stranu
+
+> 🔴 **Vlasnik, 17.09:** *„ubedio sam klijenta da na editu profila studenta ne treba da ide delete!
+> Tu proceduru mozes da sacuvas za sada. Treba da ide reset kao sto ima u delu reset results. Tako
+> cuvamo podatke. Mnogo bolja opcija. A student moze ponovo da radi"*
+
+### Zašto je okretanje ispravno, a ne kolebanje
+
+Cilj je oba puta bio isti i oba puta se postiže: **dete može ponovo da radi isti ispit.** Razlika je
+isključivo u tome **šta preživi** — a to je pitanje na koje se odgovor saznaje tek kad zatreba.
+
+Istog dana su donete dve suprotne odluke i obe su donete sa punim podacima: ADR-0106 pošto su
+posledice tvrdog brisanja iznete i vlasnik ga je svejedno tražio, a ova pošto je vlasnik razgovarao
+sa klijentom. **To što je druga poništila prvu je ishod razgovora sa klijentom, ne promena mišljenja
+u prazno** — i zato prva ostaje zapisana, sa razlozima, a ne briše se.
+
+### Šta reset čuva, a brisanje nije
+
+| | reset (sada) | brisanje (ADR-0106) |
+| --- | --- | --- |
+| red u `attempts` | **ostaje**, `status = void` | nestaje |
+| **ocena** (`score`, `max_score`) | **ostaje netaknuta** | nestaje |
+| odgovori deteta i istorija ocenjivanja | **ostaju** | nestaju kaskadno |
+| ko je i **zašto** | **`attempt_resets`** | ne postoji nigde |
+| objavljena ocena u Layer B | skinuta kroz `ResultLedger::reconcile()` | briše se ručno |
+| dete može ponovo | **da** | da |
+
+Poništen pokušaj ne zauzima mesto u `unique(registration_id, active_test_id)`, pa posle ponovnog
+izlaska postoje **dva reda** za isti par (dete, test) — **istorija se slaže, ne prepisuje**.
+
+### Razlog se KUCA, ne popunjava se sam
+
+Kod brisanja je razlog bio ugrađen tekst, jer audita ionako nije bilo. Sada je **polje**, kao na
+Reset results ekranu, i to je suština a ne formalnost: sačuvan red vredi tek ako odgovara na pitanje
+*zašto*. „Reset sa student strane" za šest nedelja ne znači ništa; *„nestalo struje u sali 3"* znači.
+
+Modal je isti kao na Reset results ekranu — narandžast, obavezan razlog, greška **unutar** dijaloga.
+
+### 🪤 Endpoint za brisanje ostaje, ali ga ništa ne zove
+
+`DELETE /api/results/attempts/{attempt}` i njegovi testovi ostaju na vlasnikov zahtev („tu proceduru
+mozes da sacuvas za sada"). **Ništa u SPA ga ne poziva.** To piše i u samom test fajlu, da sledeći
+čitalac ne shvati postojanje endpointa kao dozvolu da ga vrati na ekran.
+
+### ⚠️ Šta i dalje niko ne vidi
+
+Reset čuva sve, ali **nijedan ekran ne prikazuje staru ocenu**: panel je izuzima, izveštaji je
+izuzimaju, a izvoz sa Reset ekrana nosi samo **ko** je resetovan — ne i **kolika je ocena bila**.
+`attempt_resets` se upisuje, a **ne čita ga niko**. Podatak postoji i može se izvući upitom; kroz
+aplikaciju do njega nema puta.
+
+⏳ I nosi rok: sve to **nestaje pri prelasku sezone** (`SeasonRollover::WIPE_TABLES`), jer arhiva
+čuva samo konačnu ocenu. Ako istorija pokušaja ikad treba, odluka o arhiviranju ide **pre**
+prelaska — stavka **0** u `NEXT-SESSION.md`.
