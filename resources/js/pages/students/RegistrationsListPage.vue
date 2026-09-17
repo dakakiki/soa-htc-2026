@@ -477,7 +477,7 @@ onMounted(async () => {
                         <td class="whitespace-nowrap px-4 py-3 text-gray-600">{{ fmtDob(x.date_of_birth) }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ x.country?.name ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ x.school?.name ?? $t('common.dash') }}</td>
-                        <td class="max-w-xs truncate px-4 py-3 text-gray-600">{{ x.school_external || $t('common.dash') }}</td>
+                        <td class="w-48 min-w-48 px-4 py-3 text-gray-600">{{ x.school_external || $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ x.grade ?? $t('common.dash') }}</td>
                         <td class="px-4 py-3 text-center text-gray-600">{{ x.level?.level_short ?? $t('common.dash') }}</td>
                         <template v-for="col in resultCols" :key="col.round_id">
