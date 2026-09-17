@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
+use App\Domain\Audit\Support\AuditTrail;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDifficultyCategoryRequest;
 use App\Http\Requests\UpdateDifficultyCategoryRequest;
@@ -45,7 +46,15 @@ class DifficultyCategoryController extends Controller
 
     public function update(UpdateDifficultyCategoryRequest $request, DifficultyCategory $difficultyCategory): DifficultyCategoryResource
     {
+        $before = AuditTrail::fields($difficultyCategory, 'name', 'type', 'countries_all', 'status');
+
         $difficultyCategory->update($request->safe()->except('country_ids'));
+        AuditTrail::record(
+            'difficulty_category.updated',
+            $difficultyCategory,
+            $before,
+            AuditTrail::fields($difficultyCategory->refresh(), 'name', 'type', 'countries_all', 'status'),
+        );
 
         // Only touch the country scope when the request actually carries it.
         if ($request->has('countries_all')) {

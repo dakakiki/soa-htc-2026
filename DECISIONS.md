@@ -3810,3 +3810,58 @@ ostao bez mesta**.
 ⚠️ Trag **ništa ne sprečava**. Vlasnik je to izričito potvrdio kad je postavljeno kao pitanje:
 *„ne treba da spreci... logujemo to sto smo dogovorili"*. Ko je šta smeo ostaje pitanje permisija
 (ADR-0038), i nije predmet ove odluke.
+
+
+## ADR-0111 — Trag pokriva i administrativne registre, a odluka o prijavi koordinatora ide i u trag
+
+**Datum:** 2026-09-17 · **Status:** prihvaćeno · **PR #96** · **Dopunjuje:** ADR-0071, ADR-0110
+
+> 🔴 **Vlasnik, 17.09:** *„potrebno je prosirenje za User Log, pratis: Difficulty levels,
+> Coordinators, Registrations, Venues"* — i za Registrations: *„logovati ko je uradio approve"*.
+
+### Šta je dodato
+
+| radnja | zapis |
+| --- | --- |
+| `venue.created/updated/deleted` | naziv · država · region · grad · tip · status |
+| `difficulty_level.*` i `difficulty_category.*` | šifarnička polja, **pre i posle** |
+| `user.created/updated/deleted` **sa koordinatorskog ekrana** | isto kao sa ekrana Users |
+| `coordinator_application.approved/declined/deleted` | ko je odlučio, i razlog kod odbijanja |
+| `coordinators.imported` | fajl · broj redova · upisano · greške, ⛔ **ne i sadržaj** |
+
+### 🔴 Odluka o prijavi ide u trag iako već stoji na redu
+
+`AuditTrail` u svom opisu izričito kaže da se kloni tragova koji već postoje, i **imenuje baš ovaj
+slučaj** — „odlučena prijava koordinatora na samom redu prijave". Red zaista nosi `reviewed_by`,
+`reviewed_at` i `decline_reason`.
+
+**Ali `destroy()` briše odlučenu prijavu, i `reviewed_by` odlazi sa njom.** Znači red **nije trajan
+zapis** o tome ko je nekoga pustio unutra — trag jeste. Ovo zato nije dupliranje trajnog zapisa,
+nego jedini trajni zapis. Brisanje prijave uz to snima `reviewed_by` **pre** nego što nestane.
+
+### 🔴 Rupa koja nije bila u zahtevu, a nađena je usput
+
+Ekran **Users** je pisao u trag (`user.created/updated/deleted`), a ekran **Coordinators** — koji
+pravi i briše **iste `User` redove** — nije pisao ništa.
+
+Dakle da li je otvaranje ili brisanje naloga ostavilo trag **zavisilo je od toga kojim si ekranom
+išao**. To je gore od nepostojećeg traga, jer trag izgleda potpun.
+
+🪤 Koordinatorski ekran piše **ista imena radnji** kao Users, namerno. Koordinator **jeste** red u
+`users`; razlikuje se samo ekran. Dva skupa imena za jedan čin značila bi da pitanje „nađi svako
+brisanje naloga" traži oba, a trag postoji da bi to pitanje imalo **jedan** odgovor.
+
+### 🪤 Test koji je prestao da tvrdi ono što je mislio
+
+`SeasonResetTest` je tvrdio da je `audit_logs` posle reseta **prazan**. To je bilo tačno samo dok
+koordinatorski ekran nije upisivao ništa — a pravilo koje `SeasonRollover` zapravo propisuje je
+drugo: red o takmičaru ili objavi **odlazi** sa redovima koje opisuje, a red o **nalogu, roli ili
+sezoni preživljava** (ADR-0068).
+
+Tvrdnja je zamenjena time što pravilo stvarno kaže: planirani `results.publish` red **nestaje**, a
+`user.created` **ostaje**. Prazna tabela je bila tačna slučajno.
+
+### Šta ostaje napolju
+
+⛔ Sadržaj uvoza i izvoza — pravilo iz ADR-0110, nepromenjeno.
+⛔ Samo takmičenje — dete koje se identifikuje, počinje ili predaje i dalje ne piše u trag.

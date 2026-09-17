@@ -133,9 +133,22 @@ class SeasonResetTest extends TestCase
         $this->artisan('season:reset', ['--force' => true])->assertExitCode(0);
 
         // Transactional chain is empty.
-        foreach (['registrations', 'attempts', 'attempt_answers', 'attempt_resets', 'grade_revisions', 'student_sessions', 'student_session_quiz', 'publication_batches', 'audit_logs'] as $table) {
+        foreach (['registrations', 'attempts', 'attempt_answers', 'attempt_resets', 'grade_revisions', 'student_sessions', 'student_session_quiz', 'publication_batches'] as $table) {
             $this->assertSame(0, DB::table($table)->count(), "{$table} should be empty");
         }
+
+        /*
+         * 🔴 `audit_logs` is NOT emptied, and asserting that it was is what this
+         * test used to do — vacuously, because nothing wrote an account row into
+         * it. Creating a coordinator does now (ADR-0111), so the rule the rollover
+         * actually states can be asserted instead: a row about a competitor or a
+         * publication goes with the rows it describes, a row about an ACCOUNT
+         * outlives the season on purpose (ADR-0068).
+         */
+        $this->assertSame(0, DB::table('audit_logs')->where('action', 'results.publish')->count(),
+            'a row about a publication points at nothing once the publication is gone');
+        $this->assertGreaterThan(0, DB::table('audit_logs')->where('action', 'user.created')->count(),
+            'who opened an account outlives the season it was opened in');
 
         // School coordinator account is deleted, and its school scope cascades away.
         $this->assertDatabaseMissing('users', ['id' => $schoolCoord->id]);

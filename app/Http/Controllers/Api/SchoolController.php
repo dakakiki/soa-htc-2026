@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Organization\Models\School;
 use App\Domain\Organization\Support\SchoolExporter;
 use App\Domain\Organization\Support\SchoolImporter;
@@ -230,6 +231,8 @@ class SchoolController extends Controller
 
         $school = School::create($data);
 
+        AuditTrail::record('venue.created', $school, after: AuditTrail::fields($school, 'name', 'country_id', 'region_id', 'city', 'school_type', 'status'));
+
         return SchoolResource::make($school->load(['country', 'region']))
             ->response()
             ->setStatusCode(201);
@@ -254,7 +257,9 @@ class SchoolController extends Controller
             $data['image_path'] = $request->file('image')->store('venues', 'public');
         }
 
+        $before = AuditTrail::fields($school, 'name', 'country_id', 'region_id', 'city', 'school_type', 'status');
         $school->update($data);
+        AuditTrail::record('venue.updated', $school, $before, AuditTrail::fields($school->refresh(), 'name', 'country_id', 'region_id', 'city', 'school_type', 'status'));
 
         return SchoolResource::make($school->load(['country', 'region']));
     }
@@ -263,7 +268,11 @@ class SchoolController extends Controller
     {
         $this->authorize('delete', $school);
 
+        $before = AuditTrail::fields($school, 'name', 'country_id', 'region_id', 'city', 'school_type', 'status');
+
         $school->delete();
+
+        AuditTrail::record('venue.deleted', $school, before: $before);
 
         return response()->noContent();
     }
