@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\StudentAvailabilityController;
 use App\Http\Controllers\Api\TestController;
 use App\Http\Controllers\Api\TestTypeController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UserLogController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 
@@ -423,6 +424,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Results export (all from Layer B, with-answers from Layer A). Gated by results.manage.
     Route::get('results/export', [ResultsController::class, 'exportResults']);
     Route::get('results/export-answers', [ResultsController::class, 'exportResultsWithAnswers']);
+
+    /*
+     * Monitoring — User log. Who got in and what they did to the authority
+     * surface. Administrators only: the trail has no venue column, so it cannot
+     * be narrowed to a coordinator's own schools (see the controller).
+     */
+    Route::get('monitoring/user-log', [UserLogController::class, 'index']);
+    Route::get('monitoring/user-log/options', [UserLogController::class, 'options']);
+    Route::get('monitoring/user-log/export', [UserLogController::class, 'export']);
 
     // Results archive (Layer C, ADR-0027). Read-only, gated by reports.view.
     Route::get('archive/rounds', [ArchiveController::class, 'rounds']);

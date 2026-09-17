@@ -584,6 +584,17 @@ const routes: RouteRecordRaw[] = [
         // anyone who is not global (ADR-0067).
         meta: { requiresAuth: true, permission: ['reports.view', 'schools.view.all'] },
     },
+    /*
+     * Monitoring — User log. Two permissions like the results archive: the trail
+     * has no venue column, so the server refuses a scoped reader outright and
+     * offering the screen would be offering a locked door.
+     */
+    {
+        path: '/monitoring/user-log',
+        name: 'monitoring.userLog',
+        component: () => import('@/pages/monitoring/UserLogPage.vue'),
+        meta: { requiresAuth: true, permission: ['users.manage', 'schools.view.all'] },
+    },
     {
         path: '/reset',
         name: 'reset',
