@@ -293,12 +293,20 @@ class DashboardController extends Controller
             // person. One row on the dev roster, but the moment a big exam ends
             // the queue is thousands deep, and the list would be telling an
             // administrator to publish marks that do not exist yet.
+            //
+            // 🔴 Counted as TESTS, not as sittings. Publishing is done per test
+            // (or per exam), so the number an administrator can work through is
+            // how many tests have marks waiting — 42 on the dev roster, where the
+            // sittings behind them are 39.620 and the children 17.812. Saying
+            // "39.620 tests" asked somebody to publish a number that matches
+            // nothing they can click (owner, 17.09).
             $items['results_unpublished'] = Attempt::query()
                 ->active()
                 ->whereNotNull('submitted_at')
                 ->whereNull('published_at')
                 ->whereIn('grading_status', [GradingStatus::AutoGraded, GradingStatus::Graded])
-                ->count();
+                ->distinct()
+                ->count('test_id');
         }
 
         // A venue nobody coordinates gets no students entered; the same query

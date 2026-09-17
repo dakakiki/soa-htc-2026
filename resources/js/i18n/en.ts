@@ -86,7 +86,7 @@ export default {
             clear: 'Nothing is waiting.',
             grading_queue_stalled: 'tests stuck in the grading queue — nothing is running it',
             essays_pending: 'essays waiting to be graded',
-            results_unpublished: 'graded tests not published yet',
+            results_unpublished: 'tests with results to publish',
             venues_without_coordinator: 'active venues with no coordinator',
             venues_without_students: 'active venues with no students this season',
             // 🪤 "active venues", like the two above it. The query has always

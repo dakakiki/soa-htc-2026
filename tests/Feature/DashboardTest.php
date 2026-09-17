@@ -411,6 +411,43 @@ class DashboardTest extends TestCase
      * `queued` every minute and that is the system working — counting those
      * would raise the alarm on the one day it must not.
      */
+    /**
+     * The count is TESTS with marks waiting, not sittings.
+     *
+     * Publishing is done per test, so the number has to match what an
+     * administrator can work through. On the dev roster the same query counted
+     * 39.620 sittings behind 42 tests and 17.812 children, and the label said
+     * "39.620 tests" (owner, 17.09: "tests with results to publish").
+     */
+    public function test_the_publish_list_counts_tests_rather_than_sittings(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $quiz = Quiz::create(['title' => 'Publish quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+
+        $shared = Test::create(['title' => 'Shared test', 'status' => 'active']);
+        $other = Test::create(['title' => 'Other test', 'status' => 'active']);
+
+        // Two children on one test, one child on another: three sittings, two tests.
+        $sittings = [
+            [$this->competitor('14818181', 818181), $shared],
+            [$this->competitor('14818282', 818282), $shared],
+            [$this->competitor('14818383', 818383), $other],
+        ];
+        foreach ($sittings as [$registration, $test]) {
+            Attempt::create([
+                'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+                'is_practice' => false, 'status' => 'completed', 'grading_status' => 'auto_graded',
+                'score' => 1, 'max_score' => 10,
+                'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+                'published_at' => null,
+            ]);
+        }
+
+        $attention = collect($this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.attention'));
+
+        $this->assertSame(2, $attention->firstWhere('key', 'results_unpublished')['count']);
+    }
+
     public function test_the_pending_list_shows_a_grading_queue_that_has_stopped(): void
     {
         $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
