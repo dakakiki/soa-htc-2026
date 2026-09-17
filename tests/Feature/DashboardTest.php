@@ -442,6 +442,104 @@ class DashboardTest extends TestCase
         $this->assertSame(1, $fresh()['count']);
     }
 
+    /**
+     * A reset attempt is not a sitting, on every tile that counts one.
+     *
+     * Resetting sets `status` and clears `published_at`, but leaves
+     * `submitted_at` where it was — so every count keyed on that column alone
+     * reported a child who was reset as having sat. Reports has always answered
+     * this with `status <> 'void'` and the coordinator's venue numbers too; the
+     * dashboard was the screen left disagreeing, in four places at once.
+     *
+     * Owner, 2026-09-17: "ako je pokusaj resetovan, ne moze da se broji da je
+     * polagao. jer nije."
+     */
+    public function test_a_reset_attempt_is_not_counted_as_a_sitting(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $school = School::whereNotNull('region_id')->firstOrFail();
+
+        $registration = $this->competitor('14707070', 707070);
+        $registration->update(['school_id' => $school->id, 'country_id' => $school->country_id]);
+
+        $quiz = Quiz::create(['title' => 'Reset quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+        $test = Test::create(['title' => 'Reset test', 'status' => 'active']);
+
+        // The child sat, and the attempt was then reset. `submitted_at` survives
+        // that, which is the whole trap.
+        Attempt::create([
+            'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+            'is_practice' => false, 'status' => 'void', 'grading_status' => 'auto_graded',
+            'score' => 5, 'max_score' => 10,
+            'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+        ]);
+
+        $kpis = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.kpis');
+        $this->assertSame(0, $kpis['submitted'], 'A reset attempt is not a sitting.');
+        $this->assertSame(0, $kpis['regions_in_contest'], 'A region where the only attempt was reset did not take part.');
+
+        $rows = $this->actingAs($admin)->getJson('/api/dashboard/countries')->assertOk()->json('data');
+        $country = collect($rows)->firstWhere('id', $school->country_id);
+        $this->assertSame(0, $country['submitted'] ?? 0, 'Turnout counts sittings, not reset attempts.');
+    }
+
+    /** The same child, reset once and then sitting again, is one sitting — not none, not two. */
+    public function test_a_competitor_who_sat_again_after_a_reset_is_counted_once(): void
+    {
+        $admin = User::where('email', 'admin@soahtc.test')->firstOrFail();
+        $school = School::whereNotNull('region_id')->firstOrFail();
+
+        $registration = $this->competitor('14717171', 717171);
+        $registration->update(['school_id' => $school->id, 'country_id' => $school->country_id]);
+
+        $quiz = Quiz::create(['title' => 'Retake quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+        $test = Test::create(['title' => 'Retake test', 'status' => 'active']);
+
+        foreach (['void', 'completed'] as $status) {
+            Attempt::create([
+                'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+                'is_practice' => false, 'status' => $status, 'grading_status' => 'auto_graded',
+                'score' => 5, 'max_score' => 10,
+                'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+            ]);
+        }
+
+        $kpis = $this->actingAs($admin)->getJson('/api/dashboard')->assertOk()->json('data.kpis');
+        $this->assertSame(1, $kpis['submitted']);
+        $this->assertSame(1, $kpis['regions_in_contest']);
+    }
+
+    /** The coordinator's venue table counts the same way the tiles do. */
+    public function test_the_venue_table_does_not_count_a_reset_attempt(): void
+    {
+        $school = School::query()->firstOrFail();
+        $registration = $this->competitor('14727272', 727272);
+        $registration->update(['school_id' => $school->id, 'country_id' => $school->country_id]);
+
+        $quiz = Quiz::create(['title' => 'Venue quiz', 'quiz_type' => 'competition', 'status' => 'active']);
+        $test = Test::create(['title' => 'Venue test', 'status' => 'active']);
+        $attempt = Attempt::create([
+            'registration_id' => $registration->id, 'quiz_id' => $quiz->id, 'test_id' => $test->id,
+            'is_practice' => false, 'status' => 'completed', 'grading_status' => 'auto_graded',
+            'score' => 5, 'max_score' => 10,
+            'started_at' => now(), 'expires_at' => now(), 'submitted_at' => now(),
+        ]);
+
+        // The venue table is only drawn for a coordinator holding more than one.
+        $second = School::where('id', '!=', $school->id)->firstOrFail();
+        $coordinator = $this->scopedCoordinator($school, $second);
+
+        $row = collect($this->actingAs($coordinator)->getJson('/api/dashboard')->json('data.by_venue'))
+            ->firstWhere('id', $school->id);
+        $this->assertSame(1, $row['submitted']);
+
+        $attempt->update(['status' => 'void']);
+
+        $row = collect($this->actingAs($coordinator)->getJson('/api/dashboard')->json('data.by_venue'))
+            ->firstWhere('id', $school->id);
+        $this->assertSame(0, $row['submitted'], 'A reset attempt leaves the venue count too.');
+    }
+
     private function competitor(string $number, int $sequence): Registration
     {
         $school = School::query()->firstOrFail();
