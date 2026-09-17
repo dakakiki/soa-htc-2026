@@ -175,6 +175,20 @@ class DashboardController extends Controller
         $whoSat = fn (bool $practice) => DB::query()
             ->fromSub(
                 DB::table('attempts')
+                    /*
+                     * 🔴 A reset attempt is not a sitting. Resetting sets `status`
+                     * and clears `published_at`, but LEAVES `submitted_at` where it
+                     * was — so a count keyed on that column alone reports a child
+                     * who was reset as having sat, and a child whose only attempt
+                     * was reset as having sat nothing else. Reports already answers
+                     * this question with `status <> 'void'` ({@see ReportSummary}),
+                     * and the coordinator's venue numbers do too ({@see
+                     * VenueOverview}); this screen was the one left disagreeing.
+                     *
+                     * Owner, 2026-09-17: "ako je pokusaj resetovan, ne moze da se
+                     * broji da je polagao. jer nije."
+                     */
+                    ->where('status', '!=', 'void')
                     ->whereNotNull('submitted_at')
                     ->when(
                         $sampleTestIds !== [],
@@ -206,6 +220,8 @@ class DashboardController extends Controller
         $regionsInContest = fn () => DB::table('attempts as a')
             ->join('registrations as r', 'r.id', '=', 'a.registration_id')
             ->join('schools as s', 's.id', '=', 'r.school_id')
+            // A reset attempt is not a sitting — see the note on $whoSat above.
+            ->where('a.status', '!=', 'void')
             ->whereNotNull('a.submitted_at')
             ->whereNotNull('s.region_id')
             ->when($sampleTestIds !== [], fn ($q) => $q->whereNotIn('a.test_id', $sampleTestIds))
@@ -377,6 +393,8 @@ class DashboardController extends Controller
 
         $submitted = DB::table('attempts as a')
             ->join('registrations as r', 'r.id', '=', 'a.registration_id')
+            // A reset attempt is not a sitting — see the note on $whoSat.
+            ->where('a.status', '!=', 'void')
             ->whereNotNull('a.submitted_at')
             ->whereIn('r.school_id', $ids)
             ->when($seasonId !== null, fn ($q) => $q->where('r.season_id', $seasonId))
@@ -503,6 +521,10 @@ class DashboardController extends Controller
         $turnout = DB::query()
             ->fromSub(
                 DB::table('attempts')
+                    // A reset attempt is not a sitting — see the note on $whoSat.
+                    // Excluded before the grouping, so a child left with nothing but
+                    // reset attempts drops out of the country's turnout entirely.
+                    ->where('status', '!=', 'void')
                     ->groupBy('registration_id')
                     ->selectRaw('registration_id')
                     ->selectRaw("max(submitted_at is not null and not ($isSample)) as sat")
