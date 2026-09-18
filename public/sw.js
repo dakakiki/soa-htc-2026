@@ -59,10 +59,18 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
         self.registration.showNotification(title, {
             body: payload.body || '',
-            // The uploaded brand icon, served from the same address the manifest
-            // names. A missing one costs nothing: the platform falls back.
-            icon: '/storage/branding/icon.png',
-            badge: '/storage/branding/icon.png',
+            /*
+             * 🪤 The icon comes WITH the push and is never written here. Only
+             * the server knows where it is — an administrator uploads it through
+             * Settings and it is stored under a hashed name — and a fixed path
+             * in this file does not 404 when it is wrong: it falls through to
+             * the front controller, answers 200 with the application's HTML, and
+             * the browser draws no icon while nothing reports why.
+             *
+             * Left out entirely when there is none, so the platform uses its own
+             * rather than being handed a broken address.
+             */
+            ...(payload.icon ? { icon: payload.icon, badge: payload.icon } : {}),
             /*
              * One message replaces its own earlier notification instead of
              * stacking a second copy — a coordinator who opens the app twice

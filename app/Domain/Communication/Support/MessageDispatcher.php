@@ -10,11 +10,13 @@ use App\Domain\Communication\Enums\PushOutcome;
 use App\Domain\Communication\Models\Message;
 use App\Domain\Communication\Models\MessageDelivery;
 use App\Domain\Communication\Models\PushSubscription;
+use App\Domain\Organization\Models\Setting;
 use App\Mail\CoordinatorMessage;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
@@ -212,6 +214,20 @@ class MessageDispatcher
             $payload = [
                 'title' => $message->subject,
                 'body' => $message->body,
+                /*
+                 * 🪤 The icon travels WITH the notification, because only the
+                 * server knows where it is: the upload is stored under a hashed
+                 * name an administrator chose through Settings -> Theme, and the
+                 * service worker cannot read configuration.
+                 *
+                 * The first version wrote a fixed `/storage/branding/icon.png`
+                 * into `sw.js`. That path does not exist — and it does not 404
+                 * either: it falls through to the front controller and answers
+                 * 200 with the application's HTML, so the browser is handed a
+                 * page where it asked for a picture and simply draws no icon,
+                 * with nothing anywhere reporting why. Measured, 2026-09-18.
+                 */
+                'icon' => $this->icon(),
                 // Where the tap lands: their own notices, which is the one
                 // screen that can show the message again afterwards.
                 'url' => '/app/messages',
@@ -255,6 +271,14 @@ class MessageDispatcher
         }
 
         return ['sent' => $sent, 'failed' => $failed, 'dropped' => $dropped];
+    }
+
+    /** The uploaded brand icon as an address, or null when there is none. */
+    private function icon(): ?string
+    {
+        $path = Setting::current()->logo_icon_path;
+
+        return $path === null ? null : Storage::disk('public')->url($path);
     }
 
     private function fail(MessageDelivery $delivery, string $error): void

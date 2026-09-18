@@ -1205,6 +1205,12 @@ export default {
         // coordinator who never did is not reached however the box is ticked —
         // which is why the app channel is the one that cannot be switched off.
         channelPushNote: 'To phones that have notifications turned on. Everyone else is reached in the app.',
+        // The timestamp a phone draws beside the app's name. Not a real time:
+        // the preview is of a notification that has not been sent.
+        pushJustNow: 'now',
+        // 🔴 Said on the screen where it can still be acted on. The phone cuts
+        // the text off; knowing that after sending is knowing it too late.
+        pushPreviewNote: 'A phone shows about two lines until it is opened. The rest is in the app.',
 
         when: 'When',
         sendNow: 'Send now',
