@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconBell, IconX } from '@tabler/icons-vue';
+import { IconBell, IconBellOff, IconX } from '@tabler/icons-vue';
 import { dismissMessage, messageInbox, type InboxMessage } from '@/api/messages';
 import { useNoticesStore } from '@/stores/notices';
+import { usePushToggle } from '@/composables/usePushToggle';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppScreen from '@/components/app/AppScreen.vue';
 
@@ -22,6 +23,7 @@ import AppScreen from '@/components/app/AppScreen.vue';
  */
 const { t } = useI18n();
 const notices = useNoticesStore();
+const { on: pushOn, busy: pushBusy, failed: pushFailed, unavailable: pushUnavailable, toggle: togglePush } = usePushToggle();
 
 const rows = ref<InboxMessage[]>([]);
 const loading = ref(true);
@@ -79,6 +81,39 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
             <p :class="mono" class="mt-6 text-[10.5px] text-brand-palette-1">
                 {{ waiting > 0 ? $t('message.inboxWaiting', { n: waiting }) : $t('message.inboxNoneWaiting') }}
             </p>
+
+            <!-- Notifications, offered where somebody has already shown they
+                 came for their notices. 🔴 Asked on the tap and never on load: a
+                 refusal is final until they change it in the browser's own
+                 settings, and on a phone that is several screens deep. -->
+            <div class="mt-4 flex items-start gap-3 rounded-2xl border border-white/18 bg-white/5 p-4">
+                <component
+                    :is="pushOn ? IconBell : IconBellOff"
+                    :size="19"
+                    :stroke-width="1.7"
+                    class="mt-0.5 shrink-0 text-brand-palette-3"
+                    aria-hidden="true"
+                />
+
+                <p v-if="pushUnavailable" class="min-w-0 flex-1 text-[0.85rem] leading-relaxed text-brand-palette-3">
+                    {{ pushUnavailable }}
+                </p>
+
+                <div v-else class="min-w-0 flex-1">
+                    <p class="text-[0.85rem] leading-relaxed text-brand-palette-3">
+                        {{ pushOn ? $t('message.pushIsOn') : $t('message.pushOnNote') }}
+                    </p>
+                    <button
+                        type="button"
+                        :disabled="pushBusy"
+                        class="mt-2.5 min-h-11 rounded-full border border-white/25 px-4 text-[0.85rem] font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+                        @click="togglePush()"
+                    >
+                        {{ pushBusy ? $t('message.pushWorking') : (pushOn ? $t('message.pushOff') : $t('message.pushOn')) }}
+                    </button>
+                    <p v-if="pushFailed" class="mt-2 text-[0.85rem] text-brand-palette-1">{{ $t('message.pushFailed') }}</p>
+                </div>
+            </div>
 
             <div v-if="rows.length === 0" class="pt-7">
                 <IconBell :size="40" :stroke-width="1.5" class="text-brand-palette-3/45" aria-hidden="true" />

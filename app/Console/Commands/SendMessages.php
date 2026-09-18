@@ -35,6 +35,23 @@ class SendMessages extends Command
             $this->info("Dispatched #{$message->id} \"{$message->subject}\" to {$count} coordinators.");
         }
 
+        /*
+         * 🪤 Push BEFORE mail, and the order is the whole reason it is written
+         * down. Both passes owe their work to the same dispatch, and the mail
+         * batch is far the slower of the two — up to two hundred addresses, one
+         * server at a time. Behind that, a notification whose entire point is to
+         * arrive now would wait out a run it has nothing to do with.
+         */
+        $pushed = $dispatcher->deliverPushes();
+
+        if ($pushed['sent'] > 0 || $pushed['failed'] > 0 || $pushed['dropped'] > 0) {
+            $this->info(
+                "Push: {$pushed['sent']} sent, {$pushed['failed']} failed"
+                .($pushed['dropped'] > 0 ? ", {$pushed['dropped']} dead subscriptions removed" : '')
+                .'.'
+            );
+        }
+
         $result = $dispatcher->deliverPending((int) $this->option('limit'));
 
         if ($result['sent'] > 0 || $result['failed'] > 0) {

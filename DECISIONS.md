@@ -4150,3 +4150,84 @@ u MDN-ovoj bazi kompatibilnosti: **badge na ikonici na Androidu ne postoji** (`s
 podržan ni u Chrome-u ni u Samsung Internet-u; na iPhone-u radi od iOS 16.4), a **push radi** —
 `PushManager.subscribe` i `push` događaj od Chrome Android 42/40. `notificationclick` sada ima gde
 da vodi.
+
+## ADR-0117 — Push bez Firebase-a: par ključeva, tabela uređaja i jedan red isporuke
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #103**
+
+Treći kanal iz ADR-0099, jedini koji obaveštava pre nego što čovek otvori aplikaciju.
+
+### 🔴 Firebase ne treba, i biblioteka ga ne podržava
+
+Iz README-a `minishlink/web-push`: *„This library does not support Firebase Cloud Messaging (FCM)."*
+Stari FCM put je ukinut **u junu 2024**.
+
+Ono što identifikuje pošiljaoca je **VAPID** (RFC 8292): par ključeva napravljen **na mašini**, bez
+naloga igde. Chrome-ov `endpoint` jeste na Google-ovoj infrastrukturi, Firefox-ov na Mozilinoj,
+Safari-jev na Apple-ovoj — ali tu adresu **pregledač sam vrati** pri pretplati, i server samo šalje
+na nju, potpisano svojim ključem. Nema SDK-a, nema API ključa, nema troška.
+
+✅ **Izmereno na STAGE-u pre nego što je išta pisano:** PHP 8.3.33, a od ekstenzija koje biblioteka
+traži (`openssl`, `mbstring`, `curl`, `json`) i preporučuje (`gmp`, `bcmath`) — **sve postoje**.
+
+### 🔴 Par se pravi JEDNOM po instalaciji
+
+`php artisan push:keys` ispiše dve linije za `.env`. Zamena para znači da **svaki već pretplaćen
+pregledač tiho prestane da prima**, i svaki koordinator mora ponovo da uključi. Komanda zato odbija
+da radi kad ključ već postoji.
+
+🪤 Javni ključ se **servira** (`GET /api/push/key`), ne ugrađuje u paket: pripada instalaciji, a
+ključ ugrađen u JavaScript bio bi zauvek onaj prethodni. Isti endpoint kaže i `enabled: false` kad
+instalacija nema par, pa ekran izostavi dugme umesto da nudi nešto što ne može da radi.
+
+### Uređaj nije čovek
+
+`push_subscriptions` je **jedan red po pregledaču**, ne po osobi — koordinator sa telefonom i
+tabletom ima dva. A `message_deliveries` drži **jedan red po osobi po kanalu** (jedinstveni ključ to
+kaže). Zato:
+
+> Red isporuke je **`sent` kad je bar jedan uređaj primio**, a `failed` kad nijedan.
+
+Drugačije bi tabela morala da bude o uređajima, a ona je o ljudima.
+
+🪤 **Jedinstvenost je na heš-u endpointa**, ne na samom endpointu: endpoint je `text` jer mu spec ne
+daje dužinu (FCM-ovi već prelaze 200 znakova), a MySQL ne indeksira `text` ceo. Pretplata istog
+pregledača **ažurira** svoj red — bez toga ko isključi pa uključi obaveštenja dobija **svaku sledeću
+poruku dvaput**.
+
+🔴 **Mrtva pretplata se BRIŠE, ne ponavlja.** Push servis odgovori 404/410 kad aplikacija više ne
+postoji; ostavljena, zove se na svaku poruku zauvek i tabela se puni uređajima kojih odavno nema.
+
+### Redosled u cron-u
+
+Push ide **pre** pošte u `messages:send`. Oba duguju isti dispatch, a paket pošte je daleko sporiji —
+iza njega bi obaveštenje čija je cela poenta da stigne odmah čekalo tuđi posao.
+
+### Dugme je na inbox-u, i pita se na klik
+
+Vlasnikova odluka, 18.09. Ko čita svoja obaveštenja je već pokazao po šta je došao; Welcome je ekran
+koji smo upravo raščistili.
+
+🔴 **Nikad pri učitavanju.** Odbijena dozvola se **ne može vratiti iz aplikacije** — samo kroz
+podešavanja pregledača za taj sajt — pa jedno loše tempirano pitanje košta tog čoveka obaveštenja
+zauvek. `userVisibleOnly: true` je iz istog razloga obavezan: Chrome dozvoli nekoliko tihih push-eva
+pa **povuče dozvolu**, a pretplata i dalje izgleda ispravno.
+
+### Šta test radi, a šta ne
+
+🔴 **Ništa ne potpisuje, ne šifruje niti zove mrežu.** `PushSender` je **jedna klasa sa jednim
+mrežnim pozivom** baš zato da test može da je zameni: test kome treba pravo pravljenje EC ključa
+pada na mašini čiji je OpenSSL drugačije podešen, i tada ne govori ništa o aplikaciji.
+
+Uz to `PushNotificationTest` **čita `public/sw.js`** i tvrdi da postoje `push` i `notificationclick`
+— i 🔴 **da worker i dalje ništa ne kešira**. Dodavanje push-a je tačno onaj posao tokom kog se keš
+doda iz navike, a keš ovde znači beli ekran posle deploy-a usred sezone.
+
+### Zamke okruženja nađene usput (ne tiču se koda)
+
+- 🪤 **Avast presreće TLS** na razvojnoj mašini i potpisuje svojim korenom, koji je u Windows
+  skladištu ali ne i u PHP-ovom `cacert.pem` — pa composer nije mogao do packagist-a. Rešeno
+  kombinovanim paketom kroz `COMPOSER_CAFILE`, bez gašenja provere i bez diranja instalacije PHP-a.
+- 🪤 **`OPENSSL_CONF` nije postavljen** na toj mašini, pa `openssl_pkey_new` za EC pada sa porukom
+  *„Unable to create the key"* koja ne kaže zašto. `push:keys` to prepozna i ispiše putanju.
+  Na Linuxu (CI, STAGE) ne postoji.

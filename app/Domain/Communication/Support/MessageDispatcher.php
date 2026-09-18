@@ -6,8 +6,10 @@ namespace App\Domain\Communication\Support;
 
 use App\Domain\Communication\Enums\MessageChannel;
 use App\Domain\Communication\Enums\MessageStatus;
+use App\Domain\Communication\Enums\PushOutcome;
 use App\Domain\Communication\Models\Message;
 use App\Domain\Communication\Models\MessageDelivery;
+use App\Domain\Communication\Models\PushSubscription;
 use App\Mail\CoordinatorMessage;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +38,10 @@ class MessageDispatcher
     /** Rows per insert. Kept well under SQLite's variable ceiling. */
     private const INSERT_CHUNK = 400;
 
-    public function __construct(private readonly RecipientResolver $recipients) {}
+    public function __construct(
+        private readonly RecipientResolver $recipients,
+        private readonly PushSender $push,
+    ) {}
 
     /**
      * Work out who the message goes to, write a delivery for each of them on
@@ -143,6 +148,113 @@ class MessageDispatcher
         }
 
         return ['sent' => $sent, 'failed' => $failed];
+    }
+
+    /**
+     * Hand the owed notifications to whichever push service each device belongs
+     * to, marking each row with what came of it.
+     *
+     * 🔴 One delivery row covers EVERY device that person has. The table keeps
+     * one row per person per channel (a unique key says so), while a coordinator
+     * may have a phone and a tablet — so the row is `sent` when at least one
+     * device took it, and `failed` when none did. Anything else would need the
+     * table to be about devices, and it is about people.
+     *
+     * 🪤 A subscription the service says is gone is DELETED rather than retried.
+     * The application was removed, the browser data cleared or permission
+     * withdrawn; left in place it is dialled on every message for ever and the
+     * table fills with devices that stopped existing months ago.
+     *
+     * @return array{sent: int, failed: int, dropped: int}
+     */
+    public function deliverPushes(?int $limit = null): array
+    {
+        $limit ??= (int) config('push.batch', 100);
+
+        $pending = MessageDelivery::query()
+            ->where('channel', MessageChannel::Push)
+            ->where('status', MessageDelivery::STATUS_PENDING)
+            ->with(['message', 'user'])
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+
+        $sent = 0;
+        $failed = 0;
+        $dropped = 0;
+
+        foreach ($pending as $delivery) {
+            $message = $delivery->message;
+
+            if ($message === null || $delivery->user === null) {
+                $this->fail($delivery, 'No recipient.');
+                $failed++;
+
+                continue;
+            }
+
+            $devices = PushSubscription::query()->where('user_id', $delivery->user_id)->get();
+
+            if ($devices->isEmpty()) {
+                /*
+                 * Not a failure of sending — nobody turned notifications on, or
+                 * they turned them off again. The row says so in its own words
+                 * so that a screen counting failures does not report the
+                 * administration's push channel as broken when it is merely
+                 * unused.
+                 */
+                $this->fail($delivery, 'No device is subscribed.');
+                $failed++;
+
+                continue;
+            }
+
+            $payload = [
+                'title' => $message->subject,
+                'body' => $message->body,
+                // Where the tap lands: their own notices, which is the one
+                // screen that can show the message again afterwards.
+                'url' => '/app/messages',
+                // One message replaces its own earlier notification rather than
+                // stacking a second copy on the lock screen.
+                'tag' => 'message-'.$message->id,
+            ];
+
+            $reached = 0;
+
+            foreach ($devices as $device) {
+                $outcome = $this->push->send($device, $payload);
+
+                if ($outcome === PushOutcome::Sent) {
+                    $device->forceFill(['last_sent_at' => now()])->save();
+                    $reached++;
+
+                    continue;
+                }
+
+                if ($outcome === PushOutcome::Gone) {
+                    $device->delete();
+                    $dropped++;
+                }
+            }
+
+            if ($reached > 0) {
+                $delivery->forceFill([
+                    'status' => MessageDelivery::STATUS_SENT,
+                    'sent_at' => now(),
+                    'error' => null,
+                ])->save();
+
+                $sent++;
+
+                continue;
+            }
+
+            $this->fail($delivery, 'No device accepted it.');
+            $failed++;
+        }
+
+        return ['sent' => $sent, 'failed' => $failed, 'dropped' => $dropped];
     }
 
     private function fail(MessageDelivery $delivery, string $error): void

@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PublicContentController;
+use App\Http\Controllers\Api\PushController;
 use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\QuestionMediaController;
 use App\Http\Controllers\Api\QuestionTagController;
@@ -382,6 +383,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('venues', [AppCoordinatorController::class, 'venues']);
         Route::get('venues/{school}/figures', [AppCoordinatorController::class, 'figures']);
     });
+
+    /*
+     * Turning notifications on for one browser, and off again.
+     *
+     * 🔴 No permission, for the same reason the inbox has none: anybody with an
+     * account can be sent a message, so anybody with an account may ask to be
+     * told about one. Each route acts on the endpoint the browser handed back
+     * AND on the person signed in — never on one without the other, or a stray
+     * endpoint would unsubscribe somebody else's device.
+     */
+    Route::get('push/key', [PushController::class, 'key']);
+    Route::post('push/subscriptions', [PushController::class, 'subscribe']);
+    Route::delete('push/subscriptions', [PushController::class, 'unsubscribe']);
 
     Route::get('messages/inbox', [MessageController::class, 'inbox']);
     Route::post('messages/deliveries/{delivery}/dismiss', [MessageController::class, 'dismiss']);

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconBell, IconX } from '@tabler/icons-vue';
+import { IconBell, IconBellOff, IconX } from '@tabler/icons-vue';
 import { dismissMessage, messageInbox, type InboxMessage } from '@/api/messages';
 import { useNoticesStore } from '@/stores/notices';
+import { usePushToggle } from '@/composables/usePushToggle';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 
@@ -28,6 +29,7 @@ import LoadingOverlay from '@/components/LoadingOverlay.vue';
  */
 const { t } = useI18n();
 const notices = useNoticesStore();
+const { on: pushOn, busy: pushBusy, failed: pushFailed, unavailable: pushUnavailable, toggle: togglePush } = usePushToggle();
 
 const rows = ref<InboxMessage[]>([]);
 const loading = ref(true);
@@ -90,6 +92,32 @@ onMounted(() => {
                 {{ waiting > 0 ? $t('message.inboxWaiting', { n: waiting }) : $t('message.inboxNoneWaiting') }}
             </span>
         </div>
+
+        <!-- Notifications, offered where somebody has already shown they came
+             for their notices. 🔴 Asked on the click and never on load: a
+             refusal is final until they change it in the browser's own
+             settings. -->
+        <div class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-4">
+            <component :is="pushOn ? IconBell : IconBellOff" :size="20" class="shrink-0 text-gray-400" aria-hidden="true" />
+
+            <p v-if="pushUnavailable" class="min-w-0 flex-1 text-sm text-gray-500">{{ pushUnavailable }}</p>
+
+            <template v-else>
+                <p class="min-w-0 flex-1 text-sm text-gray-600">
+                    {{ pushOn ? $t('message.pushIsOn') : $t('message.pushOnNote') }}
+                </p>
+                <button
+                    type="button"
+                    :disabled="pushBusy"
+                    class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    @click="togglePush()"
+                >
+                    {{ pushBusy ? $t('message.pushWorking') : (pushOn ? $t('message.pushOff') : $t('message.pushOn')) }}
+                </button>
+            </template>
+        </div>
+
+        <p v-if="pushFailed" class="text-sm text-red-600">{{ $t('message.pushFailed') }}</p>
 
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 

@@ -1118,6 +1118,27 @@ export default {
         // Said once, at the foot of the list, so nobody wonders whether tapping
         // × is the last they will see of it.
         inboxKeeps: 'Notices you put away stay on this screen.',
+
+        /*
+         * Notifications (2026-09-18). Said on the inbox rather than on Welcome:
+         * somebody reading their notices has already shown what they came for,
+         * and Welcome is the screen that was just cleared of everything else.
+         *
+         * 🔴 Asked on a CLICK, never on load. A refusal cannot be taken back
+         * from inside the application — only the browser's own site settings
+         * undo it — so one badly timed question costs that person notifications
+         * for good.
+         */
+        pushOn: 'Notify me',
+        pushOff: 'Stop notifying me',
+        pushOnNote: 'Get a notification on this device when a new notice arrives.',
+        pushIsOn: 'This device is being notified.',
+        pushWorking: 'Just a moment…',
+        // Each reason says what can be done about it, or that nothing can.
+        pushDenied: 'This browser is blocking notifications. Turn them back on in its settings for this site.',
+        pushUnsupported: 'This browser cannot show notifications. On an iPhone, add the app to the home screen first.',
+        pushNotConfigured: 'Notifications are not set up on this installation yet.',
+        pushFailed: 'Could not turn notifications on.',
         count: 'No. messages: {count}',
         add: 'New message',
         edit: 'Edit message',
