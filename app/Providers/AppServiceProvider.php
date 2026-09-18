@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Domain\Assessment\Models\DifficultyCategory;
 use App\Domain\Assessment\Models\DifficultyLevel;
 use App\Domain\Audit\Support\AuditTrail;
+use App\Domain\Communication\Support\MailBranding;
 use App\Domain\Competition\Models\Registration;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Country;
@@ -45,7 +46,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        /*
+         * The branding every mail's header and footer draw.
+         *
+         * 🪤 A singleton, and the cache inside it is the whole reason. The two
+         * mail views resolve this out of the container on every render, and a
+         * message to four hundred coordinators is four hundred renders — so
+         * without this line each one would build its own instance and ask the
+         * database again for a logo that cannot have changed in between.
+         */
+        $this->app->singleton(MailBranding::class);
     }
 
     /**

@@ -4636,3 +4636,51 @@ kao da je neko obrisao proveru.
 
 🪤 **`needsBody` je bio `computed(() => true)`** — konstanta koja izgleda kao nešto što se sklanja.
 Sad je pitanje, i test čuva tačan oblik odgovora.
+
+## ADR-0126 — Mejl ima svoj šablon: zaglavlje sa logom i podnožje sa sajta
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno
+
+> **Vlasnik, 18.09:** *„kreiraj mail template. Header levo: logo i naslov, plava linija odvaja header
+> od body. Footer: plava linija odvaja footer od body, dodaj tekst koji se unosi u podesavanju
+> footera i ispod copy linija kao u footeru public dela."*
+
+### Šta je bilo
+
+Laravel-ov podrazumevani šablon: ime aplikacije iz `config('app.name')` u sredini zaglavlja i
+`© 2026 SOA HTC. All rights reserved.` u podnožju. **Ništa od toga administracija nije mogla da
+dodirne.**
+
+### Odluka
+
+- **zaglavlje:** logo i naslov **levo**, pa **linija u brend boji** (`color_palette_4`)
+- **podnožje:** ista linija, pa **tekst iz podešavanja footera**, pa **copy linija** — oba iz
+  **istog layout bloka** (`public.footer`, ADR-0045) koji crta i footer sajta
+
+🔴 **Ne kopija teksta, nego isti blok.** Drugo mesto sa istim rečima bilo bi tačno na dan pisanja i
+pogrešno od prve izmene footera na sajtu.
+
+🔴 **Menja se svaki mejl aplikacije**, ne samo poruka koordinatorima — i reset lozinke ide kroz isti
+šablon. To je ono što „šablon" znači.
+
+### Zamke
+
+🪤 **SVG logo se NE crta u mejlu.** Gmail i Outlook ga ne prikazuju. Nije teorija: na dev instalaciji
+su **oba loga SVG**, a samo ikona je PNG — zaglavlje bi bilo prazno kod većine primalaca. Redosled je
+sada `logo_dark → logo → ikona`, **preskačući vektor**; ako je sve vektorsko, zaglavlje staje na
+naslov, što je zaglavlje a ne rupa.
+
+🪤 **`site_title` je bogat tekst** pisan za masthead. Ispisan kako stoji, u zaglavlju mejla bi dao
+ili prelom pasusa ili vidljive `<p>` znake — zavisno od klijenta. Strip-uje se.
+
+🪤 **Podrazumevani Laravel-ov red je morao da se UKLONI, ne da se ignoriše.** Ostavljen, štampao bi
+**drugu copy liniju**, drugim rečima, ispod administratorove. Zato je prepisan i `message.blade.php`
+— brisanje tog fajla vraća podrazumevane vrednosti umesto da ih ukloni.
+
+🪤 **`MailBranding` mora da bude singleton.** Blade ga vadi iz kontejnera na **svakom** iscrtavanju, a
+poruka za 400 koordinatora je 400 iscrtavanja — bez `singleton()` svako bi pravilo svoj primerak i
+ponovo pitalo bazu.
+
+🪤 **Tri testa su prolazila i bez šablona.** Laravel-ovo podnožje štampa baš `© 2026 SOA HTC`, a ime
+sajta stoji i u dugmetu ispod teksta — pa su tvrdnje tražene **u zaglavlju/podnožju**, ne bilo gde u
+dokumentu, a copy linija u testu je oblik koji framework ne može da proizvede.
