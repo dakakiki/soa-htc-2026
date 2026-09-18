@@ -101,7 +101,7 @@ onBeforeUnmount(() => {
                         <span
                             v-if="notices.has"
                             class="absolute -right-1.5 -top-1.5 grid min-w-[1.15rem] place-items-center rounded-full bg-brand-palette-2 px-1 text-[11px] font-semibold leading-[1.15rem] text-brand-palette-4"
-                        >{{ notices.waiting > 99 ? '99+' : notices.waiting }}</span>
+                        >{{ notices.unread > 99 ? '99+' : notices.unread }}</span>
                     </RouterLink>
                 </Tooltip>
                 <Tooltip :text="t('profile.title')" position="bottom">

@@ -27,7 +27,7 @@ class MessageDelivery extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
-        'message_id', 'user_id', 'channel', 'status', 'sent_at', 'error', 'dismissed_at',
+        'message_id', 'user_id', 'channel', 'status', 'sent_at', 'error', 'read_at', 'dismissed_at',
     ];
 
     protected function casts(): array
@@ -37,6 +37,7 @@ class MessageDelivery extends Model
             'user_id' => 'integer',
             'channel' => MessageChannel::class,
             'sent_at' => 'datetime',
+            'read_at' => 'datetime',
             'dismissed_at' => 'datetime',
         ];
     }
@@ -54,12 +55,13 @@ class MessageDelivery extends Model
     }
 
     /**
-     * What the coordinator should still see in front of them: delivered in the
-     * app, and not yet put away.
+     * What stands in the coordinator's inbox: delivered in the app, and not put
+     * away. Read or unread — a notice does not leave the screen for having been
+     * read, only for being dismissed.
      *
      * @param  Builder<MessageDelivery>  $query
      */
-    public function scopeWaitingInApp(Builder $query, int $userId): void
+    public function scopeInInboxOf(Builder $query, int $userId): void
     {
         $query->where('user_id', $userId)
             ->where('channel', MessageChannel::App)
@@ -68,5 +70,22 @@ class MessageDelivery extends Model
             // server rather than about this person; their mail is in their
             // mail.
             ->whereNull('dismissed_at');
+    }
+
+    /**
+     * What the BELL counts, which is a narrower question than the one above and
+     * was the same one until 2026-09-18.
+     *
+     * 🔴 The number beside the bell has to measure what its name says. It
+     * counted everything not dismissed — so following a notification, reading
+     * the message and leaving it in the inbox changed nothing, and the count
+     * stayed up for ever unless the person destroyed the message with × to get
+     * rid of it (owner, on a phone: *„poruka je ostala ne procitana"*).
+     *
+     * @param  Builder<MessageDelivery>  $query
+     */
+    public function scopeUnreadBy(Builder $query, int $userId): void
+    {
+        $query->inInboxOf($userId)->whereNull('read_at');
     }
 }

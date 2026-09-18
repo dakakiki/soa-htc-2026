@@ -86,7 +86,7 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', look));
                     <span
                         v-if="notices.has"
                         class="absolute -right-0.5 -top-0.5 grid min-w-[1.15rem] place-items-center rounded-full bg-brand-palette-2 px-1 text-[11px] font-semibold leading-[1.15rem] text-brand-palette-4"
-                    >{{ notices.waiting > 9 ? '9+' : notices.waiting }}</span>
+                    >{{ notices.unread > 9 ? '9+' : notices.unread }}</span>
                 </RouterLink>
 
                 <button

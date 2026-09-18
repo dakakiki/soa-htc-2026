@@ -4537,3 +4537,57 @@ tvrdnji **pada na starom kodu** (2 u `ManifestTest`, 4 u novom).
 🪤 Stari `test_theme_colour_follows_the_settings_row` je postavljao `color_primary` na **`#003758`**
 — što je slučajno tačno podrazumevana vrednost `color_palette_4`. Da je ostao takav, prošao bi i
 pre i posle izmene i **ne bi tvrdio ništa**.
+
+## ADR-0124 — Tap čini poruku pročitanom: treće stanje isporuke
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno
+
+> **Vlasnik, 18.09, sa telefona:** *„push na telefonu probudio ekran, klik odveo u inbox, medjutim
+> poruka je ostala ne procitana."* → *„tap na poruku ce je uciniti procitanom"*
+
+### To nije bio kvar — stanje nije postojalo
+
+Isporuka je znala **dve** stvari o sebi: da je otišla i da je **sklonjena**. Zvonce je brojalo drugu
+— sve što nije sklonjeno. Pa je koordinator koji je pratio notifikaciju, pročitao poruku i ostavio
+je u inboxu **i dalje bio obaveštavan da ga nešto čeka**, zauvek.
+
+🔴 Jedini način da se zvonce ugasi bio je **×**, a × je konačan (ADR-0119). Odgovor na „imaš
+nepročitane poruke" bio bi **uništavanje poruke**.
+
+### Odluka
+
+**`read_at` na isporuci.** Dodir na red upisuje vreme; red **ostaje u inboxu**, gubi narandžastu
+ivicu, i zvonce padne za jedan.
+
+| akt | šta znači | šta radi |
+| --- | --- | --- |
+| **dodir na red** | *„video sam"* | gasi iz brojača, **poruka ostaje** |
+| **×** | *„gotov sam sa ovim"* | sklanja sa ekrana, **nepovratno** (ADR-0119) |
+
+🪤 **`read_at`, a ne `seen_at`** koji je bio zapisan kao sledeća stvar. `seen_at` je trebalo da znači
+„bilo mu je na ekranu", što pregledač ne može pošteno da prijavi. Ovo se upisuje kad čovek **dodirne**
+red — njegov akt, i meri ono što mu ime kaže.
+
+🔴 **`×` NE upisuje `read_at`.** Sklanjanje nepročitane poruke je stvarna stvar; red koji bi tvrdio
+da je pročitan zato što je odgurnut sa ekrana bio bi zapis koji administraciji govori nešto što se
+nije desilo. Brojaču to ne treba — ono što broji je ionako **unutar inboxa**.
+
+### Šta se preimenovalo
+
+`meta.waiting` → **`meta.unread`**, `notices.waiting` → `notices.unread`, natpis „{n} waiting" →
+**„{n} unread"**. Broj koji se prikazuje mora da meri ono što mu ime kaže; reč „waiting" je
+**pokrivala** za brojač koji je merio nešto drugo.
+
+### Zamke
+
+🪤 **Dupli oduzetak.** Pročitaj red pa ga skloni — to su dva akta koja oba liče na „jedan manje", a
+samo je prvi nešto skinuo sa brojača. Zvonce je clamp-ovano na nuli, pa se to **ne vidi kao kvar**:
+kaže „nothing unread" nad inboxom koji ima nepročitanih. Čuvano testom koji čita izvor, na **sva tri
+ekrana** (dva inboxa + Welcome).
+
+🪤 **Dugme u dugmetu.** Meta dodira je dugme, a **×** je njegov **brat, ne dete** — pregledač sme da
+rastavi ugnježdeno dugme, a ono što nestane je unutrašnje.
+
+🪤 **Test koji je prolazio na starom kodu.** „Tuđu poruku ne možeš da pročitaš" je tvrdio 404 — a 404
+vraća i aplikacija koja **tu rutu uopšte nema**. Dopunjen je sa **204 za pravog čoveka**; tek tada
+404 znači „nije tvoja", a ne „ne postoji".

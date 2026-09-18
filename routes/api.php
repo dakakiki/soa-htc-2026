@@ -398,6 +398,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('push/subscriptions', [PushController::class, 'unsubscribe']);
 
     Route::get('messages/inbox', [MessageController::class, 'inbox']);
+    Route::post('messages/deliveries/{delivery}/read', [MessageController::class, 'read']);
     Route::post('messages/deliveries/{delivery}/dismiss', [MessageController::class, 'dismiss']);
     Route::post('messages/recipients', [MessageController::class, 'recipients']);
     Route::post('messages/recipients/list', [MessageController::class, 'recipientList']);
