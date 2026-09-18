@@ -254,37 +254,47 @@
 /* ------------------------------------------------------------------ *
  * Motion
  *
- * 🔴 Every rule here is inside `prefers-reduced-motion: no-preference`,
- * and that is the whole of the accessibility story: somebody who has
- * asked their system for less movement gets a page that simply appears,
- * with no class to remove and no code path that can forget.
+ * 🔴 NOTHING HERE CHANGES OPACITY, and that is the rule rather than a
+ * detail. A screen that fades in is a screen whose brightness rises from
+ * the page behind it, and on the swap between a navy application screen
+ * and a light website one that reads as a blink. The owner raised it on
+ * 2026-09-18 for photosensitive readers, and the guideline it touches
+ * (WCAG 2.3.1) counts flashes rather than fades — so rather than argue
+ * that one fade is under a threshold, there is no luminance change at
+ * all. Movement only: a few pixels of travel, and the element is fully
+ * drawn the whole way.
+ *
+ * 🔴 And every rule sits inside `prefers-reduced-motion: no-preference`,
+ * which is the rest of the accessibility story: somebody who has asked
+ * their system for less movement gets a page that simply appears, with
+ * no class to remove and no code path that can forget.
  *
  * Enter only, and never leave. A leave animation would hold the old
  * screen on top of the new one for as long as it ran; with `mode="out-in"`
  * and nothing to wait for, the old screen is gone at once and the new one
- * rises in — which reads as fast rather than as decorated.
+ * is already opaque as it settles.
  * ------------------------------------------------------------------ */
 @media (prefers-reduced-motion: no-preference) {
     .page-enter-active {
-        animation: page-in 220ms cubic-bezier(.22, .61, .36, 1);
+        animation: page-in 200ms cubic-bezier(.22, .61, .36, 1);
     }
 
     /*
      * A block that arrives with its screen. `both` holds the first frame
-     * before the delay runs, or a staggered item would flash at full
-     * opacity and then start over.
+     * before the delay runs, or a staggered item would jump to its place
+     * and then start over.
      */
     .rise {
-        animation: rise-in 300ms cubic-bezier(.22, .61, .36, 1) both;
+        animation: rise-in 280ms cubic-bezier(.22, .61, .36, 1) both;
     }
 }
 
 @keyframes page-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: none; }
+    from { transform: translateY(8px); }
+    to { transform: none; }
 }
 
 @keyframes rise-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: none; }
+    from { transform: translateY(10px); }
+    to { transform: none; }
 }

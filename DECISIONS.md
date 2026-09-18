@@ -4032,3 +4032,61 @@ birač sa `.slice(0, 16)`. Isti postupak koji `ManifestTest` već koristi za po�
 
 🪤 Provereno da test **pada** kad se stara linija vrati — zelen test koji prolazi i na pokvarenom i na
 popravljenom kodu ne tvrdi ništa.
+
+## ADR-0115 — Ekran se ne crta dok se ne zna koji je, i ništa ne menja svetlost (dopunjuje ADR-0113)
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #101**
+
+Dve stvari koje je vlasnik video na telefonu isti dan kad je ADR-0113 pušten.
+
+### 🔴 Prvo: aplikacija je crtala **admin** preko javne adrese
+
+Vlasnik, 18.09: *„u jednom delicu sekunde imam utisak kako da je krenuo da iscrtava admin i onda
+renderovao public site"* — i to na `/?pwa=1`, adresi koju je kucao da proba instalaciju.
+
+Lanac, izmeren a ne pretpostavljen:
+
+1. `app.ts` je zvao `app.mount('#app')` **ne čekajući** da ruter bude spreman.
+2. Do prve rezolucije rute `useRoute()` je vue-router-ov **`START_LOCATION`**, čiji je `meta`
+   **prazan objekat** (provereno u `node_modules/vue-router`).
+3. `App.vue` bira ljusku sa `meta.zone ?? 'admin'` — siguran podrazumevani izbor (ADR-0014:
+   neoznačeno → zaštićeno), koji je pogrešan **tačno jednom**, u tom prvom kadru.
+4. 🪤 **I to nije jedan kadar.** Ruterov `beforeEach` radi `await session.ensureLoaded()` — mrežni
+   poziv. Pogrešna ljuska stoji koliko traje cela povratna tura.
+
+**Popravka:** montira se tek kad su **i tema i ruter** namireni. `allSettled`, ne redom: dvoje čeka
+na različite stvari, a nijedno ne sme da zaustavi podizanje — što je i bio posao `.finally()` koji
+menja. Splash iz ADR-0113 time dobija pravi smisao: pokriva **ceo** put do prvog tačnog kadra.
+
+⚠️ Splash nije bio uzrok — pre njega je isto trajalo, samo se gledalo u belo.
+
+### 🔴 Drugo: nijedna animacija ne menja **svetlost**
+
+Vlasnik, 18.09: *„kod smene ekrana ne sme da se dogodi taj flash/bljesak jer to moze da bude problem
+kod foto osetljivih osoba"*.
+
+Prelaz iz ADR-0113 je bio **pomeraj + prelivanje** (`opacity: 0 → 1`). Ekran koji se preliva je ekran
+čija svetlost raste iz strane iza njega — a na smeni **navy** ekrana aplikacije i **svetlog** ekrana
+sajta to se čita kao treptaj.
+
+Merilo koje to dotiče (**WCAG 2.3.1**) broji **bleskove**, ne prelivanja, pa se jedno prelivanje
+verovatno i ne bi računalo. Odluka je da se o tome **ne raspravlja**: nema promene svetlosti uopšte.
+
+| | pre | sada |
+| --- | --- | --- |
+| prelaz ekrana | `opacity 0→1` + 8px pomeraja | **samo 8px pomeraja** |
+| ulazak blokova | `opacity 0→1` + 10px | **samo 10px** |
+
+Element je **potpuno iscrtan celim putem**; jedino se pomera. ✅ I dalje sve unutar
+`prefers-reduced-motion: no-preference`.
+
+### Oba čuva test koji čita izvor
+
+Front nema test runner (ADR-0074, povučen), pa:
+
+- `SpaShellTest` tvrdi da `app.ts` **čeka ruter pre montiranja** — i pada kad se vrati stari redosled.
+- `MotionDoesNotFlashTest` čita `app.css`: **nijedan `@keyframes` ne sme da nosi `opacity`**, i svako
+  pravilo mora da stoji iza pitanja o smanjenom kretanju. Pada kad se prelivanje vrati.
+
+🪤 Za oba je provereno da **padaju na starom kodu** — zelen test koji prolazi i na pokvarenom i na
+popravljenom ne tvrdi ništa.

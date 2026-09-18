@@ -43,8 +43,25 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Apply branding/theme before mounting so there is no flash of the default look
-// (the login screen needs it too). Boot proceeds even if the request fails.
-useThemeStore(pinia)
-    .load()
-    .finally(() => app.mount('#app'));
+/*
+ * Mount once BOTH of the things the first frame depends on have settled.
+ *
+ * The theme, so there is no flash of the default look — the login screen needs
+ * it too.
+ *
+ * 🔴 And the ROUTER, which is not a nicety. Until the first navigation
+ * resolves, `useRoute()` is vue-router's START_LOCATION and its `meta` is an
+ * empty object; `App.vue` picks its shell with `meta.zone ?? 'admin'`, a
+ * fail-safe default that is wrong exactly once — on that first frame. So the
+ * application drew the ADMIN shell over every public address before replacing
+ * it, and it was not a flicker: the first navigation waits on
+ * `session.ensureLoaded()` in the router's own guard, so the wrong shell stood
+ * there for a whole round trip. Reported from a phone, 2026-09-18.
+ *
+ * 🪤 Settled, not sequential, and neither may stop the boot. The two wait on
+ * different things so neither should hold the other up, and a theme request
+ * that fails must still leave an application on the screen — which is what the
+ * `.finally()` this replaces was for.
+ */
+void Promise.allSettled([useThemeStore(pinia).load(), router.isReady()])
+    .then(() => app.mount('#app'));
