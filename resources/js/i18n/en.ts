@@ -1114,10 +1114,8 @@ export default {
         inboxWaiting: '{n} waiting',
         inboxNoneWaiting: 'Nothing waiting',
         inboxPutAway: 'Put away',
-        inboxPutAwayOn: 'Put away {date}',
-        // Said once, at the foot of the list, so nobody wonders whether tapping
-        // × is the last they will see of it.
-        inboxKeeps: 'Notices you put away stay on this screen.',
+        inboxMore: 'Load more',
+        inboxLoadingMore: 'Loading…',
 
         /*
          * Notifications (2026-09-18). Said on the inbox rather than on Welcome:
@@ -1205,6 +1203,16 @@ export default {
         // coordinator who never did is not reached however the box is ticked —
         // which is why the app channel is the one that cannot be switched off.
         channelPushNote: 'To phones that have notifications turned on. Everyone else is reached in the app.',
+        // The timestamp a phone draws beside the app's name. Not a real time:
+        // the preview is of a notification that has not been sent.
+        pushJustNow: 'now',
+        // 🔴 Said on the screen where it can still be acted on. The phone cuts
+        // the text off; knowing that after sending is knowing it too late.
+        pushPreviewNote: 'A phone shows about two lines until it is opened. The rest is in the app.',
+        // 🔴 Shown when push is ticked and the app channel is not. A
+        // notification keeps nothing: swiped away, it is gone, and tapping
+        // it lands in an inbox that has no row for this message.
+        pushWithoutApp: 'A notification is not kept — tap it and it opens the app, where there will be nothing to read. Tick “In the app” as well.',
 
         when: 'When',
         sendNow: 'Send now',

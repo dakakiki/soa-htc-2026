@@ -4282,3 +4282,83 @@ imala gde da postoji.
 
 Zato `MessageChannel::App` i dalje nosi ono što mu je u dokumentaciji od početka: *„the only channel
 that needs no address, no permission and no third party, so it is the one that always arrives."*
+
+## ADR-0119 — Svaki kanal ima pregled, i ikona putuje uz notifikaciju
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #105**
+
+Dve greške iz ADR-0118, obe primećene pre nego što su nekome naudile.
+
+### Kućica bez pregleda
+
+Vlasnik, 18.09: *„kod kreiranja nove poruke za Notification nema preview u desnoj koloni?"* — tačno.
+Dodao sam kanal u levoj koloni a **nisam pregled u desnoj**, a ta kolona postoji baš zato da
+administrator vidi kako jedan tekst izgleda u tri različita oblika.
+
+Push sad ima svoj pregled: **sistemska notifikacija**, u obliku koji telefon crta, a ne kopija in-app
+kartice iznad nje. 🔴 Telo je **skraćeno na dva reda**, jer toliko Android pokaže dok je notifikacija
+sklopljena — ko piše petsto znakova treba to da vidi **dok još može da skrati**, ne posle slanja.
+
+🪤 **Test čuva pravilo, ne izgled**: za svaku kućicu kanala u levoj koloni mora da postoji panel u
+desnoj. Pravilo je puklo prvi put kad ga je proverio čovek, što je pogrešan redosled.
+
+### 🪤 Ikona: fiksna putanja koja ne pada nego laže
+
+`sw.js` je tražio `/storage/branding/icon.png`. Prava ikona se čuva pod **heširanim imenom** koje
+administrator otpremi kroz Settings → Theme, pa ta putanja **ne postoji**.
+
+I ne vraća 404: pada na front controller i odgovara **200 sa HTML-om aplikacije**. Pregledač dobije
+stranicu tamo gde je tražio sliku, **tiho ne nacrta ikonu**, i nigde se ne pojavi greška. Izmereno na
+STAGE-u.
+
+**Ispravka:** ikona putuje **u payload-u**, jer samo server zna gde je. Kad je nema, polje se
+izostavlja u celosti — platforma tada koristi svoju, umesto da joj se doda pokvarena adresa.
+
+### Šta notifikacija uopšte može da nosi (izmereno u MDN bazi)
+
+🔴 **HTML ne može.** `body` je običan tekst; oznake bi stigle kao znakovi. Notifikaciju crta
+**operativni sistem**, ne pregledač — nema stilova, fontova ni boja koje bi aplikacija birala. Zato
+push koristi `body` (isti tekst kao in-app), a `body_html` ostaje samo mejlu, i `bodyNote` u formi to
+već govori: *„Plain text — a notification cannot carry styling."*
+
+| | Chrome Android | iOS Safari |
+| --- | --- | --- |
+| `body`, `data` | ✅ | ✅ 16.4 |
+| `icon`, `tag` | ✅ 42 | ❌ |
+| `badge`, `actions`, `vibrate` | ✅ 53 | ❌ |
+| `image` (velika slika) | ✅ 56 | ❌ |
+
+⚠️ **Na iPhone-u notifikacija je naslov i tekst, i ništa više** — ni ikona ni dugmad. Ono što `sw.js`
+šalje preko toga se prosto ignoriše, što je uredan pad a ne kvar.
+
+### Dopuna istog dana: inbox je red od deset, a × ga sklanja
+
+Vlasnik, 18.09, posle prve verzije: *„dovoljno je da odvede u inbox. ne treba da se pravi posebna
+stranica za jedinacan prikaz poruke. jedino je potrebno dodati prikaz 10 poslednjih poruka pa load
+more... svakako ostaje da klik na X brise poruku iz njegovog inboxa."*
+
+**Klik vodi u inbox i to je sve.** Prva verzija je nosila `?notice=<id>` i označavala red; to je
+sklonjeno. Lista je najnovije-prvo, pa je poruka ionako na vrhu.
+
+**Deset po pogledu, pa „Load more".**
+
+🪤 **Kursor, ne broj stranice.** Poruke stižu dok neko čita, a sa `?page=2` bi red pao sa prve
+stranice na drugu — „load more" bi mu pokazao nešto što je već pročitao i sakrio nešto što nije.
+Traži se od **najstarijeg id-ja na ekranu**, a to ne može da odluta. Server vraća **jedan red više**
+nego što je traženo i time zna da li da ponudi dugme, bez drugog upita koji broji redove koje niko
+nije pogledao.
+
+### 🔴 Ovo povlači naslovnu tvrdnju ADR-0116
+
+Tamo je pisalo *„poruka koja se skloni ne nestaje"*. **Sada nestaje — sa njegovog ekrana.**
+Vlasnikova odluka.
+
+⚠️ Posledica koju treba znati: **sklonjena poruka se ne može ponovo pročitati.** To je izbor, ne
+propust.
+
+🪤 Ali se **red isporuke NE briše** — `dismissed_at` se upiše i zapis o tome šta je kome poslato
+ostaje ceo. Poruka napušta njegov pogled, ne bazu.
+
+✅ I ono zbog čega inbox i dalje ima smisla stoji nepromenjeno: dok ovog ekrana nije bilo,
+`messageInbox()` se u celoj aplikaciji pozivao sa **jednog mesta** — sa `/app/welcome` — pa
+koordinator koji radi kroz desktop **nikad nije saznao da poruka postoji**.

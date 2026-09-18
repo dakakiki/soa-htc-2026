@@ -424,6 +424,18 @@ const label = 'block text-sm font-medium text-gray-700';
                                 reaches everybody by definition.
                             -->
                             <p v-if="form.push" class="mt-3 text-xs text-gray-500">{{ $t('message.channelPushNote') }}</p>
+
+                            <!--
+                                🔴 A notification keeps nothing. Swiped off a
+                                lock screen it is gone, and tapping it opens the
+                                inbox — which has no row for a message that was
+                                never sent to the app. Said here, where the box
+                                that causes it is still under the cursor.
+                            -->
+                            <p v-if="form.push && !form.app" class="mt-2 flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-800">
+                                <IconAlertTriangle :size="14" class="mt-px shrink-0" />
+                                <span>{{ $t('message.pushWithoutApp') }}</span>
+                            </p>
                         </div>
 
                         <!--
@@ -502,6 +514,39 @@ const label = 'block text-sm font-medium text-gray-700';
                                 <p class="mt-2 text-sm font-semibold">{{ form.subject || '—' }}</p>
                                 <p class="mt-1.5 whitespace-pre-line text-[13px] leading-relaxed text-white/80">{{ form.body }}</p>
                             </div>
+                        </div>
+
+                        <!--
+                            What the phone draws. Deliberately NOT the in-app
+                            card above it: the same two lines arrive as a system
+                            notification, in the platform's own shape, over
+                            whatever the person was looking at.
+
+                            🔴 The body is clamped to two lines because that is
+                            what Android shows while the notification is
+                            collapsed. An administrator writing five hundred
+                            characters should see where the reader stops, on the
+                            screen where they are still able to shorten it.
+                        -->
+                        <div v-if="form.push" class="border-b border-gray-200 pb-6">
+                            <h2 :class="section">{{ $t('message.channelPush') }}</h2>
+
+                            <div class="mt-3 rounded-xl bg-gray-200 p-3">
+                                <div class="flex gap-2.5 rounded-lg bg-white p-3 shadow-sm">
+                                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-brand-palette-4 text-[9px] font-semibold text-white" aria-hidden="true">
+                                        S
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-gray-400">
+                                            {{ $t('app.name') }} · {{ $t('message.pushJustNow') }}
+                                        </p>
+                                        <p class="mt-1 truncate text-[13px] font-semibold text-gray-900">{{ form.subject || '—' }}</p>
+                                        <p class="mt-0.5 line-clamp-2 whitespace-pre-line text-[12.5px] leading-snug text-gray-600">{{ form.body }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="mt-2 text-xs text-gray-500">{{ $t('message.pushPreviewNote') }}</p>
                         </div>
 
                         <div v-if="form.mail" class="border-b border-gray-200 pb-6">

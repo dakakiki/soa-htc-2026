@@ -12,8 +12,10 @@ use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\Season;
 use App\Domain\Organization\Models\SeasonUserAssignment;
+use App\Domain\Organization\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -187,6 +189,58 @@ class PushNotificationTest extends TestCase
     }
 
     /**
+     * 🔴 The tap opens their notices, and that is the whole of it (owner,
+     * 2026-09-18: *„dovoljno je da odvede u inbox"*). No screen for one message
+     * and no marked row — the list is newest first, so the notice is at the top
+     * of it.
+     */
+    public function test_the_tap_opens_the_inbox(): void
+    {
+        $user = $this->coordinator();
+        $this->device($user, 'https://push.example/phone');
+
+        $seen = [];
+        $this->fakeSender(function (PushSubscription $to, array $payload) use (&$seen) {
+            $seen = $payload;
+
+            return PushOutcome::Sent;
+        });
+
+        app(MessageDispatcher::class)->deliverPushes();
+
+        $this->assertSame('/app/messages', $seen['url']);
+    }
+
+    /**
+     * 🪤 The icon travels WITH the notification, because only the server knows
+     * where it is: it is uploaded through Settings and stored under a hashed
+     * name. A fixed path written into `sw.js` — which is what the first version
+     * did — does not even 404: it falls through to the front controller, answers
+     * 200 with the application's HTML, and the browser quietly draws no icon.
+     */
+    public function test_the_payload_carries_the_icon_rather_than_the_worker_guessing_it(): void
+    {
+        $user = $this->coordinator();
+        $this->device($user, 'https://push.example/phone');
+
+        Storage::fake('public');
+        Storage::disk('public')->put('branding/hashed-name.png', 'not-really-a-png');
+        Setting::current()->update(['logo_icon_path' => 'branding/hashed-name.png']);
+
+        $seen = [];
+        $this->fakeSender(function (PushSubscription $to, array $payload) use (&$seen) {
+            $seen = $payload;
+
+            return PushOutcome::Sent;
+        });
+
+        app(MessageDispatcher::class)->deliverPushes();
+
+        $this->assertArrayHasKey('icon', $seen);
+        $this->assertStringContainsString('branding/hashed-name.png', (string) $seen['icon']);
+    }
+
+    /**
      * The half of this that lives in the browser. The front has no test runner
      * and is not getting one (ADR-0074, withdrawn), so the file is read — as
      * `ManifestTest` reads the router.
@@ -217,6 +271,16 @@ class PushNotificationTest extends TestCase
 
         $this->assertSame(0, preg_match('/\bcaches\s*\./', $worker), 'the worker has been given a cache');
         $this->assertSame(0, preg_match('/\brespondWith\s*\(/', $worker), 'the worker has started answering fetches');
+    }
+
+    /** 🔴 And it names no address of its own — see the payload test above. */
+    public function test_the_service_worker_does_not_guess_where_the_icon_is(): void
+    {
+        $this->assertSame(
+            0,
+            preg_match('#/storage/branding/[A-Za-z0-9._-]+#', $this->serviceWorker()),
+            'sw.js has a hard-coded icon path again; only the server knows where the icon is.',
+        );
     }
 
     private function serviceWorker(): string
@@ -296,6 +360,21 @@ class PushNotificationTest extends TestCase
             'audience' => [],
             'recipients_count' => 1,
             'created_by' => $user->id,
+        ]);
+
+        /*
+         * 🪤 The app row FIRST, and not only because a message with both
+         * channels really has both. It pushes the push row's id past the
+         * message's, so a test comparing the two is comparing two different
+         * numbers — with one delivery they are both 1 on a fresh SQLite
+         * database and an assertion about which one is used proves nothing.
+         */
+        MessageDelivery::create([
+            'message_id' => $message->id,
+            'user_id' => $user->id,
+            'channel' => 'app',
+            'status' => MessageDelivery::STATUS_SENT,
+            'sent_at' => now(),
         ]);
 
         MessageDelivery::create([
