@@ -4405,3 +4405,39 @@ Vlasnik: *„u inboxu nemam niti jednu poruku"*. Tačno, i očekivano:
 - Raniju poruku, onu na `app` kanalu, **sklonio je u 10:50** — a od ADR-0119 × je sklanja sa ekrana.
 
 Dva ispravna ponašanja koja se sabiraju u „prazan ekran", i zato zajedno izgledaju kao kvar.
+
+## ADR-0121 — Zvonce se budi zajedno sa aplikacijom (ispravka uz ADR-0116)
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #107**
+
+Vlasnik, 18.09: *„notifikacija je probudila telefon… nije obelezeno zvonce da ima notifikacija"*.
+
+### 🔴 Instalirana aplikacija se ne pokreće, nego se budi
+
+Brojač je tražen **samo pri montiranju ljuske**. Ali instalirana aplikacija nije zatvorena nego
+**pozadinska**: dodir na notifikaciju vraća prozor koji već postoji, pa se **ništa ne montira i
+ništa ne pita**. Zvonce zato pokazuje broj od trenutka kad je aplikacija poslednji put otvorena — a
+to je tačno onaj trenutak za koji notifikacija tvrdi da je zastareo.
+
+Sada se pita i na svaki povratak u prvi plan (`visibilitychange`), i dalje **ne na otkucaj**: ekran
+telefona se pogleda i skloni, a koordinator u hodniku plaća svaki zahtev.
+
+🪤 Administracija to nema jer ionako pita na dva minuta dok je kartica ispred (ADR-0116) — ista
+potreba, druga ljuska, i lako je pretpostaviti da je rešena na oba mesta.
+
+### Šta nije bio kvar, iako je izgledalo kao jedan
+
+Uz to je prijavljeno *„notifikacije nema u inboxu"*. Provereno u bazi: **sve poruke poslate tog
+popodneva imale su kanal `["push"]` i ništa drugo.** Nema reda na `app` kanalu → nema šta u inbox-u,
+i nema šta zvoncu da broji. Oba ekrana su bila **u pravu**.
+
+🪤 To je ista greška koju forma već imenuje (ADR-0119), ali ju je ovde lako pomešati sa pravim
+kvarom pored nje: tri simptoma zajedno, od kojih je **jedan** kvar.
+
+### ⚠️ I jedan koji nije u kodu
+
+*„klikom na poruku sam odveden na poslednji ekran aplikacije koji sam posetio"* — to je Android koji
+**vraća aplikaciju** kad rukovalac ništa ne uradi, a stari rukovalac je baš to radio (ADR-0120).
+Telefon je i dalje nosio **stari service worker**: on se menja tek kad ga pregledač povuče i
+aktivira, a instalirana aplikacija to radi kad se stvarno pokrene — ne kad se probudi iz pozadine.
+Zatvoriti je iz liste zadataka pa otvoriti.
