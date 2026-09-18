@@ -1,0 +1,8 @@
+# Staging. This is a copy of the competition with real registration data in it,
+# kept for the people building it — none of it belongs in a search index.
+#
+# Every response here also carries `X-Robots-Tag: noindex` (public/.htaccess),
+# which is what removes a page that was indexed anyway; this file is what stops
+# a well-behaved crawler from asking in the first place.
+User-agent: *
+Disallow: /
