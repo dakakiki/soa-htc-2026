@@ -42,6 +42,58 @@ class SpaShellTest extends TestCase
      * 🪤 The manifest route sits IN FRONT of the SPA catch-all and must keep its
      * own headers. A cache rule added to the shell must not have reached it.
      */
+    /**
+     * 🔴 The recovery from a stale build fires once per address PER BUILD, and
+     * the build half was missing until 2026-09-18.
+     *
+     * `sessionStorage` outlives a reload, so a key of the address alone meant
+     * the recovery was spent the first time it worked. The SECOND deploy into
+     * the same open tab found its own flag already set and returned — a dead
+     * click again, and silently, because the thing that fixes it had been used
+     * up (owner: *„kada uradis izmenu na messages pa klik na link ne radi. to
+     * smo vec sredjivali"*).
+     *
+     * 🪤 The loop guard still has to hold: a build that is genuinely broken must
+     * reload into itself once and then stop, or a bad deploy takes the console
+     * with it and nobody can see why.
+     */
+    public function test_a_stale_build_is_recovered_from_once_for_every_build_and_not_once_ever(): void
+    {
+        $router = (string) file_get_contents(base_path('resources/js/router/index.ts'));
+
+        $this->assertStringContainsString(
+            'const key = `reload-once:${runningBuild()}:${to.fullPath}`;',
+            $router,
+            'The one-shot reload is keyed by the address alone again, so the second deploy into an '
+            .'open tab is a dead click with its recovery already spent.',
+        );
+    }
+
+    /**
+     * And the build it is keyed by is the one the TAB is running, read off the
+     * page itself. After a failed dynamic import the document still holds the
+     * old entry, which is exactly the identity wanted.
+     *
+     * 🪤 The selector has to match what Vite actually emits, and this suite
+     * cannot check that: `TestCase` calls `withoutVite()`, so the shell it
+     * serves has no script tag at all. It was checked by hand against a really
+     * rendered shell — `<script type="module" src="http://host/build/assets/app-XXXX.js">`,
+     * which is ABSOLUTE, so a selector written for a root-relative `src` would
+     * match nothing and every tab would share the build id "dev".
+     *
+     * What is guarded here is the pair that would drift: the shell asks for that
+     * entry, and the router looks for it where Vite puts it.
+     */
+    public function test_the_router_looks_for_the_entry_where_the_shell_asks_for_it(): void
+    {
+        $router = (string) file_get_contents(base_path('resources/js/router/index.ts'));
+        $shell = (string) file_get_contents(base_path('resources/views/app.blade.php'));
+
+        // 🪤 `src*=`, a CONTAINS match — the emitted src is absolute.
+        $this->assertStringContainsString('[src*="/build/assets/"]', $router);
+        $this->assertStringContainsString("'resources/js/app.ts'", $shell);
+    }
+
     public function test_the_manifest_keeps_its_own_content_type(): void
     {
         $this->get('/manifest.webmanifest')
