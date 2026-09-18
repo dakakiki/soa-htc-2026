@@ -12,6 +12,7 @@ import MediaPickerModal from '@/components/MediaPickerModal.vue';
 import MultiSelect, { type MultiSelectOption } from '@/components/MultiSelect.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import type { CmsCategory, CmsMedia } from '@/types/models';
+import { fromLocalInput, toLocalInput } from '@/utils/localDateTime';
 
 const route = useRoute();
 const router = useRouter();
@@ -79,7 +80,8 @@ async function submit(): Promise<void> {
         status: form.status,
         // Blank means "now" when publishing, and the server keeps the old date
         // when a published post goes back to draft.
-        published_at: form.published_at || null,
+        // The picker holds the editor's own clock; the server keeps UTC.
+        published_at: fromLocalInput(form.published_at),
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
         image_media_id: form.image_media_id,
@@ -118,7 +120,7 @@ onMounted(async () => {
             form.body = p.body ?? '';
             form.status = p.status;
             // The datetime-local input wants "YYYY-MM-DDTHH:mm".
-            form.published_at = p.published_at ? p.published_at.slice(0, 16) : '';
+            form.published_at = p.published_at ? toLocalInput(p.published_at) : '';
             form.seo_title = p.seo_title ?? '';
             form.seo_description = p.seo_description ?? '';
             form.category_ids = (p.categories ?? []).map((c) => c.id);

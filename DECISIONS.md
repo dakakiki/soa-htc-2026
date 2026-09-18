@@ -3979,3 +3979,56 @@ dok traje; sa `mode="out-in"` i ničim da se čeka, stari nestane odmah a novi s
   tamo pod satom, i ništa ne sme između tapa i sledećeg pitanja.
 - Blokovi na ekranima aplikacije ulaze sa kratkim zaostajanjem (45 ms po stavci, **ograničeno na
   240 ms**) — lista koja stalno dodaje kašnjenje čini da poslednja stavka deluje kao kvar.
+
+## ADR-0114 — Vreme se čuva u UTC, a prevodi se na granici — u pregledaču
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #100**
+
+Vlasnik je pitao kako da podesi cron da bi mogao da **zakaže** slanje poruke. Cron je bio ispravan;
+ono što nije bilo ispravno je vreme koje bi zakazao.
+
+### Šta je bilo pogrešno
+
+`<input type="datetime-local">` drži **golo vreme sa zida** — `2026-09-20T08:00`, bez ijedne oznake
+zone. Aplikacija radi u UTC. Niko između njih nije prevodio, pa je taj niz stizao na server kao da
+je **već UTC**. Izmereno na STAGE-u:
+
+```
+birač kaže 08:00  →  zapisano 2026-09-20 08:00:00 UTC  →  šalje se u 10:00 po Beogradu
+```
+
+🪤 Isto obrnuto pri ponovnom otvaranju: `send_at.slice(0, 16)` uzima **UTC** sa ISO niza i spušta ga
+u birač koji znači lokalno vreme — administrator bi otvorio poruku i video sat koji nije birao.
+
+⚠️ **Nijedna poruka nije zakasnila.** Na STAGE-u je jedna poruka, statusa `sent`, i **nula** sa
+zakazanim vremenom — greška je čekala na putu koji tek treba da se upotrebi. Isto su nosila i **oba
+CMS birača** (`published_at` na stranama i objavama), pa bi objava zakazana za devet izašla u jedanaest.
+
+### 🔴 UTC ostaje — menja se granica
+
+Čuvanje u UTC je **tačno i nije to ono što se menja**: koordinatori čitaju iste redove iz Beograda,
+Rijada i Ulan Batora, a jedini sat oko kog mogu da se slože je onaj u kom niko ne stoji. `APP_TIMEZONE`
+na Beograd bio bi jedna linija, ali bi zakucao ceo sistem na jednu zemlju — a ovo takmičenje ima
+učionice u **sedamdesetak**.
+
+Zato prevodi **pregledač**, koji jedini i zna u kojoj je zoni čitalac, a server ne mora da zna nikad:
+
+| | pre | sada |
+| --- | --- | --- |
+| upis | golo `08:00` → 08:00 UTC | `08:00` u čitaočevoj zoni → `06:00Z` |
+| čitanje | `slice(0, 16)` → 06:00 u biraču | 06:00Z → `08:00` u biraču |
+
+Jedno mesto: `resources/js/utils/localDateTime.ts`, oba smera. 🪤 `toISOString()` sam ispisuje UTC —
+zato se **prvo oduzme `getTimezoneOffset()`**, inače se ista greška vraća jedan nivo niže.
+
+✅ **Prikaz je već bio ispravan** i nije diran: liste rade `new Date(iso).toLocaleString()`, a API
+vraća ISO sa `Z`. Posledica je bila vidljiva, ne tiha — zakažeš 08:00, a lista ti odmah pokaže 10:00.
+
+### Test čita izvor, jer front nema kako drugačije
+
+Front nema test runner i neće ga dobiti (ADR-0074, povučen), pa `PickersKeepLocalTimeTest` **čita
+`.vue` fajlove**: svaki ekran sa `datetime-local` mora da uvozi prevod, i nijedan ne sme da puni
+birač sa `.slice(0, 16)`. Isti postupak koji `ManifestTest` već koristi za početnu adresu.
+
+🪤 Provereno da test **pada** kad se stara linija vrati — zelen test koji prolazi i na pokvarenom i na
+popravljenom kodu ne tvrdi ništa.

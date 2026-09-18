@@ -13,6 +13,7 @@ import {
     type MessageAudience, type MessageChannel,
 } from '@/api/messages';
 import { useConfirmStore } from '@/stores/confirm';
+import { fromLocalInput, toLocalInput } from '@/utils/localDateTime';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -166,7 +167,7 @@ onMounted(async () => {
             form.app = message.channels.includes('app');
             form.mail = message.channels.includes('mail');
             form.scheduled = message.status === 'scheduled';
-            form.send_at = message.send_at ? message.send_at.slice(0, 16) : '';
+            form.send_at = toLocalInput(message.send_at);
             locked.value = message.status === 'sent';
 
             audience.roles = message.audience.roles ?? [];
@@ -208,7 +209,8 @@ function payload(status: 'draft' | 'scheduled') {
         audience: { ...audience },
         channels: channels.value,
         status,
-        send_at: status === 'scheduled' ? form.send_at : null,
+        // The picker holds the administrator's own clock; the server keeps UTC.
+        send_at: status === 'scheduled' ? fromLocalInput(form.send_at) : null,
     };
 }
 
