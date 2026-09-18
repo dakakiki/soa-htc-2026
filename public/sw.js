@@ -29,3 +29,77 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', () => {
     // Intentionally empty — see above.
 });
+
+/*
+ * ──────────────────────────────────────────────────────────────────────────
+ * Notifications (2026-09-18)
+ *
+ * The one thing this worker does besides exist. It is still not a cache: the
+ * two listeners below never touch the network on their own and never call
+ * `respondWith`, so everything said above about caching stands unchanged.
+ *
+ * 🔴 A push MUST show a notification. Chrome allows a very small number of
+ * silent pushes and then withdraws the permission entirely — the subscription
+ * keeps working and nothing arrives, which is the worst way for this to fail.
+ * So the payload is defended rather than trusted: a push with nothing readable
+ * in it still shows something.
+ */
+
+self.addEventListener('push', (event) => {
+    let payload = {};
+
+    try {
+        payload = event.data ? event.data.json() : {};
+    } catch {
+        // Not JSON. Whatever it was, a notification still has to appear.
+    }
+
+    const title = payload.title || 'SOA HTC';
+
+    event.waitUntil(
+        self.registration.showNotification(title, {
+            body: payload.body || '',
+            // The uploaded brand icon, served from the same address the manifest
+            // names. A missing one costs nothing: the platform falls back.
+            icon: '/storage/branding/icon.png',
+            badge: '/storage/branding/icon.png',
+            /*
+             * One message replaces its own earlier notification instead of
+             * stacking a second copy — a coordinator who opens the app twice
+             * should not find the same line twice on the lock screen.
+             */
+            tag: payload.tag || 'soa-htc',
+            renotify: false,
+            data: { url: payload.url || '/app/messages' },
+        }),
+    );
+});
+
+/*
+ * 🔴 Focus a window that is already open rather than opening another. A
+ * coordinator tapping a notification while the installed application sits in
+ * the background should be taken to it, not given a second copy of it — and on
+ * Android a second window is a second entry in the task switcher that then
+ * never agrees with the first.
+ */
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const target = (event.notification.data && event.notification.data.url) || '/app/messages';
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+            for (const client of windows) {
+                if ('focus' in client) {
+                    if ('navigate' in client) {
+                        return client.navigate(target).then((c) => (c ? c.focus() : undefined));
+                    }
+
+                    return client.focus();
+                }
+            }
+
+            return self.clients.openWindow(target);
+        }),
+    );
+});
