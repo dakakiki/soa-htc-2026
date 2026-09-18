@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { IconAlertTriangle, IconUsers } from '@tabler/icons-vue';
+import { IconCheck, IconUsers } from '@tabler/icons-vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import MultiSelect from '@/components/MultiSelect.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
@@ -38,7 +38,6 @@ const form = reactive({
     // Nothing is ticked to begin with: which way a message travels is a
     // decision, and a box that arrives already ticked makes it for whoever
     // forgets to look (owner, 2026-09-15).
-    app: false,
     mail: false,
     push: false,
     scheduled: false,
@@ -165,7 +164,6 @@ onMounted(async () => {
             form.subject = message.subject;
             form.body = message.body ?? '';
             form.body_html = message.body_html ?? '';
-            form.app = message.channels.includes('app');
             form.mail = message.channels.includes('mail');
             form.push = message.channels.includes('push');
             form.scheduled = message.status === 'scheduled';
@@ -187,10 +185,10 @@ onMounted(async () => {
 
 /* ---- saving ---------------------------------------------------------- */
 const channels = computed<MessageChannel[]>(() => {
+    // 🔴 The app is not in this list because it is not a choice: the server
+    // adds it to whatever is sent (ADR-0122). Putting it here too would be a
+    // second place for the same rule to live.
     const picked: MessageChannel[] = [];
-    if (form.app) {
-        picked.push('app');
-    }
     if (form.mail) {
         picked.push('mail');
     }
@@ -202,10 +200,11 @@ const channels = computed<MessageChannel[]>(() => {
 });
 
 /**
- * The plain text is what a notice and a notification carry — the same words in
- * both, which is why one box asks for it however many of the two are ticked.
+ * Always asked for now: it is what the in-app notice carries, and every message
+ * is an in-app notice. ⚠️ Which means a long formal mail also needs its short
+ * line — that line is what a coordinator can act on from a corridor.
  */
-const needsBody = computed(() => form.app || form.push);
+const needsBody = computed(() => true);
 /** The editor is the mail's, and only the mail's. */
 const needsHtml = computed(() => form.mail);
 
@@ -279,7 +278,6 @@ async function sendNow(): Promise<void> {
 
 const canSend = computed(() =>
     !locked.value
-    && channels.value.length > 0
     && form.subject.trim() !== ''
     && (!needsBody.value || form.body.trim() !== '')
     && (!needsHtml.value || form.body_html.trim() !== ''),
@@ -385,25 +383,30 @@ const label = 'block text-sm font-medium text-gray-700';
                         </div>
 
                         <!--
-                            How it travels. One row: they are two boxes, not two
-                            sections. Both are the administration's to choose -
-                            a message may go only by mail, or only to the app.
+                            How it travels. Two boxes, not three: the app is not
+                            a choice.
 
-                            🪤 Push was left off this screen until 2026-09-18
-                            because the channel did not exist, and a box nobody
-                            can tick is a promise the screen cannot keep. It
-                            exists now (ADR-0117), so it is here — but it is the
-                            one channel that can reach nobody: it goes only to
-                            devices whose owner turned notifications on.
+                            🔴 Owner, 2026-09-18 — *„nema nikakvog smisla da se
+                            salju notifikacije koje nece biti u inboxu"*. The app
+                            channel is the one that KEEPS the message; mail
+                            leaves the building and a notification is gone the
+                            moment it is swiped away. Four messages went out by
+                            push alone: they arrived on a phone and pointed at an
+                            inbox that had nothing in them.
+
+                            🪤 The rule is enforced on the SERVER, which adds the
+                            channel to whatever is sent. This line only says so.
                         -->
                         <div class="border-t border-gray-200 pt-6">
                             <h2 :class="section">{{ $t('message.channels') }}</h2>
 
-                            <div class="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3">
-                                <label class="inline-flex items-center gap-2 text-sm">
-                                    <input v-model="form.app" type="checkbox" :disabled="locked" />
-                                    {{ $t('message.channelApp') }}
-                                </label>
+                            <p class="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                                <IconCheck :size="16" class="shrink-0 text-green-600" aria-hidden="true" />
+                                {{ $t('message.channelAppAlways') }}
+                            </p>
+                            <p class="mt-1 text-xs text-gray-500">{{ $t('message.channelAppAlwaysNote') }}</p>
+
+                            <div class="mt-4 flex flex-wrap items-center gap-x-8 gap-y-3">
                                 <label class="inline-flex items-center gap-2 text-sm">
                                     <input v-model="form.mail" type="checkbox" :disabled="locked" />
                                     {{ $t('message.channelMail') }}
@@ -416,26 +419,13 @@ const label = 'block text-sm font-medium text-gray-700';
 
                             <!--
                                 🔴 Said only under push, because it is the only
-                                one of the three that can reach nobody: a
-                                coordinator who never turned notifications on
-                                gets nothing however this box is ticked. The
-                                other two need no such warning — mail has an
-                                address on every account, and the app channel
-                                reaches everybody by definition.
+                                one that can reach nobody: a coordinator who never
+                                turned notifications on gets nothing however this
+                                box is ticked. It can no longer leave them with
+                                nothing to read, though — the app channel is
+                                always there now.
                             -->
                             <p v-if="form.push" class="mt-3 text-xs text-gray-500">{{ $t('message.channelPushNote') }}</p>
-
-                            <!--
-                                🔴 A notification keeps nothing. Swiped off a
-                                lock screen it is gone, and tapping it opens the
-                                inbox — which has no row for a message that was
-                                never sent to the app. Said here, where the box
-                                that causes it is still under the cursor.
-                            -->
-                            <p v-if="form.push && !form.app" class="mt-2 flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-800">
-                                <IconAlertTriangle :size="14" class="mt-px shrink-0" />
-                                <span>{{ $t('message.pushWithoutApp') }}</span>
-                            </p>
                         </div>
 
                         <!--
@@ -476,7 +466,6 @@ const label = 'block text-sm font-medium text-gray-700';
                                     </div>
                                 </div>
 
-                                <p v-if="channels.length === 0" class="text-sm text-amber-700">{{ $t('message.pickAChannel') }}</p>
                             </div>
                         </div>
                     </div>
@@ -505,7 +494,7 @@ const label = 'block text-sm font-medium text-gray-700';
                             </div>
                         </div>
 
-                        <div v-if="form.app" class="border-b border-gray-200 pb-6">
+                        <div class="border-b border-gray-200 pb-6">
                             <h2 :class="section">{{ $t('message.channelApp') }}</h2>
                             <div class="mt-3 rounded-xl border-l-[3px] border-brand-palette-1 bg-brand-palette-4 p-4 text-white">
                                 <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-brand-palette-1">

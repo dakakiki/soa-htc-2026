@@ -4441,3 +4441,50 @@ kvarom pored nje: tri simptoma zajedno, od kojih je **jedan** kvar.
 Telefon je i dalje nosio **stari service worker**: on se menja tek kad ga pregledač povuče i
 aktivira, a instalirana aplikacija to radi kad se stvarno pokrene — ne kad se probudi iz pozadine.
 Zatvoriti je iz liste zadataka pa otvoriti.
+
+## ADR-0122 — In-app nije izbor: svaka poruka stoji u inbox-u
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #108**
+
+> **Vlasnik, 18.09:** *„nema nikakvog smisla da se salju notifikacije koje nece biti u inboxu. Zato
+> predlazem da se in app skloni kao opcija i da se podrazumeva da je stalno chekirano."*
+
+### 🔴 Kod je to tvrdio o sebi od prvog dana
+
+`MessageChannel::App` od svog nastanka nosi: *„always among them and **cannot be switched off**…
+the one that always arrives."* Forma je to demantovala time što ga je nudila kao kućicu, i **nikad
+nije bilo sprovedeno**. Četiri poruke su otišle samo push-om: stigle na telefon i pokazivale na
+inbox u kom ih nema.
+
+**Sada server dodaje `app` na sve što stigne.** 🪤 Sprovedeno **tamo**, ne na ekranu: pravilo koje
+živi u formi je pravilo dok neko ne pošalje JSON.
+
+### Šta se menja
+
+| | pre | sada |
+| --- | --- | --- |
+| kućica „In the app" | izbor | **nema je** — piše *„Always in the app"* |
+| `channels: []` | greška 422 | **`["app"]`** — poruka koja ide samo u aplikaciju je stvarna stvar |
+| `channels: ["push"]` | prolazilo | **`["app","push"]`** |
+| „Choose at least one channel" | postojalo | otpalo — uvek postoji jedan |
+| upozorenje „push bez app" | postojalo | otpalo — nemoguće stanje |
+
+### ⚠️ Cena, i nije mala
+
+**Svaka poruka sada traži kratak običan tekst** — i ona čiji je pravi sadržaj duga formalna mejl
+poruka. Ranije je mejl mogao da prođe bez njega.
+
+To je prihvaćeno svesno: taj red je ono što koordinator vidi u hodniku i po čemu može da postupi.
+Mejl odlazi iz zgrade, notifikacija nestaje čim se prevuče — **in-app je jedini kanal koji poruku
+ČUVA.**
+
+### Zašto je ovo ispravna strana zamene
+
+Vlasnik je ranije istog dana pitao i suprotno — *da li da se ukine in-app kad je push besplatan*
+(ADR-0118). Odgovor je bio ne, sa istim razlogom sa kog je ovo sada da: **push je zvono, in-app je
+pismo.** Zvono bez pisma zvoni u prazno; pismo bez zvona se pročita kasnije. Ovo sprovodi tu istu
+rečenicu, samo sa druge strane.
+
+🪤 Test koji čuva pregled hoda **po kućicama**, pa app panel posle ovoga ne bi video — dodat je
+poseban koji tvrdi da taj panel **nije uslovan**. Bez njega bi jedini pregled koji se vidi na svakoj
+poruci mogao da se obriše a da niko ne primeti.

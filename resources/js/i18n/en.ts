@@ -1155,7 +1155,6 @@ export default {
         bodyPlain: 'Message text',
         bodyMail: 'E-mail text',
         bodyMailPlaceholder: 'Write the e-mail…',
-        pickAChannel: 'Choose at least one channel.',
         selectAll: 'Select all',
         body: 'Text',
         // Said where it is written, because this is the one place the text
@@ -1194,6 +1193,10 @@ export default {
 
         channels: 'Channels',
         channelApp: 'In the app',
+        // 🔴 Not a checkbox (ADR-0122). The app channel is the only one that
+        // KEEPS the message, so every message has it.
+        channelAppAlways: 'Always in the app',
+        channelAppAlwaysNote: 'Every message waits in the coordinator’s notices until they put it away — on their phone and in the administration.',
         channelAppNote: 'Always on. The message waits on the coordinator’s screen until they put it away.',
         channelMail: 'E-mail',
         channelMailNote: 'To the address on the coordinator’s account.',
@@ -1209,10 +1212,6 @@ export default {
         // 🔴 Said on the screen where it can still be acted on. The phone cuts
         // the text off; knowing that after sending is knowing it too late.
         pushPreviewNote: 'A phone shows about two lines until it is opened. The rest is in the app.',
-        // 🔴 Shown when push is ticked and the app channel is not. A
-        // notification keeps nothing: swiped away, it is gone, and tapping
-        // it lands in an inbox that has no row for this message.
-        pushWithoutApp: 'A notification is not kept — tap it and it opens the app, where there will be nothing to read. Tick “In the app” as well.',
 
         when: 'When',
         sendNow: 'Send now',

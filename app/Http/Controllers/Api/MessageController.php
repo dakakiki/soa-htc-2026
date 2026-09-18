@@ -311,13 +311,29 @@ class MessageController extends Controller
             'body' => ['nullable', 'string', 'max:500'],
             'body_html' => ['nullable', 'string', 'max:20000'],
             ...$this->audienceRules(),
-            'channels' => ['required', 'array', 'min:1'],
+            // 🪤 Not `min:1`. The app channel is added below whatever came
+            // in, so an empty list is a message that goes to the app and
+            // nowhere else — which is a real thing to send.
+            'channels' => ['present', 'array'],
             'channels.*' => [Rule::enum(MessageChannel::class)],
             'status' => ['required', Rule::in([MessageStatus::Draft->value, MessageStatus::Scheduled->value])],
             'send_at' => ['nullable', 'date'],
         ]);
 
-        $channels = array_values(array_unique($data['channels']));
+        /*
+         * 🔴 The APP channel is always among them and is not the administration's
+         * to switch off (owner, 2026-09-18). It is the only one that needs no
+         * address, no permission and no third party — so it is the one that
+         * always arrives, and the only one that KEEPS the message: mail leaves
+         * the building and a notification is gone the moment it is swiped away.
+         *
+         * 🪤 Enforced HERE and not only on the screen. The enum has claimed this
+         * about itself since it was written while the form offered a checkbox
+         * that contradicted it, and four messages went out by push alone —
+         * arriving on a phone, pointing at an inbox that had nothing in it.
+         * A rule that lives in a form is a rule until somebody posts JSON.
+         */
+        $channels = array_values(array_unique([MessageChannel::App->value, ...$data['channels']]));
 
         /*
          * 🔴 Push needs a key pair before it has anywhere to go. This refused it
@@ -341,14 +357,17 @@ class MessageController extends Controller
         }
 
         /*
-         * Each body is required by the channel that carries it, and by nothing
-         * else. A mail-only message needs no notification text, and a message
-         * that only goes to the app needs no HTML — asking for both every time
-         * would leave half of every message unread and unsent.
+         * The plain text is now asked for every time, because the app channel
+         * carries it and the app channel is always there. The HTML is still
+         * asked for only by mail — a message that is not being posted needs no
+         * letter, and demanding one would leave half of every message unwritten.
+         *
+         * ⚠️ This is the cost of the rule above, and it is a real one: an
+         * administrator writing a long formal mail must also write the short
+         * line that will stand in the inbox. That line is what the coordinator
+         * can act on from a corridor.
          */
-        $notification = array_intersect([MessageChannel::App->value, MessageChannel::Push->value], $channels) !== [];
-
-        if ($notification && trim((string) ($data['body'] ?? '')) === '') {
+        if (trim((string) ($data['body'] ?? '')) === '') {
             throw ValidationException::withMessages(['body' => 'Write the message.']);
         }
 

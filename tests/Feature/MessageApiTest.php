@@ -104,18 +104,66 @@ class MessageApiTest extends TestCase
     }
 
     /**
-     * Each body is required by the channel that carries it, and by nothing
-     * else: a mail-only message needs no notification text, and one that only
-     * goes to the app needs no HTML.
+     * 🔴 The APP channel is always among them, whatever was asked for (owner,
+     * 2026-09-18: *„nema nikakvog smisla da se salju notifikacije koje nece biti
+     * u inboxu"*). It is the only one that KEEPS the message — mail leaves the
+     * building and a notification is gone the moment it is swiped away.
+     *
+     * 🪤 Asserted against the API and not the screen. The enum has claimed this
+     * about itself since it was written while the form offered a checkbox that
+     * contradicted it; a rule that lives in a form is a rule until somebody
+     * posts JSON.
      */
-    public function test_a_mail_only_message_needs_no_notification_text(): void
+    public function test_the_app_channel_is_added_to_whatever_was_asked_for(): void
     {
-        $response = $this->actingAs($this->admin())
-            ->postJson('/api/messages', $this->payload(['channels' => ['mail'], 'body' => null]))
-            ->assertCreated();
+        config(['push.vapid.public' => 'a-public-key', 'push.vapid.private' => 'a-private-key']);
 
-        $this->assertSame([MessageChannel::Mail->value], $response->json('data.channels'));
-        $this->assertNull($response->json('data.body'));
+        foreach ([['mail'], ['push'], ['mail', 'push'], []] as $asked) {
+            $channels = $this->actingAs($this->admin())
+                ->postJson('/api/messages', $this->payload(['channels' => $asked]))
+                ->assertCreated()
+                ->json('data.channels');
+
+            $this->assertContains(
+                MessageChannel::App->value,
+                $channels,
+                'asked for ['.implode(', ', $asked).'] and the app channel was left out',
+            );
+        }
+    }
+
+    /** And it is not added twice when it was asked for. */
+    public function test_the_app_channel_is_not_doubled(): void
+    {
+        $channels = $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => ['app', 'mail']]))
+            ->assertCreated()
+            ->json('data.channels');
+
+        $this->assertSame(['app', 'mail'], $channels);
+    }
+
+    /**
+     * ⚠️ The cost of that rule, said plainly: every message now needs its short
+     * plain line, including one whose real content is a long formal mail. That
+     * line is what a coordinator can act on from a corridor.
+     */
+    public function test_every_message_needs_the_plain_text_now(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => ['mail'], 'body' => null]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('body');
+    }
+
+    /** A message that only goes to the app still needs no HTML. */
+    public function test_a_message_that_is_not_posted_needs_no_letter(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => [], 'body_html' => null]))
+            ->assertCreated()
+            ->assertJsonPath('data.body_html', null)
+            ->assertJsonPath('data.channels', ['app']);
     }
 
     public function test_a_notification_only_message_needs_no_html(): void
@@ -142,12 +190,17 @@ class MessageApiTest extends TestCase
             ->assertJsonValidationErrors('body_html');
     }
 
-    public function test_a_message_needs_a_channel(): void
+    /**
+     * 🪤 An empty list is no longer a refusal. It means "the app and nowhere
+     * else", which is a real thing to send — the validation says `present`
+     * rather than `min:1` for exactly that reason.
+     */
+    public function test_asking_for_no_channel_sends_it_to_the_app(): void
     {
         $this->actingAs($this->admin())
             ->postJson('/api/messages', $this->payload(['channels' => []]))
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('channels');
+            ->assertCreated()
+            ->assertJsonPath('data.channels', ['app']);
     }
 
     /**
