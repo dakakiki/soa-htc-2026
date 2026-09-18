@@ -4778,3 +4778,43 @@ vremenu — jedno pravilo više koje može da pogreši, da bi se zapisalo nešto
 🪤 **Test ide kroz guard, ne preko HTTP-a.** Obnavljanje traži zahtev sa kolačićem i bez sesije, što
 test klijent otežava — a test koji tiho završi na 401 dokazuje samo da se stranac odbija. Ovako se
 `viaRemember()` **tvrdi kao tačan**, pa se zna da se obnavljanje stvarno desilo.
+
+## ADR-0129 — Prozor se prvo podigne pa onda usmeri; Welcome više ne nosi poruke
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno
+
+> **Vlasnik, 18.09, sa telefona:** *„klik na notifikaciju nije otvorio PWA. ali kada sam ja kliknuo
+> na ikonicu otvorio se inbox. i stoji nova ne procitana poruka."*
+>
+> *„sa welcome screen koordinatora sada treba skloniti notifikacije. vise nema potrebe jer ima
+> zvonce sa badge"*
+
+### Dodir je radio — prozor se nije podigao
+
+🔴 **Druga rečenica prijave je cela dijagnoza.** Aplikacija je, kad ju je vlasnik sam otvorio, već
+stajala **na inboxu**. Znači `navigate()` je **uspeo**; prozor prosto nikad nije izašao napred.
+
+Redosled je bio `navigate()` pa `focus()`. To košta prozor: `navigate()` vraća **novi** rukovalac
+klijentom, a gest dodira je već potrošen na čekanje — pa `focus()` iza njega na Androidu ne podiže
+ništa. Sada ide **`focus()` prvo**, pa usmeravanje; a `navigate()` koji odbije ostavlja čoveka
+**ispred aplikacije** umesto ispred ničega.
+
+🪤 Ovo je **drugi** put da isti rukovalac ima tihu grešku (prvi: ADR-0120). Oba puta se ništa nije
+videlo — ni prozor, ni greška.
+
+⚠️ **Ne mogu da proverim na telefonu.** Mehanizam je objašnjen i redosled ispravljen; potvrda je
+vlasnikova.
+
+🪤 Test tvrdi da `await client.focus();` stoji **pre** `client.navigate(` — a ne da se reč „focus"
+negde pojavljuje: rukovalac piše i `'focus' in client`, što je radio i stari, pokvareni redosled.
+
+### Welcome pita svoje pitanje i ništa više
+
+Kartice sa porukama su sklonjene sa ekrana 7. Zvonce sa brojem kaže da nešto ima, a inbox je jedan
+dodir daleko — kartice su bile **druga kopija ekrana koji već postoji**, na ekranu čiji je ceo posao
+„koje od tri stvari te zanima".
+
+🪤 Time je otpao i **jedan API poziv pri pokretanju** — a to je isti onaj snop paralelnih poziva koji
+je pisao tri reda prijave za jedan povratak (ADR-0128). Vraćanje kartica vraća i taj poziv.
+
+Otpali su i stringovi `fromOrganiser` i `dismiss`, koji posle ovoga nemaju ko da ih ispiše.

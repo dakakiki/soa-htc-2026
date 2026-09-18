@@ -14,11 +14,18 @@ use Tests\TestCase;
  */
 class ReadingIsNotDismissingTest extends TestCase
 {
-    /** Where a coordinator can meet a notice: the two inboxes and Welcome. */
+    /**
+     * Where a coordinator can meet a notice: the two inboxes.
+     *
+     * 🔴 Welcome was the third until 2026-09-18, when the owner took the notices
+     * off it — *„sa welcome screen koordinatora sada treba skloniti notifikacije.
+     * vise nema potrebe jer ima zvonce sa badge"*. The bell now says there is
+     * something and the inbox is one tap away, so the cards were a second copy
+     * of a screen that already exists.
+     */
     private const SCREENS = [
         'resources/js/pages/app/MyMessagesPage.vue',
         'resources/js/pages/messages/InboxPage.vue',
-        'resources/js/pages/app/CoordinatorHomePage.vue',
     ];
 
     /**
@@ -85,6 +92,24 @@ class ReadingIsNotDismissingTest extends TestCase
         }
 
         $this->assertStringContainsString('data.meta.unread', $this->source('resources/js/stores/notices.ts'));
+    }
+
+    /**
+     * 🔴 And Welcome does not grow them back by accident. It carried the same
+     * cards, with the same two acts on them, and the owner took them off: a
+     * screen whose whole job is "which of the three things are you asking
+     * about" had a message thread in the middle of it.
+     *
+     * 🪤 This also removed one of the API calls the application makes on boot —
+     * which is the same burst that wrote three sign-in rows for one arrival
+     * (ADR-0128). Putting the cards back puts that call back.
+     */
+    public function test_welcome_asks_its_question_and_carries_no_notices(): void
+    {
+        $welcome = $this->source('resources/js/pages/app/CoordinatorHomePage.vue');
+
+        $this->assertStringNotContainsString('messageInbox', $welcome);
+        $this->assertStringNotContainsString('useNoticesStore', $welcome);
     }
 
     private function source(string $path): string

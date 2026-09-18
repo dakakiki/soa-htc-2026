@@ -280,6 +280,42 @@ class PushNotificationTest extends TestCase
         $this->assertStringContainsString('catch', $handler, 'a navigate that refuses must be stepped over, not returned');
     }
 
+    /**
+     * 🔴 The window is focused BEFORE it is navigated.
+     *
+     * Reported from a phone on 2026-09-18: *„klik na notifikaciju nije otvorio
+     * PWA"* — and yet opening the app by its icon a moment later showed the
+     * inbox already loaded. That is the diagnosis in one sentence: the navigate
+     * HAD worked and the window simply never came forward.
+     *
+     * Navigating first costs the window. `navigate()` hands back a new client
+     * handle and the tap's gesture is spent awaiting it, so the `focus()` behind
+     * it raises nothing on Android. Focusing first spends the gesture on the one
+     * thing the person asked for — show me the app — and a navigate that then
+     * refuses leaves them in front of the app rather than in front of nothing.
+     *
+     * 🪤 Asserted on `await client.focus()` and not on the word "focus": the
+     * handler says `'focus' in client` while only testing whether it can, which
+     * the old order did too, above the navigate that broke it.
+     */
+    public function test_the_window_is_brought_forward_before_it_is_steered(): void
+    {
+        $handler = $this->clickHandler();
+
+        $focus = strpos($handler, 'await client.focus();');
+        $navigate = strpos($handler, 'client.navigate(');
+
+        $this->assertNotFalse($focus, 'nothing in the handler brings a window forward on its own');
+        $this->assertNotFalse($navigate, 'nothing in the handler steers a window to the message');
+
+        $this->assertLessThan(
+            $navigate,
+            $focus,
+            'the handler navigates before it focuses, which is the order that opened nothing on a phone: '
+            .'the page loads in a window nobody is shown',
+        );
+    }
+
     /** The `notificationclick` listener, to the end of the file. */
     private function clickHandler(): string
     {

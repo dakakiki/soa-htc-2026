@@ -569,10 +569,6 @@ export default {
             welcomeLead: 'Exams for your venues',
             venuesCount: '{n} venues',
             loadFailed: 'Could not load this just now.',
-            // The administrator's message, which is the same text the mail
-            // carries (ADR-0099/0100).
-            fromOrganiser: 'From the organiser',
-            dismiss: 'Dismiss',
             noExams: 'No exams are open for your venue.',
             // 🪤 The prototype promised "with its password and the numbers for
             // your room". The password cannot be served — it is a bcrypt hash —

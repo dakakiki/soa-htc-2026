@@ -112,24 +112,45 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil((async () => {
         const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
 
-        // Already on it: bring that one forward and change nothing.
         for (const client of windows) {
-            if (client.url === target && 'focus' in client) {
-                return client.focus();
-            }
-        }
-
-        for (const client of windows) {
-            if (!('navigate' in client) || !('focus' in client)) {
+            if (!('focus' in client)) {
                 continue;
             }
 
             try {
-                const moved = await client.navigate(target);
+                /*
+                 * 🔴 FOCUS FIRST, navigate after. The other way round was the
+                 * bug reported from a phone on 2026-09-18: "klik na notifikaciju
+                 * nije otvorio PWA", and yet opening the app by its icon a
+                 * moment later showed the inbox already loaded. That is the
+                 * whole diagnosis in one sentence — the navigate HAD worked and
+                 * the window simply never came forward.
+                 *
+                 * Navigating first costs the window: `navigate()` hands back a
+                 * NEW client handle and the tap's gesture has already been spent
+                 * awaiting it, so the `focus()` behind it raises nothing on
+                 * Android. Focusing first spends the gesture on the one thing a
+                 * person actually asked for — show me the app.
+                 */
+                await client.focus();
 
-                return (moved || client).focus();
+                // Already there: nothing left to do, and no navigation to risk.
+                if (client.url !== target && 'navigate' in client) {
+                    try {
+                        await client.navigate(target);
+                    } catch {
+                        /*
+                         * "Cannot navigate a client that is not controlled" —
+                         * which `includeUncontrolled: true` is precisely what
+                         * puts in this list. The window is in front either way,
+                         * which is more than the old order managed.
+                         */
+                    }
+                }
+
+                return;
             } catch {
-                // Not ours to steer. Try the next one, then a new window.
+                // This one will not come forward. Try the next, then a new one.
             }
         }
 
