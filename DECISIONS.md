@@ -4684,3 +4684,55 @@ ponovo pitalo bazu.
 🪤 **Tri testa su prolazila i bez šablona.** Laravel-ovo podnožje štampa baš `© 2026 SOA HTC`, a ime
 sajta stoji i u dugmetu ispod teksta — pa su tvrdnje tražene **u zaglavlju/podnožju**, ne bilo gde u
 dokumentu, a copy linija u testu je oblik koji framework ne može da proizvede.
+
+## ADR-0127 — Oporavak od starog build-a važi po build-u, ne jednom po kartici
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno
+
+> **Vlasnik, 18.09:** *„mislim da stvari koje smo danas radili nisu izuzete od kesiranja jer kada
+> uradis izmenu na messages pa klik na link ne radi. to smo vec sredjivali."*
+
+### Sređivali jesmo — ali samo prvi put
+
+PR #78 je uveo oporavak: kad klik padne na „Failed to fetch dynamically imported module", stranica se
+**jednom** ponovo učita na adresi na koju se kliknulo. Ključ te jednokratnosti bio je **samo adresa**:
+
+```
+reload-once:/messages
+```
+
+🔴 A `sessionStorage` **preživi to ponovno učitavanje.** Znači: prvi stari build se oporavi i sve
+radi; **drugi deploy u istu otvorenu karticu** nađe marker već postavljen i **vrati se bez ičega** —
+opet mrtav klik, i sada tiho, jer je jedina stvar koja to popravlja već potrošena.
+
+Zato se javlja baš posle **više izmena u jednom danu**, što je tačno današnji oblik rada.
+
+### Odluka
+
+Ključ nosi i **build koji kartica trenutno vozi**:
+
+```
+reload-once:app-upixETQv.js:/messages
+```
+
+Build se čita **iz dokumenta** — `<script type="module" src=".../build/assets/app-XXXX.js">`. Posle
+pale dinamičke pretrage kartica i dalje vozi **stari** entry, a to je baš identitet koji treba:
+„build čije je jedno ponovno učitavanje potrošeno".
+
+🪤 **Zaštita od petlje i dalje drži.** Stvarno pokvaren build se učita jednom u samog sebe, nađe svoj
+marker i stane — jedno učitavanje po build-u, a ne beskonačno.
+
+🪤 **Vite upisuje heširana imena chunk-ova u entry**, pa preimenovanje bilo kog lenjog chunk-a menja i
+ime entry-ja. Zato je to upotrebljiv broj build-a, a ne samo ime jednog fajla.
+
+🪤 **`src` je APSOLUTAN** (`http://host/build/assets/…`), pa selektor ide sa `src*=` — selektor pisan
+za putanju koja počinje kosom crtom ne bi poklopio ništa i sve kartice bi delile isti id.
+
+🪤 **Suite ovo ne može da izmeri**: `TestCase` zove `withoutVite()`, pa poslužena ljuska u testu nema
+nijedan `<script>`. Provereno rukom nad stvarno iscrtanom ljuskom; test čuva **par koji može da se
+razidе** — ljuska traži taj entry, a ruter ga traži tamo gde ga Vite ostavlja.
+
+### Šta ovo NIJE
+
+Nije keširanje u service worker-u. Toga i dalje **nema i ne sme da ga bude** — beli ekran posle
+deploy-a usred sezone; `ManifestTest` to čuva.

@@ -866,6 +866,27 @@ export const router = createRouter({
  * a reload loop is a worse failure than a dead menu: it takes the console with
  * it, so nobody can see why.
  */
+/**
+ * Which build this tab is actually running — the hashed name of the entry Vite
+ * put in the page.
+ *
+ * 🪤 Read from the DOCUMENT rather than from anything imported. After a failed
+ * dynamic import the tab is still running the old entry, and that old name is
+ * exactly the identity wanted: "the build whose one reload has been spent".
+ *
+ * Vite writes the hashed names of the chunks it imports into the entry, so a
+ * deploy that renames any lazy chunk renames the entry too — which is what makes
+ * this a usable build number and not just the name of one file.
+ *
+ * Returns a constant under `npm run dev`, where there are no hashed assets and
+ * no stale-build problem to recover from.
+ */
+function runningBuild(): string {
+    const entry = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/build/assets/"]');
+
+    return entry?.src.split('/').pop() ?? 'dev';
+}
+
 router.onError((error, to) => {
     const message = String((error as Error)?.message ?? '');
 
@@ -876,7 +897,23 @@ router.onError((error, to) => {
         return;
     }
 
-    const key = `reload-once:${to.fullPath}`;
+    /*
+     * 🔴 Once per address PER BUILD, and the build half was missing until
+     * 2026-09-18 (owner: *„kada uradis izmenu na messages pa klik na link ne
+     * radi. to smo vec sredjivali"*).
+     *
+     * The key was the address alone and `sessionStorage` outlives a reload, so
+     * the recovery fired ONCE for a given address in the life of a tab. The
+     * first stale build reloaded and worked; the second deploy into the same
+     * open tab found the flag already set and returned — a dead click again,
+     * and this time silently, because the one thing that used to fix it had
+     * already been spent.
+     *
+     * With the running build in the key, each new build gets its own single
+     * reload, and the loop guard still holds: a build that is genuinely broken
+     * reloads once into itself, finds its own flag, and stops.
+     */
+    const key = `reload-once:${runningBuild()}:${to.fullPath}`;
 
     try {
         if (window.sessionStorage.getItem(key) !== null) {
