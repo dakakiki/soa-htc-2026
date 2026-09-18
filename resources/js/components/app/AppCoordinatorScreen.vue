@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onBeforeUnmount, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconBell, IconLogout } from '@tabler/icons-vue';
@@ -40,11 +40,28 @@ async function signOut(): Promise<void> {
 }
 
 /*
- * Asked once when the frame appears, and not on a beat. A phone screen is
- * looked at and put away, so the moment worth being right about is the moment
- * it is opened — and a coordinator in a corridor pays for every request.
+ * Asked when the frame appears, and again every time the application comes back
+ * to the front. Not on a beat: a phone screen is looked at and put away, and a
+ * coordinator in a corridor pays for every request.
+ *
+ * 🔴 The second half is the one that was missing. An installed application is
+ * BACKGROUNDED, not closed — tap a notification and Android resumes the window
+ * that was already there, so nothing mounts and nothing asks. The bell then
+ * shows the count from whenever the app was last opened, which is exactly the
+ * moment a notification says it is wrong. Reported 2026-09-18.
  */
-onMounted(() => void notices.refresh());
+function look(): void {
+    if (document.visibilityState === 'visible') {
+        void notices.refresh();
+    }
+}
+
+onMounted(() => {
+    look();
+    document.addEventListener('visibilitychange', look);
+});
+
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', look));
 </script>
 
 <template>
