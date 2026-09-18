@@ -189,19 +189,15 @@ class PushNotificationTest extends TestCase
     }
 
     /**
-     * 🔴 The tap has to land on the message, not on a list to search.
-     *
-     * 🪤 And it names the MESSAGE, never the delivery. This payload is built on
-     * the PUSH-channel row; the row the reader will find in their inbox is the
-     * APP-channel one, and the two have different ids — pointing at this one
-     * would highlight nothing, on every message, for ever.
+     * 🔴 The tap opens their notices, and that is the whole of it (owner,
+     * 2026-09-18: *„dovoljno je da odvede u inbox"*). No screen for one message
+     * and no marked row — the list is newest first, so the notice is at the top
+     * of it.
      */
-    public function test_the_tap_lands_on_the_message_and_not_merely_on_the_inbox(): void
+    public function test_the_tap_opens_the_inbox(): void
     {
         $user = $this->coordinator();
         $this->device($user, 'https://push.example/phone');
-
-        $pushDelivery = $this->pushRow($user);
 
         $seen = [];
         $this->fakeSender(function (PushSubscription $to, array $payload) use (&$seen) {
@@ -212,12 +208,7 @@ class PushNotificationTest extends TestCase
 
         app(MessageDispatcher::class)->deliverPushes();
 
-        $this->assertSame('/app/messages?notice='.$pushDelivery->message_id, $seen['url']);
-        $this->assertNotSame(
-            '/app/messages?notice='.$pushDelivery->id,
-            $seen['url'],
-            'that is the push delivery, which the inbox never shows',
-        );
+        $this->assertSame('/app/messages', $seen['url']);
     }
 
     /**

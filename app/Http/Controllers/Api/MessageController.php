@@ -31,6 +31,12 @@ use Illuminate\Validation\ValidationException;
  */
 class MessageController extends Controller
 {
+    /**
+     * How many notices one look at the inbox holds (owner, 2026-09-18:
+     * "prikaz 10 poslednjih poruka pa load more").
+     */
+    private const INBOX_PAGE = 10;
+
     public function __construct(
         private readonly RecipientResolver $recipients,
         private readonly MessageDispatcher $dispatcher,
@@ -217,58 +223,67 @@ class MessageController extends Controller
      * them.
      */
     /**
-     * One person's own notices.
+     * One person's own notices: what is waiting for them, newest first.
      *
-     * Two scopes over one shape. `waiting` is what the Welcome screen puts in
-     * front of somebody — the notices they have not put away — and is the
-     * default, because that is the older question and the one most callers ask.
-     * `all` is the INBOX, and it exists because of what putting one away used to
-     * mean.
+     * 🔴 Putting one away takes it off this screen (owner, 2026-09-18: *„klik na
+     * X brise poruku iz njegovog inboxa"*). The DELIVERY ROW IS NOT DELETED —
+     * `dismissed_at` is stamped on it and the administration's record of what
+     * was sent to whom stays whole. It leaves their view, not the database.
      *
-     * 🔴 Dismissing hid a notice FOR GOOD. The query is `whereNull(dismissed_at)`
-     * and no screen anywhere showed the others, so a coordinator who tapped ×
-     * on "print the attendance register before Friday" had no way back to it —
-     * the administrator could still read it in their own list, the person it was
-     * written for could not. That is the whole reason this scope exists.
-     *
-     * `meta.waiting` is the true count rather than the size of this page: the
-     * bell in both shells is drawn from it, and a bell that stops counting at
-     * twenty is a bell that lies quietly.
+     * ⚠️ So a notice they put away cannot be read again, and that is the owner's
+     * decision rather than an oversight. What the inbox still fixes is the
+     * larger half of the same finding: until this screen existed, `inbox` was
+     * called from exactly ONE place in the whole application — the app's Welcome
+     * — so a coordinator working through the desktop never learned a message
+     * existed at all.
      */
     public function inbox(Request $request): JsonResponse
     {
         $userId = (int) $request->user()->id;
-        $everything = $request->query('scope') === 'all';
 
-        $query = $everything
-            ? MessageDelivery::query()->inApp($userId)
-            : MessageDelivery::query()->waitingInApp($userId);
+        $query = MessageDelivery::query()->waitingInApp($userId);
 
+        /*
+         * 🪤 A cursor, not a page number. Notices arrive while somebody is
+         * reading, and with `?page=2` a message landing in between pushes a row
+         * off the first page onto the second — so "load more" would show them
+         * something they have already read and hide something they have not. An
+         * id to go back from cannot drift.
+         */
+        $before = (int) $request->query('before', 0);
+
+        if ($before > 0) {
+            $query->where('id', '<', $before);
+        }
+
+        /*
+         * One more than asked for, which is how the screen knows whether to
+         * offer "load more" without a second query counting rows nobody has
+         * looked at.
+         */
         $deliveries = $query
             ->with('message:id,subject,body,sent_at')
             ->latest('id')
-            ->limit($everything ? 100 : 20)
+            ->limit(self::INBOX_PAGE + 1)
             ->get();
+
+        $more = $deliveries->count() > self::INBOX_PAGE;
 
         return response()->json([
             'data' => $deliveries
+                ->take(self::INBOX_PAGE)
                 ->filter(fn (MessageDelivery $d) => $d->message !== null)
                 ->map(fn (MessageDelivery $d) => [
                     'id' => $d->id,
-                    /*
-                     * The MESSAGE behind the delivery, so a notification can
-                     * name what it is about. A notification knows nothing about
-                     * delivery rows — it is sent on the push channel and the row
-                     * the reader will find is the one on the app channel.
-                     */
-                    'message_id' => $d->message_id,
                     'subject' => $d->message->subject,
                     'body' => $d->message->body,
                     'sent_at' => $d->message->sent_at,
-                    'dismissed_at' => $d->dismissed_at,
                 ])
                 ->values(),
-            'meta' => ['waiting' => MessageDelivery::query()->waitingInApp($userId)->count()],
+            'meta' => [
+                'waiting' => MessageDelivery::query()->waitingInApp($userId)->count(),
+                'has_more' => $more,
+            ],
         ]);
     }
 

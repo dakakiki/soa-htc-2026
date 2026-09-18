@@ -1114,10 +1114,8 @@ export default {
         inboxWaiting: '{n} waiting',
         inboxNoneWaiting: 'Nothing waiting',
         inboxPutAway: 'Put away',
-        inboxPutAwayOn: 'Put away {date}',
-        // Said once, at the foot of the list, so nobody wonders whether tapping
-        // × is the last they will see of it.
-        inboxKeeps: 'Notices you put away stay on this screen.',
+        inboxMore: 'Load more',
+        inboxLoadingMore: 'Loading…',
 
         /*
          * Notifications (2026-09-18). Said on the inbox rather than on Welcome:

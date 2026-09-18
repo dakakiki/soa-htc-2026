@@ -229,15 +229,12 @@ class MessageDispatcher
                  */
                 'icon' => $this->icon(),
                 /*
-                 * Where the tap lands: their own notices, and THIS message
-                 * within them — the one screen that can show it again
-                 * afterwards, since a notification itself keeps nothing.
-                 *
-                 * 🪤 The message and not the delivery. The row a reader will
-                 * find is the APP-channel one; this payload is built on the
-                 * PUSH-channel one, and the two have different ids.
+                 * Where the tap lands: their own notices. Not a screen for this
+                 * one message and not a marked row either — the owner's call,
+                 * 2026-09-18: reaching the inbox is enough, and the notice is at
+                 * the top of it because the list is newest first.
                  */
-                'url' => '/app/messages?notice='.$message->id,
+                'url' => '/app/messages',
                 // One message replaces its own earlier notification rather than
                 // stacking a second copy on the lock screen.
                 'tag' => 'message-'.$message->id,

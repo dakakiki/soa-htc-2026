@@ -4331,24 +4331,34 @@ već govori: *„Plain text — a notification cannot carry styling."*
 ⚠️ **Na iPhone-u notifikacija je naslov i tekst, i ništa više** — ni ikona ni dugmad. Ono što `sw.js`
 šalje preko toga se prosto ignoriše, što je uredan pad a ne kvar.
 
-### Dopuna istog dana: klik otvara **poruku**, ne samo inbox
+### Dopuna istog dana: inbox je red od deset, a × ga sklanja
 
-Vlasnik: *„da li klik na notifikaciju vodi u inbox i otvori notifikaciju?"* — vodio je u inbox, ali
-poruku **nije otvarao**: id poruke je postojao samo u `tag`-u, koji adresa ne nosi.
+Vlasnik, 18.09, posle prve verzije: *„dovoljno je da odvede u inbox. ne treba da se pravi posebna
+stranica za jedinacan prikaz poruke. jedino je potrebno dodati prikaz 10 poslednjih poruka pa load
+more... svakako ostaje da klik na X brise poruku iz njegovog inboxa."*
 
-Sada `url` glasi `/app/messages?notice=<id poruke>`, a oba inbox ekrana **označe i dovuku** taj red.
+**Klik vodi u inbox i to je sve.** Prva verzija je nosila `?notice=<id>` i označavala red; to je
+sklonjeno. Lista je najnovije-prvo, pa je poruka ionako na vrhu.
 
-🪤 **Imenuje se PORUKA, nikad isporuka.** Payload se pravi nad redom kanala **push**, a red koji
-čitalac nađe u inbox-u je onaj kanala **app** — to su dva različita id-ja. Pokazivanje na pogrešan
-označavalo bi ništa, na svakoj poruci, zauvek.
+**Deset po pogledu, pa „Load more".**
 
-🪤 Označava se, ne filtrira. Notifikacija o jednoj poruci nije razlog da ostale nestanu, a lista koja
-na dodir isprazni sebe izgleda pokvareno.
+🪤 **Kursor, ne broj stranice.** Poruke stižu dok neko čita, a sa `?page=2` bi red pao sa prve
+stranice na drugu — „load more" bi mu pokazao nešto što je već pročitao i sakrio nešto što nije.
+Traži se od **najstarijeg id-ja na ekranu**, a to ne može da odluta. Server vraća **jedan red više**
+nego što je traženo i time zna da li da ponudi dugme, bez drugog upita koji broji redove koje niko
+nije pogledao.
 
-🔴 **Rupa koju je to otkrilo:** poruka poslata **samo push-om** nema red u inbox-u, pa bi klik vodio
-na listu koja je ne sadrži. Forma zato upozorava kad je push čekiran a **In the app** nije:
-*„Notifikacija se ne pamti — otvoriće aplikaciju u kojoj neće imati šta da se pročita."*
+### 🔴 Ovo povlači naslovnu tvrdnju ADR-0116
 
-🪤 I jedna zamka u samom testu: id isporuke i id poruke su na svežoj SQLite bazi **oba 1**, pa je
-tvrdnja o tome koji se koristi dokazivala ništa. Fixture sad pravi i app red, pa se brojevi raziđu.
-Isti oblik greške koji je ovde već pet puta uhvaćen.
+Tamo je pisalo *„poruka koja se skloni ne nestaje"*. **Sada nestaje — sa njegovog ekrana.**
+Vlasnikova odluka.
+
+⚠️ Posledica koju treba znati: **sklonjena poruka se ne može ponovo pročitati.** To je izbor, ne
+propust.
+
+🪤 Ali se **red isporuke NE briše** — `dismissed_at` se upiše i zapis o tome šta je kome poslato
+ostaje ceo. Poruka napušta njegov pogled, ne bazu.
+
+✅ I ono zbog čega inbox i dalje ima smisla stoji nepromenjeno: dok ovog ekrana nije bilo,
+`messageInbox()` se u celoj aplikaciji pozivao sa **jednog mesta** — sa `/app/welcome` — pa
+koordinator koji radi kroz desktop **nikad nije saznao da poruka postoji**.

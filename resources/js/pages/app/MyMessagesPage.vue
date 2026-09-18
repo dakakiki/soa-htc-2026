@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconBell, IconBellOff, IconX } from '@tabler/icons-vue';
 import { dismissMessage, messageInbox, type InboxMessage } from '@/api/messages';
@@ -24,49 +23,52 @@ import AppScreen from '@/components/app/AppScreen.vue';
  */
 const { t } = useI18n();
 const notices = useNoticesStore();
-const route = useRoute();
 const { on: pushOn, busy: pushBusy, failed: pushFailed, unavailable: pushUnavailable, toggle: togglePush } = usePushToggle();
 
 const rows = ref<InboxMessage[]>([]);
-const loading = ref(true);
-const error = ref<string | null>(null);
-
-const waiting = computed(() => rows.value.filter((row) => row.dismissed_at === null).length);
+const more = ref(false);
+const loadingMore = ref(false);
 
 /**
- * The notification points at one message, so the inbox opens on it rather than
- * on a list somebody then has to search.
- *
- * 🪤 It marks the row instead of filtering to it. A notification about one
- * notice is not a reason to hide the others — and a list that answers a tap by
- * emptying itself looks broken.
+ * 🪤 Asks from the OLDEST row on screen, not from a page number. A notice that
+ * arrives while somebody is reading would shift a page-numbered list by one, so
+ * "load more" would hand them a row they have already read and hide one they
+ * have not.
  */
-const opened = computed(() => {
-    const asked = Number(route.query.notice);
+async function loadMore(): Promise<void> {
+    const oldest = rows.value.at(-1);
 
-    return Number.isFinite(asked) && asked > 0 ? asked : null;
-});
-
-/**
- * 🪤 Waits for the rows. The tap arrives before the request comes back, and
- * scrolling to a row that is not drawn yet scrolls to nothing.
- */
-watch(rows, async () => {
-    if (opened.value === null) {
+    if (loadingMore.value || oldest === undefined) {
         return;
     }
 
-    await nextTick();
-    document.querySelector(`[data-notice="${opened.value}"]`)?.scrollIntoView({ block: 'center' });
-});
+    loadingMore.value = true;
+
+    try {
+        const { data } = await messageInbox(oldest.id);
+        rows.value = [...rows.value, ...data.data];
+        more.value = data.meta.has_more;
+    } catch {
+        // The button stays; nothing was lost.
+    } finally {
+        loadingMore.value = false;
+    }
+}
+
+const loading = ref(true);
+const error = ref<string | null>(null);
+
+/** 🪤 The server's count, not the page's: more may be waiting below. */
+const waiting = computed(() => notices.waiting);
 
 async function load(): Promise<void> {
     loading.value = true;
     error.value = null;
 
     try {
-        const { data } = await messageInbox('all');
+        const { data } = await messageInbox();
         rows.value = data.data;
+        more.value = data.meta.has_more;
         notices.waiting = data.meta.waiting;
     } catch {
         error.value = t('public.app.loadFailed');
@@ -78,7 +80,9 @@ async function load(): Promise<void> {
 /** Dropped from the front of the list first: a notice that stays put while the
  *  request travels reads as a button that did nothing. */
 async function putAway(row: InboxMessage): Promise<void> {
-    row.dismissed_at = new Date().toISOString();
+    // 🔴 Off the screen, which is what the × means (owner, 2026-09-18). The
+    // delivery row keeps `dismissed_at`, so the record of what was sent stays.
+    rows.value = rows.value.filter((r) => r.id !== row.id);
     notices.oneLess();
 
     try {
@@ -152,42 +156,23 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
 
             <template v-else>
                 <div class="mt-4 grid gap-2.5">
-                    <!-- Waiting keeps the brand rule it has on Welcome; put away
-                         keeps its place and loses only that mark. -->
+                    <!-- Every row here is waiting: putting one away takes it off
+                         the screen, so there is no second state to draw. -->
                     <article
                         v-for="row in rows"
                         :key="row.id"
-                        :data-notice="row.message_id"
-                        class="rise flex items-start gap-3 rounded-2xl p-4"
-                        :class="[
-                            row.dismissed_at === null
-                                ? 'border-l-[3px] border-brand-palette-1 bg-white/7'
-                                : 'border border-white/14 bg-white/[0.03]',
-                            row.message_id === opened ? 'outline outline-2 outline-offset-2 outline-brand-palette-1' : '',
-                        ]"
+                        class="rise flex items-start gap-3 rounded-2xl border-l-[3px] border-brand-palette-1 bg-white/7 p-4"
                     >
                         <div class="min-w-0 flex-1">
-                            <p
-                                class="text-[15px] font-medium leading-snug"
-                                :class="row.dismissed_at === null ? 'text-white' : 'text-brand-palette-3'"
-                            >{{ row.subject }}</p>
-                            <p
-                                class="mt-1.5 whitespace-pre-line text-[0.95rem] leading-relaxed"
-                                :class="row.dismissed_at === null ? 'text-white' : 'text-brand-palette-3'"
-                            >{{ row.body }}</p>
-                            <p :class="mono" class="mt-2 text-[9.5px] text-brand-palette-3/70">
-                                {{ when(row.sent_at) }}
-                                <template v-if="row.dismissed_at">
-                                    · {{ $t('message.inboxPutAwayOn', { date: when(row.dismissed_at) }) }}
-                                </template>
-                            </p>
+                            <p class="text-[15px] font-medium leading-snug text-white">{{ row.subject }}</p>
+                            <p class="mt-1.5 whitespace-pre-line text-[0.95rem] leading-relaxed text-white">{{ row.body }}</p>
+                            <p :class="mono" class="mt-2 text-[9.5px] text-brand-palette-3/70">{{ when(row.sent_at) }}</p>
                         </div>
 
                         <button
-                            v-if="row.dismissed_at === null"
                             type="button"
                             :aria-label="t('message.inboxPutAway')"
-                            class="-mr-1 -mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-brand-palette-3/70 transition hover:bg-white/10 hover:text-white"
+                            class="-mr-1 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-full text-brand-palette-3/70 transition hover:bg-white/10 hover:text-white"
                             @click="putAway(row)"
                         >
                             <IconX :size="15" :stroke-width="2" />
@@ -195,8 +180,20 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
                     </article>
                 </div>
 
-                <p :class="mono" class="mt-5 text-center text-[9.5px] text-brand-palette-3/70">{{ $t('message.inboxKeeps') }}</p>
+                <!-- Ten at a time. Offered only when the server has said there
+                     is more, so the button never asks a question with no
+                     answer. -->
+                <button
+                    v-if="more"
+                    type="button"
+                    :disabled="loadingMore"
+                    class="mt-4 min-h-11 w-full rounded-2xl border border-white/25 text-[0.9rem] font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+                    @click="loadMore()"
+                >
+                    {{ loadingMore ? $t('message.inboxLoadingMore') : $t('message.inboxMore') }}
+                </button>
             </template>
+
         </template>
     </AppScreen>
 </template>

@@ -54,22 +54,6 @@ class MessageDelivery extends Model
     }
 
     /**
-     * Everything this person was ever sent in the app, put away or not — their
-     * inbox.
-     *
-     * 🔴 The mail channel is deliberately not in it. A row there says an address
-     * was handed a message, which is a fact about a mail server rather than
-     * about this person, and putting it in a list headed "your notices" would
-     * invite them to read it as one they can act on. Their mail is in their mail.
-     *
-     * @param  Builder<MessageDelivery>  $query
-     */
-    public function scopeInApp(Builder $query, int $userId): void
-    {
-        $query->where('user_id', $userId)->where('channel', MessageChannel::App);
-    }
-
-    /**
      * What the coordinator should still see in front of them: delivered in the
      * app, and not yet put away.
      *
@@ -77,6 +61,12 @@ class MessageDelivery extends Model
      */
     public function scopeWaitingInApp(Builder $query, int $userId): void
     {
-        $query->inApp($userId)->whereNull('dismissed_at');
+        $query->where('user_id', $userId)
+            ->where('channel', MessageChannel::App)
+            // 🔴 The MAIL channel is not a notice. A row there says an
+            // address was handed something, which is a fact about a mail
+            // server rather than about this person; their mail is in their
+            // mail.
+            ->whereNull('dismissed_at');
     }
 }

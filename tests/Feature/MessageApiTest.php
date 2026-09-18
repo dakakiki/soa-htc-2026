@@ -430,13 +430,14 @@ class MessageApiTest extends TestCase
     }
 
     /**
-     * 🔴 Putting a notice away used to mean losing it. The query behind Welcome
-     * is `whereNull(dismissed_at)` and no screen anywhere showed the rest, so a
-     * coordinator who tapped × on "print the attendance register before Friday"
-     * had no way back to it — the administrator could still read it in their own
-     * list, the person it was written for could not.
+     * 🔴 Putting a notice away takes it off their screen (owner, 2026-09-18:
+     * *„klik na X brise poruku iz njegovog inboxa"*).
+     *
+     * 🪤 And the delivery row is NOT deleted. `dismissed_at` is stamped on it,
+     * so what the administration sent to whom stays whole — a message leaves
+     * somebody's view, never the record.
      */
-    public function test_a_notice_put_away_is_still_in_the_inbox(): void
+    public function test_a_notice_put_away_leaves_the_inbox_and_stays_on_the_record(): void
     {
         $reader = $this->coordinator('reader@soahtc.test');
 
@@ -448,25 +449,53 @@ class MessageApiTest extends TestCase
         $deliveryId = $this->actingAs($reader)->getJson('/api/messages/inbox')->json('data.0.id');
         $this->actingAs($reader)->postJson("/api/messages/deliveries/{$deliveryId}/dismiss")->assertNoContent();
 
-        // Gone from what is put in front of them...
         $this->actingAs($reader)->getJson('/api/messages/inbox')
             ->assertOk()
             ->assertJsonCount(0, 'data')
             ->assertJsonPath('meta.waiting', 0);
 
-        // ...and still readable, with the day it was put away on it.
-        $this->actingAs($reader)->getJson('/api/messages/inbox?scope=all')
-            ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.id', $deliveryId)
-            ->assertJsonPath('meta.waiting', 0);
+        $delivery = MessageDelivery::findOrFail($deliveryId);
+        $this->assertNotNull($delivery->dismissed_at, 'the record of the send has to survive');
+    }
 
-        $this->assertNotNull(
-            $this->actingAs($reader)->getJson('/api/messages/inbox?scope=all')->json('data.0.dismissed_at'),
+    /**
+     * Ten at a time, and the screen is told whether there is more (owner,
+     * 2026-09-18: *„prikaz 10 poslednjih poruka pa load more"*).
+     *
+     * 🪤 The cursor is the OLDEST id on screen, not a page number: a notice
+     * arriving between two requests would shift a numbered page by one and the
+     * reader would be shown a row twice while another went missing.
+     */
+    public function test_the_inbox_comes_ten_at_a_time(): void
+    {
+        $reader = $this->coordinator('reader@soahtc.test');
+
+        for ($i = 0; $i < 12; $i++) {
+            $id = $this->actingAs($this->admin())
+                ->postJson('/api/messages', $this->payload(['subject' => 'Notice '.$i]))
+                ->json('data.id');
+            $this->actingAs($this->admin())->postJson("/api/messages/{$id}/send")->assertOk();
+        }
+
+        $first = $this->actingAs($reader)->getJson('/api/messages/inbox')->assertOk();
+        $first->assertJsonCount(10, 'data')
+            ->assertJsonPath('meta.has_more', true)
+            ->assertJsonPath('meta.waiting', 12);
+
+        $rows = $first->json('data');
+        $oldest = end($rows)['id'];
+
+        $next = $this->actingAs($reader)->getJson('/api/messages/inbox?before='.$oldest)->assertOk();
+        $next->assertJsonCount(2, 'data')->assertJsonPath('meta.has_more', false);
+
+        // 🔴 And the second page does not repeat the first.
+        $this->assertSame(
+            [],
+            array_intersect(array_column($rows, 'id'), array_column($next->json('data'), 'id')),
         );
     }
 
-    /** The inbox is one person's own, whichever scope is asked for. */
+    /** The inbox is one person's own. */
     public function test_the_inbox_never_carries_somebody_elses_notice(): void
     {
         $mine = $this->coordinator('mine@soahtc.test');
@@ -478,7 +507,7 @@ class MessageApiTest extends TestCase
         $this->actingAs($this->admin())->postJson("/api/messages/{$id}/send")->assertOk();
 
         // Two people were sent it; each sees one row, their own.
-        $rows = $this->actingAs($mine)->getJson('/api/messages/inbox?scope=all')->assertOk()->json('data');
+        $rows = $this->actingAs($mine)->getJson('/api/messages/inbox')->assertOk()->json('data');
 
         $this->assertCount(1, $rows);
         $this->assertSame(
@@ -508,7 +537,7 @@ class MessageApiTest extends TestCase
             'the fixture has to send both channels for this to be testing anything',
         );
 
-        $this->actingAs($reader)->getJson('/api/messages/inbox?scope=all')
+        $this->actingAs($reader)->getJson('/api/messages/inbox')
             ->assertOk()
             ->assertJsonCount(1, 'data');
     }

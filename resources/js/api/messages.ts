@@ -112,30 +112,28 @@ export function listRecipients(audience: MessageAudience, search?: string) {
 export interface InboxMessage {
     /** The DELIVERY's id, which is what putting it away names. */
     id: number;
-    /** The MESSAGE behind it — what a notification points at. */
-    message_id: number;
     subject: string;
     body: string;
     sent_at: string | null;
-    /** When they put it away, or null while it is still in front of them. */
-    dismissed_at: string | null;
 }
 
 /**
- * One person's own notices.
+ * One person's own notices: what is waiting for them, newest first, ten at a
+ * time.
  *
- * `waiting` is what a screen puts in front of them; `all` is the INBOX, and it
- * exists because putting a notice away used to lose it for good — no screen
- * anywhere showed a dismissed one, so a coordinator could not get back to
- * something they had read once and needed twice.
+ * 🔴 Putting one away takes it off this list (owner, 2026-09-18). The delivery
+ * row keeps `dismissed_at` so the administration's record of what was sent to
+ * whom stays whole — it leaves their view, not the database.
  *
  * 🪤 `meta.waiting` is the TRUE count and not the size of the page, because the
  * bell in both shells is drawn from it.
  */
-export function messageInbox(scope: 'waiting' | 'all' = 'waiting') {
-    return http.get<{ data: InboxMessage[]; meta: { waiting: number } }>(
+export function messageInbox(before?: number) {
+    return http.get<{ data: InboxMessage[]; meta: { waiting: number; has_more: boolean } }>(
         '/api/messages/inbox',
-        { params: scope === 'all' ? { scope } : {} },
+        // 🪤 A cursor rather than a page number: notices arrive while somebody
+        // reads, and a page number would show them a row twice and hide another.
+        { params: before ? { before } : {} },
     );
 }
 
