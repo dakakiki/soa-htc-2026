@@ -38,6 +38,25 @@ class EveryChannelIsPreviewedTest extends TestCase
     }
 
     /**
+     * 🔴 And the app's panel is always there, because the app channel always is
+     * (ADR-0122). It is no longer a checkbox, so the rule above — which walks
+     * the checkboxes — cannot see it: without this, the one preview that is
+     * shown on every single message could be deleted and nothing would notice.
+     */
+    public function test_the_app_preview_is_not_conditional(): void
+    {
+        $form = $this->form();
+
+        $this->assertSame(
+            0,
+            preg_match('/v-if="form\.app"/', $form),
+            'the app preview is behind a condition, and the app channel has none',
+        );
+        // 🪤 Single quotes: `$t` in a double-quoted PHP string is a variable.
+        $this->assertStringContainsString('message.channelApp', $form);
+    }
+
+    /**
      * 🔴 And each preview draws the body the CHANNEL actually carries. A
      * notification is drawn by the operating system out of plain text — markup
      * reaches it as characters — so previewing the rich text there would promise
