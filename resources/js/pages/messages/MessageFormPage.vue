@@ -200,11 +200,19 @@ const channels = computed<MessageChannel[]>(() => {
 });
 
 /**
- * Always asked for now: it is what the in-app notice carries, and every message
- * is an in-app notice. ⚠️ Which means a long formal mail also needs its short
- * line — that line is what a coordinator can act on from a corridor.
+ * Asked for by the two channels that CARRY it: the in-app notice, which every
+ * message is, and the notification, which is plain text and nothing else.
+ *
+ * 🔴 Except when the mail is the whole message (owner, 2026-09-18: *„kada se
+ * salje samo mail, sakri message polje i posalji ga praznog"*). That was the
+ * cost of ADR-0122: a long formal letter needed a second, short one written for
+ * a line in an inbox nobody was addressing. The inbox row then stands on its
+ * subject and says where the message is.
+ *
+ * ⚠️ Mail AND push still needs it — a notification has nowhere else to take its
+ * words from, and a phone cannot open an e-mail to look for them.
  */
-const needsBody = computed(() => true);
+const needsBody = computed(() => !form.mail || form.push);
 /** The editor is the mail's, and only the mail's. */
 const needsHtml = computed(() => form.mail);
 
@@ -501,7 +509,16 @@ const label = 'block text-sm font-medium text-gray-700';
                                     {{ $t('app.name') }}
                                 </p>
                                 <p class="mt-2 text-sm font-semibold">{{ form.subject || '—' }}</p>
-                                <p class="mt-1.5 whitespace-pre-line text-[13px] leading-relaxed text-white/80">{{ form.body }}</p>
+                                <!--
+                                    🔴 The panel shows what the inbox will show,
+                                    empty body included. A message whose only
+                                    channel is mail arrives here as its subject
+                                    and a line pointing at the letter — and the
+                                    administrator has to be able to see that
+                                    before they send it, not after.
+                                -->
+                                <p v-if="needsBody" class="mt-1.5 whitespace-pre-line text-[13px] leading-relaxed text-white/80">{{ form.body }}</p>
+                                <p v-else class="mt-1.5 text-[13px] italic leading-relaxed text-white/60">{{ $t('message.inboxInYourMail') }}</p>
                             </div>
                         </div>
 

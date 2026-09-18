@@ -225,7 +225,9 @@ const way = 'rise grid items-center gap-3 rounded-2xl border border-white/20 bg-
                 >
                     <p :class="mono" class="text-[9.5px] text-brand-palette-1">{{ $t('public.app.fromOrganiser') }}</p>
                     <p class="mt-1.5 text-[15px] font-medium leading-snug">{{ notice.subject }}</p>
-                    <p class="mt-1.5 whitespace-pre-line text-[0.95rem] leading-relaxed">{{ notice.body }}</p>
+                    <p v-if="notice.body" class="mt-1.5 whitespace-pre-line text-[0.95rem] leading-relaxed">{{ notice.body }}</p>
+                    <!-- Nothing short to carry: the letter has it. -->
+                    <p v-else-if="notice.by_mail" class="mt-1.5 text-[0.95rem] italic leading-relaxed text-white/70">{{ $t('message.inboxInYourMail') }}</p>
                     <p v-if="notice.sent_at" :class="mono" class="mt-2 text-[9.5px] text-brand-palette-3/70">
                         {{ new Date(notice.sent_at).toLocaleString() }}
                     </p>

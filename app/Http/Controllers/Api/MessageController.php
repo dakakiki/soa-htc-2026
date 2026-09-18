@@ -262,7 +262,7 @@ class MessageController extends Controller
          * looked at.
          */
         $deliveries = $query
-            ->with('message:id,subject,body,sent_at')
+            ->with('message:id,subject,body,sent_at,channels')
             ->latest('id')
             ->limit(self::INBOX_PAGE + 1)
             ->get();
@@ -276,11 +276,24 @@ class MessageController extends Controller
                 ->map(fn (MessageDelivery $d) => [
                     'id' => $d->id,
                     'subject' => $d->message->subject,
+                    /*
+                     * ⚠️ Can be empty, and the screen has to stand when it is. A
+                     * message whose only channel was mail carries no short text
+                     * (owner, 2026-09-18) — the inbox row is then its subject and
+                     * a line saying where the message itself went.
+                     */
                     'body' => $d->message->body,
                     'sent_at' => $d->message->sent_at,
                     // Which of the two a row is drawn as, and whether tapping it
                     // still has anything to do.
                     'read' => $d->read_at !== null,
+                    /*
+                     * Read from the message's own channels rather than assumed
+                     * from the empty body: what the row needs to say is "your
+                     * mail has it", and only the channels know whether that is
+                     * true.
+                     */
+                    'by_mail' => $d->message->hasChannel(MessageChannel::Mail),
                 ])
                 ->values(),
             'meta' => [
@@ -399,17 +412,24 @@ class MessageController extends Controller
         }
 
         /*
-         * The plain text is now asked for every time, because the app channel
-         * carries it and the app channel is always there. The HTML is still
-         * asked for only by mail — a message that is not being posted needs no
-         * letter, and demanding one would leave half of every message unwritten.
+         * The plain text is asked for by the two channels that CARRY it: the
+         * in-app notice, which every message is, and the notification, which is
+         * plain text and nothing else.
          *
-         * ⚠️ This is the cost of the rule above, and it is a real one: an
-         * administrator writing a long formal mail must also write the short
-         * line that will stand in the inbox. That line is what the coordinator
-         * can act on from a corridor.
+         * 🔴 Except when the mail is the whole message (owner, 2026-09-18:
+         * *„kada se salje samo mail, sakri message polje i posalji ga
+         * praznog"*). That was the cost of ADR-0122 and it was a real one — an
+         * administrator writing a long formal letter had to write a second,
+         * short one for a line in an inbox they were not addressing. The inbox
+         * row then stands on its subject and says where the message is.
+         *
+         * ⚠️ Mail AND push still needs it: the notification has nowhere to take
+         * its words from, and a phone cannot open an e-mail to find them.
          */
-        if (trim((string) ($data['body'] ?? '')) === '') {
+        $mailOnly = in_array(MessageChannel::Mail->value, $channels, true)
+            && ! in_array(MessageChannel::Push->value, $channels, true);
+
+        if (! $mailOnly && trim((string) ($data['body'] ?? '')) === '') {
             throw ValidationException::withMessages(['body' => 'Write the message.']);
         }
 

@@ -212,7 +212,9 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
                             @click="read(row)"
                         >
                             <p class="text-[15px] font-medium leading-snug text-white">{{ row.subject }}</p>
-                            <p class="mt-1.5 whitespace-pre-line text-[0.95rem] leading-relaxed text-white">{{ row.body }}</p>
+                            <p v-if="row.body" class="mt-1.5 whitespace-pre-line text-[0.95rem] leading-relaxed text-white">{{ row.body }}</p>
+                            <!-- Nothing short to carry: the letter has it. -->
+                            <p v-else-if="row.by_mail" class="mt-1.5 text-[0.95rem] italic leading-relaxed text-white/70">{{ $t('message.inboxInYourMail') }}</p>
                             <p :class="mono" class="mt-2 text-[9.5px] text-brand-palette-3/70">{{ when(row.sent_at) }}</p>
                         </button>
 

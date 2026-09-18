@@ -80,6 +80,85 @@ class MessageApiTest extends TestCase
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
+    /**
+     * 🔴 A letter needs no short line written for it (owner, 2026-09-18: *„kada
+     * se salje samo mail, sakri message polje i posalji ga praznog"*).
+     *
+     * That was the cost of ADR-0122 and it was a real one: every message stands
+     * in the inbox, the inbox row carries the plain text, so a long formal mail
+     * had to be accompanied by a second, short message written for a screen the
+     * administrator was not addressing. The row now stands on its subject.
+     */
+    public function test_a_message_that_is_only_a_letter_needs_no_short_text(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['body' => null, 'channels' => ['mail']]))
+            ->assertCreated()
+            ->assertJsonPath('data.body', null);
+    }
+
+    /**
+     * ⚠️ But a notification does. It is plain text and nothing else — the
+     * operating system draws it — and a phone cannot open an e-mail to find the
+     * words it should be showing.
+     */
+    public function test_a_letter_that_is_also_a_notification_still_needs_the_short_text(): void
+    {
+        config(['push.vapid.public' => 'a-public-key', 'push.vapid.private' => 'a-private-key']);
+
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['body' => null, 'channels' => ['mail', 'push']]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('body');
+    }
+
+    /**
+     * And so does a message going nowhere but the app, which is the one whose
+     * whole content the short text IS.
+     */
+    public function test_a_message_that_is_only_an_in_app_notice_still_needs_the_short_text(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['body' => null, 'channels' => []]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('body');
+    }
+
+    /**
+     * 🔴 It still reaches the inbox — every message does (ADR-0122). The row
+     * carries its subject and says where the words are, rather than standing
+     * over an empty space.
+     */
+    public function test_the_inbox_row_of_a_letter_points_at_the_letter(): void
+    {
+        $reader = $this->coordinator('reader@soahtc.test');
+
+        $id = $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['body' => null, 'channels' => ['mail']]))
+            ->json('data.id');
+        $this->actingAs($this->admin())->postJson("/api/messages/{$id}/send")->assertOk();
+
+        $this->actingAs($reader)->getJson('/api/messages/inbox')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.body', null)
+            ->assertJsonPath('data.0.by_mail', true);
+    }
+
+    /** And a message that was never posted says no such thing. */
+    public function test_the_inbox_row_of_an_in_app_notice_does_not_point_at_any_letter(): void
+    {
+        $reader = $this->coordinator('reader@soahtc.test');
+
+        $id = $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => []]))
+            ->json('data.id');
+        $this->actingAs($this->admin())->postJson("/api/messages/{$id}/send")->assertOk();
+
+        $this->actingAs($reader)->getJson('/api/messages/inbox')
+            ->assertJsonPath('data.0.by_mail', false);
+    }
+
     private function payload(array $overrides = []): array
     {
         return array_merge([
@@ -144,16 +223,31 @@ class MessageApiTest extends TestCase
     }
 
     /**
-     * ⚠️ The cost of that rule, said plainly: every message now needs its short
-     * plain line, including one whose real content is a long formal mail. That
-     * line is what a coordinator can act on from a corridor.
+     * The short plain line is asked for by the channels that CARRY it — the
+     * in-app notice and the notification — and by nothing else.
+     *
+     * 🔴 This test used to claim the opposite, and was right at the time: ADR-0122
+     * made every message an in-app notice, so every message needed the line,
+     * a long formal mail included. The owner took that cost back on 2026-09-18
+     * (*„kada se salje samo mail, sakri message polje"*), so a letter alone no
+     * longer has to be written twice — see the three tests near `payload()`.
      */
-    public function test_every_message_needs_the_plain_text_now(): void
+    public function test_the_short_text_is_asked_for_by_the_channels_that_carry_it(): void
     {
+        config(['push.vapid.public' => 'a-public-key', 'push.vapid.private' => 'a-private-key']);
+
+        // Mail alone: the letter is the message.
         $this->actingAs($this->admin())
             ->postJson('/api/messages', $this->payload(['channels' => ['mail'], 'body' => null]))
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('body');
+            ->assertCreated();
+
+        // Anything that shows the line on a screen still needs it written.
+        foreach ([[], ['push'], ['mail', 'push']] as $channels) {
+            $this->actingAs($this->admin())
+                ->postJson('/api/messages', $this->payload(['channels' => $channels, 'body' => null]))
+                ->assertStatus(422)
+                ->assertJsonValidationErrors('body');
+        }
     }
 
     /** A message that only goes to the app still needs no HTML. */

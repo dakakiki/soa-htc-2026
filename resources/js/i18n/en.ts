@@ -1121,6 +1121,13 @@ export default {
         inboxPutAway: 'Put away',
         /** What tapping a notice does, for somebody who cannot see the accent. */
         inboxMarkRead: 'Mark as read',
+        /**
+         * 🔴 What an in-app notice says when the message itself is a letter
+         * (owner, 2026-09-18). The row still exists — every message stands in
+         * the inbox (ADR-0122) — it just has nothing short to carry, so it says
+         * where the words are instead of leaving an empty space.
+         */
+        inboxInYourMail: 'The full message was sent to your e-mail.',
         inboxMore: 'Load more',
         inboxLoadingMore: 'Loading…',
 

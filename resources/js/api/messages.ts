@@ -113,7 +113,12 @@ export interface InboxMessage {
     /** The DELIVERY's id, which is what reading it and putting it away name. */
     id: number;
     subject: string;
-    body: string;
+    /**
+     * ⚠️ Empty when the message was a letter and nothing else. Every message
+     * stands in the inbox (ADR-0122), but a mail-only one carries no short text
+     * (owner, 2026-09-18) — the row is then its subject and `by_mail`.
+     */
+    body: string | null;
     sent_at: string | null;
     /**
      * 🔴 Read is not the same as gone. A read notice keeps its place in the
@@ -121,6 +126,8 @@ export interface InboxMessage {
      * off the screen, and × cannot be undone (ADR-0119).
      */
     read: boolean;
+    /** Their mail has the whole of it, which is what the row says instead. */
+    by_mail: boolean;
 }
 
 /**
