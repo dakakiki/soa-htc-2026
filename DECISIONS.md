@@ -4231,3 +4231,54 @@ doda iz navike, a keš ovde znači beli ekran posle deploy-a usred sezone.
 - 🪤 **`OPENSSL_CONF` nije postavljen** na toj mašini, pa `openssl_pkey_new` za EC pada sa porukom
   *„Unable to create the key"* koja ne kaže zašto. `push:keys` to prepozna i ispiše putanju.
   Na Linuxu (CI, STAGE) ne postoji.
+
+## ADR-0118 — Push je kanal koji se bira, a in-app se NE ukida (dopunjuje ADR-0117)
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #104**
+
+Vlasnik, 18.09, tri pitanja posle puštanja push-a.
+
+### Kanal se nije gubio — nikad nije ni bio dodat
+
+Komentar u formi je to i pisao: *„Push is not on this screen at all: it is not being built yet, and a
+box nobody can tick is a promise the screen cannot keep."* Uz to je stajala i **serverska brana** sa
+svojim razlogom: *„Push has nowhere to go yet — no VAPID keys and no subscriptions."*
+
+Sada postoji, pa je dodat na tri mesta: **kućica u formi**, **stavka u filteru** i **oznaka na redu**
+u listi poruka.
+
+🪤 **Brana je SUŽENA, ne obrisana.** Pola razloga je otpalo, pola nije: instalacija bez VAPID para i
+dalje nema gde da šalje, pa bi upisala isporuke koje niko ne može da naplati. Uslov sada nije „da li
+je push napravljen" nego **„da li OVA instalacija može da ga pošalje"**. Pretplate se namerno **ne**
+proveravaju — to što još niko nije uključio obaveštenja je obično stanje sveta, ne kvar, i isporuka
+to kaže svojim rečima kad ne nađe uređaj.
+
+🔴 Uz kućicu stoji rečenica koja se vidi **samo kad je push čekiran**: *„To phones that have
+notifications turned on. Everyone else is reached in the app."* Push je jedini od tri kanala koji
+može da **ne stigne nikome**, i to administrator treba da zna pre nego što ga čekira.
+
+### 🪤 Zamka koju je ta izmena otkrila: suite je zavisio od `.env`-a
+
+Kad pravilo zavisi od toga da li instalacija ima ključ, onda **developer koji je napravio par za svoju
+mašinu vozi drugi suite od CI-ja** — zeleno kod njega, crveno tamo, oko linije koju niko nije menjao.
+`phpunit.xml` zato **prikucava `VAPID_*` na prazno**, a testovi koji ispituju pravilo sami postave
+konfiguraciju. Isti oblik greške kao SQLite/MySQL razlika, samo kroz okruženje umesto kroz bazu.
+
+### 🔴 In-app se NE ukida, iako je push takođe besplatan
+
+Vlasnikovo pitanje. Odgovor je ne, i razlozi nisu stvar ukusa:
+
+| | in-app | push |
+| --- | --- | --- |
+| traži dozvolu | ne | **da**, i odbijanje se **ne može vratiti** iz aplikacije |
+| stiže svima | **da** | samo onima koji su uključili |
+| pamti se | **da — to JE inbox** | ne; sklonjeno sa zaključanog ekrana i nema ga |
+| ume tiho da umre | ne | **da** — pretplata istekne, red se obriše, čovek prestane da bude dostupan |
+| na iPhone-u | radi uvek | tek kad je aplikacija na početnom ekranu |
+
+Push je **zvono**, in-app je **pismo**. Notifikacija nije skladište: `notificationclick` vodi na
+`/app/messages`, a to je in-app inbox — ukidanjem in-app-a push bi vodio u prazno, a poruka ne bi
+imala gde da postoji.
+
+Zato `MessageChannel::App` i dalje nosi ono što mu je u dokumentaciji od početka: *„the only channel
+that needs no address, no permission and no third party, so it is the one that always arrives."*

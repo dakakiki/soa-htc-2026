@@ -40,6 +40,7 @@ const form = reactive({
     // forgets to look (owner, 2026-09-15).
     app: false,
     mail: false,
+    push: false,
     scheduled: false,
     send_at: '',
 });
@@ -166,6 +167,7 @@ onMounted(async () => {
             form.body_html = message.body_html ?? '';
             form.app = message.channels.includes('app');
             form.mail = message.channels.includes('mail');
+            form.push = message.channels.includes('push');
             form.scheduled = message.status === 'scheduled';
             form.send_at = toLocalInput(message.send_at);
             locked.value = message.status === 'sent';
@@ -192,12 +194,18 @@ const channels = computed<MessageChannel[]>(() => {
     if (form.mail) {
         picked.push('mail');
     }
+    if (form.push) {
+        picked.push('push');
+    }
 
     return picked;
 });
 
-/** The plain text is what a notice and a notification carry. */
-const needsBody = computed(() => form.app);
+/**
+ * The plain text is what a notice and a notification carry — the same words in
+ * both, which is why one box asks for it however many of the two are ticked.
+ */
+const needsBody = computed(() => form.app || form.push);
 /** The editor is the mail's, and only the mail's. */
 const needsHtml = computed(() => form.mail);
 
@@ -381,9 +389,12 @@ const label = 'block text-sm font-medium text-gray-700';
                             sections. Both are the administration's to choose -
                             a message may go only by mail, or only to the app.
 
-                            Push is not on this screen at all: it is not being
-                            built yet, and a box nobody can tick is a promise the
-                            screen cannot keep.
+                            🪤 Push was left off this screen until 2026-09-18
+                            because the channel did not exist, and a box nobody
+                            can tick is a promise the screen cannot keep. It
+                            exists now (ADR-0117), so it is here — but it is the
+                            one channel that can reach nobody: it goes only to
+                            devices whose owner turned notifications on.
                         -->
                         <div class="border-t border-gray-200 pt-6">
                             <h2 :class="section">{{ $t('message.channels') }}</h2>
@@ -397,7 +408,22 @@ const label = 'block text-sm font-medium text-gray-700';
                                     <input v-model="form.mail" type="checkbox" :disabled="locked" />
                                     {{ $t('message.channelMail') }}
                                 </label>
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input v-model="form.push" type="checkbox" :disabled="locked" />
+                                    {{ $t('message.channelPush') }}
+                                </label>
                             </div>
+
+                            <!--
+                                🔴 Said only under push, because it is the only
+                                one of the three that can reach nobody: a
+                                coordinator who never turned notifications on
+                                gets nothing however this box is ticked. The
+                                other two need no such warning — mail has an
+                                address on every account, and the app channel
+                                reaches everybody by definition.
+                            -->
+                            <p v-if="form.push" class="mt-3 text-xs text-gray-500">{{ $t('message.channelPushNote') }}</p>
                         </div>
 
                         <!--

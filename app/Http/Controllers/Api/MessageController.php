@@ -297,11 +297,24 @@ class MessageController extends Controller
 
         $channels = array_values(array_unique($data['channels']));
 
-        // 🔴 Push has nowhere to go yet — no VAPID keys and no subscriptions.
-        // Accepting it would write deliveries nothing will ever pay off.
-        if (in_array(MessageChannel::Push->value, $channels, true)) {
+        /*
+         * 🔴 Push needs a key pair before it has anywhere to go. This refused it
+         * outright until 2026-09-18, when the channel did not exist at all; now
+         * it refuses only what is still true — an installation with no VAPID
+         * pair would write deliveries nothing can ever pay off.
+         *
+         * 🪤 Narrowed rather than deleted. The condition that matters is not
+         * "has push been built" but "can THIS installation send it", and a fresh
+         * deployment that has not run `push:keys` is exactly that case.
+         *
+         * Subscriptions are deliberately NOT checked. Nobody having turned
+         * notifications on yet is an ordinary state of the world, not a
+         * misconfiguration, and the delivery says so in its own words when it
+         * finds no device.
+         */
+        if (in_array(MessageChannel::Push->value, $channels, true) && ! config('push.vapid.private')) {
             throw ValidationException::withMessages([
-                'channels' => 'Push is not available yet.',
+                'channels' => 'Notifications are not set up on this installation yet.',
             ]);
         }
 

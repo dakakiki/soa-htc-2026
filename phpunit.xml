@@ -32,5 +32,15 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!--
+            Push is OFF unless a test says otherwise.
+
+            The rule it guards depends on whether this installation has a
+            VAPID pair, and a developer who generated one for their own
+            machine would otherwise be running a different suite from CI:
+            green here, red there, over a line nobody changed.
+        -->
+        <env name="VAPID_PUBLIC_KEY" value=""/>
+        <env name="VAPID_PRIVATE_KEY" value=""/>
     </php>
 </phpunit>

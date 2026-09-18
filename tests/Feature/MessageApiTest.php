@@ -150,8 +150,18 @@ class MessageApiTest extends TestCase
             ->assertJsonValidationErrors('channels');
     }
 
-    public function test_push_is_refused_while_there_is_nowhere_to_push_to(): void
+    /**
+     * 🔴 Refused where THIS installation cannot send it — a deployment that has
+     * not run `push:keys` has nowhere to push to, and accepting the channel
+     * would write deliveries nothing can ever pay off.
+     *
+     * 🪤 It refused push outright until 2026-09-18, when the channel did not
+     * exist. The rule is narrower now, so the test says which rule it is.
+     */
+    public function test_notification_is_refused_where_the_installation_has_no_key(): void
     {
+        config(['push.vapid.public' => null, 'push.vapid.private' => null]);
+
         $this->actingAs($this->admin())
             ->postJson('/api/messages', $this->payload(['channels' => ['push']]))
             ->assertStatus(422)
@@ -501,6 +511,44 @@ class MessageApiTest extends TestCase
         $this->actingAs($reader)->getJson('/api/messages/inbox?scope=all')
             ->assertOk()
             ->assertJsonCount(1, 'data');
+    }
+
+    /**
+     * The notification channel is one the administration can pick, and picking
+     * it owes a delivery like any other.
+     *
+     * 🪤 It was missing from the compose screen until 2026-09-18 — not removed,
+     * never added: the channel did not exist, and a box nobody can tick is a
+     * promise the screen cannot keep. This is the half of that the suite can
+     * hold: the API has always accepted it, so nothing but the screen was
+     * stopping a message from going out by push.
+     */
+    public function test_a_message_can_be_sent_by_notification(): void
+    {
+        $reader = $this->coordinator('reader@soahtc.test');
+        config(['push.vapid.public' => 'a-public-key', 'push.vapid.private' => 'a-private-key']);
+
+        $id = $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['channels' => ['app', 'push']]))
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->actingAs($this->admin())->postJson("/api/messages/{$id}/send")->assertOk();
+
+        // The in-app row is the delivery; the push row is owed and waits for the
+        // scheduler, exactly as mail does.
+        $this->assertDatabaseHas('message_deliveries', [
+            'message_id' => $id,
+            'user_id' => $reader->id,
+            'channel' => 'app',
+            'status' => MessageDelivery::STATUS_SENT,
+        ]);
+        $this->assertDatabaseHas('message_deliveries', [
+            'message_id' => $id,
+            'user_id' => $reader->id,
+            'channel' => 'push',
+            'status' => MessageDelivery::STATUS_PENDING,
+        ]);
     }
 
     public function test_a_coordinator_cannot_dismiss_somebody_elses_notice(): void

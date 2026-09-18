@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconAlertTriangle, IconDeviceMobile, IconMail, IconPlus } from '@tabler/icons-vue';
+import { IconAlertTriangle, IconBell, IconDeviceMobile, IconMail, IconPlus } from '@tabler/icons-vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import RowActions from '@/components/RowActions.vue';
 import Tooltip from '@/components/Tooltip.vue';
@@ -130,6 +130,7 @@ const hasRows = computed(() => rows.value.length > 0);
                     <option value="">{{ $t('message.allChannels') }}</option>
                     <option value="app">{{ $t('message.channelApp') }}</option>
                     <option value="mail">{{ $t('message.channelMail') }}</option>
+                    <option value="push">{{ $t('message.channelPush') }}</option>
                 </select>
             </form>
         </div>
@@ -170,6 +171,10 @@ const hasRows = computed(() => rows.value.length > 0);
                                 <span v-if="row.channels.includes('mail')"
                                     class="inline-flex items-center gap-1 rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-600">
                                     <IconMail :size="13" />{{ $t('message.channelMail') }}
+                                </span>
+                                <span v-if="row.channels.includes('push')"
+                                    class="inline-flex items-center gap-1 rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-600">
+                                    <IconBell :size="13" />{{ $t('message.channelPush') }}
                                 </span>
                             </div>
                         </td>

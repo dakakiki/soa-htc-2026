@@ -1199,6 +1199,12 @@ export default {
         channelAppNote: 'Always on. The message waits on the coordinator’s screen until they put it away.',
         channelMail: 'E-mail',
         channelMailNote: 'To the address on the coordinator’s account.',
+        channelPush: 'Notification',
+        // 🔴 Says plainly that this is the one channel that can reach nobody.
+        // It goes only to devices whose owner turned notifications on, and a
+        // coordinator who never did is not reached however the box is ticked —
+        // which is why the app channel is the one that cannot be switched off.
+        channelPushNote: 'To phones that have notifications turned on. Everyone else is reached in the app.',
 
         when: 'When',
         sendNow: 'Send now',
