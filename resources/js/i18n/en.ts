@@ -1211,6 +1211,10 @@ export default {
         // 🔴 Said on the screen where it can still be acted on. The phone cuts
         // the text off; knowing that after sending is knowing it too late.
         pushPreviewNote: 'A phone shows about two lines until it is opened. The rest is in the app.',
+        // 🔴 Shown when push is ticked and the app channel is not. A
+        // notification keeps nothing: swiped away, it is gone, and tapping
+        // it lands in an inbox that has no row for this message.
+        pushWithoutApp: 'A notification is not kept — tap it and it opens the app, where there will be nothing to read. Tick “In the app” as well.',
 
         when: 'When',
         sendNow: 'Send now',

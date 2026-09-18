@@ -112,6 +112,8 @@ export function listRecipients(audience: MessageAudience, search?: string) {
 export interface InboxMessage {
     /** The DELIVERY's id, which is what putting it away names. */
     id: number;
+    /** The MESSAGE behind it — what a notification points at. */
+    message_id: number;
     subject: string;
     body: string;
     sent_at: string | null;

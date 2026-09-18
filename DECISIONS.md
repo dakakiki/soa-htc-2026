@@ -4330,3 +4330,25 @@ već govori: *„Plain text — a notification cannot carry styling."*
 
 ⚠️ **Na iPhone-u notifikacija je naslov i tekst, i ništa više** — ni ikona ni dugmad. Ono što `sw.js`
 šalje preko toga se prosto ignoriše, što je uredan pad a ne kvar.
+
+### Dopuna istog dana: klik otvara **poruku**, ne samo inbox
+
+Vlasnik: *„da li klik na notifikaciju vodi u inbox i otvori notifikaciju?"* — vodio je u inbox, ali
+poruku **nije otvarao**: id poruke je postojao samo u `tag`-u, koji adresa ne nosi.
+
+Sada `url` glasi `/app/messages?notice=<id poruke>`, a oba inbox ekrana **označe i dovuku** taj red.
+
+🪤 **Imenuje se PORUKA, nikad isporuka.** Payload se pravi nad redom kanala **push**, a red koji
+čitalac nađe u inbox-u je onaj kanala **app** — to su dva različita id-ja. Pokazivanje na pogrešan
+označavalo bi ništa, na svakoj poruci, zauvek.
+
+🪤 Označava se, ne filtrira. Notifikacija o jednoj poruci nije razlog da ostale nestanu, a lista koja
+na dodir isprazni sebe izgleda pokvareno.
+
+🔴 **Rupa koju je to otkrilo:** poruka poslata **samo push-om** nema red u inbox-u, pa bi klik vodio
+na listu koja je ne sadrži. Forma zato upozorava kad je push čekiran a **In the app** nije:
+*„Notifikacija se ne pamti — otvoriće aplikaciju u kojoj neće imati šta da se pročita."*
+
+🪤 I jedna zamka u samom testu: id isporuke i id poruke su na svežoj SQLite bazi **oba 1**, pa je
+tvrdnja o tome koji se koristi dokazivala ništa. Fixture sad pravi i app red, pa se brojevi raziđu.
+Isti oblik greške koji je ovde već pet puta uhvaćen.

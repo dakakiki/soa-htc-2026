@@ -424,6 +424,18 @@ const label = 'block text-sm font-medium text-gray-700';
                                 reaches everybody by definition.
                             -->
                             <p v-if="form.push" class="mt-3 text-xs text-gray-500">{{ $t('message.channelPushNote') }}</p>
+
+                            <!--
+                                🔴 A notification keeps nothing. Swiped off a
+                                lock screen it is gone, and tapping it opens the
+                                inbox — which has no row for a message that was
+                                never sent to the app. Said here, where the box
+                                that causes it is still under the cursor.
+                            -->
+                            <p v-if="form.push && !form.app" class="mt-2 flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-800">
+                                <IconAlertTriangle :size="14" class="mt-px shrink-0" />
+                                <span>{{ $t('message.pushWithoutApp') }}</span>
+                            </p>
                         </div>
 
                         <!--

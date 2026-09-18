@@ -228,9 +228,16 @@ class MessageDispatcher
                  * with nothing anywhere reporting why. Measured, 2026-09-18.
                  */
                 'icon' => $this->icon(),
-                // Where the tap lands: their own notices, which is the one
-                // screen that can show the message again afterwards.
-                'url' => '/app/messages',
+                /*
+                 * Where the tap lands: their own notices, and THIS message
+                 * within them — the one screen that can show it again
+                 * afterwards, since a notification itself keeps nothing.
+                 *
+                 * 🪤 The message and not the delivery. The row a reader will
+                 * find is the APP-channel one; this payload is built on the
+                 * PUSH-channel one, and the two have different ids.
+                 */
+                'url' => '/app/messages?notice='.$message->id,
                 // One message replaces its own earlier notification rather than
                 // stacking a second copy on the lock screen.
                 'tag' => 'message-'.$message->id,

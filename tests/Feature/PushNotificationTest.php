@@ -189,6 +189,38 @@ class PushNotificationTest extends TestCase
     }
 
     /**
+     * 🔴 The tap has to land on the message, not on a list to search.
+     *
+     * 🪤 And it names the MESSAGE, never the delivery. This payload is built on
+     * the PUSH-channel row; the row the reader will find in their inbox is the
+     * APP-channel one, and the two have different ids — pointing at this one
+     * would highlight nothing, on every message, for ever.
+     */
+    public function test_the_tap_lands_on_the_message_and_not_merely_on_the_inbox(): void
+    {
+        $user = $this->coordinator();
+        $this->device($user, 'https://push.example/phone');
+
+        $pushDelivery = $this->pushRow($user);
+
+        $seen = [];
+        $this->fakeSender(function (PushSubscription $to, array $payload) use (&$seen) {
+            $seen = $payload;
+
+            return PushOutcome::Sent;
+        });
+
+        app(MessageDispatcher::class)->deliverPushes();
+
+        $this->assertSame('/app/messages?notice='.$pushDelivery->message_id, $seen['url']);
+        $this->assertNotSame(
+            '/app/messages?notice='.$pushDelivery->id,
+            $seen['url'],
+            'that is the push delivery, which the inbox never shows',
+        );
+    }
+
+    /**
      * 🪤 The icon travels WITH the notification, because only the server knows
      * where it is: it is uploaded through Settings and stored under a hashed
      * name. A fixed path written into `sw.js` — which is what the first version
@@ -337,6 +369,21 @@ class PushNotificationTest extends TestCase
             'audience' => [],
             'recipients_count' => 1,
             'created_by' => $user->id,
+        ]);
+
+        /*
+         * 🪤 The app row FIRST, and not only because a message with both
+         * channels really has both. It pushes the push row's id past the
+         * message's, so a test comparing the two is comparing two different
+         * numbers — with one delivery they are both 1 on a fresh SQLite
+         * database and an assertion about which one is used proves nothing.
+         */
+        MessageDelivery::create([
+            'message_id' => $message->id,
+            'user_id' => $user->id,
+            'channel' => 'app',
+            'status' => MessageDelivery::STATUS_SENT,
+            'sent_at' => now(),
         ]);
 
         MessageDelivery::create([

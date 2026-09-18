@@ -255,6 +255,13 @@ class MessageController extends Controller
                 ->filter(fn (MessageDelivery $d) => $d->message !== null)
                 ->map(fn (MessageDelivery $d) => [
                     'id' => $d->id,
+                    /*
+                     * The MESSAGE behind the delivery, so a notification can
+                     * name what it is about. A notification knows nothing about
+                     * delivery rows — it is sent on the push channel and the row
+                     * the reader will find is the one on the app channel.
+                     */
+                    'message_id' => $d->message_id,
                     'subject' => $d->message->subject,
                     'body' => $d->message->body,
                     'sent_at' => $d->message->sent_at,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconBell, IconBellOff, IconX } from '@tabler/icons-vue';
 import { dismissMessage, messageInbox, type InboxMessage } from '@/api/messages';
@@ -29,6 +30,7 @@ import LoadingOverlay from '@/components/LoadingOverlay.vue';
  */
 const { t } = useI18n();
 const notices = useNoticesStore();
+const route = useRoute();
 const { on: pushOn, busy: pushBusy, failed: pushFailed, unavailable: pushUnavailable, toggle: togglePush } = usePushToggle();
 
 const rows = ref<InboxMessage[]>([]);
@@ -36,6 +38,33 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 
 const waiting = computed(() => rows.value.filter((row) => row.dismissed_at === null).length);
+
+/**
+ * The notification points at one message, so the inbox opens on it rather than
+ * on a list somebody then has to search.
+ *
+ * 🪤 It marks the row instead of filtering to it. A notification about one
+ * notice is not a reason to hide the others — and a list that answers a tap by
+ * emptying itself looks broken.
+ */
+const opened = computed(() => {
+    const asked = Number(route.query.notice);
+
+    return Number.isFinite(asked) && asked > 0 ? asked : null;
+});
+
+/**
+ * 🪤 Waits for the rows. The tap arrives before the request comes back, and
+ * scrolling to a row that is not drawn yet scrolls to nothing.
+ */
+watch(rows, async () => {
+    if (opened.value === null) {
+        return;
+    }
+
+    await nextTick();
+    document.querySelector(`[data-notice="${opened.value}"]`)?.scrollIntoView({ block: 'center' });
+});
 
 async function load(): Promise<void> {
     loading.value = true;
@@ -133,8 +162,12 @@ onMounted(() => {
             <article
                 v-for="row in rows"
                 :key="row.id"
-                class="rounded-lg border bg-white p-5"
-                :class="row.dismissed_at === null ? 'border-gray-200 border-l-[3px] border-l-brand-palette-1' : 'border-gray-200'"
+                :data-notice="row.message_id"
+                class="rounded-lg border bg-white p-5 transition"
+                :class="[
+                    row.dismissed_at === null ? 'border-gray-200 border-l-[3px] border-l-brand-palette-1' : 'border-gray-200',
+                    row.message_id === opened ? 'ring-2 ring-brand-link ring-offset-2' : '',
+                ]"
             >
                 <div class="flex items-start gap-4">
                     <div class="min-w-0 flex-1">
