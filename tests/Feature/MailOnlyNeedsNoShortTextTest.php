@@ -56,13 +56,17 @@ class MailOnlyNeedsNoShortTextTest extends TestCase
      * Every screen a notice can be met on stands when there is no plain text:
      * subject, then where the words are. A screen that simply drew the empty
      * body would show a bold line over nothing and read as a fault.
+     *
+     * 🔴 Two screens, not three. Welcome was the third until 2026-09-18, when
+     * the owner took the notices off it — the bell carries the count and the
+     * inbox is one tap away, so the cards there were a second copy of a screen
+     * that already exists.
      */
     public function test_every_screen_that_shows_a_notice_survives_an_empty_body(): void
     {
         foreach ([
             'resources/js/pages/app/MyMessagesPage.vue',
             'resources/js/pages/messages/InboxPage.vue',
-            'resources/js/pages/app/CoordinatorHomePage.vue',
         ] as $path) {
             $source = (string) file_get_contents(base_path($path));
 
