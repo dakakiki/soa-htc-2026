@@ -86,28 +86,53 @@ self.addEventListener('push', (event) => {
 /*
  * 🔴 Focus a window that is already open rather than opening another. A
  * coordinator tapping a notification while the installed application sits in
- * the background should be taken to it, not given a second copy of it — and on
+ * the background should be taken to it, not given a second copy — and on
  * Android a second window is a second entry in the task switcher that then
  * never agrees with the first.
+ *
+ * 🔴 And it ALWAYS ends somewhere. `client.navigate()` rejects outright on a
+ * client this worker does not control — "Cannot navigate a client that is not
+ * controlled" — which `includeUncontrolled: true` is precisely what puts in the
+ * list. The first version returned that rejection straight to `waitUntil`, so a
+ * coordinator with any tab of this site open tapped the notification and
+ * NOTHING HAPPENED: no window, no focus, no error anybody could see. Reported
+ * 2026-09-18 and reproduced against fake clients before this was changed.
+ *
+ * So: an exact match is focused, a navigate that refuses is stepped over, and
+ * `openWindow` is the floor under all of it.
  */
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    const target = (event.notification.data && event.notification.data.url) || '/app/messages';
+    const target = new URL(
+        (event.notification.data && event.notification.data.url) || '/app/messages',
+        self.location.origin,
+    ).href;
 
-    event.waitUntil(
-        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-            for (const client of windows) {
-                if ('focus' in client) {
-                    if ('navigate' in client) {
-                        return client.navigate(target).then((c) => (c ? c.focus() : undefined));
-                    }
+    event.waitUntil((async () => {
+        const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
 
-                    return client.focus();
-                }
+        // Already on it: bring that one forward and change nothing.
+        for (const client of windows) {
+            if (client.url === target && 'focus' in client) {
+                return client.focus();
+            }
+        }
+
+        for (const client of windows) {
+            if (!('navigate' in client) || !('focus' in client)) {
+                continue;
             }
 
-            return self.clients.openWindow(target);
-        }),
-    );
+            try {
+                const moved = await client.navigate(target);
+
+                return (moved || client).focus();
+            } catch {
+                // Not ours to steer. Try the next one, then a new window.
+            }
+        }
+
+        return self.clients.openWindow(target);
+    })());
 });

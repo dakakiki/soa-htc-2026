@@ -259,6 +259,39 @@ class PushNotificationTest extends TestCase
     }
 
     /**
+     * 🔴 A tap must always land somewhere.
+     *
+     * `client.navigate()` REJECTS on a client this worker does not control —
+     * "Cannot navigate a client that is not controlled" — and
+     * `includeUncontrolled: true` is exactly what puts such a client in the
+     * list. The first version returned that rejection to `waitUntil`, so a
+     * coordinator with any tab of the site open tapped the notification and
+     * nothing happened at all: no window, no focus, nothing to see.
+     *
+     * The suite cannot click a notification. What it can do is refuse the shape
+     * that had the bug: a `navigate` with nothing catching it, or a handler with
+     * no `openWindow` under it.
+     */
+    public function test_a_tap_cannot_end_nowhere(): void
+    {
+        $handler = $this->clickHandler();
+
+        $this->assertStringContainsString('openWindow', $handler, 'nothing opens a window if every client refuses');
+        $this->assertStringContainsString('catch', $handler, 'a navigate that refuses must be stepped over, not returned');
+    }
+
+    /** The `notificationclick` listener, to the end of the file. */
+    private function clickHandler(): string
+    {
+        $worker = $this->serviceWorker();
+        $at = strpos($worker, "addEventListener('notificationclick'");
+
+        $this->assertNotFalse($at, 'the click handler has gone');
+
+        return substr($worker, $at);
+    }
+
+    /**
      * 🔴 And it still caches NOTHING. This is an examination site: a worker
      * holding the shell would serve yesterday's HTML after a deploy, pointing at
      * hashed assets that no longer exist — a white screen, mid-season, for
