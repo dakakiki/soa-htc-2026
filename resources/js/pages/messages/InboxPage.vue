@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconBell, IconBellOff, IconX } from '@tabler/icons-vue';
-import { dismissMessage, messageInbox, type InboxMessage } from '@/api/messages';
+import { dismissMessage, markMessageRead, messageInbox, type InboxMessage } from '@/api/messages';
 import { useNoticesStore } from '@/stores/notices';
 import { usePushToggle } from '@/composables/usePushToggle';
 import { setDocumentTitle } from '@/utils/documentTitle';
@@ -64,8 +64,8 @@ async function loadMore(): Promise<void> {
 const loading = ref(true);
 const error = ref<string | null>(null);
 
-/** 🪤 The server's count, not the page's: more may be waiting below. */
-const waiting = computed(() => notices.waiting);
+/** 🪤 The server's count, not the page's: more may be unread below. */
+const unread = computed(() => notices.unread);
 
 async function load(): Promise<void> {
     loading.value = true;
@@ -75,11 +75,35 @@ async function load(): Promise<void> {
         const { data } = await messageInbox();
         rows.value = data.data;
         more.value = data.meta.has_more;
-        notices.waiting = data.meta.waiting;
+        notices.unread = data.meta.unread;
     } catch {
         error.value = t('message.error');
     } finally {
         loading.value = false;
+    }
+}
+
+/**
+ * They clicked it (owner, 2026-09-18). The notice keeps its place, loses its
+ * accent, and the bell drops by one — the one act that silences the bell
+ * without costing the message.
+ *
+ * 🪤 Only once. A second click must not take another off the count: it is
+ * clamped at zero, so a double decrement would not look broken, it would quietly
+ * report "nothing unread" over an inbox that has some.
+ */
+async function read(row: InboxMessage): Promise<void> {
+    if (row.read) {
+        return;
+    }
+
+    row.read = true;
+    notices.oneLess();
+
+    try {
+        await markMessageRead(row.id);
+    } catch {
+        // Unread again on the next visit, which is the honest failure.
     }
 }
 
@@ -92,7 +116,13 @@ async function putAway(row: InboxMessage): Promise<void> {
     // delivery row is not deleted — `dismissed_at` is stamped on it — so what
     // the administration sent to whom stays on the record.
     rows.value = rows.value.filter((r) => r.id !== row.id);
-    notices.oneLess();
+
+    // 🪤 Only if it was still counted. A notice that was read left the bell when
+    // it was read; taking another off for putting it away would run the count
+    // low, and low is invisible — it says "nothing unread" and looks calm.
+    if (!row.read) {
+        notices.oneLess();
+    }
 
     try {
         await dismissMessage(row.id);
@@ -121,9 +151,9 @@ onMounted(() => {
             <h1 class="text-2xl font-semibold tracking-tight">{{ $t('message.inbox') }}</h1>
             <span
                 class="rounded-full px-2.5 py-1 text-xs font-medium"
-                :class="waiting > 0 ? 'bg-brand-primary-soft text-brand-link' : 'bg-gray-100 text-gray-500'"
+                :class="unread > 0 ? 'bg-brand-primary-soft text-brand-link' : 'bg-gray-100 text-gray-500'"
             >
-                {{ waiting > 0 ? $t('message.inboxWaiting', { n: waiting }) : $t('message.inboxNoneWaiting') }}
+                {{ unread > 0 ? $t('message.inboxWaiting', { n: unread }) : $t('message.inboxNoneWaiting') }}
             </span>
         </div>
 
@@ -161,15 +191,36 @@ onMounted(() => {
         </div>
 
         <div v-else class="space-y-3">
-            <!-- Every row here is waiting: putting one away takes it off the
-                 screen, so there is no second state to draw. -->
-            <article v-for="row in rows" :key="row.id" class="rounded-lg border border-gray-200 border-l-[3px] border-l-brand-palette-1 bg-white p-5">
+            <!--
+                Two states now, carried by the accent: the orange rule marks what
+                has not been read. A read notice keeps its place and its words —
+                reading is not throwing away, and × is the only thing that takes
+                a row off this screen (ADR-0119).
+            -->
+            <article
+                v-for="row in rows"
+                :key="row.id"
+                class="rounded-lg border border-gray-200 border-l-[3px] bg-white p-5"
+                :class="row.read ? 'border-l-gray-200' : 'border-l-brand-palette-1'"
+            >
                 <div class="flex items-start gap-4">
-                    <div class="min-w-0 flex-1">
+                    <!--
+                        🪤 The click target is this button and the × is its
+                        SIBLING, never a child: a button inside a button is markup
+                        a browser takes apart on its own, and the × would stop
+                        being clickable on whichever one did.
+                    -->
+                    <button
+                        type="button"
+                        :disabled="row.read"
+                        :aria-label="row.read ? undefined : t('message.inboxMarkRead')"
+                        class="min-w-0 flex-1 text-left"
+                        @click="read(row)"
+                    >
                         <p class="text-[0.95rem] font-semibold tracking-tight text-gray-900">{{ row.subject }}</p>
                         <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-700">{{ row.body }}</p>
                         <p class="mt-3 text-xs text-gray-400">{{ when(row.sent_at) }}</p>
-                    </div>
+                    </button>
 
                     <button
                         type="button"

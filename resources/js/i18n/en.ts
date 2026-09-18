@@ -1111,9 +1111,16 @@ export default {
         inboxOpen: 'Open your notices',
         inboxEmpty: 'Nothing has been sent to you yet.',
         inboxEmptyNote: 'A notice from the organisers appears here, and stays here after you put it away.',
-        inboxWaiting: '{n} waiting',
-        inboxNoneWaiting: 'Nothing waiting',
+        /*
+         * 🔴 Unread, not "waiting" (2026-09-18). It said waiting while it
+         * counted everything not thrown away, so it stayed up after a notice had
+         * been read — and the word covered for the number.
+         */
+        inboxWaiting: '{n} unread',
+        inboxNoneWaiting: 'Nothing unread',
         inboxPutAway: 'Put away',
+        /** What tapping a notice does, for somebody who cannot see the accent. */
+        inboxMarkRead: 'Mark as read',
         inboxMore: 'Load more',
         inboxLoadingMore: 'Loading…',
 

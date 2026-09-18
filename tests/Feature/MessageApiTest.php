@@ -505,10 +505,146 @@ class MessageApiTest extends TestCase
         $this->actingAs($reader)->getJson('/api/messages/inbox')
             ->assertOk()
             ->assertJsonCount(0, 'data')
-            ->assertJsonPath('meta.waiting', 0);
+            ->assertJsonPath('meta.unread', 0);
 
         $delivery = MessageDelivery::findOrFail($deliveryId);
         $this->assertNotNull($delivery->dismissed_at, 'the record of the send has to survive');
+    }
+
+    /**
+     * A tap reads it (owner, 2026-09-18: *„tap na poruku ce je uciniti
+     * procitanom"*), which silences the bell and costs nothing.
+     *
+     * 🔴 Reported from a phone: a push arrived, the tap opened the inbox, and the
+     * message *„je ostala ne procitana"*. It had to — nothing in the application
+     * could record that anybody had read anything. The bell counted what had not
+     * been DISMISSED, so the only way to put it out was ×, and × is final.
+     */
+    public function test_a_tap_reads_a_notice_and_the_bell_stops_counting_it(): void
+    {
+        $reader = $this->coordinator('reader@soahtc.test');
+        $deliveryId = $this->sendOneTo($reader);
+
+        $this->actingAs($reader)->getJson('/api/messages/inbox')
+            ->assertJsonPath('data.0.read', false)
+            ->assertJsonPath('meta.unread', 1);
+
+        $this->actingAs($reader)->postJson("/api/messages/deliveries/{$deliveryId}/read")->assertNoContent();
+
+        $this->actingAs($reader)->getJson('/api/messages/inbox')
+            ->assertOk()
+            // 🔴 Still there. Reading is not throwing away.
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.read', true)
+            ->assertJsonPath('meta.unread', 0);
+
+        $this->assertNull(
+            MessageDelivery::findOrFail($deliveryId)->dismissed_at,
+            'reading a notice must not put it away — × is the only thing that does, and × cannot be undone',
+        );
+    }
+
+    /**
+     * 🪤 Stamped once. A second tap on a row already read would move the time
+     * forward, and then the only question the column can be asked — *when* did
+     * this reach them — would answer with the last idle tap.
+     */
+    public function test_reading_a_notice_twice_does_not_move_the_time(): void
+    {
+        $reader = $this->coordinator('reader@soahtc.test');
+        $deliveryId = $this->sendOneTo($reader);
+
+        $this->actingAs($reader)->postJson("/api/messages/deliveries/{$deliveryId}/read")->assertNoContent();
+        $first = MessageDelivery::findOrFail($deliveryId)->read_at;
+
+        $this->travel(2)->hours();
+        $this->actingAs($reader)->postJson("/api/messages/deliveries/{$deliveryId}/read")->assertNoContent();
+
+        $this->assertTrue(
+            $first->equalTo(MessageDelivery::findOrFail($deliveryId)->read_at),
+            'the time a notice was read is the FIRST time, not the last tap on it',
+        );
+    }
+
+    /**
+     * 🔴 Putting a notice away unread does not record that it was read. The two
+     * are different acts, and a row claiming to have been read because somebody
+     * swiped it off a screen would be the record telling the administration
+     * something that did not happen.
+     */
+    public function test_a_notice_swiped_away_unread_is_not_recorded_as_read(): void
+    {
+        $reader = $this->coordinator('reader@soahtc.test');
+        $deliveryId = $this->sendOneTo($reader);
+
+        $this->actingAs($reader)->postJson("/api/messages/deliveries/{$deliveryId}/dismiss")->assertNoContent();
+
+        $delivery = MessageDelivery::findOrFail($deliveryId);
+        $this->assertNull($delivery->read_at, 'swiping is not reading');
+        $this->assertNotNull($delivery->dismissed_at);
+
+        // And it is out of the count either way: the bell asks about the inbox.
+        $this->actingAs($reader)->getJson('/api/messages/inbox')->assertJsonPath('meta.unread', 0);
+    }
+
+    /**
+     * 🔴 The bell counts what has NOT BEEN READ, which stopped being the size of
+     * the inbox on 2026-09-18. A read notice keeps its place on the screen and
+     * its place on the record; it only stops being counted.
+     */
+    public function test_the_bell_counts_the_unread_and_not_the_inbox(): void
+    {
+        $reader = $this->coordinator('reader@soahtc.test');
+        $first = $this->sendOneTo($reader, 'First');
+        $this->sendOneTo($reader, 'Second');
+
+        $this->actingAs($reader)->postJson("/api/messages/deliveries/{$first}/read")->assertNoContent();
+
+        $this->actingAs($reader)->getJson('/api/messages/inbox')
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.unread', 1);
+    }
+
+    /**
+     * One person's own notice, as the dismiss beside it is.
+     *
+     * 🪤 Both halves, and the order matters. A 404 for the wrong person is also
+     * what an application with NO such endpoint answers, so the refusal on its
+     * own proves nothing — it passed against the code that had never heard of
+     * reading a notice. The 204 for the right person is what makes the 404 mean
+     * "not yours" rather than "not a thing".
+     */
+    public function test_a_coordinator_cannot_read_somebody_elses_notice(): void
+    {
+        $mine = $this->coordinator('mine@soahtc.test');
+        $deliveryId = $this->sendOneTo($mine);
+
+        $this->actingAs($this->coordinator('other@soahtc.test'))
+            ->postJson("/api/messages/deliveries/{$deliveryId}/read")
+            ->assertNotFound();
+
+        $this->assertNull(MessageDelivery::findOrFail($deliveryId)->read_at);
+
+        $this->actingAs($mine)
+            ->postJson("/api/messages/deliveries/{$deliveryId}/read")
+            ->assertNoContent();
+
+        $this->assertNotNull(MessageDelivery::findOrFail($deliveryId)->read_at);
+    }
+
+    /** One message, sent, and the id of the delivery it left for this person. */
+    private function sendOneTo(User $reader, string $subject = 'Notice'): int
+    {
+        $id = $this->actingAs($this->admin())
+            ->postJson('/api/messages', $this->payload(['subject' => $subject]))
+            ->json('data.id');
+        $this->actingAs($this->admin())->postJson("/api/messages/{$id}/send")->assertOk();
+
+        return (int) MessageDelivery::query()
+            ->where('message_id', $id)
+            ->where('user_id', $reader->id)
+            ->where('channel', 'app')
+            ->value('id');
     }
 
     /**
@@ -533,7 +669,7 @@ class MessageApiTest extends TestCase
         $first = $this->actingAs($reader)->getJson('/api/messages/inbox')->assertOk();
         $first->assertJsonCount(10, 'data')
             ->assertJsonPath('meta.has_more', true)
-            ->assertJsonPath('meta.waiting', 12);
+            ->assertJsonPath('meta.unread', 12);
 
         $rows = $first->json('data');
         $oldest = end($rows)['id'];

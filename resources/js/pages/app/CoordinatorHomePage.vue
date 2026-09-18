@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconChevronRight, IconX } from '@tabler/icons-vue';
 import { coordinatorHome, type CoordinatorHome, type CoordinatorSlice } from '@/api/appCoordinator';
-import { dismissMessage, messageInbox, type InboxMessage } from '@/api/messages';
+import { dismissMessage, markMessageRead, messageInbox, type InboxMessage } from '@/api/messages';
 import { useNoticesStore } from '@/stores/notices';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppCoordinatorScreen from '@/components/app/AppCoordinatorScreen.vue';
@@ -139,12 +139,33 @@ async function load(): Promise<void> {
  * endpoint enforces. Dropped from the screen first: a notice that stays put
  * while the request travels reads as a button that did nothing.
  */
-async function dismiss(id: number): Promise<void> {
-    inbox.value = inbox.value.filter((notice) => notice.id !== id);
+async function read(notice: InboxMessage): Promise<void> {
+    if (notice.read) {
+        return;
+    }
+
+    notice.read = true;
     notices.oneLess();
 
     try {
-        await dismissMessage(id);
+        await markMessageRead(notice.id);
+    } catch {
+        // Unread again on the next visit, which is the honest failure.
+    }
+}
+
+async function dismiss(notice: InboxMessage): Promise<void> {
+    inbox.value = inbox.value.filter((row) => row.id !== notice.id);
+
+    // 🪤 Only if it was still counted. A notice read here left the bell when it
+    // was read; taking another off for putting it away would run the count low,
+    // and low is invisible — it says "nothing unread" and looks calm.
+    if (!notice.read) {
+        notices.oneLess();
+    }
+
+    try {
+        await dismissMessage(notice.id);
     } catch {
         // It will be back on the next visit, which is the honest failure.
     }
@@ -187,22 +208,34 @@ const way = 'rise grid items-center gap-3 rounded-2xl border border-white/20 bg-
             <div
                 v-for="notice in inbox"
                 :key="notice.id"
-                class="mt-5 flex items-start gap-3 rounded-2xl border-l-[3px] border-brand-palette-1 bg-white/7 p-4"
+                class="mt-5 flex items-start gap-3 rounded-2xl border-l-[3px] p-4"
+                :class="notice.read ? 'border-white/20 bg-white/[0.04]' : 'border-brand-palette-1 bg-white/7'"
             >
-                <div class="min-w-0 flex-1">
+                <!--
+                    🪤 The tap target is this button and the × is its SIBLING,
+                    never a child: a button inside a button is markup a browser
+                    takes apart on its own.
+                -->
+                <button
+                    type="button"
+                    :disabled="notice.read"
+                    :aria-label="notice.read ? undefined : t('message.inboxMarkRead')"
+                    class="min-w-0 flex-1 text-left"
+                    @click="read(notice)"
+                >
                     <p :class="mono" class="text-[9.5px] text-brand-palette-1">{{ $t('public.app.fromOrganiser') }}</p>
                     <p class="mt-1.5 text-[15px] font-medium leading-snug">{{ notice.subject }}</p>
                     <p class="mt-1.5 whitespace-pre-line text-[0.95rem] leading-relaxed">{{ notice.body }}</p>
                     <p v-if="notice.sent_at" :class="mono" class="mt-2 text-[9.5px] text-brand-palette-3/70">
                         {{ new Date(notice.sent_at).toLocaleString() }}
                     </p>
-                </div>
+                </button>
 
                 <button
                     type="button"
                     :aria-label="t('public.app.dismiss')"
                     class="-mr-1 -mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full text-brand-palette-3/70 transition hover:bg-white/10 hover:text-white"
-                    @click="dismiss(notice.id)"
+                    @click="dismiss(notice)"
                 >
                     <IconX :size="15" :stroke-width="2" />
                 </button>

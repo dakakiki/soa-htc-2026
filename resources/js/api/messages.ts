@@ -110,11 +110,17 @@ export function listRecipients(audience: MessageAudience, search?: string) {
  * (see `MessageController::inbox`).
  */
 export interface InboxMessage {
-    /** The DELIVERY's id, which is what putting it away names. */
+    /** The DELIVERY's id, which is what reading it and putting it away name. */
     id: number;
     subject: string;
     body: string;
     sent_at: string | null;
+    /**
+     * 🔴 Read is not the same as gone. A read notice keeps its place in the
+     * inbox and only stops being counted by the bell; × is the one that takes it
+     * off the screen, and × cannot be undone (ADR-0119).
+     */
+    read: boolean;
 }
 
 /**
@@ -125,16 +131,26 @@ export interface InboxMessage {
  * row keeps `dismissed_at` so the administration's record of what was sent to
  * whom stays whole — it leaves their view, not the database.
  *
- * 🪤 `meta.waiting` is the TRUE count and not the size of the page, because the
- * bell in both shells is drawn from it.
+ * 🪤 `meta.unread` is the TRUE count and not the size of the page, because the
+ * bell in both shells is drawn from it. It counts what has not been READ — a
+ * narrower thing than what is in the inbox, and until 2026-09-18 the same thing.
  */
 export function messageInbox(before?: number) {
-    return http.get<{ data: InboxMessage[]; meta: { waiting: number; has_more: boolean } }>(
+    return http.get<{ data: InboxMessage[]; meta: { unread: number; has_more: boolean } }>(
         '/api/messages/inbox',
         // 🪤 A cursor rather than a page number: notices arrive while somebody
         // reads, and a page number would show them a row twice and hide another.
         { params: before ? { before } : {} },
     );
+}
+
+/**
+ * They tapped it (owner, 2026-09-18). The notice stays exactly where it is and
+ * stops being counted — the one act that silences the bell without costing the
+ * message.
+ */
+export function markMessageRead(deliveryId: number) {
+    return http.post(`/api/messages/deliveries/${deliveryId}/read`);
 }
 
 export function dismissMessage(deliveryId: number) {

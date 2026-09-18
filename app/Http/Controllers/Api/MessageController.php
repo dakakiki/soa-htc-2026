@@ -241,7 +241,7 @@ class MessageController extends Controller
     {
         $userId = (int) $request->user()->id;
 
-        $query = MessageDelivery::query()->waitingInApp($userId);
+        $query = MessageDelivery::query()->inInboxOf($userId);
 
         /*
          * 🪤 A cursor, not a page number. Notices arrive while somebody is
@@ -278,20 +278,62 @@ class MessageController extends Controller
                     'subject' => $d->message->subject,
                     'body' => $d->message->body,
                     'sent_at' => $d->message->sent_at,
+                    // Which of the two a row is drawn as, and whether tapping it
+                    // still has anything to do.
+                    'read' => $d->read_at !== null,
                 ])
                 ->values(),
             'meta' => [
-                'waiting' => MessageDelivery::query()->waitingInApp($userId)->count(),
+                /*
+                 * 🔴 The UNREAD count, not the size of the inbox. The bell is
+                 * asking "is there anything you have not looked at", and until
+                 * 2026-09-18 it answered a different question — "is there
+                 * anything you have not thrown away" — so it stayed lit after
+                 * the message had been read (owner, on a phone).
+                 */
+                'unread' => MessageDelivery::query()->unreadBy($userId)->count(),
                 'has_more' => $more,
             ],
         ]);
     }
 
     /** The coordinator has read it and put it away. Their own row, nobody else's. */
+    /**
+     * They tapped it: the notice is read, and the bell has one less to count
+     * (owner, 2026-09-18 — *„tap na poruku ce je uciniti procitanom"*).
+     *
+     * 🔴 It does NOT leave the inbox. Read and put away are different acts:
+     * this is "I have seen it", × is "I am finished with it", and × cannot be
+     * taken back (ADR-0119). Silencing the bell by dismissing would have
+     * answered "you have unread messages" by destroying the message.
+     *
+     * 🪤 Stamped once. A second tap on a row already read would otherwise move
+     * the time forward, and then the only thing the column could be asked —
+     * *when* did this reach them — would answer with the last idle tap instead.
+     */
+    public function read(Request $request, MessageDelivery $delivery): Response
+    {
+        abort_unless($delivery->user_id === (int) $request->user()->id, 404);
+
+        if ($delivery->read_at === null) {
+            $delivery->forceFill(['read_at' => now()])->save();
+        }
+
+        return response()->noContent();
+    }
+
     public function dismiss(Request $request, MessageDelivery $delivery): Response
     {
         abort_unless($delivery->user_id === (int) $request->user()->id, 404);
 
+        /*
+         * 🪤 `read_at` is deliberately NOT stamped here. Putting a notice away
+         * unread is a real thing to do, and a row that said it had been read
+         * because it had been swiped away would be the record telling the
+         * administration something that did not happen. The bell needs no help
+         * from it either: what it counts is already inside the inbox, and this
+         * row has just left.
+         */
         $delivery->forceFill(['dismissed_at' => now()])->save();
 
         return response()->noContent();
