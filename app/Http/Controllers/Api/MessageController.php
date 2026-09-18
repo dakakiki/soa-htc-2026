@@ -216,13 +216,38 @@ class MessageController extends Controller
      * coordinator's own, and it can only ever return what was addressed to
      * them.
      */
+    /**
+     * One person's own notices.
+     *
+     * Two scopes over one shape. `waiting` is what the Welcome screen puts in
+     * front of somebody — the notices they have not put away — and is the
+     * default, because that is the older question and the one most callers ask.
+     * `all` is the INBOX, and it exists because of what putting one away used to
+     * mean.
+     *
+     * 🔴 Dismissing hid a notice FOR GOOD. The query is `whereNull(dismissed_at)`
+     * and no screen anywhere showed the others, so a coordinator who tapped ×
+     * on "print the attendance register before Friday" had no way back to it —
+     * the administrator could still read it in their own list, the person it was
+     * written for could not. That is the whole reason this scope exists.
+     *
+     * `meta.waiting` is the true count rather than the size of this page: the
+     * bell in both shells is drawn from it, and a bell that stops counting at
+     * twenty is a bell that lies quietly.
+     */
     public function inbox(Request $request): JsonResponse
     {
-        $deliveries = MessageDelivery::query()
-            ->waitingInApp((int) $request->user()->id)
+        $userId = (int) $request->user()->id;
+        $everything = $request->query('scope') === 'all';
+
+        $query = $everything
+            ? MessageDelivery::query()->inApp($userId)
+            : MessageDelivery::query()->waitingInApp($userId);
+
+        $deliveries = $query
             ->with('message:id,subject,body,sent_at')
             ->latest('id')
-            ->limit(20)
+            ->limit($everything ? 100 : 20)
             ->get();
 
         return response()->json([
@@ -233,8 +258,10 @@ class MessageController extends Controller
                     'subject' => $d->message->subject,
                     'body' => $d->message->body,
                     'sent_at' => $d->message->sent_at,
+                    'dismissed_at' => $d->dismissed_at,
                 ])
                 ->values(),
+            'meta' => ['waiting' => MessageDelivery::query()->waitingInApp($userId)->count()],
         ]);
     }
 
