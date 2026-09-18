@@ -69,3 +69,31 @@
         Require valid-user
     </If>
 </IfFile>
+
+# ─── Staging stays out of the search index. Production does not. ─────────────
+#
+# The same idea as the block above and deliberately NOT the same file: the
+# password can be lifted for an afternoon so a phone can be handed the install
+# offer, and staging must stay unindexed while it is. `.stage` exists only on
+# the staging machine, so production reads none of this.
+<IfFile "/usr/www/users/dvpjdhdo/.stage">
+
+    # The header is what actually keeps a page out of an index; robots.txt only
+    # asks a crawler not to come. Both are set, because they fail differently:
+    # a crawler that ignores robots.txt still reads the header, and a URL found
+    # through a link is never crawled at all if robots.txt refuses it.
+    <IfModule mod_headers.c>
+        Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+    </IfModule>
+
+    # 🪤 `public/robots.txt` is shared with production, where the public site is
+    # MEANT to be indexed — so staging is handed its own copy rather than the
+    # shared file being edited into something production must never inherit.
+    #
+    # The rule sits after the front-controller rules on purpose and still runs:
+    # `robots.txt` is a real file, so the `!-f` condition above never fires for
+    # it and rewriting carries on down the file.
+    <IfModule mod_rewrite.c>
+        RewriteRule ^robots\.txt$ robots-staging.txt [L]
+    </IfModule>
+</IfFile>
