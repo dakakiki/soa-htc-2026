@@ -115,10 +115,26 @@ export interface InboxMessage {
     subject: string;
     body: string;
     sent_at: string | null;
+    /** When they put it away, or null while it is still in front of them. */
+    dismissed_at: string | null;
 }
 
-export function messageInbox() {
-    return http.get<{ data: InboxMessage[] }>('/api/messages/inbox');
+/**
+ * One person's own notices.
+ *
+ * `waiting` is what a screen puts in front of them; `all` is the INBOX, and it
+ * exists because putting a notice away used to lose it for good — no screen
+ * anywhere showed a dismissed one, so a coordinator could not get back to
+ * something they had read once and needed twice.
+ *
+ * 🪤 `meta.waiting` is the TRUE count and not the size of the page, because the
+ * bell in both shells is drawn from it.
+ */
+export function messageInbox(scope: 'waiting' | 'all' = 'waiting') {
+    return http.get<{ data: InboxMessage[]; meta: { waiting: number } }>(
+        '/api/messages/inbox',
+        { params: scope === 'all' ? { scope } : {} },
+    );
 }
 
 export function dismissMessage(deliveryId: number) {

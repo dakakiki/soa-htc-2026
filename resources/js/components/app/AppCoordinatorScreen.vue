@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
+import { onMounted } from 'vue';
+import { RouterLink, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IconLogout } from '@tabler/icons-vue';
+import { IconBell, IconLogout } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
+import { useNoticesStore } from '@/stores/notices';
 
 /**
  * A coordinator's own screen in the installed application (prototype 7, 7b):
@@ -27,13 +29,22 @@ defineProps<{
 }>();
 
 const session = useSessionStore();
+const notices = useNoticesStore();
 const router = useRouter();
 const { t } = useI18n();
 
 async function signOut(): Promise<void> {
+    notices.forget();
     await session.logout();
     await router.replace({ name: 'app.start' });
 }
+
+/*
+ * Asked once when the frame appears, and not on a beat. A phone screen is
+ * looked at and put away, so the moment worth being right about is the moment
+ * it is opened — and a coordinator in a corridor pays for every request.
+ */
+onMounted(() => void notices.refresh());
 </script>
 
 <template>
@@ -46,6 +57,20 @@ async function signOut(): Promise<void> {
                         {{ place }}
                     </span>
                 </span>
+
+                <!-- The bell carries a number rather than a dot: "three
+                     waiting" is a different decision from "something is". -->
+                <RouterLink
+                    :to="{ name: 'app.messages' }"
+                    :aria-label="t('message.inboxOpen')"
+                    class="relative grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/25 text-white transition hover:bg-white/12"
+                >
+                    <IconBell :size="19" :stroke-width="1.7" />
+                    <span
+                        v-if="notices.has"
+                        class="absolute -right-0.5 -top-0.5 grid min-w-[1.15rem] place-items-center rounded-full bg-brand-palette-2 px-1 text-[11px] font-semibold leading-[1.15rem] text-brand-palette-4"
+                    >{{ notices.waiting > 9 ? '9+' : notices.waiting }}</span>
+                </RouterLink>
 
                 <button
                     type="button"

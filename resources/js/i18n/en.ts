@@ -1098,6 +1098,26 @@ export default {
     message: {
         // Messages to coordinators (2026-09-15). One text, several channels.
         title: 'Messages',
+
+        /*
+         * The receiving end (2026-09-18). Everything above is the sender's
+         * screen; these belong to the person the message was written for.
+         *
+         * 🔴 The inbox exists because putting a notice away used to lose it: no
+         * screen showed a dismissed one, so "print the register before Friday",
+         * tapped away by mistake, was gone for the only person who needed it.
+         */
+        inbox: 'Your notices',
+        inboxOpen: 'Open your notices',
+        inboxEmpty: 'Nothing has been sent to you yet.',
+        inboxEmptyNote: 'A notice from the organisers appears here, and stays here after you put it away.',
+        inboxWaiting: '{n} waiting',
+        inboxNoneWaiting: 'Nothing waiting',
+        inboxPutAway: 'Put away',
+        inboxPutAwayOn: 'Put away {date}',
+        // Said once, at the foot of the list, so nobody wonders whether tapping
+        // × is the last they will see of it.
+        inboxKeeps: 'Notices you put away stay on this screen.',
         count: 'No. messages: {count}',
         add: 'New message',
         edit: 'Edit message',

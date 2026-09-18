@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IconLogout, IconUserCircle } from '@tabler/icons-vue';
+import { IconBell, IconLogout, IconUserCircle } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
+import { useNoticesStore } from '@/stores/notices';
 import { inApp } from '@/utils/appJourney';
 import AppSidebar from '@/components/AppSidebar.vue';
 import Tooltip from '@/components/Tooltip.vue';
@@ -15,6 +17,7 @@ import Tooltip from '@/components/Tooltip.vue';
  */
 const session = useSessionStore();
 const themeStore = useThemeStore();
+const notices = useNoticesStore();
 const router = useRouter();
 const { t } = useI18n();
 
@@ -28,9 +31,50 @@ const { t } = useI18n();
  * serves both and has to ask.
  */
 async function logout(): Promise<void> {
+    notices.forget();
     await session.logout();
     await router.replace({ name: inApp() ? 'app.start' : 'login' });
 }
+
+/*
+ * How many notices are waiting, asked once when the shell appears and again on
+ * a slow beat.
+ *
+ * 🪤 Only while the tab is in front. A coordinator leaves the administration
+ * open all day; without the check this is a request every two minutes for
+ * hours, asking a question nobody is reading the answer to — the same rule
+ * Monitoring's live screen follows.
+ *
+ * Two minutes because `messages:send` runs on the minute: asking faster than
+ * the thing that produces the answer only produces the same answer.
+ */
+const BEAT_MS = 120_000;
+let beat: ReturnType<typeof setInterval> | undefined;
+
+function follow(): void {
+    if (beat !== undefined) {
+        clearInterval(beat);
+        beat = undefined;
+    }
+
+    if (document.visibilityState === 'visible') {
+        void notices.refresh();
+        beat = setInterval(() => void notices.refresh(), BEAT_MS);
+    }
+}
+
+onMounted(() => {
+    follow();
+    document.addEventListener('visibilitychange', follow);
+});
+
+onBeforeUnmount(() => {
+    if (beat !== undefined) {
+        clearInterval(beat);
+    }
+
+    document.removeEventListener('visibilitychange', follow);
+});
 </script>
 
 <template>
@@ -45,6 +89,21 @@ async function logout(): Promise<void> {
                 <span v-else-if="!themeStore.theme?.logo_url" class="text-[1.35rem] leading-none">{{ $t('app.name') }}</span>
             </RouterLink>
             <div class="ml-auto flex items-center gap-3 text-sm">
+                <!-- The bell carries a number rather than a dot: "three waiting"
+                     is a different decision from "something is waiting". -->
+                <Tooltip :text="t('message.inboxOpen')" position="bottom">
+                    <RouterLink
+                        :to="{ name: 'messages.inbox' }"
+                        :aria-label="t('message.inboxOpen')"
+                        class="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/25 bg-white/10 text-white hover:bg-white/20"
+                    >
+                        <IconBell :size="18" />
+                        <span
+                            v-if="notices.has"
+                            class="absolute -right-1.5 -top-1.5 grid min-w-[1.15rem] place-items-center rounded-full bg-brand-palette-2 px-1 text-[11px] font-semibold leading-[1.15rem] text-brand-palette-4"
+                        >{{ notices.waiting > 99 ? '99+' : notices.waiting }}</span>
+                    </RouterLink>
+                </Tooltip>
                 <Tooltip :text="t('profile.title')" position="bottom">
                     <RouterLink :to="{ name: 'profile' }"
                         class="inline-flex items-center gap-2 rounded-md border border-white/25 bg-white/10 px-3 py-1.5 text-white hover:bg-white/20">

@@ -174,6 +174,16 @@ const routes: RouteRecordRaw[] = [
     },
     {
         /*
+         * The same notices on the coordinator's phone — the app's OWN screen,
+         * not the administration's (ADR-0103).
+         */
+        path: '/app/messages',
+        name: 'app.messages',
+        component: () => import('@/pages/app/MyMessagesPage.vue'),
+        meta: { requiresAuth: true, zone: 'public', bare: true },
+    },
+    {
+        /*
          * Which venue, for one of the three ways in. The way in is in the
          * address rather than in a store: the installed application is reopened
          * on the address it was left at, and a screen that cannot say which
@@ -413,6 +423,19 @@ const routes: RouteRecordRaw[] = [
         name: 'messages',
         component: () => import('@/pages/messages/MessagesListPage.vue'),
         meta: { requiresAuth: true, permission: 'messages.manage' },
+    },
+    {
+        /*
+         * 🔴 No `permission`, and that is the difference between this and the
+         * three routes around it. `/messages` is where a message is WRITTEN and
+         * is gated on `messages.manage`; this is where one is READ, and anybody
+         * with an account can be sent something. A permission here would have to
+         * be granted to everyone to mean anything.
+         */
+        path: '/messages/inbox',
+        name: 'messages.inbox',
+        component: () => import('@/pages/messages/InboxPage.vue'),
+        meta: { requiresAuth: true },
     },
     {
         path: '/messages/new',

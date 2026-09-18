@@ -4090,3 +4090,63 @@ Front nema test runner (ADR-0074, povučen), pa:
 
 🪤 Za oba je provereno da **padaju na starom kodu** — zelen test koji prolazi i na pokvarenom i na
 popravljenom ne tvrdi ništa.
+
+## ADR-0116 — Poruka koja se skloni ne nestaje: inbox i zvonce sa brojem
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #102**
+
+Vlasnik je pitao može li korisnik da sazna za poruku pre nego što otvori aplikaciju, može li da se
+zna da ju je pročitao, i ima li smisla praviti inbox. Odgovor na treće je bio **da**, i razlog nije
+urednost nego nalaz.
+
+### 🔴 Sklanjanje je brisalo poruku iz vidokruga zauvek
+
+Upit iza Welcome ekrana je `whereNull('dismissed_at')`, a **nijedan ekran u aplikaciji nije
+prikazivao sklonjene**. Koordinator koji klikne × na *„odštampaj spisak pre petka"* nije imao kako
+da se vrati na nju: administrator je i dalje čita u svojoj listi, čovek kome je pisana — ne.
+
+🪤 I šire od toga: `messageInbox()` se u celoj aplikaciji pozivao sa **jednog mesta** — sa
+`/app/welcome`. Koordinator koji radi kroz desktop **nikad nije saznao da poruka postoji**. Kanal
+„app" je bio prazan hod za sve koji ne otvore telefon.
+
+### Šta je napravljeno
+
+- **Jedan endpoint, dva opsega.** `GET /api/messages/inbox` i dalje vraća **ono što čeka**;
+  `?scope=all` vraća **sve**, sa `dismissed_at` na svakom redu. `meta.waiting` nosi **stvaran broj**,
+  ne veličinu stranice — zvonce koje prestane da broji na dvadeset je zvonce koje tiho laže.
+- **Dva ekrana, namerno.** `pages/messages/InboxPage.vue` za administraciju i
+  `pages/app/MyMessagesPage.vue` za telefon. To je pravilo ADR-0103: dan kad PWA zameni prava mobilna
+  aplikacija mora da bude **brisanje dva foldera**. Dele **API i store**, što je tačno ono što taj dan
+  preživljava.
+- **Zvonce sa brojem u obe ljuske** — u administratorskoj traci i na koordinatorovom telefonu. Broj,
+  ne tačkica: *„troje čeka"* je druga odluka od *„nešto čeka"*.
+- **Sklonjena poruka ostaje u listi** i gubi samo narandžastu crtu sa strane. Na dnu piše da ostaje,
+  da niko ne bi strahovao da je × poslednje što je vidi.
+
+### 🔴 Ruta inbox-a nema permisiju, i to je razlika
+
+`/messages` je mesto gde se poruka **piše** i drži `messages.manage`. `/messages/inbox` je mesto gde
+se **čita**, a poruku može da dobije svako ko ima nalog. Permisija tu bi morala da se da svima da bi
+išta značila — ista logika kao kod koordinatorskih ruta (ADR-0104).
+
+### 🪤 Mejl kanal se ne prikazuje u inbox-u
+
+Red u `message_deliveries` sa kanalom `mail` kaže da je **adresi** nešto predato — činjenica o
+mejl serveru, ne o čoveku. U listi pod naslovom „vaša obaveštenja" čitao bi se kao još jedna stvar
+koju treba uraditi. Njegov mejl je u njegovom mejlu. Test to čuva.
+
+### Ritam
+
+Administracija pita **na dva minuta i samo dok je kartica ispred** — `messages:send` se vrti na
+minut, pa brže pitanje daje isti odgovor. Telefon pita **jednom, kad se ljuska otvori**: ekran
+telefona se pogleda i skloni, a koordinator u hodniku plaća svaki zahtev.
+
+### Šta namerno nije ovde
+
+⛔ **`seen_at`.** Danas se zna **predato** i **sklonjeno**, ne i pročitano. Kad se doda, zvaće se
+onako kako meri — „bilo mu je na ekranu" — jer to nije isto što i „pročitao".
+⛔ **Push.** Sledeći posao, i jedini koji obaveštava pre nego što čovek otvori aplikaciju. Izmereno
+u MDN-ovoj bazi kompatibilnosti: **badge na ikonici na Androidu ne postoji** (`setAppBadge` nije
+podržan ni u Chrome-u ni u Samsung Internet-u; na iPhone-u radi od iOS 16.4), a **push radi** —
+`PushManager.subscribe` i `push` događaj od Chrome Android 42/40. `notificationclick` sada ima gde
+da vodi.

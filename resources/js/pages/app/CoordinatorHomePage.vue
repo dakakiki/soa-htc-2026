@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { IconChevronRight, IconX } from '@tabler/icons-vue';
 import { coordinatorHome, type CoordinatorHome, type CoordinatorSlice } from '@/api/appCoordinator';
 import { dismissMessage, messageInbox, type InboxMessage } from '@/api/messages';
+import { useNoticesStore } from '@/stores/notices';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppCoordinatorScreen from '@/components/app/AppCoordinatorScreen.vue';
 
@@ -37,9 +38,11 @@ import AppCoordinatorScreen from '@/components/app/AppCoordinatorScreen.vue';
  *    agree. The duration is printed on the paper's block, where the paper is.
  */
 const { t } = useI18n();
+const notices = useNoticesStore();
 
 const home = ref<CoordinatorHome | null>(null);
-const notices = ref<InboxMessage[]>([]);
+/** What is waiting, shown here in full; the whole history is on `app.messages`. */
+const inbox = ref<InboxMessage[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
@@ -125,7 +128,7 @@ async function load(): Promise<void> {
 
     try {
         const { data } = await messageInbox();
-        notices.value = data.data;
+        inbox.value = data.data;
     } catch {
         // The notice is context, not content: without it the screen stands.
     }
@@ -137,7 +140,8 @@ async function load(): Promise<void> {
  * while the request travels reads as a button that did nothing.
  */
 async function dismiss(id: number): Promise<void> {
-    notices.value = notices.value.filter((notice) => notice.id !== id);
+    inbox.value = inbox.value.filter((notice) => notice.id !== id);
+    notices.oneLess();
 
     try {
         await dismissMessage(id);
@@ -181,7 +185,7 @@ const way = 'rise grid items-center gap-3 rounded-2xl border border-white/20 bg-
                 the others with it.
             -->
             <div
-                v-for="notice in notices"
+                v-for="notice in inbox"
                 :key="notice.id"
                 class="mt-5 flex items-start gap-3 rounded-2xl border-l-[3px] border-brand-palette-1 bg-white/7 p-4"
             >
