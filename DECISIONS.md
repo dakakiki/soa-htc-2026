@@ -4362,3 +4362,46 @@ ostaje ceo. Poruka napušta njegov pogled, ne bazu.
 ✅ I ono zbog čega inbox i dalje ima smisla stoji nepromenjeno: dok ovog ekrana nije bilo,
 `messageInbox()` se u celoj aplikaciji pozivao sa **jednog mesta** — sa `/app/welcome` — pa
 koordinator koji radi kroz desktop **nikad nije saznao da poruka postoji**.
+
+## ADR-0120 — Dodir na notifikaciju uvek negde vodi (ispravka uz ADR-0117)
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #106**
+
+Vlasnik, 18.09, pošto je prvi push stigao: *„kada sam kliknuo na notifikaciju nije otvorio app i nije
+me odveo u inbox"*.
+
+### 🔴 Šta je bilo: dodir koji ne radi ništa
+
+`client.navigate()` **odbija** na klijentu kog ovaj worker ne kontroliše — *„Cannot navigate a client
+that is not controlled"* — a `includeUncontrolled: true` je baš ono što takvog klijenta stavlja u
+listu. Prva verzija je to odbijanje **vratila u `waitUntil`** i nikad nije stigla do `openWindow`.
+
+Posledica: koordinator koji ima **bilo koju karticu sajta otvorenu** dodirne notifikaciju i **ništa se
+ne desi** — ni prozor, ni fokus, ni greška koju iko može da vidi.
+
+🪤 Uslov je **kartica otvorena a nekontrolisana**, što je tiho stanje. Ko nema nijednu karticu dobije
+`openWindow` i sve radi — pa se greška pokazuje samo nekim ljudima, ponekad.
+
+**Izmereno, ne pretpostavljeno.** Rukovalac je pušten nad lažnim `clients` u tri stanja: bez kartice
+(radilo), kartica koja dozvoljava `navigate` (radilo), kartica koja ga odbija (**ništa**). Isti
+postupak ponoviti ako ovo ikad zatreba opet — `new Function('self', izvor)` sa lažnim
+`clients.matchAll`, `navigate` koji odbacuje, i `waitUntil` koji hvata.
+
+### Kako sada
+
+1. Prozor koji je **već na toj adresi** se samo fokusira.
+2. `navigate` koji odbije se **preskače**, ne vraća.
+3. **`openWindow` je pod svime** — dodir ne može da završi nigde.
+
+🪤 Suite ne može da klikne notifikaciju, ali može da **odbije oblik koji je nosio grešku**:
+`navigate` bez ičega što ga hvata, ili rukovalac bez `openWindow` ispod sebe.
+
+### Usput: prazan inbox nije bio kvar
+
+Vlasnik: *„u inboxu nemam niti jednu poruku"*. Tačno, i očekivano:
+
+- Poruka koju je poslao imala je kanale **samo `["push"]`** — nema reda na `app` kanalu, pa nema šta
+  da stoji u inbox-u. To je slučaj koji pokriva upozorenje u formi (ADR-0119).
+- Raniju poruku, onu na `app` kanalu, **sklonio je u 10:50** — a od ADR-0119 × je sklanja sa ekrana.
+
+Dva ispravna ponašanja koja se sabiraju u „prazan ekran", i zato zajedno izgledaju kao kvar.
