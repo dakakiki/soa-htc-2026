@@ -79,11 +79,38 @@ class ManifestTest extends TestCase
         $this->get('/')->assertSee('rel="manifest"', false);
     }
 
+    /**
+     * 🔴 The installed window's bars are the colour of the screen under them,
+     * which is the app ground — not `color_primary` (owner, 2026-09-18). That
+     * slot is the administration's blue, chosen in Settings → Theme for buttons
+     * and links on a white page; the window opens at `/app`, which is navy, so
+     * the bar came up blue above a navy screen and above a navy splash.
+     *
+     * 🪤 The two colours have to DIFFER for this to say anything. The default
+     * palette ground is `#003758`, and a test that set `color_primary` to that
+     * same navy would pass whichever slot the controller read.
+     */
+    public function test_the_window_is_the_colour_of_the_screen_behind_it(): void
+    {
+        Setting::current()->update([
+            'color_primary' => '#2563eb',
+            'color_palette_4' => '#012b44',
+        ]);
+
+        $this->get('/manifest.webmanifest')
+            ->assertJsonPath('theme_color', '#012b44')
+            ->assertJsonPath('background_color', '#012b44');
+    }
+
+    /**
+     * And it is still administered — only from the right slot. An administrator
+     * who repaints the palette repaints the installed window with it.
+     */
     public function test_theme_colour_follows_the_settings_row(): void
     {
-        Setting::current()->update(['color_primary' => '#003758']);
+        Setting::current()->update(['color_palette_4' => '#101c2c']);
 
-        $this->get('/manifest.webmanifest')->assertJsonPath('theme_color', '#003758');
+        $this->get('/manifest.webmanifest')->assertJsonPath('theme_color', '#101c2c');
     }
 
     public function test_the_installed_application_is_named_after_the_application(): void

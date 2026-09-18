@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useSessionStore } from '@/stores/session';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import { inApp, noteJourney } from '@/utils/appJourney';
+import { paintWindowChrome } from '@/utils/windowChrome';
 
 /**
  * Which application shell a route renders in (ADR-0014). `App.vue` maps this to
@@ -889,6 +890,18 @@ router.onError((error, to) => {
     }
 
     window.location.assign(to.fullPath);
+});
+
+/**
+ * The window's own bars, kept in the colour of the screen under them.
+ *
+ * The server paints them for the address it served ({@see SpaController::splash})
+ * and that is the paint a cold start on a phone sees; this is for the other case
+ * — crossing between the navy application and the light website without a page
+ * load, which is ordinary inside one SPA ({@see utils/windowChrome}).
+ */
+router.afterEach((to) => {
+    paintWindowChrome(to.path);
 });
 
 router.beforeEach(async (to) => {

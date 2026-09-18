@@ -74,21 +74,19 @@ function applyTouchIcon(url: string | null): void {
     link.href = url;
 }
 
-/**
- * The colour a browser paints its own furniture with — the address bar on
- * Android, the status bar of an installed window. The manifest carries the same
- * value for the installed app; this is the tab.
+/*
+ * 🔴 The colour of the browser's own furniture is NOT set here any more
+ * (2026-09-18). It used to be `colors.primary`, and that is a palette slot
+ * rather than a screen: the administration's blue, chosen in Settings → Theme
+ * for buttons and links on a white page. Applied to the window it painted the
+ * bar blue above a navy application screen — and it did so a moment AFTER the
+ * server had already painted it correctly, so the seam appeared on its own
+ * while the page sat still.
+ *
+ * It belongs to the screen, so it is decided by the address:
+ * {@see utils/windowChrome} on every navigation, and `SpaController::splash()`
+ * on the first paint, which is the one a cold start on a phone actually sees.
  */
-function applyThemeColor(color: string): void {
-    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (!meta) {
-        meta = document.createElement('meta');
-        meta.name = 'theme-color';
-        document.head.appendChild(meta);
-    }
-    meta.content = color;
-}
-
 export const useThemeStore = defineStore('theme', () => {
     const theme = ref<Theme | null>(null);
 
@@ -97,7 +95,6 @@ export const useThemeStore = defineStore('theme', () => {
         applyColors(next.colors);
         applyFavicon(next.logo_icon_url ?? next.logo_url);
         applyTouchIcon(next.logo_icon_url ?? next.logo_url);
-        applyThemeColor(next.colors.primary);
     }
 
     /**
