@@ -218,7 +218,9 @@ onMounted(() => {
                         @click="read(row)"
                     >
                         <p class="text-[0.95rem] font-semibold tracking-tight text-gray-900">{{ row.subject }}</p>
-                        <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-700">{{ row.body }}</p>
+                        <p v-if="row.body" class="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-700">{{ row.body }}</p>
+                        <!-- Nothing short to carry: the letter has it. -->
+                        <p v-else-if="row.by_mail" class="mt-2 text-sm italic leading-relaxed text-gray-500">{{ $t('message.inboxInYourMail') }}</p>
                         <p class="mt-3 text-xs text-gray-400">{{ when(row.sent_at) }}</p>
                     </button>
 

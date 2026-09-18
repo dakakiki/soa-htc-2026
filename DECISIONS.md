@@ -4591,3 +4591,48 @@ rastavi ugnježdeno dugme, a ono što nestane je unutrašnje.
 🪤 **Test koji je prolazio na starom kodu.** „Tuđu poruku ne možeš da pročitaš" je tvrdio 404 — a 404
 vraća i aplikacija koja **tu rutu uopšte nema**. Dopunjen je sa **204 za pravog čoveka**; tek tada
 404 znači „nije tvoja", a ne „ne postoji".
+
+## ADR-0125 — Poruka koja je samo pismo piše se jednom (ublažava ADR-0122)
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno
+
+> **Vlasnik, 18.09:** *„mail se ne salje istim kanalom kao push / in app, zbog cega je polje message
+> obavezno za mail notifikaciju??"* → *„kada se salje samo mail, sakri message polje i posalji ga
+> praznog svakako."*
+
+### Pitanje je bilo tačno postavljeno — ali krivac nije bio mejl
+
+Mejl nikad nije tražio kratak tekst. **Mejl-only poruka nije ni postojala**: server na svaku poruku
+dodaje `app` (ADR-0122), pa je svaki mejl zapravo *mejl + inbox*, a inbox red prikazuje `body`.
+Kratak tekst se tražio zato što poruka **takođe ide u inbox** — što je bila tačno ona cena koju je
+ADR-0122 svesno primio.
+
+### Odluka
+
+**Kratak tekst traže kanali koji ga NOSE**, i ništa drugo:
+
+| izabrano | kratak tekst | zašto |
+| --- | --- | --- |
+| ništa (samo app) | **traži se** | to je ceo sadržaj poruke |
+| push | **traži se** | notifikaciju crta OS iz običnog teksta |
+| **samo mail** | **ne traži se** | pismo je poruka; polje se **sakrije** |
+| mail + push | **traži se** | telefon ne može da otvori mejl da nađe reči |
+
+🔴 **Poruka i dalje stoji u inboxu** — ADR-0122 ostaje netaknut. Red nosi naslov i liniju koja kaže
+gde su reči: *„The full message was sent to your e-mail."* Prazan red bi bio podebljan naslov nad
+prazninom i čitao bi se kao kvar.
+
+🪤 `by_mail` se čita iz **kanala poruke**, ne pretpostavlja iz praznog `body`-ja. Ono što red treba da
+kaže je „tvoj mejl to ima", a to znaju samo kanali.
+
+### Zamke
+
+🪤 **Pregled mora da pokaže i to.** Desna kolona postoji da administrator vidi red koji koordinator
+dobija **pre** slanja; za pismo je to naslov i pokazivač. Bez toga bi pregled crtao prazninu.
+
+🪤 **Test koji je tvrdio suprotno.** `test_every_message_needs_the_plain_text_now` je bio tačan dok je
+pravilo važilo; prepisan je u pravilo koje sada važi, sa istorijom u docblock-u — da se ne bi čitalo
+kao da je neko obrisao proveru.
+
+🪤 **`needsBody` je bio `computed(() => true)`** — konstanta koja izgleda kao nešto što se sklanja.
+Sad je pitanje, i test čuva tačan oblik odgovora.
