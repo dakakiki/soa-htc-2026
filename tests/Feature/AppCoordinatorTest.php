@@ -10,6 +10,7 @@ use App\Domain\Assessment\Models\Test;
 use App\Domain\Assessment\Support\SampleRound;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\Registration;
+use App\Domain\Competition\Support\VenueOverview;
 use App\Domain\Identity\Enums\SystemRole;
 use App\Domain\Identity\Models\Role;
 use App\Domain\Organization\Models\School;
@@ -124,11 +125,52 @@ class AppCoordinatorTest extends TestCase
         $this->attempt($sat, $test, submitted: true);
         $this->attempt($open, $test, submitted: false);
 
-        $row = $this->openRow($this->scopedCoordinator($school), $test->id);
+        $user = $this->scopedCoordinator($school);
+        $row = $this->row($user, $school, 'running', $test->id);
 
         $this->assertSame(3, $row['entered'], 'children the paper is in front of');
         $this->assertSame(2, $row['started'], 'children who opened it');
         $this->assertSame(1, $row['submitted'], 'children who handed it in');
+
+        // 🔴 And it is in ONE of the three. A paper the room has begun is not
+        // also a paper the room has not begun.
+        $this->assertSame(['running'], $this->slicesHolding($user, $school, $test->id));
+    }
+
+    /**
+     * 🔴 "Upcoming" is open AND untouched. It is not a timetable: no exam in
+     * this system carries a date, so the only thing the data can mean by the
+     * word is that this room has not begun the paper.
+     */
+    public function test_a_paper_nobody_has_begun_is_upcoming_and_moves_the_moment_one_child_opens_it(): void
+    {
+        $school = School::query()->firstOrFail();
+        $test = $this->contestTest('Not begun');
+        $user = $this->scopedCoordinator($school);
+
+        $child = $this->competitor($school, '14900051', 900051);
+
+        $this->assertSame(['upcoming'], $this->slicesHolding($user, $school, $test->id));
+        $this->assertSame(1, $this->row($user, $school, 'upcoming', $test->id)['entered']);
+
+        $this->attempt($child, $test, submitted: false);
+
+        $this->assertSame(['running'], $this->slicesHolding($user, $school, $test->id));
+    }
+
+    /**
+     * 🔴 An unknown way in is a 404 and never a quiet fall back to the first
+     * one: a screen asking for `results` and handed `upcoming` would report the
+     * wrong state of the room under the right heading.
+     */
+    public function test_an_unknown_way_in_is_not_quietly_served_as_another(): void
+    {
+        $school = School::query()->firstOrFail();
+        $user = $this->scopedCoordinator($school);
+
+        $this->actingAs($user)
+            ->getJson("/api/app/coordinator/venues/{$school->id}/figures?slice=everything")
+            ->assertNotFound();
     }
 
     /**
@@ -148,16 +190,24 @@ class AppCoordinatorTest extends TestCase
         $this->attempt($one, $test, submitted: true, score: 20);
         $this->attempt($two, $test, submitted: true, score: 10);
 
-        // Nothing published yet: the paper is not among the published rows, and
-        // the open row it DOES appear in has no average on it.
-        $this->assertNull($this->publishedRow($user, $test->id));
-        $this->assertArrayNotHasKey('average', $this->openRow($user, $test->id) ?? ['average' => null]);
+        // Nothing published yet: the paper is among the papers the room is still
+        // working through, and that row carries no average at all.
+        $this->assertSame(['running'], $this->slicesHolding($user, $school, $test->id));
+        $this->assertArrayNotHasKey('average', $this->row($user, $school, 'running', $test->id));
 
         Attempt::where('test_id', $test->id)->update(['published_at' => now()]);
 
-        $row = $this->publishedRow($user, $test->id);
+        /*
+         * 🔴 And it LEAVES "in progress" when it is published. Without that the
+         * same paper would stand under both headings and a coordinator would be
+         * told one room is at once working and finished — which is what happens
+         * on the dev database, where every started paper at one venue is already
+         * marked.
+         */
+        $this->assertSame(['published'], $this->slicesHolding($user, $school, $test->id));
 
-        $this->assertNotNull($row);
+        $row = $this->row($user, $school, 'published', $test->id);
+
         // Cast because JSON gives back a whole mean as an integer.
         $this->assertSame(15.0, (float) $row['average'], 'the mean of 20 and 10');
         $this->assertSame(2, $row['submitted']);
@@ -179,8 +229,8 @@ class AppCoordinatorTest extends TestCase
         $this->attempt($child, $practice, submitted: true, score: 30);
         Attempt::where('test_id', $practice->id)->update(['published_at' => now()]);
 
-        $this->assertNull($this->publishedRow($user, $practice->id), 'a practice round is not the contest');
-        $this->assertNull($this->openRow($user, $practice->id));
+        $this->assertSame([], $this->slicesHolding($user, $school, $practice->id),
+            'a practice round reaches none of the three');
     }
 
     /**
@@ -205,12 +255,19 @@ class AppCoordinatorTest extends TestCase
         $voided = $this->attempt($child, $test, submitted: true);
         $voided->update(['status' => 'void']);
 
-        $this->assertSame(0, $this->openRow($user, $test->id)['submitted'], 'nothing but a voided row');
+        /*
+         * 🪤 And so the paper is UPCOMING, not in progress — which is the honest
+         * answer: an administrator took the attempt away so the child could sit
+         * again, and until they do, nobody at this venue has begun it.
+         */
+        $this->assertSame(['upcoming'], $this->slicesHolding($user, $school, $test->id));
+        $this->assertSame(0, $this->row($user, $school, 'upcoming', $test->id)['submitted'],
+            'nothing but a voided row');
 
         // The child sits again; one child, counted once.
         $this->attempt($child, $test, submitted: true);
 
-        $row = $this->openRow($user, $test->id);
+        $row = $this->row($user, $school, 'running', $test->id);
 
         $this->assertSame(1, $row['submitted']);
         $this->assertSame(1, $row['started']);
@@ -225,9 +282,66 @@ class AppCoordinatorTest extends TestCase
         $this->competitor($schools[0], '14900041', 900041);
         $this->competitor($schools[1], '14900042', 900042);
 
-        $row = $this->openRow($this->scopedCoordinator($schools[0]), $test->id);
+        $user = $this->scopedCoordinator($schools[0]);
+        $row = $this->row($user, $schools[0], 'upcoming', $test->id);
 
         $this->assertSame(1, $row['entered']);
+    }
+
+    /**
+     * 🔴 The three ways in are labelled with a number only for somebody who
+     * holds ONE venue. Summed across the two dozen a country coordinator runs,
+     * the number is about no room at all — and a number like that on the first
+     * screen is what made the old one unreadable.
+     */
+    public function test_the_ways_in_are_numbered_for_one_venue_and_not_for_many(): void
+    {
+        $schools = School::query()->orderBy('id')->take(2)->get();
+        $school = $schools[0];
+        $begun = $this->contestTest('Begun');
+        $untouched = $this->contestTest('Untouched');
+
+        $child = $this->competitor($school, '14900061', 900061);
+        $this->attempt($child, $begun, submitted: false);
+
+        $this->actingAs($this->scopedCoordinator($school))
+            ->getJson('/api/app/coordinator/home')
+            ->assertOk()
+            ->assertJsonPath('data.counts.upcoming', 1)
+            ->assertJsonPath('data.counts.running', 1)
+            ->assertJsonPath('data.counts.published', 0);
+
+        $this->actingAs($this->scopedCoordinator($school, $schools[1]))
+            ->getJson('/api/app/coordinator/home')
+            ->assertOk()
+            ->assertJsonPath('data.counts', null);
+    }
+
+    /**
+     * The number beside a venue is the number for the way in that was tapped —
+     * a venue with nothing upcoming may well have results, and a row that says
+     * otherwise sends somebody into an empty screen.
+     */
+    public function test_a_venue_row_is_counted_for_the_way_in_that_was_asked_for(): void
+    {
+        $school = School::query()->firstOrFail();
+        $test = $this->contestTest('Counted');
+        $user = $this->scopedCoordinator($school);
+
+        $child = $this->competitor($school, '14900071', 900071);
+
+        $this->assertSame([1], $this->actingAs($user)
+            ->getJson('/api/app/coordinator/venues?slice=upcoming')->assertOk()->json('data.*.papers'));
+        $this->assertSame([0], $this->actingAs($user)
+            ->getJson('/api/app/coordinator/venues?slice=running')->assertOk()->json('data.*.papers'));
+
+        $this->attempt($child, $test, submitted: true);
+        Attempt::where('test_id', $test->id)->update(['published_at' => now()]);
+
+        $this->assertSame([0], $this->actingAs($user)
+            ->getJson('/api/app/coordinator/venues?slice=upcoming')->assertOk()->json('data.*.papers'));
+        $this->assertSame([1], $this->actingAs($user)
+            ->getJson('/api/app/coordinator/venues?slice=published')->assertOk()->json('data.*.papers'));
     }
 
     // ---------------------------------------------------------------- helpers
@@ -240,20 +354,34 @@ class AppCoordinatorTest extends TestCase
      */
     private array $quizIdByTest = [];
 
-    /** @return array<string, mixed>|null */
-    private function openRow(User $user, int $testId): ?array
+    /**
+     * One paper as one of the three ways in shows it, or null when that way in
+     * does not carry it.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function row(User $user, School $school, string $slice, int $testId): ?array
     {
-        $rows = $this->actingAs($user)->getJson('/api/app/coordinator/home')->assertOk()->json('data.open');
+        $rows = $this->actingAs($user)
+            ->getJson("/api/app/coordinator/venues/{$school->id}/figures?slice={$slice}")
+            ->assertOk()
+            ->json('data.papers');
 
         return collect($rows)->firstWhere('test_id', $testId);
     }
 
-    /** @return array<string, mixed>|null */
-    private function publishedRow(User $user, int $testId): ?array
+    /**
+     * Which of the three a paper is in, as a list — so a test can say "exactly
+     * this one" instead of asserting one way in and trusting the others.
+     *
+     * @return list<string>
+     */
+    private function slicesHolding(User $user, School $school, int $testId): array
     {
-        $rows = $this->actingAs($user)->getJson('/api/app/coordinator/home')->assertOk()->json('data.published');
-
-        return collect($rows)->firstWhere('test_id', $testId);
+        return array_values(array_filter(
+            VenueOverview::SLICES,
+            fn (string $slice) => $this->row($user, $school, $slice, $testId) !== null,
+        ));
     }
 
     /**

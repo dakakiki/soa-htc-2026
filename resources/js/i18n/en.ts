@@ -593,9 +593,64 @@ export default {
             // The round alone, without the year the site's own strip carries:
             // typed with the season record, never inferred (ADR-0081).
             roundOnly: 'Round {round}',
-            venueResults: 'Venue results',
-            venueResultsNote: 'Every test, every venue you run',
-            venueResultsOneNote: 'Published after the round closes',
+
+            /*
+             * The three ways in (owner, 2026-09-18). They replaced one list of
+             * every open paper, which for a country coordinator was eighteen
+             * white cards and six published rows whose every number was a total
+             * across 257 venues — a figure about no room at all.
+             *
+             * 🔴 "Upcoming" is not a promise about a date. Nothing in this
+             * system dates an exam, so the word can only mean *open, and this
+             * room has not begun it*.
+             */
+            wayUpcoming: 'Upcoming',
+            wayRunning: 'In progress',
+            wayResults: 'Results',
+            // A coordinator with several venues is choosing a room next, so the
+            // note speaks of rooms; one with a single venue is opening theirs.
+            upcomingNoteMany: 'Papers your rooms have not started',
+            inProgressNoteMany: 'Being sat now, and waiting on marking',
+            resultsNoteMany: 'Marks an administrator has published',
+            upcomingNoteOne: 'Not started yet',
+            inProgressNoteOne: 'Sitting now, or waiting on marking',
+            resultsNoteOne: 'Published marks',
+            waysHintMany: 'Each one asks which venue first',
+            waysHintOne: 'One venue — no venue list',
+
+            // What each way in is showing, said above the blocks.
+            upcomingLead: 'Open papers nobody at this venue has started.',
+            inProgressLead: 'Started here, and not yet published.',
+            resultsLead: 'Marks an administrator has published.',
+            papersCount: '{n} papers',
+            papersCountOne: '{n} paper',
+            // The word on its own, under the number beside a venue — the number
+            // is the size the eye lands on, so the two are separate elements
+            // rather than one sentence pulled apart at render time.
+            papersWord: 'papers',
+            paperWord: 'paper',
+
+            /*
+             * Where a paper stands, in words. Three numbers alone do not say
+             * whether a room is working or has finished and is waiting on
+             * somebody else — and on the dev database the second is far commoner
+             * than the first.
+             */
+            sittingNowCount: '{n} sitting now',
+            notStartedCount: '{n} have not started',
+            allHandedIn: 'All handed in · waiting on marking',
+            // The strip over the blocks. 🪤 Its number is added up from the very
+            // rows below it, so the two cannot disagree.
+            nobodySitting: 'Nobody sitting right now',
+            liveEvery: 'Updated just now · every 10 s',
+            refreshNow: 'Refresh',
+
+            // Each way in, when it holds nothing.
+            upcomingEmpty: 'Every open paper here has already been started.',
+            upcomingEmptyNote: 'Look under In progress, or under Results once the marks are out.',
+            inProgressEmpty: 'Nothing is being sat at this venue right now.',
+            inProgressEmptyNote: 'Every paper this room has opened is either still to come or already published.',
+
             countryCoordinator: 'Country coordinator',
             whichVenue: 'Which venue?',
             search: 'Search',

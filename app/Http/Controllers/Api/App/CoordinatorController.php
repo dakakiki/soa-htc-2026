@@ -62,8 +62,17 @@ class CoordinatorController extends Controller
             'venues_count' => count($schoolIds),
             'round' => $season?->round_number,
             'season' => $season?->name,
-            'open' => $season === null ? [] : VenueOverview::open($schoolIds, $season->id),
-            'published' => $season === null ? [] : VenueOverview::published($schoolIds, $season->id),
+            /*
+             * 🔴 Counted only for somebody who holds ONE venue, and `null`
+             * otherwise. A number beside the three ways in has to be a number
+             * about a room; summed across the two dozen venues a country
+             * coordinator runs it is about no room at all, and putting it there
+             * is what made the old screen unreadable in the first place. They
+             * are asked which venue, and the numbers begin after that.
+             */
+            'counts' => $season !== null && count($schoolIds) === 1
+                ? VenueOverview::counts($schoolIds, $season->id)
+                : null,
         ]]);
     }
 
@@ -78,6 +87,8 @@ class CoordinatorController extends Controller
     public function venues(Request $request): JsonResponse
     {
         $term = trim((string) $request->query('q', ''));
+        $slice = $this->slice($request);
+        $season = SeasonContext::active();
 
         $venues = School::query()
             ->whereIn('id', $this->schoolIds($request->user()))
@@ -88,18 +99,35 @@ class CoordinatorController extends Controller
             ->limit(200)
             ->get(['id', 'name', 'city']);
 
+        /*
+         * The count that decides whether a row is worth opening, and it is the
+         * count for the way in they tapped — a venue with nothing upcoming may
+         * well have results. Counted over the venues actually listed, so a
+         * search narrows the work as well as the list.
+         */
+        $counts = $season === null
+            ? []
+            : VenueOverview::countsPerSchool($venues->pluck('id')->map(intval(...))->all(), $season->id);
+
         return response()->json(['data' => $venues->map(fn (School $school) => [
             'id' => $school->id,
             'name' => $school->name,
             'city' => $school->city,
+            'papers' => $counts[$school->id][$slice] ?? 0,
         ])]);
     }
 
     /**
-     * One venue's numbers, paper by paper.
+     * One venue's papers in one of the three slices, paper by paper.
      *
-     * 🔴 Published only. An open paper's average is a moving number (owner,
-     * 2026-09-15), and this screen exists to be read rather than watched.
+     * 🔴 An AVERAGE reaches only the published slice. While a room is still
+     * working, an average says something different every time it is read (owner,
+     * 2026-09-15) — that is not a number, it is a number in motion.
+     *
+     * 🪤 No "sitting now" figure is sent. The screen adds it up out of the very
+     * rows it is drawing, so the strip at the top and the blocks beneath it
+     * cannot disagree — a total standing over a list it does not describe is the
+     * mistake this application was caught making three times in one day.
      */
     public function figures(Request $request, School $school): JsonResponse
     {
@@ -107,6 +135,7 @@ class CoordinatorController extends Controller
 
         abort_unless(in_array($school->id, $this->schoolIds($user), true), 404);
 
+        $slice = $this->slice($request);
         $season = SeasonContext::active();
 
         return response()->json(['data' => [
@@ -114,7 +143,10 @@ class CoordinatorController extends Controller
                 'id' => $school->id,
                 'name' => $school->name,
                 'city' => $school->city,
+                // The header names the country above the school (owner, 18.09).
+                'country' => $school->country?->name,
             ],
+            'slice' => $slice,
             /*
              * How many venues they hold, answered here as well as on Welcome.
              * The screen needs it to know whether there is ANOTHER venue to
@@ -122,8 +154,28 @@ class CoordinatorController extends Controller
              * the address it was opened with, which anybody can retype.
              */
             'venues_count' => count($this->schoolIds($user)),
-            'figures' => $season === null ? [] : VenueOverview::published([$school->id], $season->id),
+            'papers' => $season === null ? [] : match ($slice) {
+                'upcoming' => VenueOverview::upcoming([$school->id], $season->id),
+                'running' => VenueOverview::running([$school->id], $season->id),
+                default => VenueOverview::published([$school->id], $season->id),
+            },
         ]]);
+    }
+
+    /**
+     * Which of the three ways in this request is for.
+     *
+     * 🪤 An unknown one is a 404 rather than a quiet fall back to the first: a
+     * screen that asks for `results` and is handed `upcoming` reports the wrong
+     * room state under the right heading, and nothing on the way says so.
+     */
+    private function slice(Request $request): string
+    {
+        $slice = (string) $request->query('slice', 'upcoming');
+
+        abort_unless(in_array($slice, VenueOverview::SLICES, true), 404);
+
+        return $slice;
     }
 
     /**

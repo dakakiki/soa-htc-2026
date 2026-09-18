@@ -14,6 +14,20 @@ import { http } from '@/api/http';
  * so there is nothing here to add later.
  */
 
+/**
+ * The three ways a coordinator can look at one venue, in the words the server
+ * slices by — one vocabulary from the query string to the heading.
+ *
+ * 🔴 `upcoming` is NOT a timetable. Nothing in this system dates an exam: a test
+ * carries a duration and a status, and the only dates in the database belong to
+ * the season. It means *open, and this room has not begun it*, which is the only
+ * thing the data can say.
+ *
+ * 🔴 `running` is started AND not yet published. Drop the second half and a
+ * marked paper stands under two headings at once.
+ */
+export type CoordinatorSlice = 'upcoming' | 'running' | 'published';
+
 /** One paper, as a coordinator's room sees it. */
 export interface CoordinatorPaper {
     test_id: number;
@@ -36,6 +50,10 @@ export interface CoordinatorVenue {
     id: number;
     name: string;
     city: string | null;
+    /** The header names the country above the school (owner, 2026-09-18). */
+    country?: string | null;
+    /** On the list of venues: how many papers this one holds in the way in asked for. */
+    papers?: number;
 }
 
 export interface CoordinatorHome {
@@ -48,20 +66,35 @@ export interface CoordinatorHome {
     /** Typed with the season record, never inferred (ADR-0081). */
     round: number | null;
     season: string | null;
-    open: CoordinatorPaper[];
-    published: CoordinatorPaper[];
+    /**
+     * 🔴 How many papers each way in holds — and `null` for somebody who runs
+     * more than one venue. A number beside a way in has to be a number about a
+     * room; summed across two dozen venues it is about no room at all, and a
+     * number like that on the first screen is what made the old one unreadable.
+     */
+    counts: Record<CoordinatorSlice, number> | null;
+}
+
+export interface CoordinatorFigures {
+    venue: CoordinatorVenue;
+    slice: CoordinatorSlice;
+    venues_count: number;
+    papers: CoordinatorPaper[];
 }
 
 export function coordinatorHome() {
     return http.get<{ data: CoordinatorHome }>('/api/app/coordinator/home');
 }
 
-export function coordinatorVenues(q = '') {
-    return http.get<{ data: CoordinatorVenue[] }>('/api/app/coordinator/venues', { params: q === '' ? {} : { q } });
+export function coordinatorVenues(slice: CoordinatorSlice, q = '') {
+    return http.get<{ data: CoordinatorVenue[] }>('/api/app/coordinator/venues', {
+        params: q === '' ? { slice } : { slice, q },
+    });
 }
 
-export function venueFigures(venueId: number) {
-    return http.get<{ data: { venue: CoordinatorVenue; venues_count: number; figures: CoordinatorPaper[] } }>(
+export function venueFigures(venueId: number, slice: CoordinatorSlice) {
+    return http.get<{ data: CoordinatorFigures }>(
         `/api/app/coordinator/venues/${venueId}/figures`,
+        { params: { slice } },
     );
 }

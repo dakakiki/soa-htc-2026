@@ -3865,3 +3865,62 @@ Tvrdnja je zamenjena time što pravilo stvarno kaže: planirani `results.publish
 
 ⛔ Sadržaj uvoza i izvoza — pravilo iz ADR-0110, nepromenjeno.
 ⛔ Samo takmičenje — dete koje se identifikuje, počinje ili predaje i dalje ne piše u trag.
+
+## ADR-0112 — Koordinatorov prvi ekran pita, ne nabraja: Upcoming · In progress · Results
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #98**
+
+Ekran 7 je bio **lista svega otvorenog, pa lista svega objavljenog**. Izmereno na dev bazi, državni
+koordinator Srbije je dobijao **18 belih kartica + 6 objavljenih redova** — oko sedam ekrana
+skrolovanja — i **svaki broj na njima bio je zbir preko 257 učionica**. Školski koordinator je
+dobijao median **10**.
+
+> **Vlasnik, 18.09:** *„predugačko i nepregledno kada je u pitanju country coordinator i ima 40 venua“*
+
+**Odluka:** lista se seli **iza učionice**, a na prvom ekranu ostaju **tri dugmeta**. Dugme
+„Venue results“ se briše — sva tri puta vode na iste blokove.
+
+### 🔴 Šta tri reči smeju da znače, i zašto baš to
+
+| | znači | zašto ne nešto drugo |
+| --- | --- | --- |
+| **Upcoming** | otvoreno, i **u ovoj učionici niko nije započeo** | **nijedan ispit u sistemu nema datum.** `tests` nosi `duration` i `status`, `exams` samo `status`; jedini datumi u bazi su `seasons.starts_at/ends_at`. Raspored bi bio **kolona i administratorski ekran**, ne preimenovanje ovoga |
+| **In progress** | započeto **I još neobjavljeno** | bez drugog dela isti rad stoji na **dva ekrana**. Na dev bazi se to i dešava — u Mladenovcu je svih 5 započetih već objavljeno, pa bi „In progress“ pokazivao 5 radova koji su gotovi |
+| **Results** | objavljene ocene | jedino mesto gde **sme prosek** (ADR-0104) |
+
+Svaki rad pada u **tačno jedan** isečak; test to tvrdi kao listu, ne po isečku.
+
+### 🔴 Državni koordinator nema brojeve na dugmadima
+
+Jedini broj koji bi tu mogao da stoji je **zbir preko svih njegovih učionica** — a to je tačno onaj
+broj zbog kog je stari ekran bio nečitljiv. Pita ga se koja učionica, pa brojevi počinju posle toga.
+**Ko drži jednu učionicu dobija brojeve odmah**, jer je tada broj — njegova soba.
+
+Granica je **broj učionica, ne rola** (`counts` je `null` kad ih je više od jedne): državni
+koordinator koji drži tačno jednu nema kome drugom da se pošalje ni ovde ni na ekranu 9.
+
+### Šta nosi ekran učionice
+
+Zaglavlje nosi **zemlju iznad škole** (vlasnik, 18.09). Blok pod „Upcoming“ nosi **jedan broj**
+(Entered) — mreža od tri bi imala dve nule iz istog razloga. Pod „In progress“ nosi tri broja i
+**rečenicu**: *N sitting now* → *N have not started* → *All handed in · waiting on marking*, tim
+redom, jer tri broja ne kažu da li soba radi ili je gotova i čeka nekog drugog.
+
+🪤 **Živi red se sabira na ekranu, iz istih redova iz kojih se crtaju blokovi** — ne šalje se kao
+svoj broj sa servera. Zbir iznad liste koju ne opisuje je greška koju je ova aplikacija napravila
+**tri puta u jednom danu** (ADR-0107/0108); sabiranjem iz liste neslaganje postaje nemoguće.
+Osvežava se na **10 s**, isto kao Monitoring → Current action, i **samo dok je kartica ispred** i
+samo na tom isečku.
+
+### 🪤 Usput popravljen bug koji je živeo od 15.09
+
+`resources/js/router/index.ts` je nosio `path: '/app/venues/:venueId(\d+)'`. U JavaScript-u `'\d'`
+**nije escape** — to su dva znaka `d+`. Ruta je zato poklapala **`/app/venues/ddd`**, a **nije**
+`/app/venues/188`. Klik kroz aplikaciju je i dalje crtao ekran (to se rešava po **imenu** rute), ali
+**osvežavanje te adrese — i ponovno otvaranje instalirane aplikacije na njoj — padalo je na Not
+found.** Izmereno `router.resolve()`-om, ne pročitano iz koda. Sada `\d+`.
+
+### Cena
+
+Koordinator sa jednom učionicom ima **jedan tap više** do brojeva nego ranije. To je svesno: i njemu
+je lista bila deset kartica, pa podela plaća taj tap.
