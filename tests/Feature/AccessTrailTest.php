@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Domain\Audit\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -49,6 +52,78 @@ class AccessTrailTest extends TestCase
         $this->assertSame($admin->name, $row->actor_label);
         $this->assertSame($admin::class, $row->subject_type);
         $this->assertNotNull($row->ip_address);
+    }
+
+    /**
+     * 🔴 A browser coming back on its "remember me" cookie is not a sign-in, and
+     * three of them arriving together are not three sign-ins.
+     *
+     * Reported from STAGE on 2026-09-18: one coordinator, three identical
+     * `auth.signed_in` rows inside one second, same address and same browser.
+     * Nobody signed in three times. The session had expired and the cookie had
+     * not, and the SPA opens several API calls at once on boot — none of them
+     * held a session, so each rebuilt its own out of the same cookie, and
+     * Laravel fires `Login` for every one of those.
+     *
+     * 🪤 `$event->remember` cannot separate the two: it is true here AND for
+     * somebody signing in with the box ticked. `viaRemember()` can, and
+     * `userFromRecaller()` sets it before the event is fired.
+     *
+     * 🪤 Driven through the guard rather than over HTTP. The recall needs a
+     * request carrying the recaller and no session, which the test client fights
+     * — and a test that quietly ends up at a 401 proves only that a stranger is
+     * turned away. This runs the real path: `viaRemember()` is asserted true, so
+     * the recall demonstrably happened.
+     */
+    public function test_a_browser_returning_on_its_remember_cookie_is_not_a_sign_in(): void
+    {
+        $admin = $this->admin();
+        $admin->setRememberToken(Str::random(60));
+        $admin->save();
+
+        $name = Auth::guard('web')->getRecallerName();
+        $recaller = implode('|', [
+            $admin->getAuthIdentifier(),
+            $admin->getRememberToken(),
+            // Laravel's own third segment: the password hash, so that changing
+            // the password invalidates every remembered browser.
+            $admin->getAuthPassword(),
+        ]);
+
+        // Three calls arriving with the cookie and no session — the SPA's boot.
+        foreach (range(1, 3) as $ignored) {
+            Auth::forgetGuards();
+
+            $request = Request::create('/api/auth/user');
+            $request->cookies->set($name, $recaller);
+            $request->setLaravelSession(app('session.store'));
+            app('session.store')->flush();
+
+            $guard = Auth::guard('web');
+            $guard->setRequest($request);
+
+            $this->assertSame($admin->id, $guard->user()?->id);
+            $this->assertTrue($guard->viaRemember(), 'the recall did not happen, so nothing here is being tested');
+        }
+
+        $this->assertSame(
+            0,
+            AuditLog::where('action', 'auth.signed_in')->count(),
+            'a remembered return was written down as a sign-in — and one return writes one row per '
+            .'parallel call, which is how three appeared for one coordinator inside one second',
+        );
+    }
+
+    /** And a real sign-in still writes exactly one, remember box ticked or not. */
+    public function test_a_sign_in_with_remember_me_is_still_written_down_once(): void
+    {
+        $admin = $this->admin();
+
+        $this->spa()->postJson('/api/auth/login', [
+            'email' => $admin->email, 'password' => 'password', 'remember' => true,
+        ])->assertOk();
+
+        $this->assertSame(1, AuditLog::where('action', 'auth.signed_in')->count());
     }
 
     public function test_a_sign_out_is_written_down(): void

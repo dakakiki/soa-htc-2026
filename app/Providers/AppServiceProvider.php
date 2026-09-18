@@ -28,10 +28,12 @@ use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -210,6 +212,33 @@ class AppServiceProvider extends ServiceProvider
     private function recordWhoGetsIn(): void
     {
         Event::listen(Login::class, function (Login $event): void {
+            /*
+             * 🔴 A SIGN-IN, which is not the only thing `Login` means.
+             *
+             * Laravel fires this event again whenever `SessionGuard` rebuilds a
+             * session out of the "remember me" cookie — nobody types anything,
+             * the browser simply comes back. Recording that as a sign-in was
+             * wrong twice over: it is not one, and it arrives in BURSTS. The
+             * SPA opens several API calls at once, none of them holds a session
+             * yet, so each rebuilds its own from the same cookie and each fires
+             * its own event.
+             *
+             * 🪤 Measured on 2026-09-18, after the owner found three identical
+             * `auth.signed_in` rows for one coordinator inside one second on
+             * STAGE: three parallel requests carrying only the recaller wrote
+             * exactly three rows, same second, same address, same browser.
+             *
+             * 🪤 `$event->remember` cannot tell these apart — it is true for a
+             * remembered return AND for a sign-in with the box ticked. The guard
+             * can: `userFromRecaller()` sets `viaRemember` before the event is
+             * fired (SessionGuard, lines 197 and 202).
+             */
+            $guard = Auth::guard($event->guard);
+
+            if ($guard instanceof SessionGuard && $guard->viaRemember()) {
+                return;
+            }
+
             AuditTrail::recordAccess('auth.signed_in', $event->user, self::device());
         });
 
