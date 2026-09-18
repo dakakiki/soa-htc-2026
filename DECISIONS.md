@@ -4488,3 +4488,52 @@ rečenicu, samo sa druge strane.
 🪤 Test koji čuva pregled hoda **po kućicama**, pa app panel posle ovoga ne bi video — dodat je
 poseban koji tvrdi da taj panel **nije uslovan**. Bez njega bi jedini pregled koji se vidi na svakoj
 poruci mogao da se obriše a da niko ne primeti.
+
+## ADR-0123 — Traka prozora je boja ekrana ispod nje, a ne boja iz palete
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno
+
+> **Vlasnik, 18.09:** *„3 — popravi"* — na nalaz da se traka instaliranog prozora i splash **ne
+> slažu**.
+
+### Šta je bilo pogrešno
+
+Boju prozorske trake (`theme-color`) držala su **tri mesta i sva tri su tvrdila različito**:
+
+| gde | šta je slao | kada |
+| --- | --- | --- |
+| `ManifestController` | `color_primary` — **#2563eb**, administratorsko plavo | instaliran prozor, i splash koji Android crta |
+| `app.blade.php` | `$splash['bg']` — **navy na `/app`**, papir na sajtu | prvi pixel, sa servera |
+| `stores/theme.ts` | `colors.primary` — **opet #2563eb** | ~300 ms kasnije, na **svakoj** stranici |
+
+🔴 **Treće mesto je bilo gore od prvog.** Server je traku obojio **tačno**, a onda ju je SPA
+prebojio plavim čim se tema učita — dakle nad navy ekranom, **bez ijednog dodira**. Lanac je
+`app.ts:66 → useThemeStore().load() → apply() → applyThemeColor(colors.primary)`.
+
+### Odluka
+
+**`theme-color` pripada EKRANU, ne paleti.** `color_primary` je slot koji administrator bira u
+Settings → Theme za dugmad i linkove na beloj strani — nikad nije bio boja prozora.
+
+- manifest: `theme_color` = **`color_palette_4`**, isto što i `background_color` (navy `/app`)
+- `stores/theme.ts`: **ne dira** traku više — paleta, favicon i touch ikona su njegovo
+- `utils/windowChrome.ts`: boja se bira po **adresi**, istim pravilom kao `SpaController::splash()`
+  (`/app` ili `/app/…` → navy, inače papir), i primenjuje u `router.afterEach`
+
+⚠️ **I dalje je administrirano** — samo iz pravog slota. Ko prefarba paletu, prefarba i prozor.
+
+🪤 SPA prelaz između navy aplikacije i svetlog sajta ide **bez učitavanja stranice**, pa bez
+`afterEach` traka ostaje u boji onog ekrana koji je prvi poslužen.
+
+🪤 **Dva odgovora na isto pitanje** — „da li je ovo aplikacija" — sada stoje u dva jezika
+(`SpaController` i `windowChrome.ts`). Test tvrdi da glase **isto**; da razidu nema ko drugi da
+primeti osim čoveka sa telefonom.
+
+### Čime je čuvano
+
+Front nema runner, pa `WindowChromeMatchesTheScreenTest` **čita izvor**. Provereno da svih šest
+tvrdnji **pada na starom kodu** (2 u `ManifestTest`, 4 u novom).
+
+🪤 Stari `test_theme_colour_follows_the_settings_row` je postavljao `color_primary` na **`#003758`**
+— što je slučajno tačno podrazumevana vrednost `color_palette_4`. Da je ostao takav, prošao bi i
+pre i posle izmene i **ne bi tvrdio ništa**.

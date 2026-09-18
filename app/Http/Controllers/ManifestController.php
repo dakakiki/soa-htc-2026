@@ -57,7 +57,26 @@ class ManifestController extends Controller
                  * a venue's desktop and on a tablet somebody brought, and locking
                  * either one of those to the other's shape helps nobody.
                  */
-                'theme_color' => $setting->color_primary,
+                /*
+                 * The colour of the installed window's own furniture: the title
+                 * bar, the status bar, and the card the task switcher draws.
+                 *
+                 * 🔴 The GROUND OF THE SCREEN, and the same value as
+                 * `background_color` on purpose — not `color_primary`, which it
+                 * read until 2026-09-18. That slot is the administration's blue,
+                 * chosen in Settings → Theme for buttons and links on a white
+                 * page; the installed window opens at `start_url`, and
+                 * `start_url` is `/app`, which is navy ({@see AppScreen}). So the
+                 * bar came up blue above a navy screen and above a navy splash,
+                 * and the seam was the first thing on the phone (owner,
+                 * 2026-09-18).
+                 *
+                 * ⚠️ Still administered, only from the right slot: an
+                 * administrator who repaints the palette repaints the window with
+                 * it. What changed is WHICH colour the window is, not whether the
+                 * screen decides it.
+                 */
+                'theme_color' => $setting->color_palette_4,
                 /*
                  * The colour held behind the window while the SPA boots, and the
                  * ground of the splash Android draws from this file.
