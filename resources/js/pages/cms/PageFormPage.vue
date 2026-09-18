@@ -11,6 +11,7 @@ import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import MediaPickerModal from '@/components/MediaPickerModal.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import type { CmsMedia } from '@/types/models';
+import { fromLocalInput, toLocalInput } from '@/utils/localDateTime';
 
 const route = useRoute();
 const router = useRouter();
@@ -72,7 +73,8 @@ async function submit(): Promise<void> {
         slug: form.slug || null,
         body: form.body || null,
         status: form.status,
-        published_at: form.published_at || null,
+        // The picker holds the editor's own clock; the server keeps UTC.
+        published_at: fromLocalInput(form.published_at),
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
         image_media_id: form.image_media_id,
@@ -103,7 +105,7 @@ onMounted(async () => {
         form.slug = p.slug;
         form.body = p.body ?? '';
         form.status = p.status;
-        form.published_at = p.published_at ? p.published_at.slice(0, 16) : '';
+        form.published_at = p.published_at ? toLocalInput(p.published_at) : '';
         form.seo_title = p.seo_title ?? '';
         form.seo_description = p.seo_description ?? '';
         currentPath.value = p.path;
