@@ -166,6 +166,14 @@ watch(() => [route.params.venueId, route.params.slice], () => {
     syncPolling();
 });
 
+/**
+ * A short stagger, so a list reads as one thing arriving rather than as many.
+ * Capped: a list that keeps adding delay makes its last item feel like a fault.
+ */
+function rise(index: number) {
+    return { animationDelay: `${Math.min(index * 45, 240)}ms` };
+}
+
 const mono = 'font-mono uppercase tracking-[0.12em]';
 const cell = 'block font-mono text-[1.1rem] font-semibold tabular-nums';
 const cellLabel = 'mt-0.5 block font-mono text-[9px] uppercase tracking-[0.1em] text-brand-palette-4/50';
@@ -268,7 +276,12 @@ const another = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl bo
 
                 <!-- One block per paper. -->
                 <div class="mt-3 grid gap-2.5">
-                    <article v-for="paper in papers" :key="paper.test_id" class="rounded-2xl bg-white p-4 text-brand-palette-4">
+                    <article
+                        v-for="(paper, index) in papers"
+                        :key="paper.test_id"
+                        :style="rise(index)"
+                        class="rise rounded-2xl bg-white p-4 text-brand-palette-4"
+                    >
                         <p :class="mono" class="text-[10px] text-brand-palette-4/45">
                             {{ paper.quiz }}<template v-if="paper.round"> · {{ paper.round }}</template>
                         </p>

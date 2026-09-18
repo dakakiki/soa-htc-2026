@@ -82,8 +82,51 @@ class SpaController extends Controller
          * one out of the cache.
          */
         return response()
-            ->view('app', ['meta' => $meta])
+            ->view('app', ['meta' => $meta, 'splash' => $this->splash($path, $meta)])
             ->header('Cache-Control', 'no-cache, must-revalidate');
+    }
+
+    /**
+     * What the shell paints while the SPA is still being fetched.
+     *
+     * Until 2026-09-18 that was a blank white page: `<div id="app">` is empty
+     * until Vue mounts, and on a phone over a venue's connection that is the
+     * whole of the first second. Vue REPLACES the children of its mount point,
+     * so anything put there is a splash that needs no code to take away.
+     *
+     * 🔴 It is drawn with CSS and nothing else — no image, no font file, no
+     * request of any kind. A splash that waits on a download is not a splash.
+     *
+     * 🪤 And it is painted in the colour of the screen that follows it, which is
+     * not one colour: the installed application is navy ({@see AppScreen}) and
+     * the website is not. A single ground would trade a white flash for a navy
+     * one on whichever side lost.
+     *
+     * @param  array<string, string|null>  $meta
+     * @return array<string, string>
+     */
+    private function splash(string $path, array $meta): array
+    {
+        $inApp = $path === '/app' || str_starts_with($path, '/app/');
+
+        try {
+            $setting = Setting::current();
+            $ground = (string) $setting->color_palette_4;
+            $accent = (string) $setting->color_palette_2;
+        } catch (Throwable) {
+            // The same reasoning as the meta above: the shell is served even
+            // when the database will not answer.
+            $ground = '#003758';
+            $accent = '#f39200';
+        }
+
+        $appName = (string) config('app.name', 'SOA HTC');
+
+        return $inApp
+            // The application names itself, as the home-screen icon does.
+            ? ['bg' => $ground, 'ink' => '#ffffff', 'rule' => $accent, 'name' => $appName]
+            // The website carries the competition's name, as its header does.
+            : ['bg' => '#fbfaf8', 'ink' => $ground, 'rule' => $accent, 'name' => (string) ($meta['site_name'] ?? $appName)];
     }
 
     /** Where the redirect's target lives now, or null if it is gone or unpublished. */

@@ -29,7 +29,7 @@ class ManifestController extends Controller
     public function __invoke(): JsonResponse
     {
         $setting = Setting::current();
-        $name = $this->name($setting);
+        $name = $this->name();
 
         return response()
             ->json([
@@ -59,30 +59,43 @@ class ManifestController extends Controller
                  */
                 'theme_color' => $setting->color_primary,
                 /*
-                 * The colour held behind the window while the SPA boots. White
-                 * rather than the brand, because white is what the application
-                 * then draws: the brand here would flash and be replaced.
+                 * The colour held behind the window while the SPA boots, and the
+                 * ground of the splash Android draws from this file.
+                 *
+                 * 🪤 It has to be the colour of `start_url`, and `start_url` is
+                 * `/app` — which is navy ({@see AppScreen}). It said `#ffffff`
+                 * until 2026-09-18, reasoning that "white is what the application
+                 * then draws"; that was true of the website and has never been
+                 * true of the installed application, so every launch flashed
+                 * white and then went navy.
                  */
-                'background_color' => '#ffffff',
+                'background_color' => $setting->color_palette_4,
                 'icons' => $this->icons($setting),
             ], options: JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
             ->header('Content-Type', 'application/manifest+json');
     }
 
     /**
-     * The site's own name. `site_title` is rich text written next to the logo, so
-     * it arrives as markup and is reduced to its words here; an empty one falls
-     * back to the configured application name rather than to nothing, because a
-     * manifest without a name is one a browser refuses.
+     * What the installed application calls itself: **the application's** name,
+     * `APP_NAME` — "SOA HTC".
+     *
+     * 🔴 Deliberately NOT `site_title` any more (owner, 2026-09-18: "PWA treba
+     * da nosi naslov SOA HTC"). The two are different things and only look alike
+     * on a page where they sit near each other: `site_title` is the rich text an
+     * administrator writes beside the logo and it names the COMPETITION — on the
+     * dev database it reads "Hippo the Contest", which is what installed under
+     * the icon. The icon on a phone's home screen belongs to the PLATFORM, which
+     * is the same whichever competition it is running this year.
+     *
+     * The icon and the colours are still administered; only the name is not, and
+     * `APP_NAME` is where an application's name already lives.
      */
-    private function name(Setting $setting): string
+    private function name(): string
     {
-        $title = trim(html_entity_decode(strip_tags((string) $setting->site_title), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-        // \p{Z} as well as \s: a rich-text editor writes &nbsp; between words, and
-        // that is a separator PCRE does not count as whitespace.
-        $title = trim((string) preg_replace('/[\s\p{Z}]+/u', ' ', $title));
+        $name = trim((string) config('app.name'));
 
-        return $title !== '' ? $title : (string) config('app.name', 'SOA HTC');
+        // A manifest without a name is one a browser refuses to install from.
+        return $name !== '' ? $name : 'SOA HTC';
     }
 
     /**

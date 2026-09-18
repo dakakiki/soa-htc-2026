@@ -35,6 +35,15 @@ declare module 'vue-router' {
          * (`components/app/AppSignedInScreen.vue`) instead of that zone's.
          */
         requiresCompetitor?: boolean;
+        /**
+         * Arrive without the page transition.
+         *
+         * Two reasons, and a route may have either: a `<Transition>` takes ONE
+         * root element and warns on anything else, which the two CMS screens
+         * have; and an exam in progress must never put an animation between a
+         * tap and the next question, whatever its markup.
+         */
+        still?: boolean;
     }
 }
 
@@ -249,7 +258,8 @@ const routes: RouteRecordRaw[] = [
         path: '/news/:slug',
         name: 'news.post',
         component: () => import('@/pages/public/NewsPostPage.vue'),
-        meta: { zone: 'public' },
+        // `still`: several root elements, which a <Transition> will not take.
+        meta: { zone: 'public', still: true },
     },
     {
         /*
@@ -285,7 +295,13 @@ const routes: RouteRecordRaw[] = [
         path: '/student/tests/:testId',
         name: 'student.test',
         component: () => import('@/pages/student/StudentTestPage.vue'),
-        meta: { zone: 'student', bare: true },
+        /*
+         * `still`: several root elements, and the one screen where an
+         * animation would be wrong whatever its markup. A child sits here
+         * under a clock, and nothing belongs between a tap and the next
+         * question.
+         */
+        meta: { zone: 'student', bare: true, still: true },
     },
     {
         path: '/dashboard',
@@ -700,7 +716,8 @@ const routes: RouteRecordRaw[] = [
         path: '/:slug',
         name: 'cms.page',
         component: () => import('@/pages/public/CmsPageView.vue'),
-        meta: { zone: 'public' },
+        // `still`: several root elements, which a <Transition> will not take.
+        meta: { zone: 'public', still: true },
     },
     {
         path: '/:pathMatch(.*)*',
