@@ -78,8 +78,16 @@ onMounted(() => {
     void load();
 });
 
+/**
+ * A short stagger, so a list reads as one thing arriving rather than as many.
+ * Capped: a list that keeps adding delay makes its last item feel like a fault.
+ */
+function rise(index: number) {
+    return { animationDelay: `${Math.min(index * 45, 240)}ms` };
+}
+
 const mono = 'font-mono uppercase tracking-[0.12em]';
-const row = 'grid grid-cols-[1fr_auto_1.125rem] items-center gap-3 rounded-2xl border border-white/20 bg-white/5 p-4 text-left transition hover:bg-white/10 active:scale-[0.985]';
+const row = 'rise grid grid-cols-[1fr_auto_1.125rem] items-center gap-3 rounded-2xl border border-white/20 bg-white/5 p-4 text-left transition hover:bg-white/10 active:scale-[0.985]';
 </script>
 
 <template>
@@ -108,8 +116,9 @@ const row = 'grid grid-cols-[1fr_auto_1.125rem] items-center gap-3 rounded-2xl b
 
         <div v-else class="mt-4 grid gap-2.5">
             <RouterLink
-                v-for="venue in venues"
+                v-for="(venue, index) in venues"
                 :key="venue.id"
+                :style="rise(index)"
                 :to="{ name: 'app.venue', params: { slice, venueId: venue.id } }"
                 :class="row"
             >

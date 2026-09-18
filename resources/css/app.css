@@ -250,3 +250,41 @@
 .round-band {
     background: color-mix(in oklab, currentColor 12%, transparent);
 }
+
+/* ------------------------------------------------------------------ *
+ * Motion
+ *
+ * 🔴 Every rule here is inside `prefers-reduced-motion: no-preference`,
+ * and that is the whole of the accessibility story: somebody who has
+ * asked their system for less movement gets a page that simply appears,
+ * with no class to remove and no code path that can forget.
+ *
+ * Enter only, and never leave. A leave animation would hold the old
+ * screen on top of the new one for as long as it ran; with `mode="out-in"`
+ * and nothing to wait for, the old screen is gone at once and the new one
+ * rises in — which reads as fast rather than as decorated.
+ * ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: no-preference) {
+    .page-enter-active {
+        animation: page-in 220ms cubic-bezier(.22, .61, .36, 1);
+    }
+
+    /*
+     * A block that arrives with its screen. `both` holds the first frame
+     * before the delay runs, or a staggered item would flash at full
+     * opacity and then start over.
+     */
+    .rise {
+        animation: rise-in 300ms cubic-bezier(.22, .61, .36, 1) both;
+    }
+}
+
+@keyframes page-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes rise-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}

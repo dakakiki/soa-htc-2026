@@ -3924,3 +3924,58 @@ found.** Izmereno `router.resolve()`-om, ne pročitano iz koda. Sada `\d+`.
 
 Koordinator sa jednom učionicom ima **jedan tap više** do brojeva nego ranije. To je svesno: i njemu
 je lista bila deset kartica, pa podela plaća taj tap.
+
+## ADR-0113 — Aplikacija kaže ko je dok se učitava, i kreće se koliko treba
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno · **PR #99**
+
+Vlasnik, 18.09: *„da li mozes da napravis neki splash screen dok se ucitava? PWA treba da nosi naslov
+SOA HTC. Takodje, da li mozes da uvedes animacije za elemente i tranzicije stranica?"*
+
+### 🔴 Instalirana aplikacija se zove **SOA HTC**, ne po sajtu
+
+Manifest je ime uzimao iz `site_title` — bogatog teksta koji administrator piše pored logotipa. Na
+dev bazi to je **„Hippo the Contest"**, i to se instaliralo ispod ikone.
+
+To su dve različite stvari koje samo stoje blizu jedna druge: `site_title` imenuje **takmičenje**
+ove godine, a ikona na početnom ekranu telefona pripada **platformi**, koja je ista ma koje
+takmičenje vozila. Ime sada dolazi iz `APP_NAME`. Ikona i boje **ostaju administrirane**.
+
+### 🪤 `background_color` je bio bela, a `start_url` je navy
+
+Manifest je nosio `#ffffff` uz obrazloženje „belo je ono što aplikacija zatim crta". To je bilo tačno
+za **sajt** i nikad za instaliranu aplikaciju: `start_url` je `/app`, a to je navy ekran
+(`AppScreen`). Svako pokretanje je bljesnulo belo pa otišlo u navy. Sada je `color_palette_4`.
+
+### Splash je ono što ljuska crta pre nego što SPA uopšte stigne
+
+`<div id="app">` je bio **prazan** dok se Vue ne montira — na telefonu preko veze u učionici to je
+cela prva sekunda bele stranice.
+
+- 🔴 **Crta se CSS-om i ničim drugim** — bez slike, bez fonta, bez ijednog zahteva. Splash koji čeka
+  preuzimanje nije splash. Test to tvrdi.
+- 🔴 **Živi UNUTAR `#app`**, jer ga to i sklanja: Vue radi `container.textContent = ''` pre
+  montiranja (`runtime-dom`, `createApp`). Pomeren napolje, stajao bi preko aplikacije zauvek.
+- 🪤 **Boja nije jedna.** Instalirana aplikacija je navy, sajt nije. Jedna podloga bi samo zamenila
+  beli bljesak navy bljeskom na onoj strani koja izgubi. `/app*` dobija navy, ostalo svetlu podlogu —
+  i `theme-color` prati istu boju, pa telefon oboji trake pre nego što se išta nacrta.
+- Ime na splash-u prati isto pravilo: aplikacija imenuje sebe, sajt nosi ime takmičenja.
+
+### Kretanje
+
+Prelaz stranica je **samo ulaz, nikad izlaz**. Izlazna animacija bi držala stari ekran preko novog
+dok traje; sa `mode="out-in"` i ničim da se čeka, stari nestane odmah a novi se podigne — što se
+čita kao brzo, ne kao ukrašeno.
+
+- 🔴 **Sve je unutar `prefers-reduced-motion: no-preference`.** Ko je od sistema tražio manje
+  kretanja dobija stranicu koja se prosto pojavi — nema klase koja se skida ni grane koja može da
+  zaboravi.
+- 🪤 **Nije ključano po adresi.** Ključ bi remontovao ekran na svaku promenu adrese, uključujući onu
+  koja menja samo parametar — isti ekran koji serveru postavlja drugo pitanje — pa bi bacio ono što
+  je već nacrtao da bi animirao ponovno crtanje.
+- 🔴 **`meta.still` zaobilazi prelaz.** `<Transition>` prima **jedan** koreni element i upozorava na
+  sve ostalo; **tri** ekrana imaju više (izmereno: 80 ima jedan, tri nemaju) — dve CMS strane i
+  **ispit**. Ispit je i jedino mesto gde bi animacija bila pogrešna ma kakav mu bio markup: dete je
+  tamo pod satom, i ništa ne sme između tapa i sledećeg pitanja.
+- Blokovi na ekranima aplikacije ulaze sa kratkim zaostajanjem (45 ms po stavci, **ograničeno na
+  240 ms**) — lista koja stalno dodaje kašnjenje čini da poslednja stavka deluje kao kvar.

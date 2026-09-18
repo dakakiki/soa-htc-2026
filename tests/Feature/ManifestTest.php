@@ -24,7 +24,12 @@ class ManifestTest extends TestCase
         $response->assertJsonPath('start_url', '/app');
         $response->assertJsonPath('scope', '/');
         $response->assertJsonPath('display', 'standalone');
-        $response->assertJsonPath('background_color', '#ffffff');
+        /*
+         * 🔴 The colour of `start_url`, which is the navy application screen —
+         * not white. This read `#ffffff` until 2026-09-18 and every launch of
+         * the installed app flashed white before going navy.
+         */
+        $response->assertJsonPath('background_color', Setting::current()->color_palette_4);
 
         $this->assertStringContainsString(
             'application/manifest+json',
@@ -81,7 +86,7 @@ class ManifestTest extends TestCase
         $this->get('/manifest.webmanifest')->assertJsonPath('theme_color', '#003758');
     }
 
-    public function test_the_name_falls_back_to_the_application_name(): void
+    public function test_the_installed_application_is_named_after_the_application(): void
     {
         config(['app.name' => 'SOA HTC']);
 
@@ -91,23 +96,38 @@ class ManifestTest extends TestCase
     }
 
     /**
-     * `site_title` is rich text written beside the logo, so it arrives as markup —
-     * including the non-breaking spaces an editor puts between words.
+     * 🔴 The icon on a home screen belongs to the PLATFORM, not to whichever
+     * competition it is running this year (owner, 2026-09-18). `site_title` is
+     * the rich text written beside the logo and it names the competition — on
+     * the dev database "Hippo the Contest", which is what used to install under
+     * the icon.
      */
-    public function test_the_site_title_is_reduced_to_its_words(): void
+    public function test_the_installed_name_does_not_follow_the_site_title(): void
     {
-        Setting::current()->update(['site_title' => '<strong>SOA</strong>&nbsp;HTC ']);
+        config(['app.name' => 'SOA HTC']);
+        Setting::current()->update(['site_title' => '<p>Hippo the Contest</p>']);
 
-        $this->get('/manifest.webmanifest')->assertJsonPath('name', 'SOA HTC');
+        $this->get('/manifest.webmanifest')
+            ->assertJsonPath('name', 'SOA HTC')
+            ->assertJsonPath('short_name', 'SOA HTC');
     }
 
+    /** A name too long for a home screen is cut back to its first whole word. */
     public function test_a_long_name_installs_under_its_first_word(): void
     {
-        Setting::current()->update(['site_title' => '<p>SOA Hippo Talent Competition</p>']);
+        config(['app.name' => 'SOA Hippo Talent Competition']);
 
         $this->get('/manifest.webmanifest')
             ->assertJsonPath('name', 'SOA Hippo Talent Competition')
             ->assertJsonPath('short_name', 'SOA');
+    }
+
+    /** A manifest without a name is one a browser refuses to install from. */
+    public function test_an_empty_application_name_still_produces_a_name(): void
+    {
+        config(['app.name' => '  ']);
+
+        $this->get('/manifest.webmanifest')->assertJsonPath('name', 'SOA HTC');
     }
 
     public function test_no_icon_is_declared_until_one_is_uploaded(): void

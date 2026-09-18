@@ -151,8 +151,17 @@ onMounted(() => {
     void load();
 });
 
+/**
+ * A short stagger, so the three read as one thing arriving rather than three.
+ * Capped, because a list that keeps adding delay makes its last item feel like
+ * a fault; the whole stagger is over inside a quarter of a second.
+ */
+function rise(index: number, extra: Record<string, string> = {}) {
+    return { animationDelay: `${Math.min(index * 45, 240)}ms`, ...extra };
+}
+
 const mono = 'font-mono uppercase tracking-[0.14em]';
-const way = 'grid items-center gap-3 rounded-2xl border border-white/20 bg-white/5 p-[1.125rem] text-left transition hover:bg-white/10 active:scale-[0.985]';
+const way = 'rise grid items-center gap-3 rounded-2xl border border-white/20 bg-white/5 p-[1.125rem] text-left transition hover:bg-white/10 active:scale-[0.985]';
 </script>
 
 <template>
@@ -202,11 +211,11 @@ const way = 'grid items-center gap-3 rounded-2xl border border-white/20 bg-white
             -->
             <div class="mt-6 grid gap-3">
                 <RouterLink
-                    v-for="item in ways"
+                    v-for="(item, index) in ways"
                     :key="item.slice"
                     :to="target(item.slice)"
                     :class="way"
-                    :style="{ gridTemplateColumns: count(item.slice) === null ? '1fr 1.125rem' : '1fr auto 1.125rem' }"
+                    :style="rise(index, { gridTemplateColumns: count(item.slice) === null ? '1fr 1.125rem' : '1fr auto 1.125rem' })"
                 >
                     <span class="min-w-0">
                         <span class="block text-[1.06rem] font-semibold tracking-[-0.01em]">{{ item.name }}</span>
