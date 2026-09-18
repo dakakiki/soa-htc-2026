@@ -4736,3 +4736,45 @@ razidе** — ljuska traži taj entry, a ruter ga traži tamo gde ga Vite ostavl
 
 Nije keširanje u service worker-u. Toga i dalje **nema i ne sme da ga bude** — beli ekran posle
 deploy-a usred sezone; `ManifestTest` to čuva.
+
+## ADR-0128 — Povratak preko „remember me" kolačića nije prijava
+
+**Datum:** 2026-09-18 · **Status:** prihvaćeno
+
+> **Vlasnik, 18.09, sa STAGE-a:** *„na stage se pojavio log x3 za jednog korisnika"* — tri identična
+> `auth.signed_in` reda za `lvl10`, u istoj sekundi, isti IP, isti pregledač.
+
+### Nije bilo tri prijave — bio je jedan povratak
+
+Laravel ispaljuje događaj `Login` i kad **niko ništa nije ukucao**: kad `SessionGuard` obnovi sesiju
+iz „remember me" kolačića. A SPA na startu otvori **više API poziva odjednom**; nijedan još nema
+sesiju, pa **svaki** za sebe obnovi prijavu iz istog kolačića — i svaki ispali svoj `Login`.
+
+Naš slušalac je svaki od njih upisao kao prijavu.
+
+🔴 **Izmereno dvaput, pre nego što je išta menjano:**
+- preko pravog HTTP-a na dev-u: prijava sa `remember`, pa se sesija baci, pa **tri paralelna
+  zahteva** sa samo tim kolačićem → **tri reda**, ista sekunda, isti IP, isti pregledač
+- kroz guard u testu: tri obnavljanja → stari kod **3 reda**, novi **0**
+
+Dokaz iz samog loga: `lvl10` ima **tačno tri** reda i to **tri puta**, **nijednom nema
+`auth.signed_out`**, a jedna grupa glasi `16:18:03 · 16:18:03 · 16:18:02` — preko granice sekunde.
+Čovek koji kuca lozinku to ne proizvodi, a dugme je ionako zaključano dok prijava traje.
+
+### Odluka
+
+**Povratak preko kolačića se NE upisuje.** Ekran sam kaže šta sadrži — *„Sign-ins, sign-outs and
+failed attempts"* — a povratak nije prijava: niko nije ukucao lozinku. Jedna ukucana lozinka = jedan
+red, uvek.
+
+🪤 **`$event->remember` ne razdvaja to dvoje** — tačan je i za povratak i za prijavu sa čekiranom
+kućicom. Guard razdvaja: `userFromRecaller()` postavi `viaRemember` **pre** nego što se događaj
+ispali (`SessionGuard`, linije 197 i 202).
+
+🪤 **Sabijanje duplikata ne bi bilo dovoljno** i zato nije uzeto: tri paralelna zahteva su tri
+**stvarna** obnavljanja sesije, pa bi svako pravilo koje ih broji i dalje moralo da ih sabija po
+vremenu — jedno pravilo više koje može da pogreši, da bi se zapisalo nešto što ionako nije prijava.
+
+🪤 **Test ide kroz guard, ne preko HTTP-a.** Obnavljanje traži zahtev sa kolačićem i bez sesije, što
+test klijent otežava — a test koji tiho završi na 401 dokazuje samo da se stranac odbija. Ovako se
+`viaRemember()` **tvrdi kao tačan**, pa se zna da se obnavljanje stvarno desilo.
