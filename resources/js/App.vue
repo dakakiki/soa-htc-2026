@@ -21,10 +21,17 @@ const layout = computed(() => layouts[(route.meta.zone ?? 'admin') as Zone]);
 <template>
     <component :is="layout">
         <!--
-            A screen arrives rather than appearing: a short rise and fade, and no
-            leave animation at all, so the old one is gone the instant the new
+            A screen arrives rather than appearing: a few pixels of travel, and
+            no leave animation at all, so the old one is gone the instant the new
             one is ready. `mode="out-in"` with nothing to wait for is what makes
             that snappy rather than a cross-fade of two layouts.
+
+            🔴 Travel and NOTHING ELSE — no fade. A screen whose opacity rises
+            is a screen whose brightness rises from the page behind it, and on
+            the swap between a navy application screen and a light website one
+            that reads as a blink. Raised by the owner on 2026-09-18 for
+            photosensitive readers; the rule lives in `app.css`, where every
+            keyframe here is defined.
 
             🪤 Not keyed on the path. Keying would re-mount on every address
             change, including one that only alters a parameter — the same screen

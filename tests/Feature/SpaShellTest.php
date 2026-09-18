@@ -99,6 +99,39 @@ class SpaShellTest extends TestCase
     }
 
     /**
+     * 🔴 The holding screen is only worth anything if it is still there when the
+     * application has something RIGHT to draw.
+     *
+     * Until the first navigation resolves, `useRoute()` is vue-router's
+     * START_LOCATION and its `meta` is an empty object — so `App.vue`, which
+     * picks its shell with `meta.zone ?? 'admin'`, picks the ADMIN one. That
+     * default is a fail-safe and is correct; it is simply wrong on the first
+     * frame, and mounting before the router is ready is what puts that frame on
+     * screen. Worse, it is not a frame: the router's own guard awaits
+     * `session.ensureLoaded()`, so the wrong shell stands there for a whole
+     * round trip. Reported from a phone, 2026-09-18: the admin appearing over a
+     * public address and then being replaced.
+     *
+     * The front has no test runner, so this reads the file — as the picker test
+     * and `ManifestTest` do.
+     */
+    public function test_the_application_is_not_mounted_before_it_knows_which_route_it_is_on(): void
+    {
+        $boot = (string) file_get_contents(base_path('resources/js/app.ts'));
+
+        $waits = strpos($boot, 'router.isReady()');
+        $mounts = strpos($boot, "app.mount('#app')");
+
+        $this->assertNotFalse($waits, 'app.ts must wait for the router before it mounts.');
+        $this->assertNotFalse($mounts);
+        $this->assertLessThan(
+            $mounts,
+            $waits,
+            'The mount has to come after the wait, or the first frame is the wrong shell.',
+        );
+    }
+
+    /**
      * 🔴 No request of any kind. A splash that waits on a stylesheet, a font or
      * an image is not a splash — it is the blank page it was meant to replace,
      * with extra steps.
