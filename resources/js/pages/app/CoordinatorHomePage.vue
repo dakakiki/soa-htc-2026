@@ -3,38 +3,38 @@ import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconChevronRight, IconX } from '@tabler/icons-vue';
-import { coordinatorHome, type CoordinatorHome } from '@/api/appCoordinator';
+import { coordinatorHome, type CoordinatorHome, type CoordinatorSlice } from '@/api/appCoordinator';
 import { dismissMessage, messageInbox, type InboxMessage } from '@/api/messages';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppCoordinatorScreen from '@/components/app/AppCoordinatorScreen.vue';
 
 /**
- * Welcome — what is open across the venues this coordinator runs, and what has
- * been marked (prototype 7 and 7b).
+ * Welcome — three ways into one venue, and nothing else (owner, 2026-09-18).
  *
- * 🔴 The application's own page (ADR-0103). Nothing on the website shows this:
- * a coordinator's desktop is the administration, with its sidebar and its
- * tables, and this is the same person in a corridor with a phone.
+ * 🔴 It used to be the list itself: every open paper, then every published one.
+ * Measured on the dev database, a country coordinator for Serbia was handed
+ * EIGHTEEN white cards and six published rows, and every number on them was a
+ * total across 257 venues — a figure that describes no room and that nobody can
+ * act on. A school coordinator got ten. So the list moved behind a venue, and
+ * what is left here is the question that comes first: which of the three things
+ * are you asking about.
+ *
+ * 🔴 A country coordinator's buttons carry NO number. The only number this
+ * screen could put there is the sum over every venue they run, which is the very
+ * figure that made the old screen unreadable. They are asked which venue, and
+ * the numbers begin after that. Somebody holding ONE venue gets their numbers
+ * here, because then the number is their room.
  *
  * 🪤 Three things the prototype drew that are NOT here, each for its own reason:
  *
  *  - **The exam password.** `quizzes.quiz_password` is a bcrypt hash: the server
  *    can check one and cannot read one back, so `••••••` with an eye would be a
- *    control that cannot work. Offered the owner the one way it could be done —
- *    storing it reversibly — and the answer on 2026-09-15 was to drop the card:
- *    "skloni karticu sa lozinkom". A coordinator gets the password from an
- *    administrator, as they do today.
- *  - **"Entry closes 20 Sep · 5 days left".** Removed on the owner's word,
- *    2026-09-15: "nije potrebna izbaci je".
+ *    control that cannot work. The owner's answer on 2026-09-15 was to drop the
+ *    card: "skloni karticu sa lozinkom".
+ *  - **"Entry closes 20 Sep · 5 days left".** Removed on the owner's word.
  *  - **A clock window ("10:00 – 10:40")**. A test carries a DURATION and no time
- *    of day, and the owner's answer was to print that instead ("umesto 10:00 -
- *    10:40 napisi trajanje ispita") — which is also what the candidate's own
- *    screen says, so the two agree.
- *
- * 🔴 And one number that is deliberately absent from the open cards: an
- * AVERAGE. While the room is still working it says something different every
- * time it is read (owner, 2026-09-15), so it belongs under Published and
- * nowhere else.
+ *    of day — which is also what the candidate's own screen says, so the two
+ *    agree. The duration is printed on the paper's block, where the paper is.
  */
 const { t } = useI18n();
 
@@ -59,18 +59,56 @@ const place = computed(() => {
         : t('public.app.venuesCount', { n: data.venues_count });
 });
 
-/**
- * Where "Venue results" leads. A school coordinator holds one venue, so there
- * is nothing to choose and the row opens their figures directly (prototype 9d);
- * a country coordinator is asked which one first (prototype 8).
- */
-const resultsTarget = computed(() => {
-    const venue = home.value?.venue;
+/** A coordinator holding one venue opens it; anyone else is asked which. */
+const sole = computed(() => home.value?.venue ?? null);
 
-    return venue !== null && venue !== undefined
-        ? { name: 'app.venue', params: { venueId: venue.id } }
-        : { name: 'app.venues' };
+/**
+ * Where a way in leads. The slice travels in the ADDRESS rather than in a
+ * store: the installed application reopens on the address it was left at, and a
+ * screen that cannot say which question it is answering comes back answering
+ * the first one.
+ */
+function target(slice: CoordinatorSlice) {
+    const venue = sole.value;
+
+    return venue !== null
+        ? { name: 'app.venue', params: { slice, venueId: venue.id } }
+        : { name: 'app.venues', params: { slice } };
+}
+
+function count(slice: CoordinatorSlice): number | null {
+    return home.value?.counts?.[slice] ?? null;
+}
+
+/**
+ * Nothing open anywhere. Said UNDER the three ways rather than instead of them:
+ * the screen keeps the shape it will have tomorrow when the numbers are not
+ * zero, so nobody has to learn it twice.
+ */
+const nothingAtAll = computed(() => {
+    const counts = home.value?.counts;
+
+    return counts !== null && counts !== undefined
+        && counts.upcoming === 0 && counts.running === 0 && counts.published === 0;
 });
+
+const ways = computed(() => [
+    {
+        slice: 'upcoming' as const,
+        name: t('public.app.wayUpcoming'),
+        note: t(sole.value !== null ? 'public.app.upcomingNoteOne' : 'public.app.upcomingNoteMany'),
+    },
+    {
+        slice: 'running' as const,
+        name: t('public.app.wayRunning'),
+        note: t(sole.value !== null ? 'public.app.inProgressNoteOne' : 'public.app.inProgressNoteMany'),
+    },
+    {
+        slice: 'published' as const,
+        name: t('public.app.wayResults'),
+        note: t(sole.value !== null ? 'public.app.resultsNoteOne' : 'public.app.resultsNoteMany'),
+    },
+]);
 
 async function load(): Promise<void> {
     loading.value = true;
@@ -114,9 +152,7 @@ onMounted(() => {
 });
 
 const mono = 'font-mono uppercase tracking-[0.14em]';
-const cell = 'block font-mono text-[1.05rem] font-semibold tabular-nums';
-const cellLabel = 'mt-0.5 block font-mono text-[9px] uppercase tracking-[0.1em]';
-const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border border-white/20 bg-white/5 p-[1.125rem] text-left transition hover:bg-white/10 active:scale-[0.985]';
+const way = 'grid items-center gap-3 rounded-2xl border border-white/20 bg-white/5 p-[1.125rem] text-left transition hover:bg-white/10 active:scale-[0.985]';
 </script>
 
 <template>
@@ -160,89 +196,45 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
             </div>
 
             <!--
-                Nothing open (prototype 7b). Not a blank screen: it says when a
-                paper appears and offers the one thing there is to do meanwhile.
+                The three ways in. A number rides along only when this person
+                holds one venue — see the note at the top of this file for why a
+                country coordinator's buttons stay bare.
             -->
-            <template v-if="home.open.length === 0">
+            <div class="mt-6 grid gap-3">
+                <RouterLink
+                    v-for="item in ways"
+                    :key="item.slice"
+                    :to="target(item.slice)"
+                    :class="way"
+                    :style="{ gridTemplateColumns: count(item.slice) === null ? '1fr 1.125rem' : '1fr auto 1.125rem' }"
+                >
+                    <span class="min-w-0">
+                        <span class="block text-[1.06rem] font-semibold tracking-[-0.01em]">{{ item.name }}</span>
+                        <span class="mt-0.5 block text-[0.79rem] leading-snug text-brand-palette-3">{{ item.note }}</span>
+                    </span>
+
+                    <b
+                        v-if="count(item.slice) !== null"
+                        class="font-mono text-[1.4rem] font-semibold tabular-nums"
+                        :class="count(item.slice) === 0 ? 'text-brand-palette-3/70' : 'text-white'"
+                    >{{ count(item.slice) }}</b>
+
+                    <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
+                </RouterLink>
+            </div>
+
+            <!--
+                Nothing open at all (prototype 7b). Not a blank screen: it says
+                when a paper appears and leaves the three ways standing above it.
+            -->
+            <template v-if="nothingAtAll">
                 <p class="mt-7 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ $t('public.app.noExams') }}</p>
                 <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-3">{{ $t('public.app.noExamsNote') }}</p>
             </template>
 
-            <!-- One card per open paper: what it is, and how far the room has got. -->
-            <article v-for="paper in home.open" :key="paper.test_id" class="mt-4 rounded-[1.25rem] bg-white p-[1.125rem] text-brand-palette-4">
-                <p :class="mono" class="text-[10px] text-brand-palette-4/50">
-                    {{ paper.quiz }}<template v-if="paper.round"> · {{ paper.round }}</template>
-                </p>
-                <p class="mt-1.5 text-[0.9rem] text-brand-palette-4/65">{{ paper.exam }}</p>
-                <p class="mt-0.5 text-[1rem] font-semibold tracking-[-0.015em]">{{ paper.test }}</p>
-                <p :class="mono" class="mt-1 text-[10px] text-brand-palette-4/50">
-                    <template v-if="paper.duration">{{ $t('student.dashboard.durationMin', { n: paper.duration }) }} · </template>
-                    {{ $t('public.app.questionsCount', { n: paper.questions }) }}
-                </p>
-
-                <div class="mt-3.5 grid grid-cols-3 gap-2.5 border-t border-brand-palette-4/12 pt-3.5">
-                    <div>
-                        <b :class="cell">{{ paper.entered }}</b>
-                        <span :class="cellLabel" class="text-brand-palette-4/50">{{ $t('public.app.entered') }}</span>
-                    </div>
-                    <div>
-                        <b :class="cell">{{ paper.started }}</b>
-                        <span :class="cellLabel" class="text-brand-palette-4/50">{{ $t('public.app.started') }}</span>
-                    </div>
-                    <div>
-                        <b :class="cell">{{ paper.submitted }}</b>
-                        <span :class="cellLabel" class="text-brand-palette-4/50">{{ $t('public.app.submitted') }}</span>
-                    </div>
-                </div>
-            </article>
-
-            <!--
-                What is already marked, under what is still running. 🪤 The round
-                comes from the SEASON record an administrator typed (owner,
-                2026-09-15: "ovaj podatak uzimas iz settings"), never from
-                counting what happens to be active — ADR-0081.
-            -->
-            <template v-if="home.published.length > 0">
-                <div :class="mono" class="mt-8 flex items-baseline justify-between gap-2.5 border-b border-white/16 pb-2.5 text-[10.5px] text-brand-palette-3">
-                    <span>{{ $t('public.app.publishedHead') }}</span>
-                    <span v-if="home.round">{{ $t('public.app.roundOnly', { round: home.round }) }}</span>
-                </div>
-
-                <div v-for="paper in home.published" :key="`done-${paper.test_id}`" class="border-b border-white/12 py-4 last:border-b-0">
-                    <p :class="mono" class="text-[9.5px] text-brand-palette-3/70">
-                        {{ paper.quiz }}<template v-if="paper.round"> · {{ paper.round }}</template>
-                    </p>
-                    <p class="mt-1 text-[0.88rem] text-brand-palette-3">{{ paper.exam }}</p>
-                    <p class="mt-0.5 text-[1rem] font-semibold tracking-[-0.015em]">{{ paper.test }}</p>
-
-                    <div class="mt-3 grid grid-cols-3 gap-2.5">
-                        <div>
-                            <b :class="cell">{{ paper.entered }}</b>
-                            <span :class="cellLabel" class="text-brand-palette-3">{{ $t('public.app.entered') }}</span>
-                        </div>
-                        <div>
-                            <b :class="cell">{{ paper.submitted }}</b>
-                            <span :class="cellLabel" class="text-brand-palette-3">{{ $t('public.app.submitted') }}</span>
-                        </div>
-                        <div>
-                            <b :class="cell">{{ paper.average }}</b>
-                            <span :class="cellLabel" class="text-brand-palette-3">{{ $t('public.app.average') }}</span>
-                        </div>
-                    </div>
-                </div>
-            </template>
-
-            <div class="mt-5 grid gap-3" :class="home.open.length === 0 ? 'border-t border-white/16 pt-5' : ''">
-                <RouterLink :to="resultsTarget" :class="way">
-                    <span>
-                        <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ $t('public.app.venueResults') }}</span>
-                        <span class="mt-0.5 block text-[0.79rem] leading-snug text-brand-palette-3">
-                            {{ home.venue !== null ? $t('public.app.venueResultsOneNote') : $t('public.app.venueResultsNote') }}
-                        </span>
-                    </span>
-                    <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
-                </RouterLink>
-            </div>
+            <p v-else :class="mono" class="mt-6 text-center text-[10px] text-brand-palette-3/75">
+                {{ sole !== null ? $t('public.app.waysHintOne') : $t('public.app.waysHintMany') }}
+            </p>
         </template>
     </AppCoordinatorScreen>
 </template>

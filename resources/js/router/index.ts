@@ -164,13 +164,31 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, zone: 'public', bare: true },
     },
     {
-        path: '/app/venues',
+        /*
+         * Which venue, for one of the three ways in. The way in is in the
+         * address rather than in a store: the installed application is reopened
+         * on the address it was left at, and a screen that cannot say which
+         * question it is answering comes back answering the first one.
+         *
+         * The words are the ones the server slices by, so there is one
+         * vocabulary from the query to the heading; `Results` is what the
+         * heading says, and that translation lives in the language file.
+         */
+        path: '/app/venues/:slice(upcoming|running|published)',
         name: 'app.venues',
         component: () => import('@/pages/app/VenuePickPage.vue'),
         meta: { requiresAuth: true, zone: 'public', bare: true },
     },
     {
-        path: '/app/venues/:venueId(\d+)',
+        /*
+         * 🪤 `\\d+`, with both slashes. `'(\d+)'` in a JavaScript string is not
+         * an escape, so it is the two characters `d+` — and this route carried
+         * exactly that until 2026-09-18: it matched `/app/venues/ddd` and did
+         * NOT match `/app/venues/188`. Clicking through still drew the screen,
+         * because that resolves the record by NAME; reloading it, or reopening
+         * the installed application on it, fell through to Not found.
+         */
+        path: '/app/venues/:slice(upcoming|running|published)/:venueId(\\d+)',
         name: 'app.venue',
         component: () => import('@/pages/app/VenueFiguresPage.vue'),
         meta: { requiresAuth: true, zone: 'public', bare: true },

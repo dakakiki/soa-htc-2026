@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { computed, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconChevronRight } from '@tabler/icons-vue';
-import { coordinatorVenues, type CoordinatorVenue } from '@/api/appCoordinator';
+import { coordinatorVenues, type CoordinatorSlice, type CoordinatorVenue } from '@/api/appCoordinator';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppScreen from '@/components/app/AppScreen.vue';
 
@@ -11,15 +11,29 @@ import AppScreen from '@/components/app/AppScreen.vue';
  * Which venue (prototype 8).
  *
  * A screen only a COUNTRY coordinator ever sees: a school coordinator holds one
- * venue, so there is nothing to choose and Welcome opens their figures directly.
+ * venue, so there is nothing to choose and Welcome opens their papers directly.
  * That is decided on Welcome rather than here — a screen that exists only to
  * forward is a screen that flickers.
  *
  * 🔴 The list is what the server says this person holds. It is not filtered
  * here and could not be: the scope is the gate, applied in
  * `Api\App\CoordinatorController`.
+ *
+ * 🔴 It says WHICH of the three ways in it is filling, in the heading and on
+ * every row. The same list serves all three, and a venue with nothing upcoming
+ * may well have results — a row counted for the wrong question sends somebody
+ * into an empty screen.
  */
 const { t } = useI18n();
+const route = useRoute();
+
+const slice = computed(() => route.params.slice as CoordinatorSlice);
+
+const title = computed(() => t(({
+    upcoming: 'public.app.wayUpcoming',
+    running: 'public.app.wayRunning',
+    published: 'public.app.wayResults',
+})[slice.value]));
 
 const term = ref('');
 const venues = ref<CoordinatorVenue[]>([]);
@@ -29,7 +43,7 @@ async function load(): Promise<void> {
     loading.value = true;
 
     try {
-        const { data } = await coordinatorVenues(term.value.trim());
+        const { data } = await coordinatorVenues(slice.value, term.value.trim());
         venues.value = data.data;
     } catch {
         venues.value = [];
@@ -53,16 +67,23 @@ watch(term, () => {
     timer = setTimeout(() => void load(), 250);
 });
 
-onMounted(() => {
-    setDocumentTitle(t('public.app.venueResults'));
+/** One screen serves all three ways in, so the address is what changes. */
+watch(slice, () => {
+    setDocumentTitle(title.value);
     void load();
 });
 
-const row = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border border-white/20 bg-white/5 p-4 text-left transition hover:bg-white/10 active:scale-[0.985]';
+onMounted(() => {
+    setDocumentTitle(title.value);
+    void load();
+});
+
+const mono = 'font-mono uppercase tracking-[0.12em]';
+const row = 'grid grid-cols-[1fr_auto_1.125rem] items-center gap-3 rounded-2xl border border-white/20 bg-white/5 p-4 text-left transition hover:bg-white/10 active:scale-[0.985]';
 </script>
 
 <template>
-    <AppScreen :back="{ name: 'app.welcome' }" :title="t('public.app.venueResults')">
+    <AppScreen :back="{ name: 'app.welcome' }" :title="title">
         <p class="mt-8 font-mono text-[10.5px] uppercase tracking-[0.16em] text-brand-palette-1">
             {{ $t('public.app.countryCoordinator') }}
         </p>
@@ -89,15 +110,27 @@ const row = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
             <RouterLink
                 v-for="venue in venues"
                 :key="venue.id"
-                :to="{ name: 'app.venue', params: { venueId: venue.id } }"
+                :to="{ name: 'app.venue', params: { slice, venueId: venue.id } }"
                 :class="row"
             >
                 <span class="min-w-0">
                     <span class="block truncate text-[1rem] font-semibold tracking-[-0.01em]">{{ venue.name }}</span>
-                    <span v-if="venue.city" class="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-brand-palette-3">
+                    <span v-if="venue.city" :class="mono" class="mt-0.5 block text-[10px] text-brand-palette-3">
                         {{ venue.city }}
                     </span>
                 </span>
+
+                <!-- How many papers this venue holds under the question asked. A
+                     bare number beside a name does not say a number of what, so
+                     the word rides under it. -->
+                <span :class="mono" class="shrink-0 text-right text-[10px] text-brand-palette-3">
+                    <b
+                        class="block font-mono text-[1.05rem] font-semibold tabular-nums"
+                        :class="venue.papers === 0 ? 'text-brand-palette-3/60' : 'text-white'"
+                    >{{ venue.papers }}</b>
+                    {{ venue.papers === 1 ? $t('public.app.paperWord') : $t('public.app.papersWord') }}
+                </span>
+
                 <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
             </RouterLink>
         </div>
