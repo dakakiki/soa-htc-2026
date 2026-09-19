@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
 import { IconBell, IconBellOff, IconX } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { dismissMessage, markMessageRead, messageInbox, type InboxMessage } from '@/api/messages';
 import { useNoticesStore } from '@/stores/notices';
 import { usePushToggle } from '@/composables/usePushToggle';
@@ -21,7 +21,7 @@ import AppScreen from '@/components/app/AppScreen.vue';
  * what is waiting; tapping × there removed it from the only screen that had it.
  * Everything sent is here, put away or not.
  */
-const { t } = useI18n();
+const { ac } = useAppCopy();
 const notices = useNoticesStore();
 const { on: pushOn, busy: pushBusy, failed: pushFailed, unavailable: pushUnavailable, toggle: togglePush } = usePushToggle();
 
@@ -71,7 +71,7 @@ async function load(): Promise<void> {
         more.value = data.meta.has_more;
         notices.unread = data.meta.unread;
     } catch {
-        error.value = t('public.app.loadFailed');
+        error.value = ac('public.app.loadFailed');
     } finally {
         loading.value = false;
     }
@@ -127,7 +127,7 @@ function when(value: string | null): string {
 }
 
 onMounted(() => {
-    setDocumentTitle(t('message.inbox'));
+    setDocumentTitle(ac('message.inbox'));
     void load();
 });
 
@@ -135,13 +135,13 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
 </script>
 
 <template>
-    <AppScreen :back="{ name: 'app.welcome' }" :title="t('message.inbox')">
+    <AppScreen :back="{ name: 'app.welcome' }" :title="ac('message.inbox')">
         <p v-if="loading" class="py-10 text-center text-sm text-brand-palette-3">{{ $t('common.loading') }}</p>
         <p v-else-if="error" class="py-10 text-center text-sm text-brand-palette-1">{{ error }}</p>
 
         <template v-else>
             <p :class="mono" class="mt-6 text-[10.5px] text-brand-palette-1">
-                {{ unread > 0 ? $t('message.inboxWaiting', { n: unread }) : $t('message.inboxNoneWaiting') }}
+                {{ unread > 0 ? $t('message.inboxWaiting', { n: unread }) : ac('message.inboxNoneWaiting') }}
             </p>
 
             <!-- Notifications, offered where somebody has already shown they
@@ -163,7 +163,7 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
 
                 <div v-else class="min-w-0 flex-1">
                     <p class="text-[0.85rem] leading-relaxed text-brand-palette-3">
-                        {{ pushOn ? $t('message.pushIsOn') : $t('message.pushOnNote') }}
+                        {{ pushOn ? ac('message.pushIsOn') : ac('message.pushOnNote') }}
                     </p>
                     <button
                         type="button"
@@ -171,16 +171,16 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
                         class="mt-2.5 min-h-11 rounded-full border border-white/25 px-4 text-[0.85rem] font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
                         @click="togglePush()"
                     >
-                        {{ pushBusy ? $t('message.pushWorking') : (pushOn ? $t('message.pushOff') : $t('message.pushOn')) }}
+                        {{ pushBusy ? ac('message.pushWorking') : (pushOn ? ac('message.pushOff') : ac('message.pushOn')) }}
                     </button>
-                    <p v-if="pushFailed" class="mt-2 text-[0.85rem] text-brand-palette-1">{{ $t('message.pushFailed') }}</p>
+                    <p v-if="pushFailed" class="mt-2 text-[0.85rem] text-brand-palette-1">{{ ac('message.pushFailed') }}</p>
                 </div>
             </div>
 
             <div v-if="rows.length === 0" class="pt-7">
                 <IconBell :size="40" :stroke-width="1.5" class="text-brand-palette-3/45" aria-hidden="true" />
-                <p class="mt-5 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ $t('message.inboxEmpty') }}</p>
-                <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-3">{{ $t('message.inboxEmptyNote') }}</p>
+                <p class="mt-5 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ ac('message.inboxEmpty') }}</p>
+                <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-3">{{ ac('message.inboxEmptyNote') }}</p>
             </div>
 
             <template v-else>
@@ -207,20 +207,20 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
                         <button
                             type="button"
                             :disabled="row.read"
-                            :aria-label="row.read ? undefined : t('message.inboxMarkRead')"
+                            :aria-label="row.read ? undefined : ac('message.inboxMarkRead')"
                             class="min-w-0 flex-1 text-left"
                             @click="read(row)"
                         >
                             <p class="text-[15px] font-medium leading-snug text-white">{{ row.subject }}</p>
                             <p v-if="row.body" class="mt-1.5 whitespace-pre-line text-[0.95rem] leading-relaxed text-white">{{ row.body }}</p>
                             <!-- Nothing short to carry: the letter has it. -->
-                            <p v-else-if="row.by_mail" class="mt-1.5 text-[0.95rem] italic leading-relaxed text-white/70">{{ $t('message.inboxInYourMail') }}</p>
+                            <p v-else-if="row.by_mail" class="mt-1.5 text-[0.95rem] italic leading-relaxed text-white/70">{{ ac('message.inboxInYourMail') }}</p>
                             <p :class="mono" class="mt-2 text-[9.5px] text-brand-palette-3/70">{{ when(row.sent_at) }}</p>
                         </button>
 
                         <button
                             type="button"
-                            :aria-label="t('message.inboxPutAway')"
+                            :aria-label="ac('message.inboxPutAway')"
                             class="-mr-1 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-full text-brand-palette-3/70 transition hover:bg-white/10 hover:text-white"
                             @click="putAway(row)"
                         >
@@ -239,7 +239,7 @@ const mono = 'font-mono uppercase tracking-[0.12em]';
                     class="mt-4 min-h-11 w-full rounded-2xl border border-white/25 text-[0.9rem] font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
                     @click="loadMore()"
                 >
-                    {{ loadingMore ? $t('message.inboxLoadingMore') : $t('message.inboxMore') }}
+                    {{ loadingMore ? ac('message.inboxLoadingMore') : ac('message.inboxMore') }}
                 </button>
             </template>
 

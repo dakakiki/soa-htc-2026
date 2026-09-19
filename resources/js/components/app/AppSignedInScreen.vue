@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { IconLogout } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { useStudentSessionStore } from '@/stores/studentSession';
 
 /**
@@ -25,7 +25,7 @@ import { useStudentSessionStore } from '@/stores/studentSession';
  */
 const student = useStudentSessionStore();
 const router = useRouter();
-const { t } = useI18n();
+const { ac } = useAppCopy();
 
 async function signOut(): Promise<void> {
     await student.logout();
@@ -46,7 +46,7 @@ async function signOut(): Promise<void> {
 
                 <button
                     type="button"
-                    :aria-label="t('student.dashboard.signOut')"
+                    :aria-label="ac('student.dashboard.signOut')"
                     class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-brand-palette-4/18 text-brand-palette-4 transition hover:bg-brand-palette-4/6"
                     @click="signOut"
                 >

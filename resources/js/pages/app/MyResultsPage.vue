@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { IconCheck, IconChevronRight, IconFileText } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { results } from '@/api/student';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import { setDocumentTitle } from '@/utils/documentTitle';
@@ -34,7 +34,7 @@ import type { AvailabilityExam, AvailabilityQuiz, AvailabilityTest } from '@/typ
  *    reached by identification alone, so a competition quiz stays locked all the
  *    way through, which is correct because nothing here opens one.
  */
-const { t } = useI18n();
+const { ac } = useAppCopy();
 const student = useStudentSessionStore();
 
 const quizzes = ref<AvailabilityQuiz[]>([]);
@@ -95,17 +95,17 @@ const streams = computed(() => [
         key: 'competition',
         tone: 'stream-contest stream-panel',
         headingTone: '',
-        heading: t('student.results.contest'),
+        heading: ac('student.results.contest'),
         blocks: competition.value,
-        note: t('student.results.contestNote'),
+        note: ac('student.results.contestNote'),
     },
     {
         key: 'sample',
         tone: 'stream-practice',
         headingTone: 'text-brand-ink-accent',
-        heading: t('student.results.practice'),
+        heading: ac('student.results.practice'),
         blocks: practice.value,
-        note: t('student.results.practiceNote'),
+        note: ac('student.results.practiceNote'),
     },
 ]);
 
@@ -117,14 +117,14 @@ async function load(): Promise<void> {
         const { data } = await results(student.token ?? '');
         quizzes.value = data.quizzes;
     } catch {
-        error.value = t('student.results.error');
+        error.value = ac('student.results.error');
     } finally {
         loading.value = false;
     }
 }
 
 onMounted(() => {
-    setDocumentTitle(t('student.results.title'));
+    setDocumentTitle(ac('student.results.title'));
     void load();
 });
 
@@ -134,8 +134,8 @@ const chip = 'mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palett
 
 <template>
     <AppSignedInScreen>
-        <p :class="mono" class="text-[10.5px] text-brand-palette-4/40">{{ $t('student.results.eyebrow') }}</p>
-        <h1 class="mt-1.5 text-[1.9rem] font-semibold leading-[1.04] tracking-[-0.04em]">{{ $t('student.results.title') }}</h1>
+        <p :class="mono" class="text-[10.5px] text-brand-palette-4/40">{{ ac('student.results.eyebrow') }}</p>
+        <h1 class="mt-1.5 text-[1.9rem] font-semibold leading-[1.04] tracking-[-0.04em]">{{ ac('student.results.title') }}</h1>
 
         <p v-if="loading" class="py-10 text-sm text-brand-palette-4/45">{{ $t('common.loading') }}</p>
         <p v-else-if="error" class="py-10 text-sm text-red-600">{{ error }}</p>
@@ -147,8 +147,8 @@ const chip = 'mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palett
         <div v-else-if="nothingAtAll" class="pt-7">
             <IconFileText :size="40" :stroke-width="1.5" class="text-brand-palette-4/25" aria-hidden="true" />
 
-            <p class="mt-5 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ $t('student.results.empty') }}</p>
-            <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-4/55">{{ $t('public.app.noResultsNote') }}</p>
+            <p class="mt-5 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ ac('student.results.empty') }}</p>
+            <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-4/55">{{ ac('public.app.noResultsNote') }}</p>
 
             <div class="mt-7 border-t border-brand-palette-4/14 pt-5">
                 <RouterLink
@@ -156,8 +156,8 @@ const chip = 'mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palett
                     class="grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border border-brand-palette-4/15 bg-white p-[1.125rem] text-left transition hover:bg-brand-palette-4/4 active:scale-[0.985]"
                 >
                     <span>
-                        <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ $t('public.app.backToTests') }}</span>
-                        <span class="mt-0.5 block text-[0.79rem] leading-snug text-brand-palette-4/60">{{ $t('public.app.backToTestsNote') }}</span>
+                        <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ ac('public.app.backToTests') }}</span>
+                        <span class="mt-0.5 block text-[0.79rem] leading-snug text-brand-palette-4/60">{{ ac('public.app.backToTestsNote') }}</span>
                     </span>
                     <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
                 </RouterLink>
@@ -208,14 +208,14 @@ const chip = 'mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-palett
 
                             <p :class="[chip, mono]">
                                 <IconCheck :size="13" stroke-width="3" />
-                                {{ $t('student.dashboard.completedLabel') }}
+                                {{ ac('student.dashboard.completedLabel') }}
                             </p>
 
                             <!-- Not published: sat, marked or not, but not
                                  released. Said in the same words the list of
                                  tests uses, so the two agree. -->
                             <p v-if="!test.published" class="mt-1.5 text-[13px] opacity-70">
-                                {{ $t('student.dashboard.awaitingResult') }}
+                                {{ ac('student.dashboard.awaitingResult') }}
                             </p>
                         </div>
                     </div>

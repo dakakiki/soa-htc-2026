@@ -4996,3 +4996,85 @@ dozvolom bio bi link koji na Save vraća 403.
 
 🪤 **Push nema ništa od ovoga.** Obaveštenje na telefonu crta operativni sistem. Zato se tab zove
 **„E-mail template"**, a ne „Notification".
+
+---
+
+## ADR-0133 — Website → Mobile: ekrani aplikacije dobijaju administraciju
+
+**Datum:** 2026-09-19 · **Status:** prihvaćeno
+
+> **Vlasnik, 19.09:** *„potrebno je da se napravi administracija za sadrzaj na ekranima PWA, kao sto
+> si napravio Website \ Layouts — na isti nacin Website \ Mobile pa tabovi po ekranima. Svaki tab
+> sadrzi polje koje nosi vrednost koja se prikazuje na aplikaciji iz language fajla sada (ili je
+> hardkodirano)."*
+
+### Ovo PREOKREĆE raniju odluku, i to treba znati
+
+U `en.ts` i u `LayoutZones` je crno na belo pisalo da ekrani aplikacije **namerno nemaju**
+administraciju: *„svaka reč ovde je interfejs, a ne sadržaj"*, i da bi administrator koji menja tekst
+na ekranu do kog se stiže dodirom ikone menjao **jedini ekran koji niko ne može da otvori i proveri**.
+
+Vlasnik je 19.09 tražio suprotno. Odluka se menja — ali razlog koji je staro pravilo činio bezbednim
+se **ne baca**, nego postaje tri ograničenja ispod.
+
+### Odluka
+
+Novi ekran **Website → Mobile**, jedanaest tabova: deset ekrana aplikacije plus **„Across the app"**
+za reči koje govori više ekrana. **115 polja.** Registar ekrana i polja je `AppScreens`, **u kodu** —
+kao što su zone u `LayoutZones` — pa ekran ne može da se doda kucanjem imena.
+
+### Tri ograničenja, i zašto svako postoji
+
+**1 · Svako polje je NADJAČAVANJE.** Ekrani i dalje zovu `t()` sa istim ključem, `en.ts` i dalje nosi
+reči; red u bazi postoji **samo tamo gde je neko nešto ukucao**. 🔴 **Prazno polje nije prazan ekran** —
+prazno polje je tekst kakav aplikacija nosi od danas, a **brisanje je način da se original vrati**.
+Zato tabela ne čuva nijednu podrazumevanu vrednost, a svaki okvir nosi današnju rečenicu i kao
+placeholder i ispisanu ispod sebe (placeholder nestane čim se okvir popuni).
+
+**2 · Ključ JESTE i18n ključ.** `public.app.who`, ne drugo ime za istu stvar. Nema dva spiska koja se
+razilaze, a ključ izbačen iz kataloga prosto prestane da se nudi.
+
+**3 · Šta se NE nudi.** Labele polja i placeholder-i („E-mail", „Candidate no", „Choose…") — vlasnikovo
+pravilo od **25.08** i dalje važi: administrator koji preimenuje polje **kvari formu**, ne poboljšava
+stranicu. I sve što nosi `{n}` ili `{round}`: *„{n} papers"* bez svog `{n}` je linija koja se ispisuje
+kao svoj tekst, a ekran koji time pukne je **na telefonu u ispitnoj sali**.
+
+⚠️ Dugmad **jesu** unutra, na vlasnikov zahtev: *„butoni sadrze dosta teksta, mozda ce hteti to da
+menjaju."*
+
+### Izmena stiže SAMO na aplikaciju
+
+Pet od deset ekrana deli ključeve sa sajtom i adminom — `SignInPage` traži bukvalno isti
+`login.submit` kao prijava na sajtu, `MyMessagesPage` iste `message.*` kao admin inbox. Vlasnik je
+19.09 izabrao da izmena u Mobile menja **samo aplikaciju**.
+
+🔴 To **ne čuva** registar u PHP-u, nego **komponente**: nadjačavanje se primenjuje samo tamo gde se
+zove `ac()` iz `useAppCopy()`, a to zovu isključivo `pages/app` i `components/app`. 🪤 Znači: ekran
+sajta koji za isti ključ zove `$t()` **nije propust** — to je sajt koji govori svoje. Test
+`AppScreenCopyIsActuallyReadTest` čuva i jedno i drugo.
+
+### Učitava se pre prvog kadra, uz temu
+
+`app.ts` je čekao temu i ruter; sada čeka i ovo. Razlog je isti kao za temu: tekst koji stigne
+**posle** iscrtavanja menja reči pod čovekom koji ih već čita — a na dve ulazne strane aplikacije to
+je prva stvar koju aplikacija uradi pred detetom. Zahtev pada tiho: svaka linija ima podrazumevanu
+vrednost, a greška bačena tu bila bi greška u podizanju aplikacije.
+
+### Zamke
+
+🪤 **Tabela svoja, ne kolone na `settings`.** Mejl šablon je stao na `settings` singleton jer ima
+šačicu polja; ovo ima 115 i dobiće još — a **izmena šeme po rečenici nije šema**.
+
+🪤 **Red koji registar prestane da nudi ostaje u tabeli** i ništa ga ne briše. Zato se filtrira i **na
+izlazu**, ne samo na ulazu: inače bi aplikacija crtala liniju koju uređivač više nikome ne pokazuje,
+i ne bi postojao ekran na kom se ona može naći.
+
+🪤 **Admin i aplikacija su ista SPA.** Posle snimanja se `appCopy` store resetuje — bez toga bi
+administrator koji snimi pa u sledećem kliku otvori `/app` video kopiju učitanu pri podizanju, **bez
+svoje izmene, baš na ekranu na koji je otišao da je proveri**.
+
+🪤 **Prazan okvir i okvir sa razmacima su ista stvar.** `trim()` na serveru, inače bi jedan razmak bio
+„nadjačavanje" koje ispisuje prazno.
+
+🪤 **Ključevi su tačkasti, pa `assertJsonPath('values.public.app.who')` ne radi** — traži ugnežđeno
+`public` → `app` → `who`. Čita se ceo `values` pa poredi.

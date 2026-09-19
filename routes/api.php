@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\AttemptController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Cms\AppCopyController as CmsAppCopyController;
 use App\Http\Controllers\Api\Cms\CategoryController as CmsCategoryController;
 use App\Http\Controllers\Api\Cms\LayoutController as CmsLayoutController;
 use App\Http\Controllers\Api\Cms\MediaController as CmsMediaController;
@@ -87,6 +88,13 @@ Route::prefix('public')->group(function () {
     // The sections of a layout zone (ADR-0043). Switched-off blocks and buttons
     // are filtered server-side, so the page never has to know they existed.
     Route::get('layout/{zone}', [PublicContentController::class, 'layout']);
+    /*
+     * What an administrator has rewritten on the installed application's screens
+     * (ADR-0133) — the overrides only, never the defaults, which the SPA already
+     * ships. Public because `/app` is: it is reached by tapping an icon, before
+     * anybody has signed in.
+     */
+    Route::get('app-copy', [CmsAppCopyController::class, 'publicIndex']);
     // The country list the registration form picks from. Reference data, and the
     // same list the competitor entry screen gets from under its own prefix.
     Route::get('countries', [PublicContentController::class, 'countries']);
@@ -227,6 +235,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('layout/{zone}/order', [CmsLayoutController::class, 'saveOrder']);
         Route::put('layout-blocks/{block}', [CmsLayoutController::class, 'update'])->whereNumber('block');
         Route::delete('layout-blocks/{block}', [CmsLayoutController::class, 'destroy'])->whereNumber('block');
+
+        /*
+         * The installed application's own words (ADR-0133). Screens come from
+         * code, as zones do, so there is nothing that creates one; what is saved
+         * is an override per line, a screen at a time.
+         */
+        Route::get('app-screens', [CmsAppCopyController::class, 'index']);
+        Route::put('app-screens/{screen}', [CmsAppCopyController::class, 'update']);
 
         // The media library: uploaded once, referenced from anywhere.
         Route::apiResource('media', CmsMediaController::class)

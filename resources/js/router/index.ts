@@ -745,6 +745,17 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'settings.manage' },
     },
     /*
+     * The installed application's own words (ADR-0133). `cms.manage`, unlike its
+     * Notifications neighbour: nothing here touches the settings singleton — it
+     * is screen copy, which is what the rest of the Website group edits.
+     */
+    {
+        path: '/website/mobile',
+        name: 'cms.mobile',
+        component: () => import('@/pages/website/AppScreensPage.vue'),
+        meta: { requiresAuth: true, permission: 'cms.manage' },
+    },
+    /*
      * A CMS page lives at the root (`/about`). It is declared last so every
      * application route wins the match first; the component itself falls back to
      * the not-found screen when the slug is not a published page.

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n';
 import { RouterLink, type RouteLocationRaw } from 'vue-router';
 import { IconChevronLeft } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 
 /**
  * One screen of the installed application: the navy ground, the narrow column,
@@ -29,7 +29,7 @@ defineProps<{
     title?: string;
 }>();
 
-const { t } = useI18n();
+const { ac } = useAppCopy();
 </script>
 
 <template>
@@ -48,7 +48,7 @@ const { t } = useI18n();
                 <RouterLink
                     v-if="back !== undefined"
                     :to="back"
-                    :aria-label="t('public.app.back')"
+                    :aria-label="ac('public.app.back')"
                     class="grid h-[2.375rem] w-[2.375rem] shrink-0 place-items-center rounded-full bg-white/10 transition hover:bg-white/20"
                 >
                     <IconChevronLeft :size="19" :stroke-width="2" />

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconChevronRight } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { coordinatorHome, type CoordinatorHome, type CoordinatorSlice } from '@/api/appCoordinator';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppCoordinatorScreen from '@/components/app/AppCoordinatorScreen.vue';
@@ -36,6 +37,7 @@ import AppCoordinatorScreen from '@/components/app/AppCoordinatorScreen.vue';
  *    agree. The duration is printed on the paper's block, where the paper is.
  */
 const { t } = useI18n();
+const { ac } = useAppCopy();
 
 const home = ref<CoordinatorHome | null>(null);
 const loading = ref(true);
@@ -93,18 +95,18 @@ const nothingAtAll = computed(() => {
 const ways = computed(() => [
     {
         slice: 'upcoming' as const,
-        name: t('public.app.wayUpcoming'),
-        note: t(sole.value !== null ? 'public.app.upcomingNoteOne' : 'public.app.upcomingNoteMany'),
+        name: ac('public.app.wayUpcoming'),
+        note: ac(sole.value !== null ? 'public.app.upcomingNoteOne' : 'public.app.upcomingNoteMany'),
     },
     {
         slice: 'running' as const,
-        name: t('public.app.wayRunning'),
-        note: t(sole.value !== null ? 'public.app.inProgressNoteOne' : 'public.app.inProgressNoteMany'),
+        name: ac('public.app.wayRunning'),
+        note: ac(sole.value !== null ? 'public.app.inProgressNoteOne' : 'public.app.inProgressNoteMany'),
     },
     {
         slice: 'published' as const,
-        name: t('public.app.wayResults'),
-        note: t(sole.value !== null ? 'public.app.resultsNoteOne' : 'public.app.resultsNoteMany'),
+        name: ac('public.app.wayResults'),
+        note: ac(sole.value !== null ? 'public.app.resultsNoteOne' : 'public.app.resultsNoteMany'),
     },
 ]);
 
@@ -116,14 +118,14 @@ async function load(): Promise<void> {
         const { data } = await coordinatorHome();
         home.value = data.data;
     } catch {
-        error.value = t('public.app.loadFailed');
+        error.value = ac('public.app.loadFailed');
     } finally {
         loading.value = false;
     }
 }
 
 onMounted(() => {
-    setDocumentTitle(t('public.app.welcome'));
+    setDocumentTitle(ac('public.app.welcome'));
     void load();
 });
 
@@ -147,8 +149,8 @@ const way = 'rise grid items-center gap-3 rounded-2xl border border-white/20 bg-
 
         <template v-else-if="home">
             <span class="block h-[3px] w-11 bg-brand-palette-2" aria-hidden="true"></span>
-            <h1 class="mt-3 text-[1.9rem] font-semibold leading-[1.04] tracking-[-0.045em]">{{ $t('public.app.welcome') }}</h1>
-            <p class="mt-2 text-[0.94rem] leading-relaxed text-brand-palette-3">{{ $t('public.app.welcomeLead') }}</p>
+            <h1 class="mt-3 text-[1.9rem] font-semibold leading-[1.04] tracking-[-0.045em]">{{ ac('public.app.welcome') }}</h1>
+            <p class="mt-2 text-[0.94rem] leading-relaxed text-brand-palette-3">{{ ac('public.app.welcomeLead') }}</p>
 
             <!--
                 The three ways in. A number rides along only when this person
@@ -183,12 +185,12 @@ const way = 'rise grid items-center gap-3 rounded-2xl border border-white/20 bg-
                 when a paper appears and leaves the three ways standing above it.
             -->
             <template v-if="nothingAtAll">
-                <p class="mt-7 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ $t('public.app.noExams') }}</p>
-                <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-3">{{ $t('public.app.noExamsNote') }}</p>
+                <p class="mt-7 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ ac('public.app.noExams') }}</p>
+                <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-3">{{ ac('public.app.noExamsNote') }}</p>
             </template>
 
             <p v-else :class="mono" class="mt-6 text-center text-[10px] text-brand-palette-3/75">
-                {{ sole !== null ? $t('public.app.waysHintOne') : $t('public.app.waysHintMany') }}
+                {{ sole !== null ? ac('public.app.waysHintOne') : ac('public.app.waysHintMany') }}
             </p>
         </template>
     </AppCoordinatorScreen>

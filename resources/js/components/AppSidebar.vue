@@ -25,6 +25,7 @@ import {
     IconFileExport,
     IconFileImport,
     IconFileText,
+    IconDeviceMobile,
     IconFolders,
     IconHelpCircle,
     IconHistory,
@@ -199,6 +200,9 @@ const nav: NavNode[] = [
             { label: t('nav.layout'), icon: IconLayoutRows, to: 'cms.layout', prefix: 'cms.layout', perm: 'cms.manage' },
             // 🪤 `settings.manage`, unlike its five neighbours — see the route.
             { label: t('nav.notifications'), icon: IconMailCog, to: 'cms.notifications', prefix: 'cms.notifications', perm: 'settings.manage' },
+            // The installed application's screens (ADR-0133). Last in the group:
+            // it is the one entry that edits something other than the website.
+            { label: t('nav.mobile'), icon: IconDeviceMobile, to: 'cms.mobile', prefix: 'cms.mobile', perm: 'cms.manage' },
         ],
     },
     // Messages to coordinators (2026-09-15). After the website and before

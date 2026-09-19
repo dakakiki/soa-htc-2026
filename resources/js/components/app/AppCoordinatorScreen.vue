@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { IconBell, IconLogout } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { useSessionStore } from '@/stores/session';
 import { useNoticesStore } from '@/stores/notices';
 
@@ -31,7 +31,7 @@ defineProps<{
 const session = useSessionStore();
 const notices = useNoticesStore();
 const router = useRouter();
-const { t } = useI18n();
+const { ac } = useAppCopy();
 
 async function signOut(): Promise<void> {
     notices.forget();
@@ -79,7 +79,7 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', look));
                      waiting" is a different decision from "something is". -->
                 <RouterLink
                     :to="{ name: 'app.messages' }"
-                    :aria-label="t('message.inboxOpen')"
+                    :aria-label="ac('message.inboxOpen')"
                     class="relative grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/25 text-white transition hover:bg-white/12"
                 >
                     <IconBell :size="19" :stroke-width="1.7" />
@@ -91,7 +91,7 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', look));
 
                 <button
                     type="button"
-                    :aria-label="t('student.dashboard.signOut')"
+                    :aria-label="ac('student.dashboard.signOut')"
                     class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/25 text-white transition hover:bg-white/12"
                     @click="signOut"
                 >

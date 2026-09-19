@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { IconEye, IconEyeOff } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { useSessionStore } from '@/stores/session';
 import { apiErrorMessage } from '@/api/http';
 import { setDocumentTitle } from '@/utils/documentTitle';
@@ -36,7 +36,7 @@ import AppScreen from '@/components/app/AppScreen.vue';
 const session = useSessionStore();
 const router = useRouter();
 const route = useRoute();
-const { t } = useI18n();
+const { ac } = useAppCopy();
 
 /*
  * 🪤 Empty, never the dev administrator's address. The website's form was seeded
@@ -55,7 +55,7 @@ const input = 'mt-1.5 w-full rounded-[13px] border border-white/20 bg-white/5 p-
     + 'placeholder:text-brand-palette-3/50 focus:outline-none focus-visible:outline focus-visible:outline-2 '
     + 'focus-visible:outline-offset-1 focus-visible:outline-brand-palette-1';
 
-onMounted(() => setDocumentTitle(t('public.app.coordinator')));
+onMounted(() => setDocumentTitle(ac('public.app.coordinator')));
 
 async function submit(): Promise<void> {
     loading.value = true;
@@ -65,7 +65,7 @@ async function submit(): Promise<void> {
         // Remembered, always — see the note above.
         await session.login(email.value, password.value, true);
     } catch (e) {
-        error.value = apiErrorMessage(e, t('login.failed'));
+        error.value = apiErrorMessage(e, ac('login.failed'));
 
         return;
     } finally {
@@ -86,15 +86,15 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-    <AppScreen :back="{ name: 'app.start' }" :title="t('public.app.coordinator')">
+    <AppScreen :back="{ name: 'app.start' }" :title="ac('public.app.coordinator')">
         <form id="sign-in" @submit.prevent="submit">
             <span class="mt-8 block h-[3px] w-11 bg-brand-palette-2" aria-hidden="true"></span>
 
             <h1 class="mt-3 text-[1.75rem] font-semibold leading-[1.04] tracking-[-0.045em]">
-                {{ $t('login.submit') }}
+                {{ ac('login.submit') }}
             </h1>
 
-            <p class="mt-2.5 text-[0.94rem] leading-relaxed text-brand-palette-3">{{ $t('public.app.signInLead') }}</p>
+            <p class="mt-2.5 text-[0.94rem] leading-relaxed text-brand-palette-3">{{ ac('public.app.signInLead') }}</p>
 
             <label class="mt-5 block">
                 <span :class="label">{{ $t('login.email') }}</span>
@@ -138,12 +138,12 @@ async function submit(): Promise<void> {
                 to="/forgot-password"
                 class="mt-3.5 inline-block text-[0.9rem] text-brand-palette-1 underline underline-offset-4 transition hover:text-white"
             >
-                {{ $t('login.forgot') }}
+                {{ ac('login.forgot') }}
             </RouterLink>
 
             <p v-if="error" class="mt-5 text-sm text-brand-palette-1">{{ error }}</p>
 
-            <p class="mt-6 text-[0.78rem] leading-relaxed text-brand-palette-3/75">{{ $t('public.app.signInHelper') }}</p>
+            <p class="mt-6 text-[0.78rem] leading-relaxed text-brand-palette-3/75">{{ ac('public.app.signInHelper') }}</p>
         </form>
 
         <template #foot>
@@ -153,7 +153,7 @@ async function submit(): Promise<void> {
                 :disabled="loading"
                 class="w-full rounded-full bg-brand-palette-2 p-[1.0625rem] text-base font-semibold text-brand-palette-4 transition hover:brightness-105 active:scale-[0.99] disabled:opacity-45"
             >
-                {{ loading ? $t('login.submitting') : $t('login.submit') }}
+                {{ loading ? ac('login.submitting') : ac('login.submit') }}
             </button>
         </template>
     </AppScreen>

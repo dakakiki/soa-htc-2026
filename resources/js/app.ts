@@ -6,6 +6,7 @@ import { i18n } from '@/i18n';
 import { onUnauthorized } from '@/api/http';
 import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
+import { useAppCopyStore } from '@/stores/appCopy';
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -58,10 +59,15 @@ if ('serviceWorker' in navigator) {
  * `session.ensureLoaded()` in the router's own guard, so the wrong shell stood
  * there for a whole round trip. Reported from a phone, 2026-09-18.
  *
- * 🪤 Settled, not sequential, and neither may stop the boot. The two wait on
- * different things so neither should hold the other up, and a theme request
- * that fails must still leave an application on the screen — which is what the
+ * 🪤 Settled, not sequential, and none of them may stop the boot. They wait on
+ * different things so none should hold the others up, and a theme request that
+ * fails must still leave an application on the screen — which is what the
  * `.finally()` this replaces was for.
+ *
+ * The third is the application's own copy (ADR-0133), here for the same reason
+ * as the theme: an administrator's rewording that arrives after the first frame
+ * changes the words under somebody already reading them. It fetches a handful of
+ * overrides and usually none at all, and it swallows its own failures.
  */
-void Promise.allSettled([useThemeStore(pinia).load(), router.isReady()])
+void Promise.allSettled([useThemeStore(pinia).load(), useAppCopyStore(pinia).load(), router.isReady()])
     .then(() => app.mount('#app'));
