@@ -182,6 +182,27 @@ class AppCopyApiTest extends TestCase
             ->assertJsonPath('values', []);
     }
 
+    /**
+     * 🪤 An installation that has rewritten nothing is the ordinary case, and it
+     * is the one PHP gets wrong on its own: an empty array goes out as `[]`,
+     * where both clients are typed for a map. Nothing broke — a missing key
+     * reads as `undefined` either way and every line falls back to the
+     * catalogue — but a contract that is wrong in the common case is a contract
+     * nobody checks against.
+     */
+    public function test_an_empty_set_of_overrides_is_sent_as_an_object(): void
+    {
+        $this->assertStringContainsString(
+            '"values":{}',
+            $this->getJson('/api/public/app-copy')->getContent(),
+        );
+
+        $this->assertStringContainsString(
+            '"values":{}',
+            $this->actingAs($this->admin())->getJson('/api/cms/app-screens')->getContent(),
+        );
+    }
+
     public function test_the_editor_is_closed_to_somebody_without_the_permission(): void
     {
         $outsider = User::factory()->create();

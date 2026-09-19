@@ -58,7 +58,7 @@ class AppCopyController extends Controller
 
         return response()->json([
             'screens' => $screens,
-            'values' => self::stored(),
+            'values' => self::values(),
         ]);
     }
 
@@ -106,7 +106,7 @@ class AppCopyController extends Controller
         });
 
         return response()->json([
-            'values' => self::stored(),
+            'values' => self::values(),
         ]);
     }
 
@@ -126,8 +126,24 @@ class AppCopyController extends Controller
     public function publicIndex(): JsonResponse
     {
         return response()->json([
-            'values' => self::stored(),
+            'values' => self::values(),
         ]);
+    }
+
+    /**
+     * The overrides as the wire carries them: an OBJECT, keyed by i18n key.
+     *
+     * 🪤 The cast is not decoration. PHP writes an empty array as `[]`, so an
+     * installation that has rewritten nothing — which is every installation
+     * until somebody opens the screen — served `{"values":[]}` where the client
+     * is typed for a map. Nothing broke, because a missing key on an array reads
+     * as `undefined` just as it does on an object and every line falls back to
+     * the catalogue; but the common case was the one shape the contract did not
+     * describe, which is how a type stops being believed.
+     */
+    private static function values(): object
+    {
+        return (object) self::stored();
     }
 
     /**
