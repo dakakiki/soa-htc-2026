@@ -86,13 +86,24 @@ const overriddenHere = computed(() => {
     return current.value.fields.filter((f) => (stored.value[f.key] ?? '') !== '').length;
 });
 
-function apply(values: Record<string, string>): void {
+/** What the server now holds. Touches no box on its own — see below. */
+function remember(values: Record<string, string>): void {
     stored.value = values;
+}
 
-    for (const screen of screens.value) {
-        for (const f of screen.fields) {
-            draft[f.key] = values[f.key] ?? '';
-        }
+/**
+ * Put a screen's boxes back to what is stored.
+ *
+ * 🔴 A screen at a time, and that is the whole point. Rewriting every box on
+ * every save threw away work the screen itself was advertising: each tab carries
+ * a dot while it holds something unsaved, and saving a DIFFERENT tab used to
+ * clear the lot — type a heading on Start, go to Notices, save, and the Start
+ * tab's dot and its text were gone, under a green "Saved." (found in review,
+ * 2026-09-19).
+ */
+function resetDraft(screen: AppScreenInfo): void {
+    for (const f of screen.fields) {
+        draft[f.key] = stored.value[f.key] ?? '';
     }
 }
 
@@ -106,7 +117,10 @@ async function load(): Promise<void> {
         if (tab.value === '' || !data.screens.some((s) => s.key === tab.value)) {
             tab.value = data.screens[0]?.key ?? '';
         }
-        apply(data.values);
+        // A fresh page: every box comes from the server, because nothing has
+        // been typed yet.
+        remember(data.values);
+        screens.value.forEach(resetDraft);
     } catch (e) {
         error.value = apiErrorMessage(e, t('mobile.error'));
     } finally {
@@ -130,7 +144,14 @@ async function save(): Promise<void> {
 
     try {
         const { data } = await updateAppCopy(current.value.key, values);
-        apply(data.values);
+
+        /*
+         * The yardstick moves for every key — the server has just told us what
+         * it holds — but only THIS screen's boxes are put back to it. Another
+         * tab's unsaved work is not this save's to throw away.
+         */
+        remember(data.values);
+        resetDraft(current.value);
         saved.value = true;
 
         /*
@@ -153,12 +174,8 @@ function cancel(): void {
     saved.value = false;
     error.value = null;
 
-    if (current.value === null) {
-        return;
-    }
-
-    for (const f of current.value.fields) {
-        draft[f.key] = stored.value[f.key] ?? '';
+    if (current.value !== null) {
+        resetDraft(current.value);
     }
 }
 

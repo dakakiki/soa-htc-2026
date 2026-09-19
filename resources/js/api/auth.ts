@@ -1,4 +1,4 @@
-import { http } from '@/api/http';
+import { BOOT_TIMEOUT_MS, http } from '@/api/http';
 import type { AuthUser } from '@/types/models';
 
 /**
@@ -42,8 +42,16 @@ export async function resetPassword(payload: {
     await http.post('/api/auth/reset-password', payload);
 }
 
+/**
+ * Who is signed in.
+ *
+ * 🔴 Capped: the router's own guard awaits this before the first navigation can
+ * finish, so a connection that stalls here holds the whole boot — and nothing
+ * mounts, on a splash with nothing to press. Failing is handled (the session
+ * store treats it as "nobody is signed in"); hanging is not.
+ */
 export async function fetchUser(): Promise<AuthUser> {
-    const { data } = await http.get<{ data: AuthUser }>('/api/auth/user');
+    const { data } = await http.get<{ data: AuthUser }>('/api/auth/user', { timeout: BOOT_TIMEOUT_MS });
 
     return data.data;
 }

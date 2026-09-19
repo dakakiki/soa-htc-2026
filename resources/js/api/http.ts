@@ -29,6 +29,24 @@ export const http = axios.create({
     },
 });
 
+/**
+ * How long a request the FIRST FRAME waits on may take before it is given up on.
+ *
+ * 🔴 Per call, and deliberately not on the instance above. Three requests hold
+ * the boot — the theme, the application's own copy, and the session the router's
+ * guard awaits — and a connection that stalls rather than fails leaves all three
+ * pending for ever: `allSettled` never settles, `app.mount()` never runs, and a
+ * phone sits on the boot splash with nothing to press. A cap on the instance
+ * would reach the twenty blob downloads and uploads as well, where a big export
+ * legitimately takes minutes, and turning those into failures would be a worse
+ * bug than the one being fixed.
+ *
+ * 🪤 Generous on purpose. Missing the deadline is not free — the theme falls
+ * back to the default palette for the rest of the session — so this has to be
+ * longer than any network worth waiting for and shorter than "for ever".
+ */
+export const BOOT_TIMEOUT_MS = 15000;
+
 /** Statuses that mean the server session is no longer valid. */
 const SESSION_EXPIRED_STATUSES = new Set([401, 419]);
 

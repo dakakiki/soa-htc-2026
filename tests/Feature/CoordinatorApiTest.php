@@ -193,6 +193,70 @@ class CoordinatorApiTest extends TestCase
     }
 
     /**
+     * 🔴 And through the FORM, which is the screen a coordinator is edited on.
+     *
+     * The test above posts `status` alone — the inline toggle in the list — and
+     * it passed while the form did not. CoordinatorFormPage sends `status` AND
+     * `role_id` on every save, and `role_id` makes `syncCoordinator()` replace
+     * the assignment: it deleted the row that had just been switched off and
+     * wrote a new one with a hard-coded 'active'. `users.status` said inactive,
+     * the assignment said active, and the assignment is the one that grants
+     * everything — so the switch did nothing at all, silently, on the only
+     * screen most of this is done from (found in review, 2026-09-19).
+     */
+    public function test_the_status_switch_survives_a_full_form_save(): void
+    {
+        $school = School::first();
+        $roleId = $this->roleId(SystemRole::SchoolCoordinator->value);
+
+        $created = $this->actingAs($this->admin())
+            ->postJson('/api/coordinators', [
+                'name' => 'Form Save',
+                'email' => 'formsave@soahtc.test',
+                'password' => 'secret-password',
+                'country_id' => $school->country_id,
+                'role_id' => $roleId,
+                'school_ids' => [$school->id],
+            ])->json('data');
+
+        // Exactly what the edit form posts: the switch and the role together.
+        $this->actingAs($this->admin())
+            ->putJson("/api/coordinators/{$created['id']}", [
+                'name' => 'Form Save',
+                'email' => 'formsave@soahtc.test',
+                'country_id' => $school->country_id,
+                'role_id' => $roleId,
+                'school_ids' => [$school->id],
+                'status' => 'inactive',
+            ])->assertOk();
+
+        $this->assertDatabaseHas('season_user_assignments', [
+            'user_id' => $created['id'],
+            'status' => 'inactive',
+        ]);
+        $this->assertDatabaseMissing('season_user_assignments', [
+            'user_id' => $created['id'],
+            'status' => 'active',
+        ]);
+
+        // And back up the same way, so the form can undo what the form did.
+        $this->actingAs($this->admin())
+            ->putJson("/api/coordinators/{$created['id']}", [
+                'name' => 'Form Save',
+                'email' => 'formsave@soahtc.test',
+                'country_id' => $school->country_id,
+                'role_id' => $roleId,
+                'school_ids' => [$school->id],
+                'status' => 'active',
+            ])->assertOk();
+
+        $this->assertDatabaseHas('season_user_assignments', [
+            'user_id' => $created['id'],
+            'status' => 'active',
+        ]);
+    }
+
+    /**
      * The end the owner actually met: listed among coordinators, missing from the
      * message audience, and the switch already up so there was nothing to pull.
      */

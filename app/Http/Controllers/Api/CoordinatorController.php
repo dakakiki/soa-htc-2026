@@ -372,7 +372,28 @@ class CoordinatorController extends Controller
             'season_id' => $season->id,
             'user_id' => $user->id,
             'role_id' => $roleId,
-            'status' => 'active',
+            /*
+             * 🔴 The person's own switch, NOT a literal 'active' (ADR-0131: one
+             * switch, one meaning).
+             *
+             * This method replaces the assignment — it deletes the old row and
+             * writes a new one — and it runs on the same save as
+             * {@see syncAssignmentStatus()}, just after it. Hard-coded, it undid
+             * that call every time: the edit form posts `status` AND `role_id`
+             * together, so switching a coordinator off and pressing Save set the
+             * assignment to inactive and then threw the row away and made an
+             * active one. `users.status` said inactive, the role said active, and
+             * the role is the one that grants everything — so the switch did
+             * nothing at all on the screen coordinators are actually edited on.
+             * Only the inline toggle in the list worked, because it posts
+             * `status` alone.
+             *
+             * 🪤 `?? 'active'`, matching the column's own default: on a create
+             * the attribute is only in memory, so a request that did not carry a
+             * status leaves it null here even though the row will be written
+             * active.
+             */
+            'status' => $user->status ?? 'active',
         ]);
         $assignment->schools()->sync($schoolIds);
     }

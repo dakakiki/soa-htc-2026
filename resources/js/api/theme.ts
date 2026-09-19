@@ -1,8 +1,15 @@
-import { http } from '@/api/http';
+import { BOOT_TIMEOUT_MS, http } from '@/api/http';
 import type { Theme, ThemeColorKey } from '@/types/models';
 
+/**
+ * The palette and the logos.
+ *
+ * 🔴 Capped: the boot waits for this so the first frame is not the default look,
+ * and a stalled connection would hold it for ever. Missing the deadline costs
+ * the administered colours for the session; missing the mount costs everything.
+ */
 export function getTheme() {
-    return http.get<{ data: Theme }>('/api/theme');
+    return http.get<{ data: Theme }>('/api/theme', { timeout: BOOT_TIMEOUT_MS });
 }
 
 export interface ThemeFiles {
