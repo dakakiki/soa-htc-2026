@@ -1,4 +1,4 @@
-import { http } from '@/api/http';
+import { BOOT_TIMEOUT_MS, http } from '@/api/http';
 
 /**
  * Website → Mobile (ADR-0133): the words on the installed application's screens.
@@ -38,7 +38,13 @@ export function updateAppCopy(screen: string, values: Record<string, string>) {
     return http.put<{ values: Record<string, string> }>(`/api/cms/app-screens/${screen}`, { values });
 }
 
-/** What the application itself reads at boot: the overrides, and nothing else. */
+/**
+ * What the application itself reads at boot: the overrides, and nothing else.
+ *
+ * 🔴 Capped, like the other two the first frame waits on. Every line has a
+ * default in the catalogue, so giving up costs an administrator's rewording for
+ * the session — where hanging costs the whole application.
+ */
 export function getPublicAppCopy() {
-    return http.get<{ values: Record<string, string> }>('/api/public/app-copy');
+    return http.get<{ values: Record<string, string> }>('/api/public/app-copy', { timeout: BOOT_TIMEOUT_MS });
 }
