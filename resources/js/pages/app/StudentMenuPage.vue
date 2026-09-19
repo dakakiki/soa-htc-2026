@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { IconChevronRight } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppScreen from '@/components/app/AppScreen.vue';
 
@@ -22,20 +22,20 @@ import AppScreen from '@/components/app/AppScreen.vue';
  * leave a child who was told to tap it looking at a screen that does not have
  * it (the owner's rule of 2026-08-27 — "a gate that lies to the candidate").
  */
-const { t } = useI18n();
+const { ac } = useAppCopy();
 
-onMounted(() => setDocumentTitle(t('public.app.student')));
+onMounted(() => setDocumentTitle(ac('public.app.student')));
 
 const row = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl p-[1.125rem] text-left transition active:scale-[0.985]';
 const note = 'mt-0.5 block text-[0.79rem] leading-snug';
 </script>
 
 <template>
-    <AppScreen :back="{ name: 'app.start' }" :title="t('public.app.student')">
+    <AppScreen :back="{ name: 'app.start' }" :title="ac('public.app.student')">
         <span class="mt-8 block h-[3px] w-11 bg-brand-palette-2" aria-hidden="true"></span>
 
         <h1 class="mt-3 text-balance text-[1.75rem] font-semibold leading-[1.04] tracking-[-0.045em]">
-            {{ $t('public.app.what') }}
+            {{ ac('public.app.what') }}
         </h1>
 
         <div class="mt-5 grid gap-3">
@@ -47,8 +47,8 @@ const note = 'mt-0.5 block text-[0.79rem] leading-snug';
                 class="border border-brand-palette-2 bg-brand-palette-2 py-[1.375rem] text-brand-palette-4 hover:brightness-105"
             >
                 <span>
-                    <span class="block text-[1.16rem] font-semibold tracking-[-0.01em]">{{ $t('public.app.start') }}</span>
-                    <span :class="note" class="text-brand-palette-4/75">{{ $t('public.app.startNote') }}</span>
+                    <span class="block text-[1.16rem] font-semibold tracking-[-0.01em]">{{ ac('public.app.start') }}</span>
+                    <span :class="note" class="text-brand-palette-4/75">{{ ac('public.app.startNote') }}</span>
                 </span>
                 <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
             </RouterLink>
@@ -59,8 +59,8 @@ const note = 'mt-0.5 block text-[0.79rem] leading-snug';
                 class="border border-white/20 bg-white/5 hover:bg-white/10"
             >
                 <span>
-                    <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ $t('public.app.sample') }}</span>
-                    <span :class="note" class="text-brand-palette-3">{{ $t('public.app.sampleNote') }}</span>
+                    <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ ac('public.app.sample') }}</span>
+                    <span :class="note" class="text-brand-palette-3">{{ ac('public.app.sampleNote') }}</span>
                 </span>
                 <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
             </RouterLink>
@@ -71,7 +71,7 @@ const note = 'mt-0.5 block text-[0.79rem] leading-snug';
                 class="border border-white/20 bg-white/5 hover:bg-white/10"
             >
                 <span>
-                    <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ $t('public.app.results') }}</span>
+                    <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ ac('public.app.results') }}</span>
                     <!-- `<i18n-t>` rather than `$t`: the two words that name the
                          streams have to be elements to be set apart, and both are
                          named because the screen behind this row shows both

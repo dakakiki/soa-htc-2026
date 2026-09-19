@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IconChevronRight, IconClock, IconFileText, IconRefresh } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { venueFigures, type CoordinatorPaper, type CoordinatorSlice, type CoordinatorVenue } from '@/api/appCoordinator';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppScreen from '@/components/app/AppScreen.vue';
@@ -27,6 +28,7 @@ import AppScreen from '@/components/app/AppScreen.vue';
  */
 const route = useRoute();
 const { t } = useI18n();
+const { ac } = useAppCopy();
 
 const slice = computed(() => route.params.slice as CoordinatorSlice);
 
@@ -45,13 +47,13 @@ const error = ref<string | null>(null);
 const venuesHeld = ref(1);
 const hasOthers = computed(() => venuesHeld.value > 1);
 
-const title = computed(() => t(({
+const title = computed(() => ac(({
     upcoming: 'public.app.wayUpcoming',
     running: 'public.app.wayRunning',
     published: 'public.app.wayResults',
 })[slice.value]));
 
-const lead = computed(() => t(({
+const lead = computed(() => ac(({
     upcoming: 'public.app.upcomingLead',
     running: 'public.app.inProgressLead',
     published: 'public.app.resultsLead',
@@ -91,7 +93,7 @@ function standing(paper: CoordinatorPaper): { text: string; live: boolean } {
 
     return missing > 0
         ? { text: t('public.app.notStartedCount', { n: missing }), live: false }
-        : { text: t('public.app.allHandedIn'), live: false };
+        : { text: ac('public.app.allHandedIn'), live: false };
 }
 
 function duration(paper: CoordinatorPaper): string {
@@ -116,7 +118,7 @@ async function load(): Promise<void> {
         // 🪤 Including a venue this coordinator does not hold, which the server
         // answers 404 to rather than naming. The screen says the same thing it
         // would say about a venue that is not there, because to them it is not.
-        error.value = t('public.app.venueNotFound');
+        error.value = ac('public.app.venueNotFound');
     } finally {
         loading.value = false;
     }
@@ -217,14 +219,14 @@ const another = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl bo
 
                 <span class="min-w-0 flex-1">
                     <span class="block text-[0.95rem] font-semibold tracking-[-0.01em]">
-                        {{ sitting > 0 ? $t('public.app.sittingNowCount', { n: sitting }) : $t('public.app.nobodySitting') }}
+                        {{ sitting > 0 ? $t('public.app.sittingNowCount', { n: sitting }) : ac('public.app.nobodySitting') }}
                     </span>
-                    <span :class="mono" class="mt-0.5 block text-[9.5px] text-brand-palette-3">{{ $t('public.app.liveEvery') }}</span>
+                    <span :class="mono" class="mt-0.5 block text-[9.5px] text-brand-palette-3">{{ ac('public.app.liveEvery') }}</span>
                 </span>
 
                 <button
                     type="button"
-                    :aria-label="t('public.app.refreshNow')"
+                    :aria-label="ac('public.app.refreshNow')"
                     class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/25 text-white transition hover:bg-white/12"
                     @click="load"
                 >
@@ -245,20 +247,20 @@ const another = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl bo
                 />
 
                 <p class="mt-5 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">
-                    <template v-if="slice === 'upcoming'">{{ $t('public.app.upcomingEmpty') }}</template>
-                    <template v-else-if="slice === 'running'">{{ $t('public.app.inProgressEmpty') }}</template>
-                    <template v-else>{{ hasOthers ? $t('public.app.nothingPublished') : $t('public.app.nothingPublishedMine') }}</template>
+                    <template v-if="slice === 'upcoming'">{{ ac('public.app.upcomingEmpty') }}</template>
+                    <template v-else-if="slice === 'running'">{{ ac('public.app.inProgressEmpty') }}</template>
+                    <template v-else>{{ hasOthers ? ac('public.app.nothingPublished') : ac('public.app.nothingPublishedMine') }}</template>
                 </p>
                 <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-3">
-                    <template v-if="slice === 'upcoming'">{{ $t('public.app.upcomingEmptyNote') }}</template>
-                    <template v-else-if="slice === 'running'">{{ $t('public.app.inProgressEmptyNote') }}</template>
-                    <template v-else>{{ $t('public.app.nothingPublishedNote') }}</template>
+                    <template v-if="slice === 'upcoming'">{{ ac('public.app.upcomingEmptyNote') }}</template>
+                    <template v-else-if="slice === 'running'">{{ ac('public.app.inProgressEmptyNote') }}</template>
+                    <template v-else>{{ ac('public.app.nothingPublishedNote') }}</template>
                 </p>
 
                 <div v-if="hasOthers" class="mt-7 border-t border-white/16 pt-5">
                     <RouterLink :to="{ name: 'app.venues', params: { slice } }" :class="another">
                         <span>
-                            <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ $t('public.app.anotherVenue') }}</span>
+                            <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ ac('public.app.anotherVenue') }}</span>
                             <span class="mt-0.5 block text-[0.79rem] text-brand-palette-3">
                                 {{ $t('public.app.venuesCount', { n: venuesHeld }) }}
                             </span>
@@ -310,21 +312,21 @@ const another = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl bo
                              zero for the same reason. -->
                         <div v-if="slice === 'upcoming'" class="mt-3 border-t border-brand-palette-4/12 pt-3">
                             <b :class="cell">{{ paper.entered }}</b>
-                            <span :class="cellLabel">{{ $t('public.app.entered') }}</span>
+                            <span :class="cellLabel">{{ ac('public.app.entered') }}</span>
                         </div>
 
                         <div v-else class="mt-3 grid grid-cols-3 gap-2.5 border-t border-brand-palette-4/12 pt-3">
                             <div>
                                 <b :class="cell">{{ paper.entered }}</b>
-                                <span :class="cellLabel">{{ $t('public.app.entered') }}</span>
+                                <span :class="cellLabel">{{ ac('public.app.entered') }}</span>
                             </div>
                             <div>
                                 <b :class="cell">{{ slice === 'running' ? paper.started : paper.submitted }}</b>
-                                <span :class="cellLabel">{{ slice === 'running' ? $t('public.app.started') : $t('public.app.submitted') }}</span>
+                                <span :class="cellLabel">{{ slice === 'running' ? ac('public.app.started') : ac('public.app.submitted') }}</span>
                             </div>
                             <div>
                                 <b :class="cell">{{ slice === 'running' ? paper.submitted : paper.average }}</b>
-                                <span :class="cellLabel">{{ slice === 'running' ? $t('public.app.submitted') : $t('public.app.average') }}</span>
+                                <span :class="cellLabel">{{ slice === 'running' ? ac('public.app.submitted') : ac('public.app.average') }}</span>
                             </div>
                         </div>
                     </article>

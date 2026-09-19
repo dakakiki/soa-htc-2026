@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { IconCalendar, IconCheck, IconChevronRight, IconLock, IconPlayerPlayFilled, IconRefresh } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { availability } from '@/api/student';
 import { useStudentSessionStore } from '@/stores/studentSession';
 import { setDocumentTitle } from '@/utils/documentTitle';
@@ -32,7 +32,7 @@ import type { AvailabilityExam, AvailabilityQuiz, AvailabilityTest } from '@/typ
  *  - **It does not decide what is open.** Every status comes from
  *    `StudentAvailability` server-side; this file only draws them.
  */
-const { t } = useI18n();
+const { ac } = useAppCopy();
 const student = useStudentSessionStore();
 
 const quizzes = ref<AvailabilityQuiz[]>([]);
@@ -84,14 +84,14 @@ async function load(): Promise<void> {
         const { data } = await availability(student.token ?? '');
         quizzes.value = data.quizzes;
     } catch {
-        error.value = t('student.dashboard.error');
+        error.value = ac('student.dashboard.error');
     } finally {
         loading.value = false;
     }
 }
 
 onMounted(() => {
-    setDocumentTitle(t('student.dashboard.yourQuiz'));
+    setDocumentTitle(ac('student.dashboard.yourQuiz'));
     void load();
 });
 
@@ -118,8 +118,8 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
         <div v-else-if="visibleQuizzes.length === 0" class="pt-7">
             <IconCalendar :size="40" :stroke-width="1.5" class="text-brand-palette-4/25" aria-hidden="true" />
 
-            <p class="mt-5 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ $t('public.app.noTests') }}</p>
-            <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-4/55">{{ $t('public.app.noTestsNote') }}</p>
+            <p class="mt-5 max-w-[19rem] text-[19px] leading-[1.45] tracking-[-0.02em]">{{ ac('public.app.noTests') }}</p>
+            <p class="mt-3 max-w-[20rem] text-[15px] leading-relaxed text-brand-palette-4/55">{{ ac('public.app.noTestsNote') }}</p>
 
             <div class="mt-7 grid gap-3 border-t border-brand-palette-4/14 pt-5">
                 <!-- 🪤 Practice only when the candidate is NOT in the contest
@@ -127,15 +127,15 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
                      exam is offering them the wrong thing to press. -->
                 <RouterLink v-if="student.mode !== 'competition'" :to="{ name: 'app.identify', params: { mode: 'sample' } }" :class="way">
                     <span>
-                        <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ $t('public.app.sample') }}</span>
-                        <span class="mt-0.5 block text-[0.79rem] leading-snug text-brand-palette-4/60">{{ $t('public.app.sampleWay') }}</span>
+                        <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ ac('public.app.sample') }}</span>
+                        <span class="mt-0.5 block text-[0.79rem] leading-snug text-brand-palette-4/60">{{ ac('public.app.sampleWay') }}</span>
                     </span>
                     <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
                 </RouterLink>
 
                 <RouterLink :to="{ name: 'app.results' }" :class="way">
                     <span>
-                        <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ $t('public.app.results') }}</span>
+                        <span class="block text-[1.02rem] font-semibold tracking-[-0.01em]">{{ ac('public.app.results') }}</span>
                         <i18n-t keypath="public.app.resultsNote" tag="span" class="mt-0.5 block text-[0.79rem] leading-snug text-brand-palette-4/60">
                             <template #competition><b class="font-semibold text-brand-palette-4">{{ $t('public.app.resultsCompetition') }}</b></template>
                             <template #sample><b class="font-semibold text-brand-palette-4">{{ $t('public.app.resultsSample') }}</b></template>
@@ -148,7 +148,7 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
 
         <div v-else class="space-y-12">
             <article v-for="quiz in visibleQuizzes" :key="quiz.id">
-                <p :class="mono" class="text-[10.5px] text-brand-palette-4/40">{{ $t('student.dashboard.yourQuiz') }}</p>
+                <p :class="mono" class="text-[10.5px] text-brand-palette-4/40">{{ ac('student.dashboard.yourQuiz') }}</p>
                 <h1 class="mt-1.5 text-[1.9rem] font-semibold leading-[1.04] tracking-[-0.04em]">{{ quiz.title }}</h1>
 
                 <section v-for="{ exam, ordinal: number } in roundsLatestFirst(quiz)" :key="exam.id" class="mt-8">
@@ -171,7 +171,7 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
                     </div>
 
                     <p v-if="exam.tests.length === 0" class="pt-3.5 text-sm text-brand-palette-4/45">
-                        {{ $t('student.dashboard.noTests') }}
+                        {{ ac('student.dashboard.noTests') }}
                     </p>
 
                     <div
@@ -214,7 +214,7 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
                             class="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-brand-palette-4 px-5 text-[15px] font-medium text-white transition hover:brightness-125"
                         >
                             <IconPlayerPlayFilled :size="15" />
-                            {{ test.status === 'in_progress' ? $t('student.dashboard.resume') : $t('student.dashboard.start') }}
+                            {{ test.status === 'in_progress' ? ac('student.dashboard.resume') : ac('student.dashboard.start') }}
                         </RouterLink>
 
                         <!-- A finished test. In practice it keeps its mark and
@@ -228,20 +228,20 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
 
                                 <p :class="[chip, mono]">
                                     <IconCheck :size="13" stroke-width="3" />
-                                    {{ $t('student.dashboard.completedLabel') }}
+                                    {{ ac('student.dashboard.completedLabel') }}
                                 </p>
 
                                 <!-- Sat, and not marked yet. The truth is that it
                                      is being marked, not that it has no score. -->
                                 <p v-if="!test.published" class="mt-1.5 text-[13px] text-brand-palette-4/60">
-                                    {{ $t('student.dashboard.awaitingResult') }}
+                                    {{ ac('student.dashboard.awaitingResult') }}
                                 </p>
                             </div>
 
                             <RouterLink
                                 v-if="test.retakeable"
                                 :to="{ name: 'student.test', params: { testId: test.id } }"
-                                :aria-label="t('student.dashboard.retake')"
+                                :aria-label="ac('student.dashboard.retake')"
                                 class="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-brand-palette-4/30 text-brand-palette-4 transition hover:bg-brand-palette-4/5"
                             >
                                 <IconRefresh :size="16" />
@@ -253,7 +253,7 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
                             :size="20"
                             :stroke-width="1.7"
                             role="img"
-                            :aria-label="t('student.dashboard.locked')"
+                            :aria-label="ac('student.dashboard.locked')"
                             class="shrink-0"
                         />
                     </div>
@@ -263,10 +263,10 @@ const way = 'grid grid-cols-[1fr_1.125rem] items-center gap-3 rounded-2xl border
                          would be a lie (owner, 2026-08-25). -->
                     <template v-if="quiz.mode === 'competition'">
                         <p v-if="exam.tests.some(isOpen)" class="pt-2.5 text-[14px] text-pretty text-brand-palette-4/45">
-                            {{ $t('student.dashboard.sequence') }}
+                            {{ ac('student.dashboard.sequence') }}
                         </p>
                         <p v-else-if="isAhead(exam)" class="pt-2.5 text-[14px] text-pretty text-brand-palette-4/45">
-                            {{ $t('student.dashboard.opensLater') }}
+                            {{ ac('student.dashboard.opensLater') }}
                         </p>
                     </template>
                 </section>

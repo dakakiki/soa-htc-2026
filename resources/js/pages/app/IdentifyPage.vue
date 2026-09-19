@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { IconArrowRight } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { listCountries } from '@/api/student';
 import { getSiteStatus } from '@/api/publicContent';
 import { apiErrorMessage } from '@/api/http';
@@ -40,7 +40,7 @@ import type { Country } from '@/types/models';
  */
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { ac } = useAppCopy();
 const student = useStudentSessionStore();
 
 const mode = computed<EntryMode>(() => {
@@ -52,10 +52,10 @@ const mode = computed<EntryMode>(() => {
 /** The name of the screen, which is the only place the stream is named. */
 const title = computed(() => {
     if (mode.value === 'competition') {
-        return t('public.app.titleCompetition');
+        return ac('public.app.titleCompetition');
     }
 
-    return mode.value === 'results' ? t('public.app.results') : t('public.app.titleSample');
+    return mode.value === 'results' ? ac('public.app.results') : ac('public.app.titleSample');
 });
 
 const countries = ref<Country[]>([]);
@@ -171,7 +171,7 @@ async function submit(): Promise<void> {
          * number that was right all along. A wrong exam password carries no
          * response of its own and falls back to it.
          */
-        error.value = apiErrorMessage(e, t('student.access.error'));
+        error.value = apiErrorMessage(e, ac('student.access.error'));
 
         return;
     } finally {
@@ -195,9 +195,9 @@ async function submit(): Promise<void> {
         <template v-if="shut">
             <span class="mt-8 block h-[3px] w-11 bg-brand-palette-2" aria-hidden="true"></span>
             <h1 class="mt-3 text-balance text-[1.75rem] font-semibold leading-[1.06] tracking-[-0.04em]">
-                {{ mode === 'competition' ? $t('student.access.shutCompetition') : $t('student.access.shutSample') }}
+                {{ mode === 'competition' ? ac('student.access.shutCompetition') : ac('student.access.shutSample') }}
             </h1>
-            <p class="mt-2.5 text-[0.94rem] leading-relaxed text-brand-palette-3">{{ $t('student.access.shutLead') }}</p>
+            <p class="mt-2.5 text-[0.94rem] leading-relaxed text-brand-palette-3">{{ ac('student.access.shutLead') }}</p>
 
             <div class="mt-6 grid gap-3">
                 <RouterLink
@@ -205,20 +205,20 @@ async function submit(): Promise<void> {
                     :to="{ name: 'app.identify', params: { mode: 'sample' } }"
                     class="rounded-2xl border border-white/20 bg-white/5 p-[1.125rem] text-[1.02rem] font-semibold transition hover:bg-white/10"
                 >
-                    {{ $t('student.access.shutTrySample') }}
+                    {{ ac('student.access.shutTrySample') }}
                 </RouterLink>
                 <RouterLink
                     :to="{ name: 'app.identify', params: { mode: 'results' } }"
                     class="rounded-2xl border border-white/20 bg-white/5 p-[1.125rem] text-[1.02rem] font-semibold transition hover:bg-white/10"
                 >
-                    {{ $t('student.access.shutCheckResults') }}
+                    {{ ac('student.access.shutCheckResults') }}
                 </RouterLink>
             </div>
         </template>
 
         <form v-else-if="streamOpen" id="identify" class="pt-1" @submit.prevent="submit">
             <h1 class="text-balance text-[1.75rem] font-semibold leading-[1.04] tracking-[-0.045em]">
-                {{ $t('public.app.details') }}
+                {{ ac('public.app.details') }}
             </h1>
 
             <div class="mt-4">
@@ -256,7 +256,7 @@ async function submit(): Promise<void> {
             <template v-if="mode === 'competition'">
                 <p class="mt-6 flex items-center gap-3 font-mono text-[9.5px] uppercase tracking-[0.14em] text-brand-palette-3/70">
                     <span class="h-px flex-1 bg-white/15"></span>
-                    {{ $t('public.app.competitionTest') }}
+                    {{ ac('public.app.competitionTest') }}
                     <span class="h-px flex-1 bg-white/15"></span>
                 </p>
 
@@ -274,7 +274,7 @@ async function submit(): Promise<void> {
                 </label>
 
                 <p class="mt-2.5 text-[0.78rem] leading-relaxed text-brand-palette-3/75">
-                    {{ $t('public.app.passwordHelper') }}
+                    {{ ac('public.app.passwordHelper') }}
                 </p>
             </template>
 
@@ -288,7 +288,7 @@ async function submit(): Promise<void> {
                 :disabled="loading || !canSubmit"
                 class="flex w-full items-center justify-center gap-2.5 rounded-full bg-brand-palette-2 p-[1.0625rem] text-base font-semibold text-brand-palette-4 transition hover:brightness-105 active:scale-[0.99] disabled:opacity-45"
             >
-                {{ loading ? $t('student.access.starting') : $t('public.app.continue') }}
+                {{ loading ? ac('student.access.starting') : ac('public.app.continue') }}
                 <IconArrowRight v-if="!loading" :size="17" :stroke-width="2.2" aria-hidden="true" />
             </button>
         </template>

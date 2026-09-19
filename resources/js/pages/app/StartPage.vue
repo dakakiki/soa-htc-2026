@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { IconBuildingEstate, IconChevronRight, IconSchool } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { getSiteStatus } from '@/api/publicContent';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppScreen from '@/components/app/AppScreen.vue';
@@ -33,6 +34,8 @@ import type { SiteStatus } from '@/types/models';
  * about who this is, and skipping the screen on the strength of it would leave
  * a child who picked wrong with no way back to the other card.
  */
+const { ac } = useAppCopy();
+
 const site = ref<SiteStatus | null>(null);
 
 onMounted(async () => {
@@ -67,10 +70,10 @@ const note = 'mt-0.5 block text-[0.8rem] leading-snug';
         <p :class="mono" class="mt-3.5 text-[10.5px] font-medium text-brand-palette-1">{{ $t('app.name') }}</p>
 
         <h1 class="mt-3 text-balance text-[2rem] font-semibold leading-[1.04] tracking-[-0.045em]">
-            {{ $t('public.app.who') }}
+            {{ ac('public.app.who') }}
         </h1>
 
-        <p class="mt-2.5 text-[0.94rem] leading-relaxed text-brand-palette-3">{{ $t('public.app.lead') }}</p>
+        <p class="mt-2.5 text-[0.94rem] leading-relaxed text-brand-palette-3">{{ ac('public.app.lead') }}</p>
 
         <div class="mt-7 grid gap-3.5">
             <RouterLink :to="{ name: 'app.student' }" :class="card" class="bg-brand-palette-2 text-brand-palette-4 hover:brightness-105">
@@ -78,8 +81,8 @@ const note = 'mt-0.5 block text-[0.8rem] leading-snug';
                     <IconSchool :size="24" :stroke-width="1.7" />
                 </span>
                 <span>
-                    <span :class="name">{{ $t('public.app.student') }}</span>
-                    <span :class="note" class="text-brand-palette-4/80">{{ $t('public.app.studentNote') }}</span>
+                    <span :class="name">{{ ac('public.app.student') }}</span>
+                    <span :class="note" class="text-brand-palette-4/80">{{ ac('public.app.studentNote') }}</span>
                 </span>
                 <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
             </RouterLink>
@@ -89,8 +92,8 @@ const note = 'mt-0.5 block text-[0.8rem] leading-snug';
                     <IconBuildingEstate :size="24" :stroke-width="1.7" />
                 </span>
                 <span>
-                    <span :class="name">{{ $t('public.app.coordinator') }}</span>
-                    <span :class="note" class="text-brand-palette-3">{{ $t('public.app.coordinatorNote') }}</span>
+                    <span :class="name">{{ ac('public.app.coordinator') }}</span>
+                    <span :class="note" class="text-brand-palette-3">{{ ac('public.app.coordinatorNote') }}</span>
                 </span>
                 <IconChevronRight :size="18" :stroke-width="2" aria-hidden="true" />
             </RouterLink>

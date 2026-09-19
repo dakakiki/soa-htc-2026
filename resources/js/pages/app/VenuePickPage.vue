@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { IconChevronRight } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import { coordinatorVenues, type CoordinatorSlice, type CoordinatorVenue } from '@/api/appCoordinator';
 import { setDocumentTitle } from '@/utils/documentTitle';
 import AppScreen from '@/components/app/AppScreen.vue';
@@ -24,12 +24,12 @@ import AppScreen from '@/components/app/AppScreen.vue';
  * may well have results — a row counted for the wrong question sends somebody
  * into an empty screen.
  */
-const { t } = useI18n();
+const { ac } = useAppCopy();
 const route = useRoute();
 
 const slice = computed(() => route.params.slice as CoordinatorSlice);
 
-const title = computed(() => t(({
+const title = computed(() => ac(({
     upcoming: 'public.app.wayUpcoming',
     running: 'public.app.wayRunning',
     published: 'public.app.wayResults',
@@ -93,11 +93,11 @@ const row = 'rise grid grid-cols-[1fr_auto_1.125rem] items-center gap-3 rounded-
 <template>
     <AppScreen :back="{ name: 'app.welcome' }" :title="title">
         <p class="mt-8 font-mono text-[10.5px] uppercase tracking-[0.16em] text-brand-palette-1">
-            {{ $t('public.app.countryCoordinator') }}
+            {{ ac('public.app.countryCoordinator') }}
         </p>
 
         <h1 class="mt-3 text-balance text-[1.75rem] font-semibold leading-[1.04] tracking-[-0.045em]">
-            {{ $t('public.app.whichVenue') }}
+            {{ ac('public.app.whichVenue') }}
         </h1>
 
         <label class="mt-5 block">
@@ -112,7 +112,7 @@ const row = 'rise grid grid-cols-[1fr_auto_1.125rem] items-center gap-3 rounded-
         </label>
 
         <p v-if="loading" class="py-8 text-center text-sm text-brand-palette-3">{{ $t('common.loading') }}</p>
-        <p v-else-if="venues.length === 0" class="py-8 text-sm text-brand-palette-3">{{ $t('public.app.noVenues') }}</p>
+        <p v-else-if="venues.length === 0" class="py-8 text-sm text-brand-palette-3">{{ ac('public.app.noVenues') }}</p>
 
         <div v-else class="mt-4 grid gap-2.5">
             <RouterLink

@@ -51,6 +51,7 @@ export default {
         menus: 'Menus',
         layout: 'Layout',
         notifications: 'Notifications',
+        mobile: 'Mobile',
         login: 'Login',
         logout: 'Logout',
         toggleMenu: 'Toggle navigation',
@@ -831,6 +832,26 @@ export default {
         laravel: 'Laravel',
         serverTime: 'Server time (UTC)',
         apiError: 'API is unavailable.',
+    },
+    /*
+     * Website → Mobile (ADR-0133): the installed application's own screens.
+     *
+     * 🔴 The screen labels and the field names are NOT here — they come from the
+     * server, out of the `AppScreens` registry, which is the same declaration
+     * the save is validated against. Two lists of the same screens would drift
+     * the first time one was edited.
+     */
+    mobile: {
+        title: 'Mobile',
+        subtitle: 'The words on the installed application\'s screens, one tab per screen. Every box is optional: left empty, the screen says what it says today.',
+        saved: 'Saved.',
+        error: 'The screens could not be loaded.',
+        saveFailed: 'This screen could not be saved.',
+        hint: 'Type to replace a line, or empty the box to put the original back. Each tab is saved on its own.',
+        original: 'Now:',
+        unsaved: 'not saved',
+        unsavedHere: 'This tab has changes that are not saved.',
+        overridden: '{n} of these are rewritten.',
     },
     notifications: {
         title: 'Notifications',

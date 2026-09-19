@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconSearch } from '@tabler/icons-vue';
+import { useAppCopy } from '@/composables/useAppCopy';
 import type { Country } from '@/types/models';
 
 /**
@@ -48,6 +49,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'update:modelValue', value: number | null): void }>();
 
 const { t } = useI18n();
+const { ac } = useAppCopy();
 
 const open = ref(false);
 const term = ref('');
@@ -219,7 +221,7 @@ onBeforeUnmount(() => {
             <div class="flex w-full max-w-[26rem] flex-col rounded-t-[24px] bg-[#fbfaf8] px-4 pb-6 pt-4 text-brand-palette-4" :style="panelStyle">
                 <button
                     type="button"
-                    :aria-label="t('public.app.close')"
+                    :aria-label="ac('public.app.close')"
                     class="mx-auto mb-3.5 h-1 w-10 shrink-0 rounded-full bg-brand-palette-4/20"
                     @click="hide"
                 ></button>
@@ -235,7 +237,7 @@ onBeforeUnmount(() => {
 
                 <ul class="mt-3 flex-1 overflow-y-auto">
                     <li v-if="matches.length === 0" class="px-1.5 py-5 text-sm text-brand-palette-4/55">
-                        {{ loading === true ? t('common.loading') : t('public.app.noCountry') }}
+                        {{ loading === true ? t('common.loading') : ac('public.app.noCountry') }}
                     </li>
                     <li v-for="country in matches" :key="country.id">
                         <button
