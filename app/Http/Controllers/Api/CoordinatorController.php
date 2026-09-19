@@ -281,6 +281,9 @@ class CoordinatorController extends Controller
 
         DB::transaction(function () use ($request, $coordinator, $data): void {
             $coordinator->update($data);
+            if (array_key_exists('status', $data)) {
+                $this->syncAssignmentStatus($coordinator, (string) $data['status']);
+            }
             if ($request->filled('role_id')) {
                 $this->syncCoordinator($coordinator, $request->integer('role_id'), $this->schoolIds($request));
             }
@@ -372,6 +375,40 @@ class CoordinatorController extends Controller
             'status' => 'active',
         ]);
         $assignment->schools()->sync($schoolIds);
+    }
+
+    /**
+     * The active-season coordinator role follows the switch on the person.
+     *
+     * 🔴 There are two `status` columns and they were drifting apart. The switch
+     * on this screen wrote `users.status`, which turns out to gate almost
+     * nothing — it does not even stop a sign-in. What actually turns a
+     * coordinator off is `season_user_assignments.status`: it is what
+     * {@see User::activeAssignments()} reads, so an inactive one leaves the
+     * person with no permissions at all, and it is what the message audience
+     * asks. That one had no screen, so once it went down nothing in the
+     * application could bring it back up.
+     *
+     * Measured on STAGE, 2026-09-19: one country coordinator sat at
+     * `users.status = active` with the assignment `inactive` — listed on this
+     * screen, invisible to Messages, and with the switch already up there was
+     * nothing left to pull. Now one switch means one thing (owner, 2026-09-19).
+     *
+     * 🪤 The ACTIVE season only. Past seasons are history: the person did hold
+     * that role then, and turning them off today does not unmake it.
+     */
+    private function syncAssignmentStatus(User $coordinator, string $status): void
+    {
+        $seasonId = SeasonContext::active()?->id;
+
+        if ($seasonId === null) {
+            return;
+        }
+
+        $coordinator->seasonAssignments()
+            ->where('season_id', $seasonId)
+            ->whereIn('role_id', $this->coordinatorRoleIds())
+            ->update(['status' => $status]);
     }
 
     /** @return Collection<int, int> */

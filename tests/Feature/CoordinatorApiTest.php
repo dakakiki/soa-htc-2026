@@ -161,6 +161,71 @@ class CoordinatorApiTest extends TestCase
             ->assertJsonPath('data.venues_count', 1);
     }
 
+    /**
+     * 🔴 One switch, one meaning. `users.status` gates almost nothing — it does
+     * not even stop a sign-in — while the assignment's own status is what
+     * User::activeAssignments() reads and what the message audience asks. They
+     * were drifting apart, and the second one had no screen to pull it back up
+     * (owner, 2026-09-19).
+     */
+    public function test_the_status_switch_reaches_the_role_in_the_active_season(): void
+    {
+        $school = School::first();
+        $created = $this->actingAs($this->admin())
+            ->postJson('/api/coordinators', [
+                'name' => 'Both Ends',
+                'email' => 'bothends@soahtc.test',
+                'password' => 'secret-password',
+                'country_id' => $school->country_id,
+                'role_id' => $this->roleId(SystemRole::SchoolCoordinator->value),
+                'school_ids' => [$school->id],
+            ])->json('data');
+
+        $assignment = ['id' => $created['assignment_id']];
+
+        $this->actingAs($this->admin())
+            ->putJson("/api/coordinators/{$created['id']}", ['status' => 'inactive'])->assertOk();
+        $this->assertDatabaseHas('season_user_assignments', $assignment + ['status' => 'inactive']);
+
+        $this->actingAs($this->admin())
+            ->putJson("/api/coordinators/{$created['id']}", ['status' => 'active'])->assertOk();
+        $this->assertDatabaseHas('season_user_assignments', $assignment + ['status' => 'active']);
+    }
+
+    /**
+     * The end the owner actually met: listed among coordinators, missing from the
+     * message audience, and the switch already up so there was nothing to pull.
+     */
+    public function test_switching_a_coordinator_back_on_returns_them_to_the_message_audience(): void
+    {
+        $school = School::first();
+        $created = $this->actingAs($this->admin())
+            ->postJson('/api/coordinators', [
+                'name' => 'Audience Coord',
+                'email' => 'audiencecoord@soahtc.test',
+                'password' => 'secret-password',
+                'country_id' => $school->country_id,
+                'role_id' => $this->roleId(SystemRole::SchoolCoordinator->value),
+                'school_ids' => [$school->id],
+            ])->json('data');
+
+        $named = fn (): bool => collect(
+            $this->actingAs($this->admin())
+                ->postJson('/api/messages/recipients/list', ['search' => 'Audience Coord'])
+                ->assertOk()->json('data')
+        )->contains('id', $created['id']);
+
+        $this->assertTrue($named(), 'a fresh coordinator should already be reachable');
+
+        $this->actingAs($this->admin())
+            ->putJson("/api/coordinators/{$created['id']}", ['status' => 'inactive'])->assertOk();
+        $this->assertFalse($named(), 'switched off, they should leave the audience');
+
+        $this->actingAs($this->admin())
+            ->putJson("/api/coordinators/{$created['id']}", ['status' => 'active'])->assertOk();
+        $this->assertTrue($named(), 'switched back on, they should return');
+    }
+
     public function test_admin_can_delete_a_coordinator(): void
     {
         $school = School::first();

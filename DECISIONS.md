@@ -4888,3 +4888,46 @@ Novi izvoz **nije napisao treću verziju**. Izvedba je izvučena u `App\Domain\A
 ExamOfAttempt`, panel sada zove nju, a izvoz isto. 🪤 `resetExport` je **ostavljen kako jeste** —
 menjanje bi promenilo zatečenu tabelu koju niko nije tražio da se menja; nesaglasnost je zapisana u
 docblock-u te klase da se ne otkrije po treći put.
+
+## ADR-0131 — Jedan prekidač „active", jedno značenje
+
+**Datum:** 2026-09-19 · **Status:** prihvaćeno
+
+> **Vlasnik, 19.09:** *„ako u delu coordinators potražim Davor (Serbia) pronađem country koordinatora
+> koji je aktivan. Kada to isto uradim u pretrazi na messages nema tog koordinatora? u čemu je problem?"*
+
+### Bila su dva „active", i ekran je pokazivao onaj slabiji
+
+Izmereno na STAGE-u, korisnik **#8 `davor test`**: `users.status = **active**`, a njegova uloga
+country koordinatora za sezonu 14 — `season_user_assignments.status = **inactive**`.
+
+| kolona | šta stvarno radi |
+| --- | --- |
+| `users.status` | 🪤 **skoro ništa.** Ne zaustavlja ni prijavu (`AuthController` je ne gleda). Jedino filter „status" na ekranu *Coordinators* |
+| `season_user_assignments.status` | **sve.** `User::activeAssignments()` je čita, pa ugašena znači **nijedna dozvola** u sezoni; `RecipientResolver` je čita, pa ugašena znači **nije u publici poruka** |
+
+Klizač na *Coordinators* pisao je **samo prvu**. Drugu je upisivalo na `active` jedino **dodeljivanje
+uloge iznova**, a gasio je jedino `AssignmentController` — koji **nema ekran**. Dakle: kad jednom
+padne, ništa u aplikaciji nije moglo da je digne. Davor je bio „aktivan", nedostupan porukama, i sa
+klizačem koji je već gore — nije imalo šta da se povuče.
+
+### Odluka
+
+**Klizač na *Coordinators* upisuje isto stanje na oba mesta** — na nalog i na koordinatorsku ulogu
+**u aktivnoj sezoni**. „Aktivan koordinator" znači aktivan svuda.
+
+🪤 **Samo aktivna sezona.** Prošle su istorija: čovek je tada stvarno držao ulogu, i gašenje danas to
+ne poništava.
+
+🪤 **Samo koordinatorske uloge** (`CoordinatorScope::ROLE_KEYS`). Ekran upravlja koordinatorima, pa
+nema posla sa administratorskom ulogom istog čoveka.
+
+⚡ **Zatečeni redovi se ne diraju migracijom.** Na STAGE-u je bio **tačno jedan** razilazeći red, a
+sada se popravlja sam: klizač dole pa gore. Migracija koja pogađa šta je neko *mislio* kad je ugasio
+ulogu pisala bi istoriju koju nema odakle da zna.
+
+### Zašto nije obrnuto rešeno (da *Coordinators* samo **prikaže** status uloge)
+
+Prikaz bi objasnio zašto je čovek nevidljiv, ali ga ne bi vratio — drugi prekidač i dalje ne bi imao
+gde da se povuče. A dva prekidača na jednom redu su pitanje „koji je pravi?" postavljeno svakom ko
+otvori ekran; ovde postoji tačan odgovor, pa ga nosi aplikacija a ne čovek.
