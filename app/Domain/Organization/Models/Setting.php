@@ -43,6 +43,15 @@ class Setting extends Model
         'cert_logo_path',
         'cert_signature_path',
         'cert_qr_path',
+        // The e-mail template (see MailBranding). Every one is an override:
+        // empty means "keep borrowing what the mail borrows today".
+        'mail_logo_path',
+        'mail_header_text',
+        'mail_greeting',
+        'mail_signoff',
+        'mail_footer_text',
+        'mail_footer_web',
+        'mail_footer_email',
         ...self::COLOR_KEYS,
     ];
 

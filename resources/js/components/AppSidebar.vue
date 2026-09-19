@@ -30,6 +30,7 @@ import {
     IconHistory,
     IconLayoutDashboard,
     IconLayoutRows,
+    IconMailCog,
     IconListCheck,
     IconLock,
     IconMail,
@@ -196,6 +197,8 @@ const nav: NavNode[] = [
             { label: t('nav.media'), icon: IconPhoto, to: 'cms.media', prefix: 'cms.media', perm: 'cms.manage' },
             { label: t('nav.menus'), icon: IconMenu2, to: 'cms.menus', prefix: 'cms.menus', perm: 'cms.manage' },
             { label: t('nav.layout'), icon: IconLayoutRows, to: 'cms.layout', prefix: 'cms.layout', perm: 'cms.manage' },
+            // 🪤 `settings.manage`, unlike its five neighbours — see the route.
+            { label: t('nav.notifications'), icon: IconMailCog, to: 'cms.notifications', prefix: 'cms.notifications', perm: 'settings.manage' },
         ],
     },
     // Messages to coordinators (2026-09-15). After the website and before

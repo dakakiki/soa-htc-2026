@@ -32,6 +32,14 @@ use Throwable;
  */
 class MailBranding
 {
+    /**
+     * What the letter opened and closed with before any of it was editable, kept
+     * as the default so an untouched installation sends the same mail it did.
+     */
+    public const DEFAULT_GREETING = 'Hello {name},';
+
+    public const DEFAULT_SIGNOFF = "Thanks,\n{site}";
+
     private ?Setting $setting = null;
 
     /** @var array<string, mixed>|null */
@@ -64,7 +72,12 @@ class MailBranding
     {
         $setting = $this->setting();
 
-        foreach ([$setting?->logo_dark_path, $setting?->logo_path, $setting?->logo_icon_path] as $path) {
+        // 🔴 The mail's OWN upload first (ADR-0132). It is the field that exists
+        // because of the rule below: an installation whose logos are all vector
+        // has nowhere else to put a raster, and this is that nowhere else.
+        $candidates = [$setting?->mail_logo_path, $setting?->logo_dark_path, $setting?->logo_path, $setting?->logo_icon_path];
+
+        foreach ($candidates as $path) {
             if (is_string($path) && $path !== '' && ! $this->isVector($path)) {
                 return Storage::disk('public')->url($path);
             }
@@ -93,12 +106,102 @@ class MailBranding
         return $title !== '' ? $title : (string) config('app.name', 'SOA HTC');
     }
 
-    /** The paragraph under the footer rule — admin-authored markup, as on the site. */
+    /**
+     * The name printed beside the logo.
+     *
+     * The mail's own wording when one is set, otherwise the site's — a masthead
+     * that has never been given words is still the competition's name.
+     */
+    public function headerText(): string
+    {
+        $own = trim((string) $this->setting()?->mail_header_text);
+
+        return $own !== '' ? $own : $this->title();
+    }
+
+    /**
+     * The line the letter opens with, addressed to $name.
+     *
+     * 🪤 `{name}` is substituted here and the whole line is the administrator's,
+     * so a greeting that does not use a name (or one written in a language that
+     * puts it elsewhere) is a matter of typing it that way.
+     */
+    public function greeting(?string $name): ?string
+    {
+        $line = trim((string) ($this->setting()?->mail_greeting ?? ''));
+
+        if ($line === '') {
+            $line = self::DEFAULT_GREETING;
+        }
+
+        return trim(str_replace('{name}', trim((string) $name), $line)) ?: null;
+    }
+
+    /**
+     * The line it closes with. `{site}` is the competition's name.
+     *
+     * Plain text rather than markup: it is two short lines at the end of a
+     * letter, and the view turns its newlines into breaks.
+     */
+    public function signOff(): ?string
+    {
+        $text = trim((string) ($this->setting()?->mail_signoff ?? ''));
+
+        if ($text === '') {
+            $text = self::DEFAULT_SIGNOFF;
+        }
+
+        return trim(str_replace('{site}', $this->title(), $text)) ?: null;
+    }
+
+    /**
+     * The paragraph under the footer rule — admin-authored markup, as on the site.
+     *
+     * 🔴 An OVERRIDE, not a replacement (ADR-0132). Left empty this still reads
+     * the website's own footer block, which is the promise ADR-0126 made: one
+     * wording, edited in one place, never drifting from the site. The field
+     * exists for the installation that wants the letter to say something the
+     * page does not — and the day it is cleared, the site's words come back.
+     */
     public function footerText(): ?string
     {
+        $own = trim((string) ($this->setting()?->mail_footer_text ?? ''));
+
+        if ($own !== '') {
+            return $own;
+        }
+
         $text = trim((string) ($this->footerBlock()['text'] ?? ''));
 
         return $text !== '' ? $text : null;
+    }
+
+    /** The website address printed in the foot of the letter, if one is set. */
+    public function footerWeb(): ?string
+    {
+        return trim((string) ($this->setting()?->mail_footer_web ?? '')) ?: null;
+    }
+
+    /** The address a recipient can write back to, if one is set. */
+    public function footerEmail(): ?string
+    {
+        return trim((string) ($this->setting()?->mail_footer_email ?? '')) ?: null;
+    }
+
+    /**
+     * The address as a link. A bare `soa-htc.org` is what an administrator types
+     * and not something a mail client will make clickable, so the scheme is put
+     * back on for the href while the printed text stays as typed.
+     */
+    public function footerWebUrl(): ?string
+    {
+        $web = $this->footerWeb();
+
+        if ($web === null) {
+            return null;
+        }
+
+        return preg_match('~^https?://~i', $web) === 1 ? $web : 'https://'.$web;
     }
 
     /**

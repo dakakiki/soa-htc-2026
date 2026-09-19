@@ -8,17 +8,12 @@
     and a personal one needs to know which of them the account is under, and
     being told costs nothing: whoever is reading this mail already has it.
 --}}
-<x-mail::message>
+<x-mail::message :greet="$name">
 # Set a new password
-
-Hello {{ $name }},
 
 Somebody asked to set a new password for **{{ $email }}** on {{ $siteName }}. Use the button below and choose one.
 
 <x-mail::button :url="$resetUrl">Set a new password</x-mail::button>
 
 The link works once and stops working in {{ $minutes }} minutes. If you did not ask for it, you do not have to do anything — your password has not changed.
-
-Thanks,<br>
-{{ $siteName }}
 </x-mail::message>

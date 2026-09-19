@@ -210,6 +210,121 @@ class MailTemplateTest extends TestCase
         $this->assertSame(0, $queries, 'the header is rendered once per recipient; it must not ask again');
     }
 
+    // ---- the template's own settings (ADR-0132) ----
+
+    /**
+     * 🔴 The reason the field exists. Both of the site's logos may be vectors,
+     * which a mail cannot draw at all, so the mail's own upload is the only
+     * raster in the building — and it has to beat them.
+     */
+    public function test_the_mails_own_logo_beats_the_ones_the_site_uploaded(): void
+    {
+        Setting::current()->update([
+            'logo_dark_path' => 'branding/site-dark.png',
+            'mail_logo_path' => 'branding/for-the-mail.png',
+        ]);
+
+        $html = $this->render();
+
+        $this->assertStringContainsString('for-the-mail.png', $html);
+        $this->assertStringNotContainsString('site-dark.png', $html);
+    }
+
+    /** 🪤 And the skip still applies to it: an SVG here is a hole for most readers. */
+    public function test_a_vector_uploaded_for_the_mail_is_skipped_like_any_other(): void
+    {
+        Setting::current()->update([
+            'logo_path' => 'branding/site.png',
+            'mail_logo_path' => 'branding/for-the-mail.svg',
+        ]);
+
+        $html = $this->render();
+
+        $this->assertStringNotContainsString('for-the-mail.svg', $html);
+        $this->assertStringContainsString('site.png', $html);
+    }
+
+    public function test_the_mails_own_header_text_beats_the_site_title(): void
+    {
+        Setting::current()->update([
+            'site_title' => '<p>Hippo the Contest</p>',
+            'mail_header_text' => 'Hippo — official mail',
+            'color_palette_4' => '#012b44',
+        ]);
+
+        $this->assertSame('Hippo — official mail', $this->headerTitle($this->render()));
+    }
+
+    /** Untouched, the letter opens and closes exactly as it did before any of this. */
+    public function test_an_untouched_template_greets_and_signs_off_the_way_it_always_did(): void
+    {
+        Setting::current()->update(['site_title' => 'Hippo the Contest']);
+
+        $html = $this->render();
+
+        $this->assertStringContainsString('Hello Ana,', $html);
+        $this->assertStringContainsString('Thanks,', $html);
+        $this->assertStringContainsString('Hippo the Contest', $html);
+    }
+
+    public function test_the_greeting_and_the_sign_off_are_the_administrations_words(): void
+    {
+        Setting::current()->update([
+            'site_title' => 'Hippo the Contest',
+            'mail_greeting' => 'Dear {name},',
+            'mail_signoff' => "Warm regards,\nThe {site} team",
+        ]);
+
+        $html = $this->render();
+
+        $this->assertStringContainsString('Dear Ana,', $html);
+        $this->assertStringNotContainsString('Hello Ana,', $html);
+        // 🪤 The newline has to survive as a break, or the sign-off is one line.
+        $this->assertStringContainsString('Warm regards,<br>', $html);
+        $this->assertStringContainsString('The Hippo the Contest team', $html);
+    }
+
+    public function test_the_footer_address_and_mailbox_are_printed_and_linked(): void
+    {
+        Setting::current()->update([
+            'mail_footer_web' => 'soa-htc.org',
+            'mail_footer_email' => 'info@soa-htc.org',
+        ]);
+
+        $html = $this->render();
+
+        // Typed without a scheme, linked with one.
+        $this->assertStringContainsString('href="https://soa-htc.org"', $html);
+        $this->assertStringContainsString('href="mailto:info@soa-htc.org"', $html);
+    }
+
+    public function test_nothing_is_printed_where_no_address_was_given(): void
+    {
+        $html = $this->render();
+
+        $this->assertStringNotContainsString('mailto:', $html);
+    }
+
+    /**
+     * 🔴 The promise ADR-0126 made, kept. The field is an override: filled it
+     * wins, emptied the website's own footer comes back — so the two can only
+     * differ because somebody decided they should.
+     */
+    public function test_the_footer_paragraph_is_an_override_of_the_websites_own(): void
+    {
+        $this->footerBlock(['text' => 'Written on the website.']);
+
+        $this->assertStringContainsString('Written on the website.', $this->render());
+
+        Setting::current()->update(['mail_footer_text' => 'Written for the letter.']);
+        $html = $this->render();
+        $this->assertStringContainsString('Written for the letter.', $html);
+        $this->assertStringNotContainsString('Written on the website.', $html);
+
+        Setting::current()->update(['mail_footer_text' => '']);
+        $this->assertStringContainsString('Written on the website.', $this->render());
+    }
+
     /**
      * The words beside the logo: the text of the span the header draws in the
      * brand colour. Null when this template is not the one that rendered.
@@ -237,6 +352,12 @@ class MailTemplateTest extends TestCase
 
     private function render(): string
     {
+        // 🪤 A fresh reader per render. MailBranding is a singleton that memoises
+        // the settings row — right for one send, where four hundred headers must
+        // not be four hundred queries, and wrong for a test that renders, changes
+        // a setting and renders again. Each call here stands for a separate send.
+        app()->forgetInstance(MailBranding::class);
+
         $message = new Message([
             'subject' => 'Entry closes on 20 September',
             'body' => 'Every child needs a candidate number.',

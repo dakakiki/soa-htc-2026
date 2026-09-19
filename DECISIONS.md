@@ -4931,3 +4931,68 @@ ulogu pisala bi istoriju koju nema odakle da zna.
 Prikaz bi objasnio zašto je čovek nevidljiv, ali ga ne bi vratio — drugi prekidač i dalje ne bi imao
 gde da se povuče. A dva prekidača na jednom redu su pitanje „koji je pravi?" postavljeno svakom ko
 otvori ekran; ovde postoji tačan odgovor, pa ga nosi aplikacija a ne čovek.
+
+## ADR-0132 — Website → Notifications: mejl šablon dobija svoja podešavanja
+
+**Datum:** 2026-09-19 · **Status:** prihvaćeno
+
+> **Vlasnik, 19.09:** *„u delu website dodaj novi link za «Notifications» tu će se ređati templejti za
+> notifikacije. prvi tab neka bude ovaj mail template. postavi opcije: header: za upload slike i ispis
+> teksta pored logotipa; body:; footer: web adresa, email, text"*
+>
+> i, na pitanje šta se podešava pod „body": **pozdrav i potpis oko poruke**.
+
+### Do sada je mejl sve pozajmljivao
+
+Logo iz *Settings → Theme*, ime pored njega iz `site_title`, pasus u podnožju iz istog CMS bloka koji
+crta i podnožje sajta. To je bilo tačno dok nije bilo šta da se odluči — ali **logo koji mejl ne ume
+da nacrta je prazno zaglavlje**, a podnožje sajta nema polje za kontakt adresu.
+
+### Odluka: sedam polja, i svako je NADJAČAVANJE
+
+Sve kolone su na `settings` singleton-u i sve su prazne po podrazumevanom. 🔴 **Prazno polje ne znači
+prazan mejl** — znači „i dalje pozajmi". Instalacija koja nikad ne otvori ovaj ekran šalje **potpuno
+isti mejl** kao pre.
+
+| polje | šta nadjačava |
+| --- | --- |
+| `mail_logo_path` | logo iz Theme-a — 🔴 **raster obavezno**, i pri proveri i pri čitanju |
+| `mail_header_text` | `site_title` |
+| `mail_greeting` | `Hello {name},` |
+| `mail_signoff` | `Thanks,\n{site}` |
+| `mail_footer_text` | tekst iz CMS bloka `public.footer` |
+| `mail_footer_web`, `mail_footer_email` | **ništa** — ta dva nisu postojala nigde |
+
+### Podnožje ostaje nadjačavanje, ne zamena (ublažava ADR-0126)
+
+ADR-0126 je namerno vezao podnožje mejla za blok sajta, da se dve formulacije nikad ne raziđu. Novo
+polje **ne kida** to obećanje: prazno — čita se sajt; popunjeno — čita se ono; obrisano — sajt se
+vraća. Dakle dve formulacije mogu da se razlikuju **samo zato što je neko tako odlučio**, nikad slučajno.
+
+### Pozdrav i potpis su izašli iz pisama u omotač
+
+Sva četiri pisma su svako za sebe pisala `Hello {name},` i `Thanks, {site}` — četiri mesta za izmenu i
+četiri prilike da sledeće napiše nešto treće. Sada ih nosi `message.blade.php`, a pismo samo kaže
+**koga** pozdravlja (`:greet="$name"`). Podrazumevane vrednosti su doslovno ono što je pisalo do sada.
+
+### Tekst je pored loga, ne ispod
+
+Bila je **jedna** ćelija sa slikom i tekstom, pa ih je `display: block` slagao jedno ispod drugog —
+dok je komentar iznad tvrdio „beside". Sada su **dve ćelije u istom redu**, a linija ispod ima
+`colspan` koji prati red iznad.
+
+### Zamke koje su usput izašle
+
+🪤 **`MailBranding` je singleton i pamti red.** Ispravno za slanje — četiri stotine zaglavlja ne smeju
+biti četiri stotine upita — a **pogrešno za odgovor na snimanje** i za test koji dva puta crta. Zato
+kontroler pravi **svež** primerak za odgovor, a test zaboravlja instancu pre svakog crtanja.
+
+🪤 **`{name}` u prevodima nije tekst.** vue-i18n ga čita kao promenljivu i ispisao bi prazno; u `en.ts`
+ide kao `{'{name}'}`.
+
+🪤 **Ekran je u grupi Website ali traži `settings.manage`**, za razliku od svih pet suseda
+(`cms.manage`). Vrednosti su na `settings` redu i `SettingPolicy` čuva upis — link pod slabijom
+dozvolom bio bi link koji na Save vraća 403.
+
+🪤 **Push nema ništa od ovoga.** Obaveštenje na telefonu crta operativni sistem. Zato se tab zove
+**„E-mail template"**, a ne „Notification".
