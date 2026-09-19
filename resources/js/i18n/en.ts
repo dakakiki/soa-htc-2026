@@ -1928,7 +1928,7 @@ export default {
     },
     export: {
         title: 'Export results',
-        subtitle: 'Download published results. Filter the population, then export the wide results sheet — or, for one test, a per-question answers sheet.',
+        subtitle: 'Download published results. Filter the population, then export the wide results sheet — or, for one test, a per-question answers sheet, or everything sat inside a time interval.',
         filters: 'Filters',
         country: 'Country',
         region: 'Region',
@@ -1942,6 +1942,12 @@ export default {
         allHint: 'Wide sheet — one row per competitor, scores per round and the S/Q/F advancement codes (from published results).',
         answers: 'Export with answers',
         answersHint: 'One row per competitor for the chosen test, with each question’s response. In-app only; requires a quiz, exam and test.',
+        activity: 'Export activity',
+        activityHint: 'One row per attempt started in the interval — who sat which quiz, exam and test, when they started and finished, and the grade once it has been published. The filters above apply; the interval is this sheet’s alone.',
+        interval: 'Time interval',
+        from: 'From',
+        to: 'To',
+        clockNote: 'Times are on your own clock.',
         working: 'Preparing…',
     },
     publishing: {

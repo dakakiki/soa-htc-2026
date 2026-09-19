@@ -437,9 +437,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('results/import/options', [ResultsController::class, 'importOptions']);
     Route::get('results/import/template', [ResultsController::class, 'importTemplate']);
     Route::post('results/import', [ResultsController::class, 'import']);
-    // Results export (all from Layer B, with-answers from Layer A). Gated by results.manage.
+    // Results export (all from Layer B, with-answers and activity from Layer A).
+    // Gated by results.manage.
     Route::get('results/export', [ResultsController::class, 'exportResults']);
     Route::get('results/export-answers', [ResultsController::class, 'exportResultsWithAnswers']);
+    Route::get('results/export-activity', [ResultsController::class, 'exportActivity']);
 
     /*
      * Monitoring — User log. Who got in and what they did to the authority

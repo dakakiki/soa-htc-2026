@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Assessment\Models\DifficultyCategory;
+use App\Domain\Assessment\Support\ExamOfAttempt;
 use App\Domain\Assessment\Support\SampleRound;
 use App\Domain\Audit\Support\AuditTrail;
 use App\Domain\Competition\Models\Attempt;
@@ -525,39 +526,15 @@ class RegistrationController extends Controller
     /**
      * The exam each attempt sat under, keyed "quizId:testId".
      *
-     * An attempt records the quiz and the test but not the exam between them, so
-     * it is recovered from the two pivots: the exam that belongs to that quiz and
-     * carries that test. A test reused across two exams of one quiz resolves to
-     * the earlier one by the quiz's own ordering, which is the one the competitor
-     * met first.
-     *
      * @param  Collection<int, Attempt>  $attempts
      * @return array<string, string>
      */
     private function examTitlesFor($attempts): array
     {
-        $quizIds = $attempts->pluck('quiz_id')->filter()->unique()->all();
-        $testIds = $attempts->pluck('test_id')->filter()->unique()->all();
-
-        if ($quizIds === [] || $testIds === []) {
-            return [];
-        }
-
-        $rows = DB::table('exam_quiz')
-            ->join('exam_test', 'exam_test.exam_id', '=', 'exam_quiz.exam_id')
-            ->join('exams', 'exams.id', '=', 'exam_quiz.exam_id')
-            ->whereIn('exam_quiz.quiz_id', $quizIds)
-            ->whereIn('exam_test.test_id', $testIds)
-            ->orderBy('exam_quiz.position')
-            ->select(['exam_quiz.quiz_id', 'exam_test.test_id', 'exams.title'])
-            ->get();
-
-        $map = [];
-        foreach ($rows as $row) {
-            $map[$row->quiz_id.':'.$row->test_id] ??= $row->title;
-        }
-
-        return $map;
+        return ExamOfAttempt::titlesFor(
+            $attempts->pluck('quiz_id')->filter()->unique()->values()->all(),
+            $attempts->pluck('test_id')->filter()->unique()->values()->all(),
+        );
     }
 
     public function show(Registration $registration): RegistrationResource

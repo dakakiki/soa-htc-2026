@@ -4818,3 +4818,73 @@ dodir daleko — kartice su bile **druga kopija ekrana koji već postoji**, na e
 je pisao tri reda prijave za jedan povratak (ADR-0128). Vraćanje kartica vraća i taj poziv.
 
 Otpali su i stringovi `fromOrganiser` i `dismiss`, koji posle ovoga nemaju ko da ih ispiše.
+
+## ADR-0130 — Treći izvoz: ko je radio u zadatom intervalu
+
+**Datum:** 2026-09-19 · **Status:** prihvaćeno
+
+> **Vlasnik, 19.09:** *„treći izveštaj treba da obuhvati vremenski period koji user odabere […]
+> Export treba da sadrži ko je radio u definisanom periodu (uzimajući u obzir i ostale filtere)"*
+>
+> pa, kad je predloženo da interval stoji u zajedničkom bloku filtera:
+> *„da se ne diraju postojeći izveštaji. da se time interval od – do doda u 3 card. Tako da važi
+> samo za taj 3 export."*
+>
+> i: *„ocena se prikazuje samo ako je objavljena"*, *„i možeš da dodaš i vreme"*
+
+### Interval ne može da stoji u zajedničkom bloku — ne zato što bi smetao, nego zato što ne postoji
+
+Prva dva izvoza čitaju **Layer B** (`registration_results`), a ta tabela **nema nijedno vreme**.
+Pitanje „ko je radio između ova dva trenutka" njoj se ne može postaviti. Da je interval ostao gore,
+jedan isti filter bi za dve od tri kartice **ne značio ništa** — a broj ili filter koji ne meri ono
+što mu ime kaže je greška koju je ovaj projekat već platio (ADR-0084, ADR-0107).
+
+Zato interval živi **u trećoj kartici**, a gornji blok (country · region · venue · level · quiz ·
+exam · test) i dalje važi za sva tri izvoza. Vlasnikova odluka i tehnička granica su se ovde poklopile.
+
+### Prozor je na `started_at`
+
+`started_at` je **jedina kolona koja nikad nije prazna** — `submitted_at` je `null` dok se traje, a
+`published_at` dok se ne objavi. Zato svaki pokušaj pada u **tačno jedan** interval, uključujući i
+onaj koji se upravo radi. Pokušaj započet pre `from` a predat unutar intervala vodi se pod **kad je
+počeo**, što je i obično čitanje pitanja „ko je radio tih dana".
+
+🪤 Nijedan indeks ne pokriva `started_at` sam; najbliži je `attempts_turnout_index`. Na 184.389
+redova uporediv pun prolaz je izmeren na **168 ms** (vidi migraciju `2026_09_17_140000`), pa je
+ostavljeno bez novog indeksa dok se ne pokaže da treba.
+
+### Ocena se ispisuje tek kad je objavljena
+
+🔴 **Vlasnikovo pravilo.** Završen pokušaj ima `score` **čim ocenjivanje završi**, mnogo pre nego što
+iko odluči da se ocene puste. Tabela koja bi ga ispisala bila bi put kojim ocena izlazi ranije nego
+što je odlučeno. Uslov je `published_at` na samom pokušaju, ne status ocenjivanja.
+
+⚠️ Postojeći izvoz „with answers" ovo pravilo **nema** — on ispisuje `score` bez obzira na objavu.
+Nije dirano: to je zaseban ekran i zasebna odluka, i menjanje zatečenog ponašanja nije traženo.
+
+### Vreme je na satu onoga ko gleda
+
+Polja su `datetime-local`, pa idu kroz `fromLocalInput()` — pravilo koje čuva `PickersKeepLocalTimeTest`
+i koje je uvedeno jer je administrator koji bira 08:00 u Beogradu upisivao 08:00 UTC, dakle **deset
+sati po njemu**. Pregledač uz interval šalje i svoju zonu (`tz`, IANA ime), pa server ispisuje
+`Start time` i `End time` **na čitaočevom satu** — isto što pokazuju i ekrani. Kroz IANA ime, a ne
+kroz razliku u minutima, jer razlika ne zna za letnje računanje vremena.
+
+### Kolona `Practice`
+
+Vlasnikov spisak kolona je ispoštovan redom; dodata je samo **`Practice`** na kraju. „Ko je radio" je
+pitanje o aktivnosti, i dete koje je izašlo na probni ispit **jeste radilo** — ali proba i takmičenje
+nisu jedna populacija (ADR-0084), pa kolona drži granicu vidljivom umesto da je sabije. Granica je
+`SampleRound::testIds()`, isto mesto kao svuda — **runda**, ne tip kviza i ne `attempts.is_practice`.
+
+### `ExamOfAttempt` — jedan dom za izvođenje ispita
+
+Pokušaj pamti `quiz_id` i `test_id`, ali **ne i `exam_id`**. Ispit se izvodi iz dva pivota, i to je do
+sada bilo napisano **dvaput različito**: panel „Exams taken" ređa po `exam_quiz.position` i uzima kviz
+u obzir, a `resetExport` ređa po `exam_test.position` i kviz ignoriše. Na današnjem sadržaju se slažu;
+na testu koji je u dva ispita — ne.
+
+Novi izvoz **nije napisao treću verziju**. Izvedba je izvučena u `App\Domain\Assessment\Support\
+ExamOfAttempt`, panel sada zove nju, a izvoz isto. 🪤 `resetExport` je **ostavljen kako jeste** —
+menjanje bi promenilo zatečenu tabelu koju niko nije tražio da se menja; nesaglasnost je zapisana u
+docblock-u te klase da se ne otkrije po treći put.

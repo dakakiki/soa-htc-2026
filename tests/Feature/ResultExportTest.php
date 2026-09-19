@@ -21,6 +21,7 @@ use App\Domain\Organization\Models\Season;
 use App\Models\User;
 use App\Support\XlsxReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -229,5 +230,194 @@ class ResultExportTest extends TestCase
         $this->getJson('/api/results/export')->assertUnauthorized();
         $this->actingAs(User::factory()->create())->getJson('/api/results/export')->assertForbidden();
         $this->actingAs(User::factory()->create())->getJson('/api/results/export-answers')->assertForbidden();
+        $this->actingAs(User::factory()->create())->getJson('/api/results/export-activity')->assertForbidden();
+    }
+
+    // ---- activity export (ADR-0130) ----
+
+    /**
+     * One attempt for $reg at $content, started at $startedAt.
+     *
+     * @param  array{quiz: Quiz, exam: Exam, test: Test}  $content
+     */
+    private function attempt(Registration $r, array $content, string $startedAt, array $overrides = []): Attempt
+    {
+        return Attempt::create(array_merge([
+            'registration_id' => $r->id, 'quiz_id' => $content['quiz']->id, 'test_id' => $content['test']->id,
+            'status' => 'completed', 'score' => 7.0, 'max_score' => 10, 'grading_status' => 'auto_graded',
+            'started_at' => $startedAt,
+            'expires_at' => Carbon::parse($startedAt)->addMinutes(30),
+            'submitted_at' => Carbon::parse($startedAt)->addMinutes(20),
+            'published_at' => now(), 'channel' => 'web',
+        ], $overrides));
+    }
+
+    /** Rows of the activity sheet keyed by Student ID, plus the header row. */
+    private function activity(string $query): array
+    {
+        $rows = $this->parse($this->actingAs($this->admin())
+            ->get('/api/results/export-activity?'.$query)->assertOk()->getContent());
+
+        return [$rows[0], collect($rows)->skip(1)->keyBy(0)->all()];
+    }
+
+    public function test_activity_export_lists_only_attempts_started_inside_the_interval(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $inside = $this->registration();
+        $before = $this->registration();
+        $after = $this->registration();
+
+        $this->attempt($inside, $c, '2026-09-10 09:00:00');
+        $this->attempt($before, $c, '2026-09-09 23:59:59');
+        $this->attempt($after, $c, '2026-09-11 00:00:01');
+
+        [$header, $rows] = $this->activity('from=2026-09-10T00:00:00Z&to=2026-09-10T23:59:59Z');
+
+        $this->assertSame([
+            'Student ID', 'Name', 'Country', 'Venue', 'Difficulty level',
+            'Quiz', 'Exam', 'Test', 'Start time', 'End time', 'Grade', 'Practice',
+        ], $header);
+
+        $this->assertArrayHasKey($inside->competitor_number, $rows);
+        $this->assertArrayNotHasKey($before->competitor_number, $rows);
+        $this->assertArrayNotHasKey($after->competitor_number, $rows);
+
+        // 🪤 The same window written with an offset instead of Z. A Carbon is bound
+        // by formatting it in its own zone, so without ->utc() this reads 10:00-11:00
+        // UTC and the 09:00 attempt vanishes.
+        [, $offset] = $this->activity('from=2026-09-10T11:00:00%2B02:00&to=2026-09-10T13:00:00%2B02:00');
+        $this->assertArrayHasKey($inside->competitor_number, $offset);
+    }
+
+    public function test_activity_export_names_the_quiz_exam_and_test_of_each_attempt(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+        $this->attempt($reg, $c, '2026-09-10 09:00:00');
+
+        [$header, $rows] = $this->activity('from=2026-09-10T00:00:00Z&to=2026-09-10T23:59:59Z');
+        $row = $rows[$reg->competitor_number];
+
+        $this->assertSame('CQ', $row[$this->col($header, 'Quiz')]);
+        $this->assertSame('E Preliminary round', $row[$this->col($header, 'Exam')]);
+        $this->assertSame('Reading', $row[$this->col($header, 'Test')]);
+        $this->assertSame('H2', $row[$this->col($header, 'Difficulty level')]);
+        $this->assertSame('No', $row[$this->col($header, 'Practice')]);
+        $this->assertNotSame('', $row[$this->col($header, 'Venue')]);
+    }
+
+    /**
+     * 🔴 The owner's rule (2026-09-19): a grade appears once it is published. A
+     * completed attempt carries a score the moment grading finishes, and this
+     * sheet must not be the way a mark gets out early.
+     */
+    public function test_activity_export_shows_the_grade_only_once_it_is_published(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $shown = $this->registration();
+        $hidden = $this->registration();
+
+        $this->attempt($shown, $c, '2026-09-10 09:00:00');
+        $this->attempt($hidden, $c, '2026-09-10 09:00:00', ['published_at' => null]);
+
+        [$header, $rows] = $this->activity('from=2026-09-10T00:00:00Z&to=2026-09-10T23:59:59Z');
+        $grade = $this->col($header, 'Grade');
+
+        $this->assertSame('7', $rows[$shown->competitor_number][$grade]);
+        $this->assertSame('', $rows[$hidden->competitor_number][$grade]);
+    }
+
+    /** Someone still working is someone who worked: the row is there, the end is not. */
+    public function test_activity_export_carries_an_unfinished_attempt_with_no_end_and_no_grade(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+        $this->attempt($reg, $c, '2026-09-10 09:00:00', [
+            'status' => 'in_progress', 'submitted_at' => null, 'score' => null,
+            'grading_status' => null, 'published_at' => null,
+        ]);
+
+        [$header, $rows] = $this->activity('from=2026-09-10T00:00:00Z&to=2026-09-10T23:59:59Z');
+        $row = $rows[$reg->competitor_number];
+
+        $this->assertNotSame('', $row[$this->col($header, 'Start time')]);
+        $this->assertSame('', $row[$this->col($header, 'End time')]);
+        $this->assertSame('', $row[$this->col($header, 'Grade')]);
+    }
+
+    /** A reset attempt is gone as far as every screen is concerned (ADR-0022). */
+    public function test_activity_export_leaves_out_a_reset_attempt(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+        $this->attempt($reg, $c, '2026-09-10 09:00:00', ['status' => 'void']);
+
+        [, $rows] = $this->activity('from=2026-09-10T00:00:00Z&to=2026-09-10T23:59:59Z');
+
+        $this->assertArrayNotHasKey($reg->competitor_number, $rows);
+    }
+
+    /** 🪤 The ROUND's is_sample, which is the one home for the boundary (ADR-0084). */
+    public function test_activity_export_marks_a_practice_attempt(): void
+    {
+        $sample = $this->content('Sample', 'Reading');
+        $reg = $this->registration();
+        $this->attempt($reg, $sample, '2026-09-10 09:00:00');
+
+        [$header, $rows] = $this->activity('from=2026-09-10T00:00:00Z&to=2026-09-10T23:59:59Z');
+
+        $this->assertSame('Yes', $rows[$reg->competitor_number][$this->col($header, 'Practice')]);
+    }
+
+    public function test_activity_export_honours_the_population_filters(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $rs = School::firstOrFail();
+        $mk = School::create([
+            'country_id' => Country::where('code', 'MK')->value('id'),
+            'name' => 'MK School', 'status' => 'active',
+        ]);
+
+        $rsReg = $this->registration($rs);
+        $mkReg = $this->registration($mk);
+        $this->attempt($rsReg, $c, '2026-09-10 09:00:00');
+        $this->attempt($mkReg, $c, '2026-09-10 09:00:00');
+
+        [, $rows] = $this->activity(
+            'from=2026-09-10T00:00:00Z&to=2026-09-10T23:59:59Z&country_id='.$rs->country_id
+        );
+
+        $this->assertArrayHasKey($rsReg->competitor_number, $rows);
+        $this->assertArrayNotHasKey($mkReg->competitor_number, $rows);
+    }
+
+    /** The hours printed are the reader's, not the UTC the application stores. */
+    public function test_activity_export_prints_the_times_on_the_readers_clock(): void
+    {
+        $c = $this->content('Preliminary round', 'Reading');
+        $reg = $this->registration();
+        $this->attempt($reg, $c, '2026-09-10 09:00:00');
+
+        [$header, $rows] = $this->activity(
+            'from=2026-09-10T00:00:00Z&to=2026-09-10T23:59:59Z&tz=Europe/Belgrade'
+        );
+        $row = $rows[$reg->competitor_number];
+
+        // 09:00 UTC is 11:00 in Belgrade in September, and the attempt ran 20 minutes.
+        $this->assertSame('2026-09-10 11:00:00', $row[$this->col($header, 'Start time')]);
+        $this->assertSame('2026-09-10 11:20:00', $row[$this->col($header, 'End time')]);
+    }
+
+    public function test_activity_export_requires_an_interval_that_runs_forwards(): void
+    {
+        $this->actingAs($this->admin())->getJson('/api/results/export-activity')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['from', 'to']);
+
+        $this->actingAs($this->admin())
+            ->getJson('/api/results/export-activity?from=2026-09-11T00:00:00Z&to=2026-09-10T00:00:00Z')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['to']);
     }
 }
