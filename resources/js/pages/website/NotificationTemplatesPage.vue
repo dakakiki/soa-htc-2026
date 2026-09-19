@@ -11,9 +11,11 @@
  *
  * 🪤 Built as the Layout screen's editor is built, and not as a stack of cards:
  * one white card, fields in a column, sections told apart by a rule, and Cancel
- * left / Save right on a bar of its own with Cancel dead until something has
- * changed. A second shape for the same job is a screen that reads as somebody
- * else's (owner, 2026-09-19).
+ * left / Save right on a bar of its own. A second shape for the same job is a
+ * screen that reads as somebody else's (owner, 2026-09-19).
+ *
+ * The one place it departs from that editor is Cancel, which is always live
+ * here — see the button.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -60,7 +62,11 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 const saved = ref(false);
 
-/** What was last saved, so Cancel can be dead until there is something to undo. */
+/**
+ * What was last saved. Not for greying Cancel out — it is always live — but so
+ * the green "Saved." band goes away the moment the form stops describing what
+ * was saved. A confirmation still standing over an edited form is a lie.
+ */
 const snapshot = (): string => JSON.stringify(fields) + (logoFile.value?.name ?? '');
 const savedState = ref(snapshot());
 const dirty = computed(() => snapshot() !== savedState.value);
@@ -254,10 +260,15 @@ onMounted(load);
                     </div>
                 </div>
 
-                <!-- Cancel left, Save right, as on every other form. Cancel is
-                     dead until something has changed, and says so. -->
+                <!-- Cancel left, Save right, as on every other form.
+                     🪤 Always live, unlike the Layout editor's (owner,
+                     2026-09-19). There it sits in a modal, where a dead button
+                     still reads as "nothing to undo"; on a tab it reads as
+                     broken, and the owner read it that way within a minute of
+                     seeing it. Clicking it with nothing changed simply reloads
+                     what is stored, which is what it says it does. -->
                 <div v-if="canManage" class="flex items-center justify-between border-t border-gray-200 px-6 py-4">
-                    <button type="button" :disabled="saving || !dirty"
+                    <button type="button" :disabled="saving"
                         class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
                         @click="cancel">
                         {{ $t('common.cancel') }}
