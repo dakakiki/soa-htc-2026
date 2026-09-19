@@ -8,8 +8,14 @@
  * footer block, so an empty box does not mean an empty letter. That is why each
  * one carries what the letter would say today as its placeholder, and why
  * clearing a box is a way of giving something back rather than deleting it.
+ *
+ * 🪤 Built as the Layout screen's editor is built, and not as a stack of cards:
+ * one white card, fields in a column, sections told apart by a rule, and Cancel
+ * left / Save right on a bar of its own with Cancel dead until something has
+ * changed. A second shape for the same job is a screen that reads as somebody
+ * else's (owner, 2026-09-19).
  */
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconCheck } from '@tabler/icons-vue';
 import { useSessionStore } from '@/stores/session';
@@ -54,8 +60,18 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 const saved = ref(false);
 
-const fileBtn =
-    'mt-1 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-brand-primary hover:bg-brand-primary-soft';
+/** What was last saved, so Cancel can be dead until there is something to undo. */
+const snapshot = (): string => JSON.stringify(fields) + (logoFile.value?.name ?? '');
+const savedState = ref(snapshot());
+const dirty = computed(() => snapshot() !== savedState.value);
+
+watch(dirty, (isDirty) => {
+    if (isDirty) {
+        saved.value = false;
+    }
+});
+
+const field = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none';
 
 // 🔴 Raster only. Gmail and Outlook draw no SVG — that is the whole reason this
 // upload exists next to the theme's, whose logos may well be vectors.
@@ -73,8 +89,10 @@ function apply(data: MailTemplateSettings): void {
     fields.mail_footer_web = data.footer_web ?? '';
     fields.mail_footer_email = data.footer_email ?? '';
     logoUrl.value = data.logo_url;
+    logoFile.value = null;
     effective.value = data.effective;
     defaults.value = data.defaults;
+    savedState.value = snapshot();
 }
 
 async function load(): Promise<void> {
@@ -97,13 +115,18 @@ async function save(): Promise<void> {
     try {
         const { data } = await updateMailTemplate({ ...fields }, logoFile.value);
         apply(data);
-        logoFile.value = null;
         saved.value = true;
     } catch (e) {
         error.value = apiErrorMessage(e, t('notifications.saveFailed'));
     } finally {
         saving.value = false;
     }
+}
+
+/** There is nothing to close on a tab, so Cancel puts back what was last saved. */
+function cancel(): void {
+    saved.value = false;
+    void load();
 }
 
 async function removeLogo(): Promise<void> {
@@ -138,29 +161,29 @@ onMounted(load);
             </button>
         </nav>
 
-        <p v-if="error" class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-
         <p v-if="saved"
             class="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
             <IconCheck :size="16" class="shrink-0" />
             {{ $t('notifications.saved') }}
         </p>
 
-        <div v-if="tab === 'mail'" class="relative space-y-6">
+        <div v-if="tab === 'mail'" class="relative min-h-[8rem]">
             <LoadingOverlay v-if="loading" />
 
-            <!-- Header -->
-            <fieldset class="rounded-lg border border-gray-200 bg-white p-4">
-                <legend class="px-1 text-sm font-semibold text-gray-800">{{ $t('notifications.header') }}</legend>
-                <p class="text-sm text-gray-500">{{ $t('notifications.headerHint') }}</p>
+            <div class="flex w-full flex-col rounded-lg border border-gray-200 bg-white">
+                <div class="flex flex-col gap-6 px-6 py-5">
+                    <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
-                <div class="mt-3 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <!-- Header -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('notifications.logo') }}</label>
-                        <label v-if="canManage" :class="fileBtn">
-                            <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4" />
-                            </svg>
+                        <h2 class="text-sm font-semibold text-gray-800">{{ $t('notifications.header') }}</h2>
+                        <p class="mt-0.5 text-xs text-gray-500">{{ $t('notifications.headerHint') }}</p>
+                    </div>
+
+                    <div>
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('notifications.logo') }}</span>
+                        <label v-if="canManage"
+                            class="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-brand-primary hover:bg-brand-primary-soft">
                             <span class="truncate">{{ logoFile?.name || $t('notifications.chooseImage') }}</span>
                             <input type="file" :accept="ACCEPT" class="hidden" @change="onLogoChange" />
                         </label>
@@ -168,85 +191,83 @@ onMounted(load);
                             <ImageThumb :src="logoUrl" alt="mail logo" img-class="h-10 max-w-[12rem] object-contain"
                                 :removable="canManage" @remove="removeLogo" />
                         </div>
-                        <p class="mt-1 text-xs text-gray-400">{{ $t('notifications.logoHint') }}</p>
+                        <span class="mt-1 block text-xs text-gray-400">{{ $t('notifications.logoHint') }}</span>
 
                         <!-- What the masthead carries right now, which is the only
                              way to tell an empty box from an empty header. -->
-                        <p v-if="!logoUrl" class="mt-2 text-xs"
+                        <span v-if="!logoUrl" class="mt-1 block text-xs"
                             :class="effective?.logo_url ? 'text-gray-500' : 'text-amber-700'">
                             {{ effective?.logo_url ? $t('notifications.logoBorrowed') : $t('notifications.logoNone') }}
-                        </p>
+                        </span>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('notifications.headerText') }}</label>
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('notifications.headerText') }}</span>
                         <input v-model="fields.mail_header_text" type="text" maxlength="200" :disabled="!canManage"
-                            :placeholder="effective?.header_text"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50" />
-                        <p class="mt-1 text-xs text-gray-400">{{ $t('notifications.headerTextHint') }}</p>
+                            :placeholder="effective?.header_text" :class="field" />
+                        <span class="mt-1 block text-xs text-gray-400">{{ $t('notifications.headerTextHint') }}</span>
+                    </label>
+
+                    <!-- Body -->
+                    <div class="border-t border-gray-200 pt-6">
+                        <h2 class="text-sm font-semibold text-gray-800">{{ $t('notifications.body') }}</h2>
+                        <p class="mt-0.5 text-xs text-gray-500">{{ $t('notifications.bodyHint') }}</p>
                     </div>
-                </div>
-            </fieldset>
 
-            <!-- Body -->
-            <fieldset class="rounded-lg border border-gray-200 bg-white p-4">
-                <legend class="px-1 text-sm font-semibold text-gray-800">{{ $t('notifications.body') }}</legend>
-                <p class="text-sm text-gray-500">{{ $t('notifications.bodyHint') }}</p>
-
-                <div class="mt-3 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('notifications.greeting') }}</label>
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('notifications.greeting') }}</span>
                         <input v-model="fields.mail_greeting" type="text" maxlength="200" :disabled="!canManage"
-                            :placeholder="defaults?.greeting"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50" />
-                        <p class="mt-1 text-xs text-gray-400">{{ $t('notifications.greetingHint') }}</p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('notifications.signoff') }}</label>
+                            :placeholder="defaults?.greeting" :class="field" />
+                        <span class="mt-1 block text-xs text-gray-400">{{ $t('notifications.greetingHint') }}</span>
+                    </label>
+
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('notifications.signoff') }}</span>
                         <textarea v-model="fields.mail_signoff" rows="3" maxlength="500" :disabled="!canManage"
-                            :placeholder="defaults?.signoff"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"></textarea>
-                        <p class="mt-1 text-xs text-gray-400">{{ $t('notifications.signoffHint') }}</p>
+                            :placeholder="defaults?.signoff" :class="field" />
+                        <span class="mt-1 block text-xs text-gray-400">{{ $t('notifications.signoffHint') }}</span>
+                    </label>
+
+                    <!-- Footer -->
+                    <div class="border-t border-gray-200 pt-6">
+                        <h2 class="text-sm font-semibold text-gray-800">{{ $t('notifications.footer') }}</h2>
+                        <p class="mt-0.5 text-xs text-gray-500">{{ $t('notifications.footerHint') }}</p>
                     </div>
-                </div>
-            </fieldset>
 
-            <!-- Footer -->
-            <fieldset class="rounded-lg border border-gray-200 bg-white p-4">
-                <legend class="px-1 text-sm font-semibold text-gray-800">{{ $t('notifications.footer') }}</legend>
-                <p class="text-sm text-gray-500">{{ $t('notifications.footerHint') }}</p>
-
-                <div class="mt-3 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('notifications.footerWeb') }}</label>
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('notifications.footerWeb') }}</span>
                         <input v-model="fields.mail_footer_web" type="text" maxlength="200" :disabled="!canManage"
-                            placeholder="soa-htc.org"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">{{ $t('notifications.footerEmail') }}</label>
+                            placeholder="soa-htc.org" :class="field" />
+                    </label>
+
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('notifications.footerEmail') }}</span>
                         <input v-model="fields.mail_footer_email" type="email" maxlength="200" :disabled="!canManage"
-                            placeholder="info@soa-htc.org"
-                            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50" />
+                            placeholder="info@soa-htc.org" :class="field" />
+                    </label>
+
+                    <div>
+                        <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('notifications.footerText') }}</span>
+                        <RichTextEditor :model-value="fields.mail_footer_text"
+                            @update:model-value="fields.mail_footer_text = $event" />
+                        <span class="mt-1 block text-xs text-gray-400">{{ $t('notifications.footerTextHint') }}</span>
                     </div>
                 </div>
 
-                <div class="mt-4">
-                    <label class="block text-sm font-medium text-gray-700">{{ $t('notifications.footerText') }}</label>
-                    <RichTextEditor v-model="fields.mail_footer_text" />
-                    <p class="mt-1 text-xs text-gray-400">{{ $t('notifications.footerTextHint') }}</p>
+                <!-- Cancel left, Save right, as on every other form. Cancel is
+                     dead until something has changed, and says so. -->
+                <div v-if="canManage" class="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+                    <button type="button" :disabled="saving || !dirty"
+                        class="rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        @click="cancel">
+                        {{ $t('common.cancel') }}
+                    </button>
+                    <button type="button" :disabled="saving"
+                        class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
+                        @click="save">
+                        {{ saving ? $t('common.saving') : $t('common.save') }}
+                    </button>
                 </div>
-            </fieldset>
-
-            <div v-if="canManage" class="flex items-center gap-3">
-                <button type="button" :disabled="saving"
-                    class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
-                    @click="save">
-                    {{ saving ? $t('notifications.saving') : $t('notifications.save') }}
-                </button>
-                <button type="button" class="text-sm text-gray-500 hover:text-gray-700" @click="load">
-                    {{ $t('notifications.cancel') }}
-                </button>
             </div>
         </div>
     </section>

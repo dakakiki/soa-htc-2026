@@ -837,9 +837,6 @@ export default {
         subtitle: 'Templates for what the application sends out. Every field here is optional — left empty, the e-mail keeps using the logo, the name and the footer the website already carries.',
         tabMail: 'E-mail template',
         saved: 'Saved.',
-        save: 'Save',
-        saving: 'Saving…',
-        cancel: 'Discard changes',
         error: 'The template could not be loaded.',
         saveFailed: 'The template could not be saved.',
 
