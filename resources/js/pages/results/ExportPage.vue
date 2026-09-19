@@ -1,22 +1,37 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { IconTable, IconFileText } from '@tabler/icons-vue';
+import { IconTable, IconFileText, IconClockHour4 } from '@tabler/icons-vue';
 import SearchSelect, { type SearchSelectOption } from '@/components/SearchSelect.vue';
 import LoadingOverlay from '@/components/LoadingOverlay.vue';
 import { reportFilters, type ReportFilterOptions } from '@/api/reports';
-import { exportResults, exportResultsWithAnswers, type ExportScope } from '@/api/results';
+import { exportActivity, exportResults, exportResultsWithAnswers, type ExportScope } from '@/api/results';
+import { fromLocalInput } from '@/utils/localDateTime';
 
 const emptyOpts: ReportFilterOptions = {
     countries: [], regions: [], schools: [], levels: [], quizzes: [], exams: [], tests: [], coordinators: [],
 };
 const opts = ref<ReportFilterOptions>({ ...emptyOpts });
 const optionsLoading = ref(false);
-const working = ref<'all' | 'answers' | null>(null);
+const working = ref<'all' | 'answers' | 'activity' | null>(null);
 
 const q = reactive<ExportScope>({
     country_id: null, region_id: null, school_id: null, difficulty_level_id: null,
     quiz_id: null, exam_id: null, test_id: null,
 });
+
+/**
+ * The activity sheet's own interval. It lives in that card and not in the filter
+ * block above, because the other two sheets read a layer that carries no
+ * timestamp — one shared control meaning nothing for two of three cards is the
+ * kind of thing that reads as a bug.
+ *
+ * 🪤 Bare wall clocks (`2026-09-19T08:00`), so they go through `fromLocalInput`
+ * before they leave: the application stores UTC, and an hour handed over
+ * untranslated is off by whatever the reader's offset is.
+ */
+const interval = reactive<{ from: string; to: string }>({ from: '', to: '' });
+
+const canActivity = computed(() => !!interval.from && !!interval.to && interval.from <= interval.to);
 
 const named = (rows: { id: number; name: string }[]): SearchSelectOption[] => rows.map((r) => ({ id: r.id, label: r.name }));
 const titled = (rows: { id: number; title: string }[]): SearchSelectOption[] => rows.map((r) => ({ id: r.id, label: r.title }));
@@ -74,11 +89,22 @@ function saveBlob(data: Blob, name: string): void {
 
 const stamp = () => new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '');
 
-async function download(kind: 'all' | 'answers'): Promise<void> {
+const SUFFIX = { all: 'results', answers: 'results-answers', activity: 'activity' } as const;
+
+async function download(kind: 'all' | 'answers' | 'activity'): Promise<void> {
     working.value = kind;
     try {
-        const { data } = kind === 'all' ? await exportResults(q) : await exportResultsWithAnswers(q);
-        saveBlob(data as Blob, `results${kind === 'answers' ? '-answers' : ''}-${stamp()}.xlsx`);
+        const { data } = kind === 'all'
+            ? await exportResults(q)
+            : kind === 'answers'
+                ? await exportResultsWithAnswers(q)
+                : await exportActivity({
+                    ...q,
+                    from: fromLocalInput(interval.from),
+                    to: fromLocalInput(interval.to),
+                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                });
+        saveBlob(data as Blob, `${SUFFIX[kind]}-${stamp()}.xlsx`);
     } finally {
         working.value = null;
     }
@@ -147,7 +173,7 @@ onMounted(loadOptions);
         </div>
 
         <!-- Actions -->
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <article class="flex flex-col rounded-lg border border-gray-200 bg-white p-4">
                 <h3 class="flex items-center gap-2 text-sm font-semibold text-gray-800">
                     <IconTable :size="18" class="text-brand-primary" /> {{ $t('export.all') }}
@@ -169,6 +195,36 @@ onMounted(loadOptions);
                     class="mt-3 self-start rounded-md bg-brand-primary px-4 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
                     @click="download('answers')">
                     {{ working === 'answers' ? $t('export.working') : $t('export.answers') }}
+                </button>
+            </article>
+
+            <article class="flex flex-col rounded-lg border border-gray-200 bg-white p-4">
+                <h3 class="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                    <IconClockHour4 :size="18" class="text-brand-primary" /> {{ $t('export.activity') }}
+                </h3>
+                <p class="mt-1 flex-1 text-sm text-gray-500">{{ $t('export.activityHint') }}</p>
+
+                <fieldset class="mt-3">
+                    <legend class="mb-1 text-xs font-medium text-gray-500">{{ $t('export.interval') }}</legend>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label class="block">
+                            <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.from') }}</span>
+                            <input v-model="interval.from" type="datetime-local"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-xs font-medium text-gray-500">{{ $t('export.to') }}</span>
+                            <input v-model="interval.to" type="datetime-local"
+                                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                        </label>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-400">{{ $t('export.clockNote') }}</p>
+                </fieldset>
+
+                <button type="button" :disabled="working !== null || !canActivity"
+                    class="mt-3 self-start rounded-md bg-brand-primary px-4 py-1.5 text-sm font-medium text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50"
+                    @click="download('activity')">
+                    {{ working === 'activity' ? $t('export.working') : $t('export.activity') }}
                 </button>
             </article>
         </div>

@@ -182,3 +182,17 @@ export function exportResults(scope: ExportScope) {
 export function exportResultsWithAnswers(scope: ExportScope) {
     return http.get('/api/results/export-answers', { params: cleanParams(scope), responseType: 'blob' });
 }
+
+/**
+ * The same population scope plus the interval the activity sheet is about.
+ *
+ * `from`/`to` are ISO-8601 instants in UTC — the picker holds a bare wall clock,
+ * so it goes through `fromLocalInput()` first. `tz` is the reader's own zone, so
+ * the hours printed in the sheet are the ones their screens show.
+ */
+export type ActivityScope = ExportScope & { from: string | null; to: string | null; tz?: string };
+
+/** Download the activity sheet (.xlsx): one row per attempt started in the interval. */
+export function exportActivity(scope: ActivityScope) {
+    return http.get('/api/results/export-activity', { params: cleanParams(scope), responseType: 'blob' });
+}

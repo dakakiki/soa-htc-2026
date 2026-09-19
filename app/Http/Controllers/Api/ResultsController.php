@@ -8,6 +8,8 @@ use App\Domain\Assessment\Enums\QuizType;
 use App\Domain\Assessment\Models\Exam;
 use App\Domain\Assessment\Models\Quiz;
 use App\Domain\Assessment\Models\Test;
+use App\Domain\Assessment\Support\ExamOfAttempt;
+use App\Domain\Assessment\Support\SampleRound;
 use App\Domain\Competition\Enums\AttemptStatus;
 use App\Domain\Competition\Models\Attempt;
 use App\Domain\Competition\Models\AttemptReset;
@@ -26,6 +28,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -681,6 +684,109 @@ class ResultsController extends Controller
         [$headers, $rows] = ResultExporter::withAnswers($testId, $this->answerRegistrationIds($filters, $testId));
 
         return $this->xlsxDownload($headers, $rows, 'Answers', 'results-answers-'.now()->format('Y-m-d_His').'.xlsx');
+    }
+
+    /**
+     * The activity export (ADR-0130): one row per attempt STARTED inside a chosen
+     * interval, narrowed by the same population filters as the other two sheets.
+     *
+     * 🔴 Layer A, not Layer B. Layer B carries no timestamp at all, so "who worked
+     * between these two moments" is a question it cannot be asked — which is also
+     * why the interval lives in this card alone and not in the shared filter block.
+     *
+     * 🔴 The grade is printed only once it is PUBLISHED (owner, 2026-09-19). An
+     * attempt has a `score` the moment grading finishes, and a sheet that showed
+     * it would hand out a mark before the competitor is allowed to see it.
+     *
+     * 🪤 The window is on `started_at`, the one timestamp that is never null, so
+     * every attempt — including one still running — falls in exactly one interval.
+     * An attempt begun before `from` and handed in inside it is filed under when
+     * it began, which is what "who worked in this period" reads as.
+     *
+     * 🪤 Void (reset) attempts stay out, as they do on every other screen.
+     */
+    public function exportActivity(Request $request): Response
+    {
+        $this->authorize('results.manage');
+
+        $filters = $request->validate(array_merge($this->candidateRules(), [
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+            // The reader's own zone, so the printed hours match what every screen
+            // shows them. Absent (a direct API call), the sheet is in app time.
+            'tz' => ['nullable', 'timezone'],
+        ]));
+
+        $rows = Attempt::query()
+            // 🪤 Not scopeActive(): `registrations` is joined below and it has a
+            // `status` column of its own, so an unqualified one is ambiguous.
+            ->where('attempts.status', '!=', AttemptStatus::Void->value)
+            // 🪤 `->utc()`, not a bare parse. A Carbon is bound by formatting it in
+            // ITS OWN zone, so an ISO string carrying an offset — `…T08:00:00+02:00`
+            // — would be compared as 08:00 against a column stored in UTC, two
+            // hours off. The screen always sends `Z`; a direct API call need not.
+            ->where('attempts.started_at', '>=', Carbon::parse($filters['from'])->utc())
+            ->where('attempts.started_at', '<=', Carbon::parse($filters['to'])->utc())
+            ->when($filters['quiz_id'] ?? null, fn ($q, $v) => $q->where('attempts.quiz_id', $v))
+            ->when($filters['test_id'] ?? null, fn ($q, $v) => $q->where('attempts.test_id', $v))
+            ->when($filters['exam_id'] ?? null, fn ($q, $v) => $q->whereIn(
+                'attempts.test_id',
+                fn ($sub) => $sub->from('exam_test')->select('test_id')->where('exam_id', $v)
+            ))
+            ->whereIn('attempts.registration_id', $this->populationRegistrationIds($filters))
+            ->toBase()
+            ->join('registrations as r', 'attempts.registration_id', '=', 'r.id')
+            ->leftJoin('countries as c', 'r.country_id', '=', 'c.id')
+            ->leftJoin('schools as s', 'r.school_id', '=', 's.id')
+            ->leftJoin('difficulty_levels as dl', 'r.difficulty_level_id', '=', 'dl.id')
+            ->leftJoin('quizzes as qz', 'attempts.quiz_id', '=', 'qz.id')
+            ->leftJoin('tests as t', 'attempts.test_id', '=', 't.id')
+            ->orderBy('attempts.started_at')
+            ->orderBy('attempts.id')
+            ->get([
+                'attempts.quiz_id', 'attempts.test_id', 'attempts.started_at',
+                'attempts.submitted_at', 'attempts.score', 'attempts.published_at',
+                'r.competitor_number', 'r.name',
+                'c.name as country', 's.name as venue', 'dl.level_short as level',
+                'qz.title as quiz', 't.title as test',
+            ]);
+
+        $examTitles = ExamOfAttempt::titlesFor(
+            $rows->pluck('quiz_id')->filter()->unique()->values()->all(),
+            $rows->pluck('test_id')->filter()->unique()->values()->all(),
+        );
+
+        // 🪤 The ROUND's is_sample, never the attempt's own stamp — one home for
+        // the practice boundary (ADR-0084).
+        $sampleTestIds = SampleRound::testIds()->pluck('test_id')
+            ->map(fn ($id): int => (int) $id)->all();
+
+        $zone = $filters['tz'] ?? config('app.timezone');
+        $clock = function ($value) use ($zone): ?string {
+            // A flat join query hands timestamps back as driver-formatted strings,
+            // so they are parsed as the UTC the application stored, then shifted.
+            return $value === null ? null : Carbon::parse((string) $value, 'UTC')->setTimezone($zone)->format('Y-m-d H:i:s');
+        };
+
+        $headers = [
+            'Student ID', 'Name', 'Country', 'Venue', 'Difficulty level',
+            'Quiz', 'Exam', 'Test', 'Start time', 'End time', 'Grade', 'Practice',
+        ];
+
+        $data = [];
+        foreach ($rows as $row) {
+            $data[] = [
+                $row->competitor_number, $row->name, $row->country, $row->venue, $row->level,
+                $row->quiz, $examTitles[$row->quiz_id.':'.$row->test_id] ?? null, $row->test,
+                $clock($row->started_at), $clock($row->submitted_at),
+                // 🪤 Cast, like every other score leaving the results layer: a
+                // decimal comes back as '2' from SQLite and '2.00' from MySQL.
+                $row->published_at === null || $row->score === null ? null : (float) $row->score,
+                in_array((int) $row->test_id, $sampleTestIds, true) ? 'Yes' : 'No',
+            ];
+        }
+
+        return $this->xlsxDownload($headers, $data, 'Activity', 'activity-'.now()->format('Y-m-d_His').'.xlsx');
     }
 
     /**
