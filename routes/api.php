@@ -421,6 +421,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('settings/certificate', [SettingsController::class, 'certificate']);
     Route::put('settings/certificate', [SettingsController::class, 'updateCertificate']);
     Route::delete('settings/certificate/assets/{asset}', [SettingsController::class, 'deleteCertificateAsset']);
+    // The e-mail template behind Website → Notifications (ADR-0132). Under
+    // settings/ and not cms/ because every field is an override on the settings
+    // singleton, and SettingPolicy is what says who may write to it.
+    Route::get('settings/mail-template', [SettingsController::class, 'mailTemplate']);
+    Route::put('settings/mail-template', [SettingsController::class, 'updateMailTemplate']);
+    Route::delete('settings/mail-template/assets/{asset}', [SettingsController::class, 'deleteMailTemplateAsset']);
 
     // Results: essay grading (5b), publication (5c), attempt reset (5e). Gated by results.manage.
     Route::get('grading/attempts', [GradingController::class, 'index']);

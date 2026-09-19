@@ -8,6 +8,12 @@
     right on the day it was written and wrong from the first time somebody
     edited the footer on the website.
 
+    🪤 The paragraph can now be OVERRIDDEN from Website → Notifications
+    (ADR-0132), but only overridden: left empty it is still the website's, so
+    the promise above holds for everyone who does not deliberately break it.
+    The address and the mailbox under it exist only here — the site's footer
+    has no field for either.
+
     🪤 `{year}` is substituted when the mail is drawn, never stored — see
     MailBranding::copyright().
 --}}
@@ -21,6 +27,22 @@
 @if ($brand->footerText())
 {{-- Admin-authored markup, the same trust the CMS gives its own pages. --}}
 <div style="font-size: 13px; line-height: 1.6; color: #6b7280;">{!! $brand->footerText() !!}</div>
+@endif
+@if ($brand->footerWeb() || $brand->footerEmail())
+{{-- Where to find them and where to write to them. Linked, because a recipient
+     expects an address in a letter to be one, and kept in the same grey as the
+     paragraph above so it reads as part of the same foot. --}}
+<p style="margin: 8px 0 0; font-size: 13px; line-height: 1.6; color: #6b7280;">
+@if ($brand->footerWeb())
+<a href="{{ $brand->footerWebUrl() }}" style="color: #6b7280; text-decoration: underline;">{{ $brand->footerWeb() }}</a>
+@endif
+@if ($brand->footerWeb() && $brand->footerEmail())
+<span style="color: #9ca3af;">&nbsp;·&nbsp;</span>
+@endif
+@if ($brand->footerEmail())
+<a href="mailto:{{ $brand->footerEmail() }}" style="color: #6b7280; text-decoration: underline;">{{ $brand->footerEmail() }}</a>
+@endif
+</p>
 @endif
 @if ($brand->copyright())
 <p style="margin: 12px 0 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9ca3af;">

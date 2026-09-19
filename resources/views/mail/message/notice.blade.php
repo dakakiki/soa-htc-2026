@@ -13,10 +13,8 @@
     is nothing to act on in a mail, and the coordinator's own screen is where
     the numbers and the exam password live.
 --}}
-<x-mail::message>
+<x-mail::message :greet="$name">
 # {{ $message->subject }}
-
-Hello {{ $name }},
 
 @if (filled($html))
 <div>{!! $html !!}</div>
@@ -25,7 +23,4 @@ Hello {{ $name }},
 @endif
 
 <x-mail::button :url="$loginUrl">Open {{ $siteName }}</x-mail::button>
-
-Thanks,<br>
-{{ $siteName }}
 </x-mail::message>

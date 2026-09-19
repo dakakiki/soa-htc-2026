@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Communication\Support\MailBranding;
 use App\Domain\Competition\Support\SoaCertificate;
 use App\Domain\Organization\Models\Setting;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateCertificateRequest;
+use App\Http\Requests\UpdateMailTemplateRequest;
 use App\Http\Requests\UpdateThemeRequest;
 use App\Http\Resources\SettingResource;
 use App\Support\SvgSanitizer;
@@ -154,6 +156,94 @@ class SettingsController extends Controller
         }
 
         return response()->json($this->certificatePayload($setting));
+    }
+
+    /** The e-mail template's own settings, for Website → Notifications (ADR-0132). */
+    public function mailTemplate(): JsonResponse
+    {
+        $this->authorize('update', Setting::current());
+
+        return response()->json($this->mailTemplatePayload(Setting::current()));
+    }
+
+    public function updateMailTemplate(UpdateMailTemplateRequest $request): JsonResponse
+    {
+        $setting = Setting::current();
+
+        $data = $request->safe()->except(['mail_logo']);
+
+        if ($request->hasFile('mail_logo')) {
+            if ($setting->mail_logo_path) {
+                Storage::disk('public')->delete($setting->mail_logo_path);
+            }
+            $data['mail_logo_path'] = $request->file('mail_logo')->store('branding', 'public');
+        }
+
+        $setting->update($data);
+
+        return response()->json($this->mailTemplatePayload($setting));
+    }
+
+    /** Drop the mail's own logo, which puts the header back on the theme's. */
+    public function deleteMailTemplateAsset(string $asset): JsonResponse
+    {
+        $setting = Setting::current();
+        $this->authorize('update', $setting);
+
+        if ($asset !== 'logo') {
+            abort(404);
+        }
+
+        if ($setting->mail_logo_path) {
+            Storage::disk('public')->delete($setting->mail_logo_path);
+            $setting->update(['mail_logo_path' => null]);
+        }
+
+        return response()->json($this->mailTemplatePayload($setting));
+    }
+
+    /**
+     * The template shaped for the editor.
+     *
+     * 🔴 Every field is sent twice over: the stored value, which is what the box
+     * holds and may well be empty, and beside it `*_effective` — what a letter
+     * sent this minute would actually carry. That second one is the whole point
+     * of the screen. Every field here is an override of something the mail
+     * already borrows, so a box showing nothing would leave an administrator
+     * guessing whether the letter says nothing either.
+     *
+     * @return array<string, mixed>
+     */
+    private function mailTemplatePayload(Setting $setting): array
+    {
+        // 🪤 A fresh reader, not the container's. MailBranding is a singleton that
+        // memoises the settings row on first read — correct for a send, wrong for
+        // the answer to a save, which must describe the row as it now stands.
+        $brand = new MailBranding;
+
+        return [
+            'header_text' => $setting->mail_header_text,
+            'greeting' => $setting->mail_greeting,
+            'signoff' => $setting->mail_signoff,
+            'footer_text' => $setting->mail_footer_text,
+            'footer_web' => $setting->mail_footer_web,
+            'footer_email' => $setting->mail_footer_email,
+            'logo_url' => $setting->mail_logo_path ? Storage::disk('public')->url($setting->mail_logo_path) : null,
+            'effective' => [
+                'header_text' => $brand->headerText(),
+                'greeting' => $brand->greeting('{name}'),
+                'signoff' => $brand->signOff(),
+                'footer_text' => $brand->footerText(),
+                // The masthead a letter would carry now — the theme's logo when
+                // this screen has not been given one, and nothing at all when
+                // every logo on file is a vector the mail cannot draw.
+                'logo_url' => $brand->logoUrl(),
+            ],
+            'defaults' => [
+                'greeting' => MailBranding::DEFAULT_GREETING,
+                'signoff' => MailBranding::DEFAULT_SIGNOFF,
+            ],
+        ];
     }
 
     /**

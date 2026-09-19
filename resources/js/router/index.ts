@@ -732,6 +732,19 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, permission: 'cms.manage' },
     },
     /*
+     * Notification templates (ADR-0132). 🪤 Gated by `settings.manage`, not by
+     * the `cms.manage` its neighbours in the Website group use: every field on
+     * it is an override on the settings singleton, and SettingPolicy is what
+     * decides who may write there. Guarding the link with the weaker permission
+     * would put it in front of somebody who gets a 403 on Save.
+     */
+    {
+        path: '/website/notifications',
+        name: 'cms.notifications',
+        component: () => import('@/pages/website/NotificationTemplatesPage.vue'),
+        meta: { requiresAuth: true, permission: 'settings.manage' },
+    },
+    /*
      * A CMS page lives at the root (`/about`). It is declared last so every
      * application route wins the match first; the component itself falls back to
      * the not-found screen when the slug is not a published page.
