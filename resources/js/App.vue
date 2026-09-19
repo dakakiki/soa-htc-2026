@@ -16,10 +16,43 @@ const route = useRoute();
 
 const layouts = { public: PublicLayout, admin: AdminLayout, student: StudentLayout };
 const layout = computed(() => layouts[(route.meta.zone ?? 'admin') as Zone]);
+
+/**
+ * Whether the router ever arrived anywhere.
+ *
+ * 🔴 Until it does, `useRoute()` is vue-router's START_LOCATION: no name, no
+ * `meta`, and so `meta.zone ?? 'admin'` above picks the ADMIN shell. That
+ * fail-safe is right for an unmarked route and wrong for no route at all.
+ *
+ * `app.ts` keeps the boot waiting on `router.isReady()` precisely so this
+ * cannot be seen — but `isReady()` REJECTS when the first navigation fails, and
+ * the boot mounts on settled rather than fulfilled, deliberately, so that a
+ * failed theme cannot take the application with it. The two together drew a
+ * navy admin masthead over an empty page.
+ *
+ * Reported from a phone, 2026-09-19: an installed application woken after a
+ * deploy, holding the previous build. Its cached entry script ran, the route
+ * chunk it then asked for had been removed by the new build, the first
+ * navigation failed, and what the owner met was an admin screen with nothing on
+ * it — an application that looks broken while the only thing wrong is that it
+ * is holding yesterday's copy of itself.
+ *
+ * So: no shell at all rather than the wrong one.
+ *
+ * 🪤 This is the net, not the cure. A failed first navigation is answered in
+ * `app.ts`, which sends the person to the start of whichever of the two they
+ * are in before anything is mounted at all — so in practice nothing here is
+ * ever seen. What it covers is the one case that has run out of moves: a build
+ * that cannot start twice over, where the restart has been spent.
+ */
+const arrived = computed(() => route.name !== undefined);
 </script>
 
 <template>
-    <component :is="layout">
+    <!-- `v-if="arrived"`: before the router has been anywhere there is no zone
+         to pick a shell by, and the fail-safe default would be the admin one.
+         See the computed. -->
+    <component :is="layout" v-if="arrived">
         <!--
             A screen arrives rather than appearing: a few pixels of travel, and
             no leave animation at all, so the old one is gone the instant the new

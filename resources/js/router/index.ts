@@ -905,7 +905,7 @@ export const router = createRouter({
  * Returns a constant under `npm run dev`, where there are no hashed assets and
  * no stale-build problem to recover from.
  */
-function runningBuild(): string {
+export function runningBuild(): string {
     const entry = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/build/assets/"]');
 
     return entry?.src.split('/').pop() ?? 'dev';
@@ -937,6 +937,20 @@ router.onError((error, to) => {
      * reload, and the loop guard still holds: a build that is genuinely broken
      * reloads once into itself, finds its own flag, and stops.
      */
+    /*
+     * 🪤 A failed CLICK only. The FIRST navigation is answered in `app.ts`,
+     * which restarts the application at its own front door rather than reloading
+     * an address whose code is missing — see `restartAfterFailedBoot` there. It
+     * has to be somewhere else, because the flag below belongs to the WINDOW: an
+     * installed application is woken rather than started, so a boot inherits
+     * whatever this key spent in that window's earlier life and would find its
+     * one recovery already gone (reported from a phone, 2026-09-19, after a
+     * deploy into an open app).
+     */
+    if (router.currentRoute.value.name === undefined) {
+        return;
+    }
+
     const key = `reload-once:${runningBuild()}:${to.fullPath}`;
 
     try {
