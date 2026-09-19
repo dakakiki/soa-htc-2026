@@ -56,6 +56,11 @@ class SpaShellTest extends TestCase
      * 🪤 The loop guard still has to hold: a build that is genuinely broken must
      * reload into itself once and then stop, or a bad deploy takes the console
      * with it and nobody can see why.
+     *
+     * 🪤 Since 2026-09-19 this covers a failed CLICK only — a failed first
+     * navigation is answered in `app.ts` instead, and guarded by
+     * {@see BootFailureShowsNoShellTest}. What is asserted here is unchanged by
+     * that split.
      */
     public function test_a_stale_build_is_recovered_from_once_for_every_build_and_not_once_ever(): void
     {

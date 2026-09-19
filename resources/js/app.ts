@@ -1,9 +1,10 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from '@/App.vue';
-import { router } from '@/router';
+import { router, runningBuild } from '@/router';
 import { i18n } from '@/i18n';
 import { onUnauthorized } from '@/api/http';
+import { inApp } from '@/utils/appJourney';
 import { useSessionStore } from '@/stores/session';
 import { useThemeStore } from '@/stores/theme';
 import { useAppCopyStore } from '@/stores/appCopy';
@@ -69,5 +70,97 @@ if ('serviceWorker' in navigator) {
  * changes the words under somebody already reading them. It fetches a handful of
  * overrides and usually none at all, and it swallows its own failures.
  */
-void Promise.allSettled([useThemeStore(pinia).load(), useAppCopyStore(pinia).load(), router.isReady()])
-    .then(() => app.mount('#app'));
+/**
+ * The first navigation failed. Start the application again.
+ *
+ * 🔴 A whole page load, not a route change. What fails here is the fetch of a
+ * screen's code, and after a deploy it fails because the window is holding a
+ * build the server no longer has — Vite empties the assets folder, so a deploy
+ * takes every chunk of the build before it with it. Only going back to the
+ * server gets the current one; asking the router for another screen would ask
+ * the same dead build for another missing file.
+ *
+ * TWO moves, in this order, and the order is the whole point.
+ *
+ * 1 · The address they are on. It is not the address that is broken — it is the
+ *     code in the window — so fetching the page again is served the current
+ *     build and puts the person back exactly where they were.
+ *
+ *     🔴 Which for a competitor is the EXAM. The owner asked for the front door
+ *     (2026-09-19: *„posalji ih na pocetnu stranicu aplikacije"*) and then asked
+ *     the question that answers itself: can this happen to a student? It can —
+ *     and a paper is sat at `/student/tests/:id`, which is not an `/app` address
+ *     at all. A front door first would have taken a child under a clock out of
+ *     their exam, and on the website's front page at that. The draft survives
+ *     ({@see utils/attemptDraft}), the minutes do not.
+ *
+ * 2 · Only if that fails too, on the same build: the front door, which is what
+ *     the owner asked for and is right for the case it is now kept for — a
+ *     screen that genuinely cannot load, where staying on it is a dead end.
+ *     `inApp()` and not the path, because a competitor's screens are the
+ *     website's addresses inside an installed window.
+ *
+ * 🪤 Each move once per build, or a build that cannot start becomes a window
+ * that reloads for ever. Both are served whatever build is current, so a broken
+ * one spends its two moves and stops. It says so by answering `false`, and the
+ * application is mounted after all — on no route, which `App.vue` draws as
+ * nothing. That is the last net, and better than a window with a dead script.
+ *
+ * 🪤 These keys are NOT the one `router/index.ts` uses for a failed click. That
+ * one names the address, and `sessionStorage` belongs to the window: an
+ * installed application is woken rather than started, so a boot would inherit a
+ * flag spent in that window's earlier life. This is what left an admin masthead
+ * standing over an empty page on a phone, with no way out but a refresh.
+ */
+function restartAfterFailedBoot(): boolean {
+    const build = runningBuild();
+
+    const spend = (key: string): boolean => {
+        try {
+            if (window.sessionStorage.getItem(key) !== null) {
+                return false;
+            }
+
+            window.sessionStorage.setItem(key, '1');
+        } catch {
+            // No storage to remember with: move anyway. A dead screen with no
+            // way out is the worse of the two failures.
+        }
+
+        return true;
+    };
+
+    if (spend(`restart-here:${build}`)) {
+        window.location.reload();
+
+        return true;
+    }
+
+    if (spend(`restart-home:${build}`)) {
+        window.location.assign(inApp() ? '/app' : '/');
+
+        return true;
+    }
+
+    return false;
+}
+
+/*
+ * 🔴 `isReady()` is watched apart from the other two, because settling is not
+ * the same answer for it. A theme that fails must still leave an application on
+ * the screen; a router that fails leaves no route at all, and mounting on that
+ * is what drew the admin shell over an empty page.
+ */
+let arrived = true;
+const ready = router.isReady().catch(() => {
+    arrived = false;
+});
+
+void Promise.allSettled([useThemeStore(pinia).load(), useAppCopyStore(pinia).load(), ready])
+    .then(() => {
+        if (!arrived && restartAfterFailedBoot()) {
+            return;
+        }
+
+        app.mount('#app');
+    });
